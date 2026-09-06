@@ -24,12 +24,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
@@ -76,6 +78,8 @@ import com.elysium369.meet.data.local.dao.ReportEvidenceDao
 import com.elysium369.meet.data.local.dao.ReportSignatureDao
 import com.elysium369.meet.data.local.entities.RepairActionEntity
 import com.elysium369.meet.data.local.entities.ReportEvidenceEntity
+import com.elysium369.meet.diagnostic.BeforeAfterComparator
+import com.elysium369.meet.diagnostic.ComparisonConclusion
 import com.elysium369.meet.diagnostic.DiagnosticProvenance
 import com.elysium369.meet.diagnostic.DiagnosticSnapshot
 import dagger.hilt.EntryPoint
@@ -178,10 +182,61 @@ fun InspectionSessionScreen(
                     lastQr = qr
                 },
             )
-            ReportType.POST_SCAN_REPORT,
-            ReportType.REPAIR_EVIDENCE_REPORT,
-            ReportType.PRE_PURCHASE_INSPECTION_REPORT,
-            ReportType.DVIR_REPORT -> ComingSoonCard(type = selectedType)
+            ReportType.POST_SCAN_REPORT -> PostScanSubFlow(
+                repo = repo,
+                vehicleId = vehicleId,
+                obdConnected = obdConnected,
+                isWorking = isWorking,
+                errorMsg = errorMsg,
+                onWorking = { isWorking = it },
+                onError = { errorMsg = it },
+                onSigned = { reportId, hash, qr ->
+                    lastSignedReportId = reportId
+                    lastSignedHash = hash
+                    lastQr = qr
+                },
+            )
+            ReportType.REPAIR_EVIDENCE_REPORT -> RepairEvidenceSubFlow(
+                repo = repo,
+                vehicleId = vehicleId,
+                isWorking = isWorking,
+                errorMsg = errorMsg,
+                onWorking = { isWorking = it },
+                onError = { errorMsg = it },
+                onSigned = { reportId, hash, qr ->
+                    lastSignedReportId = reportId
+                    lastSignedHash = hash
+                    lastQr = qr
+                },
+            )
+            ReportType.PRE_PURCHASE_INSPECTION_REPORT -> PrePurchaseSubFlow(
+                repo = repo,
+                vehicleId = vehicleId,
+                vehicleOdometerKm = vehicleOdometerKm,
+                isWorking = isWorking,
+                errorMsg = errorMsg,
+                onWorking = { isWorking = it },
+                onError = { errorMsg = it },
+                onSigned = { reportId, hash, qr ->
+                    lastSignedReportId = reportId
+                    lastSignedHash = hash
+                    lastQr = qr
+                },
+            )
+            ReportType.DVIR_REPORT -> DvirSubFlow(
+                repo = repo,
+                vehicleId = vehicleId,
+                vehicleOdometerKm = vehicleOdometerKm,
+                isWorking = isWorking,
+                errorMsg = errorMsg,
+                onWorking = { isWorking = it },
+                onError = { errorMsg = it },
+                onSigned = { reportId, hash, qr ->
+                    lastSignedReportId = reportId
+                    lastSignedHash = hash
+                    lastQr = qr
+                },
+            )
         }
 
         // ── signed report panel (only after a successful sign) ───────
@@ -608,27 +663,878 @@ private fun ErrorBanner(msg: String) {
     }
 }
 
-// ── placeholder for sub-flows not yet implemented ─────────────────────────
+// ── Post-Scan sub-flow ─────────────────────────────────────────────────────
 
 @Composable
-private fun ComingSoonCard(type: ReportType) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun PostScanSubFlow(
+    repo: CertifiedReportRepository,
+    vehicleId: String,
+    obdConnected: Boolean,
+    isWorking: Boolean,
+    errorMsg: String?,
+    onWorking: (Boolean) -> Unit,
+    onError: (String?) -> Unit,
+    onSigned: (reportId: String, hash: String, qr: String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val deviceId = remember { "android-${android.os.Build.SERIAL ?: UUID.randomUUID().toString()}" }
+    val userId = remember { "u-local" }
+
+    var initialDtcsText by remember { mutableStateOf("P0230, P1709") }
+    var postDtcsText by remember { mutableStateOf("") }
+    var roadTestPassed by remember { mutableStateOf(true) }
+    var freezeFrameConditionMet by remember { mutableStateOf(true) }
+    var liveValueInRange by remember { mutableStateOf(true) }
+    var signerName by remember { mutableStateOf("") }
+    var signerRole by remember { mutableStateOf("mecánico especialista") }
+    var notesText by remember { mutableStateOf("") }
+
+    val initialDtcs = remember(initialDtcsText) {
+        initialDtcsText.split(",").map { it.trim().uppercase() }.filter { it.isNotEmpty() }
+    }
+    val postDtcs = remember(postDtcsText) {
+        postDtcsText.split(",").map { it.trim().uppercase() }.filter { it.isNotEmpty() }
+    }
+
+    val comparison = remember(initialDtcs, postDtcs, roadTestPassed, freezeFrameConditionMet, liveValueInRange, obdConnected) {
+        val beforeSnap = DiagnosticSnapshot(
+            id = "snap-pre-comp",
+            vehicleId = vehicleId,
+            sessionId = null,
+            createdAtMs = System.currentTimeMillis() - 3600_000,
+            dtcsActive = initialDtcs,
+            dtcsPending = emptyList(),
+            dtcsPermanent = emptyList(),
+            freezeFramePidValues = emptyMap(),
+            readiness = mapOf("MISFIRE" to true, "FUEL" to true, "CATALYST" to true),
+            provenance = if (obdConnected) DiagnosticProvenance.Real else DiagnosticProvenance.ManualEntry(authorId = userId),
+            notes = "Snapshot inicial",
+        )
+        val afterSnap = DiagnosticSnapshot(
+            id = "snap-post-comp",
+            vehicleId = vehicleId,
+            sessionId = null,
+            createdAtMs = System.currentTimeMillis(),
+            dtcsActive = postDtcs,
+            dtcsPending = emptyList(),
+            dtcsPermanent = emptyList(),
+            freezeFramePidValues = emptyMap(),
+            readiness = mapOf("MISFIRE" to true, "FUEL" to true, "CATALYST" to true),
+            provenance = if (obdConnected) DiagnosticProvenance.Real else DiagnosticProvenance.ManualEntry(authorId = userId),
+            notes = "Snapshot post-reparación",
+        )
+        BeforeAfterComparator.compare(
+            before = beforeSnap,
+            after = afterSnap,
+            roadTestPassed = roadTestPassed,
+            freezeFrameConditionMet = freezeFrameConditionMet,
+            liveValueInRange = liveValueInRange,
+        )
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                typeChipLabel(type),
+                "Post-Scan — Validación y Certificación de Reparación",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            Text(
-                "Este flujo se entrega en una próxima release. " +
-                    "La selección ya está wireada — solo falta la lógica de captura específica. " +
-                    "Mientras tanto, generá un Pre-Scan y un Post-Scan para tener el par mínimo firmable.",
-                style = MaterialTheme.typography.bodyMedium,
+
+            if (!obdConnected) {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Warning, contentDescription = null, tint = Color(0xFFFF6F00))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "OBD offline: Conclusión marcada como UNVERIFIED según la regla forense. Se certifican las observaciones manuales del operador.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = initialDtcsText,
+                onValueChange = { initialDtcsText = it.uppercase() },
+                label = { Text("DTCs Iniciales (antes de reparar)") },
+                modifier = Modifier.fillMaxWidth(),
             )
+
+            OutlinedTextField(
+                value = postDtcsText,
+                onValueChange = { postDtcsText = it.uppercase() },
+                label = { Text("DTCs Activos Residuales (dejar vacío si se borraron todos)") },
+                placeholder = { Text("Ninguno / DTC residual") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Resultado del Comparador Forense:", fontWeight = FontWeight.SemiBold)
+                    Text("• DTCs Resueltos: ${if (comparison.clearedDtcs.isEmpty()) "Ninguno" else comparison.clearedDtcs.joinToString(", ")}")
+                    if (comparison.newDtcs.isNotEmpty()) {
+                        Text("• DTCs Nuevos / Regresión: ${comparison.newDtcs.joinToString(", ")}", color = MaterialTheme.colorScheme.error)
+                    }
+                    Text("• Conclusión: ${comparison.conclusion.name}", fontWeight = FontWeight.Medium)
+                    Text("• Declaración de Reparado: ${if (comparison.canDeclareRepaired) "SÍ (Certificación Forense Válida)" else "NO (Condiciones incompletas o provenance manual)"}")
+                }
+            }
+
+            Text("Verificaciones Físicas Obligatorias:", fontWeight = FontWeight.SemiBold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = roadTestPassed, onCheckedChange = { roadTestPassed = it })
+                Spacer(Modifier.width(4.dp))
+                Text("Prueba de manejo en ruta completada satisfactoriamente", style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = freezeFrameConditionMet, onCheckedChange = { freezeFrameConditionMet = it })
+                Spacer(Modifier.width(4.dp))
+                Text("Condición de Freeze Frame reproducida sin reaparición de falla", style = MaterialTheme.typography.bodyMedium)
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = liveValueInRange, onCheckedChange = { liveValueInRange = it })
+                Spacer(Modifier.width(4.dp))
+                Text("Valores PID en vivo dentro de rangos normales de fábrica", style = MaterialTheme.typography.bodyMedium)
+            }
+
+            OutlinedTextField(
+                value = notesText,
+                onValueChange = { notesText = it },
+                label = { Text("Observaciones y detalles de la prueba") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
+
+            OutlinedTextField(
+                value = signerName,
+                onValueChange = { signerName = it },
+                label = { Text("Nombre del técnico certificador") },
+                modifier = Modifier.fillMaxWidth(),
+                isError = signerName.isBlank() && errorMsg != null,
+            )
+
+            OutlinedTextField(
+                value = signerRole,
+                onValueChange = { signerRole = it },
+                label = { Text("Rol / Certificación") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Button(
+                enabled = !isWorking && signerName.isNotBlank() && initialDtcs.isNotEmpty(),
+                onClick = {
+                    onWorking(true)
+                    onError(null)
+                    scope.launch {
+                        try {
+                            val reportId = "r-${UUID.randomUUID()}"
+                            val afterSnap = DiagnosticSnapshot(
+                                id = "snap-${reportId}",
+                                vehicleId = vehicleId,
+                                sessionId = null,
+                                createdAtMs = System.currentTimeMillis(),
+                                dtcsActive = postDtcs,
+                                dtcsPending = emptyList(),
+                                dtcsPermanent = emptyList(),
+                                freezeFramePidValues = emptyMap(),
+                                readiness = mapOf("MISFIRE" to liveValueInRange, "FUEL" to liveValueInRange, "CATALYST" to liveValueInRange),
+                                provenance = if (obdConnected) DiagnosticProvenance.Real else DiagnosticProvenance.ManualEntry(authorId = userId),
+                                notes = "Post-Scan: Cleared=[${comparison.clearedDtcs.joinToString(",")}] Regressions=[${comparison.newDtcs.joinToString(",")}]",
+                            )
+
+                            val evidences = mutableListOf<ReportEvidenceEntity>()
+                            evidences += ReportMappers.evidenceToEntity(
+                                evidenceId = "ev-post-comp-${reportId}",
+                                reportId = reportId,
+                                type = EvidenceType.OBD_SNAPSHOT,
+                                label = "Comparativa Before/After",
+                                description = "Conclusion=${comparison.conclusion.name}; Repaired=${comparison.canDeclareRepaired}; Cleared=${comparison.clearedDtcs}; Residual=${postDtcs}",
+                                uri = "",
+                                hash = com.elysium369.meet.core.reports.HashEngine.sha256Hex("${comparison.conclusion.name}|${comparison.clearedDtcs.joinToString(",")}|${postDtcs.joinToString(",")}"),
+                                capturedAt = System.currentTimeMillis(),
+                                lat = null,
+                                lng = null,
+                            )
+                            if (notesText.isNotBlank()) {
+                                evidences += ReportMappers.evidenceToEntity(
+                                    evidenceId = "ev-notes-${reportId}",
+                                    reportId = reportId,
+                                    type = EvidenceType.REPAIR_NOTE,
+                                    label = "Notas técnicas post-escaneo",
+                                    description = notesText,
+                                    uri = "",
+                                    hash = com.elysium369.meet.core.reports.HashEngine.sha256Hex(notesText),
+                                    capturedAt = System.currentTimeMillis(),
+                                    lat = null,
+                                    lng = null,
+                                )
+                            }
+
+                            repo.createDraft(
+                                reportId = reportId,
+                                vehicleId = vehicleId,
+                                userId = userId,
+                                reportType = ReportType.POST_SCAN_REPORT,
+                                title = "Post-Scan ${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())}",
+                                odometerKm = null,
+                                vin = null,
+                                plate = null,
+                                snapshot = afterSnap,
+                                evidence = evidences,
+                                repairActions = emptyList(),
+                                notes = notesText,
+                            )
+
+                            val signed = repo.sign(
+                                reportId = reportId,
+                                signerName = signerName,
+                                signerRole = signerRole,
+                                signatureImageUri = "inline://signature-${reportId}",
+                                deviceId = deviceId,
+                            )
+
+                            val qr = QrPayload(
+                                reportId = signed.reportId,
+                                integrityHash = signed.integrityHash,
+                                vehicleId = signed.vehicleId,
+                                generatedAt = signed.generatedAt,
+                                reportType = ReportType.POST_SCAN_REPORT,
+                                verifierUrl = null,
+                            ).encode()
+
+                            onSigned(signed.reportId, signed.integrityHash, qr)
+                        } catch (e: Exception) {
+                            onError("No se pudo firmar el reporte Post-Scan: ${e.message ?: e::class.simpleName}")
+                        } finally {
+                            onWorking(false)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isWorking) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text("Firmar y generar reporte Post-Scan")
+            }
         }
+    }
+}
+
+// ── Repair Evidence sub-flow ───────────────────────────────────────────────
+
+@Composable
+private fun RepairEvidenceSubFlow(
+    repo: CertifiedReportRepository,
+    vehicleId: String,
+    isWorking: Boolean,
+    errorMsg: String?,
+    onWorking: (Boolean) -> Unit,
+    onError: (String?) -> Unit,
+    onSigned: (reportId: String, hash: String, qr: String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val deviceId = remember { "android-${android.os.Build.SERIAL ?: UUID.randomUUID().toString()}" }
+    val userId = remember { "u-local" }
+
+    var componentText by remember { mutableStateOf("") }
+    var actionType by remember { mutableStateOf("Reemplazo de pieza") }
+    var relatedDtc by remember { mutableStateOf("") }
+    var partNameAndOem by remember { mutableStateOf("") }
+    var supplierText by remember { mutableStateOf("") }
+    var costText by remember { mutableStateOf("") }
+    var warrantyDaysText by remember { mutableStateOf("90") }
+    var descriptionText by remember { mutableStateOf("") }
+    var signerName by remember { mutableStateOf("") }
+    var signerRole by remember { mutableStateOf("mecánico especialista") }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                "Evidencia de Reparación — Registro Forense de Mano de Obra y Repuestos",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            OutlinedTextField(
+                value = componentText,
+                onValueChange = { componentText = it },
+                label = { Text("Componente o sistema reparado *") },
+                placeholder = { Text("Ej. Bomba de combustible, Alternador, Frenos") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = actionType,
+                onValueChange = { actionType = it },
+                label = { Text("Tipo de acción técnica") },
+                placeholder = { Text("Reemplazo, Rectificación, Calibración, Ajuste") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = relatedDtc,
+                onValueChange = { relatedDtc = it.uppercase() },
+                label = { Text("DTC relacionado (opcional)") },
+                placeholder = { Text("P0230") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = partNameAndOem,
+                onValueChange = { partNameAndOem = it },
+                label = { Text("Repuesto / Número de Parte OEM") },
+                placeholder = { Text("Ej. Bosch 0580453443 / Original OEM") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = costText,
+                    onValueChange = { costText = it },
+                    label = { Text("Costo Total ($)") },
+                    placeholder = { Text("120.00") },
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = warrantyDaysText,
+                    onValueChange = { warrantyDaysText = it },
+                    label = { Text("Garantía (días)") },
+                    placeholder = { Text("90") },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            OutlinedTextField(
+                value = supplierText,
+                onValueChange = { supplierText = it },
+                label = { Text("Proveedor o Taller emisor") },
+                placeholder = { Text("Distribuidora / Taller Oficial") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = descriptionText,
+                onValueChange = { descriptionText = it },
+                label = { Text("Procedimiento técnico y hallazgos *") },
+                placeholder = { Text("Descripción forense del trabajo efectuado, torque aplicado, pruebas de banco...") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+            )
+
+            OutlinedTextField(
+                value = signerName,
+                onValueChange = { signerName = it },
+                label = { Text("Técnico responsable que firma *") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = signerRole,
+                onValueChange = { signerRole = it },
+                label = { Text("Rol") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Button(
+                enabled = !isWorking && componentText.isNotBlank() && descriptionText.isNotBlank() && signerName.isNotBlank(),
+                onClick = {
+                    onWorking(true)
+                    onError(null)
+                    scope.launch {
+                        try {
+                            val reportId = "r-${UUID.randomUUID()}"
+                            val costDouble = costText.toDoubleOrNull()
+                            val warrantyInt = warrantyDaysText.toIntOrNull() ?: 90
+
+                            val actionId = "act-${UUID.randomUUID()}"
+                            val repairAction = ReportMappers.repairToEntity(
+                                actionId = actionId,
+                                reportId = reportId,
+                                actionType = actionType.ifBlank { "Reparación" },
+                                component = componentText,
+                                dtcRelated = relatedDtc.ifBlank { null },
+                                description = descriptionText,
+                                partUsed = partNameAndOem.ifBlank { null },
+                                supplier = supplierText.ifBlank { null },
+                                mechanic = signerName,
+                                cost = costDouble,
+                                currency = "USD",
+                                warrantyDays = warrantyInt,
+                                createdAt = System.currentTimeMillis(),
+                            )
+
+                            val evidenceId = "ev-repair-${UUID.randomUUID()}"
+                            val evidencePayload = "Component:$componentText|Action:$actionType|Part:$partNameAndOem|Cost:$costDouble|Warranty:${warrantyInt}d"
+                            val evidence = ReportMappers.evidenceToEntity(
+                                evidenceId = evidenceId,
+                                reportId = reportId,
+                                type = EvidenceType.REPAIR_NOTE,
+                                label = "Certificado de Mano de Obra: $componentText",
+                                description = "$descriptionText (Repuesto: ${partNameAndOem.ifBlank { "No aplica" }}, Garantía: $warrantyInt días)",
+                                uri = "",
+                                hash = com.elysium369.meet.core.reports.HashEngine.sha256Hex(evidencePayload),
+                                capturedAt = System.currentTimeMillis(),
+                                lat = null,
+                                lng = null,
+                            )
+
+                            repo.createDraft(
+                                reportId = reportId,
+                                vehicleId = vehicleId,
+                                userId = userId,
+                                reportType = ReportType.REPAIR_EVIDENCE_REPORT,
+                                title = "Reparación: $componentText (${java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())})",
+                                odometerKm = null,
+                                vin = null,
+                                plate = null,
+                                snapshot = null,
+                                evidence = listOf(evidence),
+                                repairActions = listOf(repairAction),
+                                notes = descriptionText,
+                            )
+
+                            val signed = repo.sign(
+                                reportId = reportId,
+                                signerName = signerName,
+                                signerRole = signerRole,
+                                signatureImageUri = "inline://signature-${reportId}",
+                                deviceId = deviceId,
+                            )
+
+                            val qr = QrPayload(
+                                reportId = signed.reportId,
+                                integrityHash = signed.integrityHash,
+                                vehicleId = signed.vehicleId,
+                                generatedAt = signed.generatedAt,
+                                reportType = ReportType.REPAIR_EVIDENCE_REPORT,
+                                verifierUrl = null,
+                            ).encode()
+
+                            onSigned(signed.reportId, signed.integrityHash, qr)
+                        } catch (e: Exception) {
+                            onError("Error al emitir evidencia de reparación: ${e.message ?: e::class.simpleName}")
+                        } finally {
+                            onWorking(false)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isWorking) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text("Firmar y certificar reparación")
+            }
+        }
+    }
+}
+
+// ── Pre-Purchase / Peritaje sub-flow ───────────────────────────────────────
+
+@Composable
+private fun PrePurchaseSubFlow(
+    repo: CertifiedReportRepository,
+    vehicleId: String,
+    vehicleOdometerKm: Long?,
+    isWorking: Boolean,
+    errorMsg: String?,
+    onWorking: (Boolean) -> Unit,
+    onError: (String?) -> Unit,
+    onSigned: (reportId: String, hash: String, qr: String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val deviceId = remember { "android-${android.os.Build.SERIAL ?: UUID.randomUUID().toString()}" }
+    val userId = remember { "u-local" }
+
+    var scoreEngine by remember { mutableStateOf(85f) }
+    var scoreChassis by remember { mutableStateOf(90f) }
+    var scoreBodywork by remember { mutableStateOf(80f) }
+    var scoreElectrical by remember { mutableStateOf(85f) }
+    var scoreInterior by remember { mutableStateOf(90f) }
+
+    var odometerText by remember { mutableStateOf(vehicleOdometerKm?.toString() ?: "") }
+    var findingsText by remember { mutableStateOf("") }
+    var signerName by remember { mutableStateOf("") }
+    var signerRole by remember { mutableStateOf("perito certificador") }
+
+    val overallScore = remember(scoreEngine, scoreChassis, scoreBodywork, scoreElectrical, scoreInterior) {
+        ((scoreEngine + scoreChassis + scoreBodywork + scoreElectrical + scoreInterior) / 5f).toInt()
+    }
+
+    val verdict = when {
+        overallScore >= 80 -> "APROBADO — Vehículo en excelente estado técnico"
+        overallScore >= 60 -> "CONDICIONADO — Requiere mantenimiento correctivo menor / Negociar"
+        else -> "RIESGO ALTO — No recomendado / Desgaste severo o riesgo de falla"
+    }
+
+    val verdictColor = when {
+        overallScore >= 80 -> Color(0xFF00C853)
+        overallScore >= 60 -> Color(0xFFFF6F00)
+        else -> Color(0xFFD50000)
+    }
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                "Peritaje Pre-Compra — Evaluación Técnica y Valuación",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = verdictColor.copy(alpha = 0.12f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Puntuación General:", fontWeight = FontWeight.Bold)
+                        Text("$overallScore / 100", fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, color = verdictColor)
+                    }
+                    Text("Dictamen: $verdict", fontWeight = FontWeight.SemiBold, color = verdictColor)
+                }
+            }
+
+            Text("Puntuación por Sistemas (0 - 100):", fontWeight = FontWeight.SemiBold)
+
+            ScoreSlider(label = "1. Motor, Caja y Transmisión", value = scoreEngine, onValueChange = { scoreEngine = it })
+            ScoreSlider(label = "2. Chasis, Frenos y Suspensión", value = scoreChassis, onValueChange = { scoreChassis = it })
+            ScoreSlider(label = "3. Carrocería, Pintura y Estructura", value = scoreBodywork, onValueChange = { scoreBodywork = it })
+            ScoreSlider(label = "4. Sistema Eléctrico, Módulos y OBD", value = scoreElectrical, onValueChange = { scoreElectrical = it })
+            ScoreSlider(label = "5. Interior, Cabina y Seguridad Pasiva", value = scoreInterior, onValueChange = { scoreInterior = it })
+
+            OutlinedTextField(
+                value = odometerText,
+                onValueChange = { odometerText = it },
+                label = { Text("Odómetro Verificado (km)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = findingsText,
+                onValueChange = { findingsText = it },
+                label = { Text("Hallazgos, Siniestros previos y Recomendaciones *") },
+                placeholder = { Text("Estado de fluidos, historial de colisiones visibles, desgaste de neumáticos...") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+            )
+
+            OutlinedTextField(
+                value = signerName,
+                onValueChange = { signerName = it },
+                label = { Text("Nombre del Perito Certificador *") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = signerRole,
+                onValueChange = { signerRole = it },
+                label = { Text("Licencia / Rol") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Button(
+                enabled = !isWorking && signerName.isNotBlank() && findingsText.isNotBlank(),
+                onClick = {
+                    onWorking(true)
+                    onError(null)
+                    scope.launch {
+                        try {
+                            val reportId = "r-${UUID.randomUUID()}"
+                            val odoInt = odometerText.toIntOrNull()
+
+                            val peritajePayload = "Score:$overallScore|Verdict:$verdict|Engine:${scoreEngine.toInt()}|Chassis:${scoreChassis.toInt()}|Body:${scoreBodywork.toInt()}|Elec:${scoreElectrical.toInt()}|Int:${scoreInterior.toInt()}"
+                            val evidence = ReportMappers.evidenceToEntity(
+                                evidenceId = "ev-peritaje-${UUID.randomUUID()}",
+                                reportId = reportId,
+                                type = EvidenceType.PROVIDER_NOTE,
+                                label = "Dictamen de Peritaje: $overallScore/100",
+                                description = "$verdict. Hallazgos: $findingsText",
+                                uri = "",
+                                hash = com.elysium369.meet.core.reports.HashEngine.sha256Hex(peritajePayload),
+                                capturedAt = System.currentTimeMillis(),
+                                lat = null,
+                                lng = null,
+                            )
+
+                            repo.createDraft(
+                                reportId = reportId,
+                                vehicleId = vehicleId,
+                                userId = userId,
+                                reportType = ReportType.PRE_PURCHASE_INSPECTION_REPORT,
+                                title = "Peritaje Técnico — Score $overallScore/100 (${java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US).format(java.util.Date())})",
+                                odometerKm = odoInt,
+                                vin = null,
+                                plate = null,
+                                snapshot = null,
+                                evidence = listOf(evidence),
+                                repairActions = emptyList(),
+                                notes = "Puntuación global: $overallScore/100. $verdict. $findingsText",
+                            )
+
+                            val signed = repo.sign(
+                                reportId = reportId,
+                                signerName = signerName,
+                                signerRole = signerRole,
+                                signatureImageUri = "inline://signature-${reportId}",
+                                deviceId = deviceId,
+                            )
+
+                            val qr = QrPayload(
+                                reportId = signed.reportId,
+                                integrityHash = signed.integrityHash,
+                                vehicleId = signed.vehicleId,
+                                generatedAt = signed.generatedAt,
+                                reportType = ReportType.PRE_PURCHASE_INSPECTION_REPORT,
+                                verifierUrl = null,
+                            ).encode()
+
+                            onSigned(signed.reportId, signed.integrityHash, qr)
+                        } catch (e: Exception) {
+                            onError("Error al emitir peritaje: ${e.message ?: e::class.simpleName}")
+                        } finally {
+                            onWorking(false)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isWorking) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text("Firmar y emitir Peritaje Certificado")
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScoreSlider(label: String, value: Float, onValueChange: (Float) -> Unit) {
+    Column {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyMedium)
+            Text("${value.toInt()}/100", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
+        }
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = 0f..100f,
+            steps = 99,
+        )
+    }
+}
+
+// ── DVIR sub-flow ──────────────────────────────────────────────────────────
+
+@Composable
+private fun DvirSubFlow(
+    repo: CertifiedReportRepository,
+    vehicleId: String,
+    vehicleOdometerKm: Long?,
+    isWorking: Boolean,
+    errorMsg: String?,
+    onWorking: (Boolean) -> Unit,
+    onError: (String?) -> Unit,
+    onSigned: (reportId: String, hash: String, qr: String) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val deviceId = remember { "android-${android.os.Build.SERIAL ?: UUID.randomUUID().toString()}" }
+    val userId = remember { "u-local" }
+
+    var isPreTrip by remember { mutableStateOf(true) }
+    var brakesOk by remember { mutableStateOf(true) }
+    var lightsOk by remember { mutableStateOf(true) }
+    var tiresOk by remember { mutableStateOf(true) }
+    var fluidsOk by remember { mutableStateOf(true) }
+    var steeringOk by remember { mutableStateOf(true) }
+    var mirrorsOk by remember { mutableStateOf(true) }
+    var emergencyKitOk by remember { mutableStateOf(true) }
+
+    var odometerText by remember { mutableStateOf(vehicleOdometerKm?.toString() ?: "") }
+    var defectNotes by remember { mutableStateOf("") }
+    var signerName by remember { mutableStateOf("") }
+    var signerRole by remember { mutableStateOf("conductor / operador de flota") }
+
+    val allPass = brakesOk && lightsOk && tiresOk && fluidsOk && steeringOk && mirrorsOk && emergencyKitOk
+    val operabilityVerdict = if (allPass) "APTO PARA OPERACIÓN" else "REQUIERE ATENCIÓN / DEFECTOS REPORTADOS"
+    val verdictColor = if (allPass) Color(0xFF00C853) else Color(0xFFD50000)
+
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                "DVIR — Driver Vehicle Inspection Report (Flotas)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TypeChip(label = "Pre-Viaje (Pre-Trip)", selected = isPreTrip, onClick = { isPreTrip = true })
+                TypeChip(label = "Post-Viaje (Post-Trip)", selected = !isPreTrip, onClick = { isPreTrip = false })
+            }
+
+            Card(
+                colors = CardDefaults.cardColors(containerColor = verdictColor.copy(alpha = 0.12f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(if (allPass) Icons.Filled.CheckCircle else Icons.Filled.Warning, contentDescription = null, tint = verdictColor)
+                    Column {
+                        Text(operabilityVerdict, fontWeight = FontWeight.Bold, color = verdictColor)
+                        Text(
+                            if (allPass) "Todos los sistemas de seguridad aprobados para la jornada."
+                            else "Existen fallas registradas que deben ser atendidas antes de circular.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+
+            Text("Lista de Comprobación de Seguridad:", fontWeight = FontWeight.SemiBold)
+
+            DvirCheckRow("Frenos de servicio y emergencia", brakesOk) { brakesOk = it }
+            DvirCheckRow("Luces, direccionales y faros", lightsOk) { lightsOk = it }
+            DvirCheckRow("Neumáticos y tuercas de rueda", tiresOk) { tiresOk = it }
+            DvirCheckRow("Fluidos (Aceite, Refrigerante, Frenos)", fluidsOk) { fluidsOk = it }
+            DvirCheckRow("Dirección y suspensión", steeringOk) { steeringOk = it }
+            DvirCheckRow("Espejos, vidrios y limpiaparabrisas", mirrorsOk) { mirrorsOk = it }
+            DvirCheckRow("Cinturones y kit de seguridad / extintor", emergencyKitOk) { emergencyKitOk = it }
+
+            OutlinedTextField(
+                value = odometerText,
+                onValueChange = { odometerText = it },
+                label = { Text("Odómetro actual (km)") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = defectNotes,
+                onValueChange = { defectNotes = it },
+                label = { Text("Defectos o anomalías observadas") },
+                placeholder = { Text("Detallar ruidos, desgaste o averías si alguno de los ítems no cumple...") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 2,
+            )
+
+            OutlinedTextField(
+                value = signerName,
+                onValueChange = { signerName = it },
+                label = { Text("Nombre del Conductor / Inspector *") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            OutlinedTextField(
+                value = signerRole,
+                onValueChange = { signerRole = it },
+                label = { Text("Rol / ID Conductor") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            Button(
+                enabled = !isWorking && signerName.isNotBlank() && (allPass || defectNotes.isNotBlank()),
+                onClick = {
+                    onWorking(true)
+                    onError(null)
+                    scope.launch {
+                        try {
+                            val reportId = "r-${UUID.randomUUID()}"
+                            val odoInt = odometerText.toIntOrNull()
+                            val tripType = if (isPreTrip) "Pre-Trip" else "Post-Trip"
+
+                            val checklistSummary = "Brakes:$brakesOk|Lights:$lightsOk|Tires:$tiresOk|Fluids:$fluidsOk|Steer:$steeringOk|Mirrors:$mirrorsOk|Kit:$emergencyKitOk"
+                            val evidence = ReportMappers.evidenceToEntity(
+                                evidenceId = "ev-dvir-${UUID.randomUUID()}",
+                                reportId = reportId,
+                                type = EvidenceType.TEST_DRIVE_RESULT,
+                                label = "Checklist DVIR $tripType",
+                                description = "$operabilityVerdict. $checklistSummary. Notas: ${defectNotes.ifBlank { "Sin anomalías" }}",
+                                uri = "",
+                                hash = com.elysium369.meet.core.reports.HashEngine.sha256Hex("$tripType|$checklistSummary|$defectNotes"),
+                                capturedAt = System.currentTimeMillis(),
+                                lat = null,
+                                lng = null,
+                            )
+
+                            repo.createDraft(
+                                reportId = reportId,
+                                vehicleId = vehicleId,
+                                userId = userId,
+                                reportType = ReportType.DVIR_REPORT,
+                                title = "DVIR $tripType — $operabilityVerdict (${java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.US).format(java.util.Date())})",
+                                odometerKm = odoInt,
+                                vin = null,
+                                plate = null,
+                                snapshot = null,
+                                evidence = listOf(evidence),
+                                repairActions = emptyList(),
+                                notes = "DVIR $tripType: $operabilityVerdict. ${defectNotes.ifBlank { "Inspección conforme." }}",
+                            )
+
+                            val signed = repo.sign(
+                                reportId = reportId,
+                                signerName = signerName,
+                                signerRole = signerRole,
+                                signatureImageUri = "inline://signature-${reportId}",
+                                deviceId = deviceId,
+                            )
+
+                            val qr = QrPayload(
+                                reportId = signed.reportId,
+                                integrityHash = signed.integrityHash,
+                                vehicleId = signed.vehicleId,
+                                generatedAt = signed.generatedAt,
+                                reportType = ReportType.DVIR_REPORT,
+                                verifierUrl = null,
+                            ).encode()
+
+                            onSigned(signed.reportId, signed.integrityHash, qr)
+                        } catch (e: Exception) {
+                            onError("Error al emitir DVIR: ${e.message ?: e::class.simpleName}")
+                        } finally {
+                            onWorking(false)
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (isWorking) {
+                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                }
+                Text("Firmar y registrar DVIR")
+            }
+        }
+    }
+}
+
+@Composable
+private fun DvirCheckRow(label: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Checkbox(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
