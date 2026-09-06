@@ -59,6 +59,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showThemeCustomizer by remember { mutableStateOf(false) }
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
     val diagnosticPrivacyGuard = remember { VanguardPrivacyGuard() }
     var diagnosticTelemetryConsent by remember {
         mutableStateOf(diagnosticPrivacyGuard.diagnosticTelemetryConsent(context))
@@ -1133,6 +1134,17 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                             ) {
                                 Text("CERRAR SESIÓN")
                             }
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = { showDeleteAccountDialog = true },
+                                enabled = SupabaseModule.client.auth.currentUserOrNull() != null,
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = MeetColors.error,
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("ELIMINAR CUENTA")
+                            }
                         }
                     }
                 }
@@ -1140,6 +1152,44 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
 
             item { Spacer(modifier = Modifier.height(32.dp)) }
         }
+    }
+
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAccountDialog = false },
+            title = {
+                Text("¿Eliminar cuenta permanentemente?", color = MeetColors.textPrimary)
+            },
+            text = {
+                Text(
+                    "Esta acción es definitiva e irreversible. Se cerrará tu sesión, se revocarán las credenciales locales de aprovisionamiento y se eliminarán tus datos en este dispositivo.\n\nPara solicitar la purga completa y permanente de todos tus registros en los servidores centrales de acuerdo con las políticas de Google Play, visita: https://elysium-vanguard.app/delete-account",
+                    color = MeetColors.textSecondary,
+                    fontSize = 14.sp,
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showDeleteAccountDialog = false
+                        coroutineScope.launch {
+                            runCatching { SupabaseModule.client.auth.signOut() }
+                            PrincipalProvisioningStore.clear(context)
+                            Toast.makeText(context, "Cuenta y datos locales eliminados", Toast.LENGTH_LONG).show()
+                            navController.navigateTopLevel("home")
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.error),
+                ) {
+                    Text("ELIMINAR", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAccountDialog = false }) {
+                    Text("CANCELAR", color = MeetColors.textSecondary)
+                }
+            },
+            containerColor = MeetColors.cardBackground,
+        )
     }
 
     if (showThemeCustomizer) {

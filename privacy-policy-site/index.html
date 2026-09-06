@@ -3,52 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Policy - OBD2 Scanner Elysium Vanguard</title>
+    <title>Privacy Policy - OBD2 Elysium Vanguard (MEET)</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             line-height: 1.6;
-            color: #333;
-            max-width: 800px;
+            color: #222;
+            max-width: 820px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 24px;
+            background-color: #f4f6f8;
         }
-        h1, h2 {
-            color: #2c3e50;
+        h1, h2, h3 {
+            color: #0f172a;
         }
         .container {
-            background-color: #f9f9f9;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            background-color: #ffffff;
+            padding: 36px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+            border: 1px solid #e2e8f0;
         }
         .date {
-            color: #666;
+            color: #64748b;
             font-style: italic;
+            margin-bottom: 24px;
+        }
+        .badge {
+            display: inline-block;
+            background-color: #e0f2fe;
+            color: #0284c7;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+        a {
+            color: #2563eb;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        ul {
+            padding-left: 24px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .highlight-box {
+            background-color: #f8fafc;
+            border-left: 4px solid #3b82f6;
+            padding: 16px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="badge">Google Play Data Safety & GDPR/CCPA Compliant</div>
         <h1>Privacy Policy</h1>
-        <p class="date">Last updated: May 17, 2026</p>
+        <p class="date">Effective Date: September 5, 2026 | Application: OBD2 Elysium Vanguard (com.elysium369.meet)</p>
 
-        <p>This Privacy Policy describes our policies and procedures on the collection, use and disclosure of your information when you use the Application and tells you about your privacy rights and how the law protects you.</p>
+        <p>This Privacy Policy describes how <strong>Elysium Vanguard / MEET</strong> collects, uses, processes, and protects your personal and diagnostic data when you use the Android application <strong>OBD2 Elysium Vanguard</strong> and related services.</p>
 
-        <h2>1. Information Collection and Use</h2>
-        <p>The Application "OBD2 Scanner Elysium Vanguard" does not collect, store, or transmit any personal user data to external servers. All diagnostic data obtained from the vehicle's OBD2 port is processed locally on your device.</p>
+        <h2>1. Principles & Data Minimization</h2>
+        <p>We operate under a strict "Local-First and Privacy-Preserving" architecture:</p>
+        <ul>
+            <li><strong>Automotive Diagnostic Data:</strong> Real-time ECU telemetry, DTC trouble codes, and sensor readings from your ELM327/OBD2 adapter are processed and rendered entirely on your device.</li>
+            <li><strong>No Unauthenticated Transmission:</strong> Diagnostic logs and 3D digital twins are stored locally on-device unless you explicitly choose to authenticate and sync certified reports.</li>
+            <li><strong>No Sale of Personal Data:</strong> We never sell, rent, or monetize your personal data, location data, or vehicle inspection records.</li>
+        </ul>
 
-        <h2>2. OBD2 Data and Bluetooth/Location Permissions</h2>
-        <p>The Application requires Bluetooth and Location permissions to connect and communicate with your OBD2 ELM327 adapter (Android requires location permissions for Bluetooth scanning). The data retrieved (such as engine RPM, speed, and diagnostic trouble codes) is displayed solely within the app and is not shared with any third parties.</p>
+        <h2>2. Data We Collect and Why</h2>
+        <h3>A. Automotive & Diagnostics (Optional & User-Initiated)</h3>
+        <ul>
+            <li><strong>Data Type:</strong> Diagnostic Trouble Codes (DTCs), live sensor PIDs (RPM, speed, coolant temp, fuel trims), VIN (when supported by vehicle ECU), and battery voltage.</li>
+            <li><strong>Purpose:</strong> To diagnose vehicle failures, display real-time dashboard gauges, verify component repairs, and generate certified forensic PDF reports with cryptographic SHA-256 integrity hashes.</li>
+            <li><strong>Storage:</strong> Local device SQLite/Room database. Syncs to encrypted cloud database (Supabase) only upon user request.</li>
+        </ul>
 
-        <h2>3. Third-Party Services</h2>
-        <p>The Application may use third-party services (such as Google Play Services) that may collect information used to identify you. These third-party services have their own Privacy Policies addressing how they use such information.</p>
+        <h3>B. Location Services (Foreground Only)</h3>
+        <ul>
+            <li><strong>Data Type:</strong> Precise (GPS) and approximate location.</li>
+            <li><strong>Purpose:</strong>
+                <ol>
+                    <li>Required by Android OS to perform Bluetooth Low Energy (BLE) and classic Bluetooth discovery of OBD2 ELM327 scanners.</li>
+                    <li>Real-time navigation, road intelligence, speed calculation, and optional mobility dispatch operations while the driver is actively engaged in a trip.</li>
+                </ol>
+            </li>
+            <li><strong>Foreground Service:</strong> Location tracking runs only as an active Android Foreground Service with an ongoing user notification. It never operates silently in the background without user initiation.</li>
+        </ul>
 
-        <h2>4. Changes to This Privacy Policy</h2>
-        <p>We may update Our Privacy Policy from time to time. We will notify You of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes.</p>
+        <h3>C. Account & Authentication Data (Optional)</h3>
+        <ul>
+            <li><strong>Data Type:</strong> Email address and authentication tokens via Supabase Auth.</li>
+            <li><strong>Purpose:</strong> Cloud backup, multi-device sync of workshop inspection history, and workshop profile management.</li>
+        </ul>
 
-        <h2>5. Contact Us</h2>
-        <p>If you have any questions about this Privacy Policy, You can contact us via the contact information provided in the Google Play Store listing.</p>
+        <h2>3. Permissions Requested & Justification</h2>
+        <ul>
+            <li><code>BLUETOOTH_CONNECT</code> & <code>BLUETOOTH_SCAN</code>: To connect and communicate with OBD2 Bluetooth adapters.</li>
+            <li><code>ACCESS_FINE_LOCATION</code> & <code>FOREGROUND_SERVICE_LOCATION</code>: For Bluetooth scanning and active trip route telemetry.</li>
+            <li><code>FOREGROUND_SERVICE_CONNECTED_DEVICE</code>: To maintain stable, uninterrupted serial communication with the vehicle ECU during live diagnostic sessions.</li>
+            <li><code>CAMERA</code>: Optional; used strictly for scanning VIN barcodes and QR codes on inspection certificates. No facial recognition templates are ever stored.</li>
+            <li><code>NFC</code>: Optional; for digital vehicle key and access features using Host Card Emulation (HCE).</li>
+        </ul>
+
+        <h2>4. Data Retention & Security</h2>
+        <p>All network communication uses TLS 1.3 encryption. Cleartext HTTP traffic is explicitly prohibited across the entire application by Android Network Security Configuration.</p>
+        <p>Personal and diagnostic data are retained only as long as you maintain an active account or until you request deletion.</p>
+
+        <div class="highlight-box">
+            <h2>5. Account Deletion & Right to Be Forgotten</h2>
+            <p>In full compliance with Google Play's User Data Policy and international privacy standards, you have the absolute right to delete your account and all associated data at any time:</p>
+            <ul>
+                <li><strong>In-App Deletion:</strong> Open <em>Settings &rarr; Account Section &rarr; Tap "ELIMINAR CUENTA"</em>. Confirming this dialog will immediately wipe all locally stored cache, revoke provisioning credentials, and sign you out.</li>
+                <li><strong>Web-Based Deletion Request:</strong> You can submit a permanent server-side data erasure request at any time without having the app installed by visiting our deletion portal: <a href="https://elysium-vanguard.app/delete-account">https://elysium-vanguard.app/delete-account</a>.</li>
+            </ul>
+        </div>
+
+        <h2>6. Third-Party Services</h2>
+        <ul>
+            <li><strong>Google Play Services:</strong> Core platform APIs, Play Billing, and barcode scanning models.</li>
+            <li><strong>MapLibre GL / OpenStreetMap:</strong> Privacy-respecting vector map rendering without personalized tracking.</li>
+            <li><strong>Supabase:</strong> Encrypted backend database with Row-Level Security (RLS) enforcement.</li>
+        </ul>
+
+        <h2>7. Contact Us</h2>
+        <p>For any privacy inquiries, data subject access requests, or regulatory questions, please contact our Data Protection Officer:</p>
+        <p><strong>Email:</strong> <a href="mailto:privacy@elysium-vanguard.app">privacy@elysium-vanguard.app</a><br>
+        <strong>Organization:</strong> Elysium Vanguard / MEET Diagnostics<br>
+        <strong>Website:</strong> <a href="https://elysium-vanguard.app">https://elysium-vanguard.app</a></p>
     </div>
 </body>
 </html>
