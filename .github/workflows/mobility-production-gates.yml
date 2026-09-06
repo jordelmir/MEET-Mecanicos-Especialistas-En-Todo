@@ -22,6 +22,8 @@ jobs:
         run: bash tests/mobility/test-100-concurrent-dispatches.sh
       - name: Execute Mobility Financial Authority & Balanced Ledger Suite
         run: bash tests/mobility/verify-mobility-finance-postgres.sh
+      - name: Execute Mobility Safety Center, Reserve & Guest Rides Suite
+        run: bash tests/mobility/verify-mobility-safety-reserve-postgres.sh
 
   android-mobility-gates:
     name: Android Mobility OS Domain & Outbox Tests
