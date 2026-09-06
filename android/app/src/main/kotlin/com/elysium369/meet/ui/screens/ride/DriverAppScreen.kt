@@ -52,13 +52,13 @@ fun DriverAppScreen(
 ) {
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     val isOnline by viewModel.rideDriverMode.collectAsState()
     var activeRide by remember { mutableStateOf<ActiveDriverRide?>(null) }
     var showEarnings by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showSafetyCenter by remember { mutableStateOf(false) }
-    var showNavigation by remember { mutableStateOf(false) }
 
     val openRequests by viewModel.openRideRequests.collectAsState(initial = emptyList())
     val allRequests by viewModel.rideRequests.collectAsState(initial = emptyList())
@@ -148,13 +148,17 @@ fun DriverAppScreen(
             val distKm = 6371.0 * c
             val estArrival = Math.max(1, (distKm / 30.0 * 60).toInt())
 
+            val ratedTrips = completedRides.mapNotNull { it.driverRating }
+            val avgRating = if (ratedTrips.isNotEmpty()) ratedTrips.average() else 0.0
+            val totalTrips = completedRides.size
+
             viewModel.makeRideOffer(
                 requestId = request.rideId,
                 driverId = dId,
                 driverName = dName,
                 driverPhone = dPhone,
-                driverRating = 0.0,
-                driverTotalTrips = 0,
+                driverRating = avgRating,
+                driverTotalTrips = totalTrips,
                 vehicleDesc = veh,
                 counterPrice = request.fare.toDouble(),
                 currency = "CRC",
@@ -373,7 +377,9 @@ fun DriverAppScreen(
 
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Button(
-                                    onClick = { showNavigation = true },
+                                    onClick = {
+                                        viewModel.openWaze(context, ride.dropoff.latitude, ride.dropoff.longitude)
+                                    },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue)
@@ -423,19 +429,6 @@ fun DriverAppScreen(
                 Spacer(Modifier.height(40.dp))
             }
 
-            // In-App Turn-By-Turn Navigation Overlay
-            if (showNavigation) {
-                DriverTurnByTurnNavigationOverlay(
-                    nextManeuver = "Gire a la derecha en 150m hacia Escazú",
-                    distanceMeters = 150,
-                    speedKmh = 48f,
-                    speedLimitKmh = 60,
-                    etaMinutes = 11,
-                    remainingKm = 4.2,
-                    onCloseNavigation = { showNavigation = false }
-                )
-            }
-
             // Bottom Sheets
             if (showEarnings) {
                 DriverEarningsBottomSheet(
@@ -455,7 +448,6 @@ fun DriverAppScreen(
                 )
             }
 
-            val context = LocalContext.current
             if (showSafetyCenter) {
                 SafetyCenterOverlay(
                     ride = null,

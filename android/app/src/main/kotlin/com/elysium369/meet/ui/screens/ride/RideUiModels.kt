@@ -15,9 +15,10 @@ data class RidePlaceInput(
     val latitude: Double,
     val longitude: Double,
     val placeType: PlaceType = PlaceType.SEARCH,
+    val accuracyMeters: Float? = null,
 ) {
     companion object {
-        fun fromCurrentLocation(lat: Double, lng: Double): RidePlaceInput {
+        fun fromCurrentLocation(lat: Double, lng: Double, accuracyMeters: Float? = null): RidePlaceInput {
             return RidePlaceInput(
                 placeId = "current_${System.currentTimeMillis()}",
                 displayName = "Mi ubicación actual",
@@ -25,6 +26,7 @@ data class RidePlaceInput(
                 latitude = lat,
                 longitude = lng,
                 placeType = PlaceType.CURRENT,
+                accuracyMeters = accuracyMeters,
             )
         }
     }

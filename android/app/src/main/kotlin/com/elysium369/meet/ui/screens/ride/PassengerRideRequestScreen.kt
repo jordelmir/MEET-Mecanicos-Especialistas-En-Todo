@@ -60,7 +60,7 @@ fun PassengerRideRequestScreen(
     var pickup by remember(currentGps) {
         mutableStateOf(
             currentGps?.let {
-                RidePlaceInput.fromCurrentLocation(it.latitude, it.longitude)
+                RidePlaceInput.fromCurrentLocation(it.latitude, it.longitude, it.accuracy)
             }
         )
     }
@@ -83,7 +83,7 @@ fun PassengerRideRequestScreen(
             MatchedDriver(
                 driverId = driverId,
                 name = activeRideReq?.assignedDriverName ?: "Conductor Asignado",
-                rating = activeRideReq?.driverRating,
+                rating = activeRideReq?.driverRating?.takeIf { it > 0.0 },
                 totalTrips = null,
                 vehicle = activeRideReq?.assignedDriverVehicle,
                 plate = activeRideReq?.serverAssignedVehicleId,
@@ -227,7 +227,11 @@ fun PassengerRideRequestScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text("¡Conductor Asignado!", style = MaterialTheme.typography.labelMedium, color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
                                 Text(driver.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
-                                Text("${driver.vehicle ?: "Vehículo Registrado"} • ${driver.plate ?: "---"}", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                                val vehicleDesc = listOfNotNull(
+                                    driver.vehicle?.takeIf { it.isNotBlank() },
+                                    driver.plate?.takeIf { it.isNotBlank() }
+                                ).joinToString(" • ").ifBlank { "Vehículo no capturado" }
+                                Text(vehicleDesc, style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
                                 Text(
                                     driver.etaMinutes?.let { "Llegada estimada en $it min" } ?: "Llegada en cálculo",
                                     style = MaterialTheme.typography.labelSmall,
@@ -300,7 +304,7 @@ fun PassengerRideRequestScreen(
                                 pickupLat = curPickup.latitude,
                                 pickupLng = curPickup.longitude,
                                 pickupAddr = curPickup.address ?: curPickup.displayName,
-                                pickupAcc = 5.0f,
+                                pickupAcc = curPickup.accuracyMeters ?: currentGps?.accuracy ?: 0f,
                                 destLat = curDropoff.latitude,
                                 destLng = curDropoff.longitude,
                                 destAddr = curDropoff.address ?: curDropoff.displayName,

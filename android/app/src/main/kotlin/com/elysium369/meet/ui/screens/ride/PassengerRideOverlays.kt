@@ -290,7 +290,11 @@ fun DriverProfileOverlay(
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(driver.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
-                        Text("${driver.vehicle} • ${driver.plate}", style = MaterialTheme.typography.bodyMedium, color = MeetColors.textSecondary)
+                        val vehicleDesc = listOfNotNull(
+                            driver.vehicle?.takeIf { it.isNotBlank() },
+                            driver.plate?.takeIf { it.isNotBlank() }
+                        ).joinToString(" • ").ifBlank { "Vehículo no capturado" }
+                        Text(vehicleDesc, style = MaterialTheme.typography.bodyMedium, color = MeetColors.textSecondary)
                         Spacer(Modifier.height(4.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                             if (driver.rating != null) {

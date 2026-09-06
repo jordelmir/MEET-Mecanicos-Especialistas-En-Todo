@@ -219,12 +219,12 @@ fun SOSConfirmDialog(
  */
 @Composable
 fun DriverTurnByTurnNavigationOverlay(
-    nextManeuver: String = "Gire a la derecha en Av. Central",
-    distanceMeters: Int = 180,
-    speedKmh: Float = 42f,
-    speedLimitKmh: Int = 50,
-    etaMinutes: Int = 7,
-    remainingKm: Double = 2.8,
+    nextManeuver: String? = null,
+    distanceMeters: Int? = null,
+    speedKmh: Float? = null,
+    speedLimitKmh: Int? = null,
+    etaMinutes: Int? = null,
+    remainingKm: Double? = null,
     onCloseNavigation: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -260,13 +260,13 @@ fun DriverTurnByTurnNavigationOverlay(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "En ${distanceMeters}m",
+                        text = if (distanceMeters != null) "En ${distanceMeters}m" else "En ruta",
                         style = MaterialTheme.typography.labelMedium,
                         color = MeetColors.neonGreen,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = nextManeuver,
+                        text = nextManeuver ?: "Navegación guiada en progreso",
                         style = MaterialTheme.typography.titleMedium,
                         color = MeetColors.textPrimary,
                         fontWeight = FontWeight.Bold
@@ -292,35 +292,50 @@ fun DriverTurnByTurnNavigationOverlay(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Speedometer
+                val isOverSpeed = speedKmh != null && speedLimitKmh != null && speedKmh > speedLimitKmh
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = if (speedKmh > speedLimitKmh) MeetColors.error.copy(alpha = 0.2f) else MeetColors.cardBackground,
-                        border = BorderStroke(2.dp, if (speedKmh > speedLimitKmh) MeetColors.error else MeetColors.neonGreen),
+                        color = if (isOverSpeed) MeetColors.error.copy(alpha = 0.2f) else MeetColors.cardBackground,
+                        border = BorderStroke(2.dp, if (isOverSpeed) MeetColors.error else MeetColors.neonGreen),
                         modifier = Modifier.size(44.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                             Text(
-                                text = "${speedKmh.toInt()}",
+                                text = speedKmh?.toInt()?.toString() ?: "--",
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.Black,
-                                color = if (speedKmh > speedLimitKmh) MeetColors.error else MeetColors.textPrimary
+                                color = if (isOverSpeed) MeetColors.error else MeetColors.textPrimary
                             )
                         }
                     }
                     Column {
                         Text("km/h", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
-                        Text("Límite: $speedLimitKmh", style = MaterialTheme.typography.labelSmall, color = MeetColors.textMuted, fontSize = 9.sp)
+                        Text(
+                            text = if (speedLimitKmh != null) "Límite: $speedLimitKmh" else "Límite no capturado",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MeetColors.textMuted,
+                            fontSize = 9.sp
+                        )
                     }
                 }
 
                 // ETA & Distance
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("$etaMinutes min", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MeetColors.neonGreen)
-                    Text("%.1f km restantes".format(remainingKm), style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                    Text(
+                        text = if (etaMinutes != null) "$etaMinutes min" else "-- min",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.neonGreen
+                    )
+                    Text(
+                        text = if (remainingKm != null) "%.1f km restantes".format(remainingKm) else "Distancia no capturada",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MeetColors.textSecondary
+                    )
                 }
 
                 IconButton(
@@ -336,10 +351,10 @@ fun DriverTurnByTurnNavigationOverlay(
 
 @Composable
 fun DriverEarningsBottomSheet(
-    todayEarnings: Long = 45600L,
-    weekEarnings: Long = 187500L,
-    monthEarnings: Long = 723400L,
-    tripsToday: Int = 8,
+    todayEarnings: Long = 0L,
+    weekEarnings: Long = 0L,
+    monthEarnings: Long = 0L,
+    tripsToday: Int = 0,
     onDismiss: () -> Unit,
 ) {
     Dialog(
