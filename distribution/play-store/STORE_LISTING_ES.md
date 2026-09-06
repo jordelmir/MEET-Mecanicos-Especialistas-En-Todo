@@ -44,7 +44,7 @@ TERMINAL Y ENTORNO AVANZADO DE INGENIERÍA
 
 PRIVACIDAD, INTEGRIDAD Y SEGURIDAD PRIMERO
 • Local-First: Tus registros de telemetría y diagnósticos se procesan en tu propio dispositivo.
-• Cifrado robusto en tránsito (TLS 1.3) para la sincronización de nube y llamadas.
+• Cifrado robusto en tránsito mediante protocolos estándar HTTPS y TLS para sincronización de nube y llamadas.
 • Control total de tus datos: opción directa en Ajustes para purga local y eliminación total de cuenta.
 
 Descarga MEET hoy mismo y lleva el poder del diagnóstico automotriz profesional a tu bolsillo.

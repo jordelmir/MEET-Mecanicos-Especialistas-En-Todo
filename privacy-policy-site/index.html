@@ -113,14 +113,14 @@
         </ul>
 
         <h2>4. Data Retention & Security</h2>
-        <p>All network communication uses TLS 1.3 encryption. Cleartext HTTP traffic is explicitly prohibited across the entire application by Android Network Security Configuration.</p>
+        <p>All network communication is encrypted in transit using industry-standard HTTPS and TLS protocols. Cleartext HTTP traffic is explicitly prohibited across the entire application by Android Network Security Configuration.</p>
         <p>Personal and diagnostic data are retained only as long as you maintain an active account or until you request deletion.</p>
 
         <div class="highlight-box">
             <h2>5. Account Deletion & Right to Be Forgotten</h2>
             <p>In full compliance with Google Play's User Data Policy and international privacy standards, you have the absolute right to delete your account and all associated data at any time:</p>
             <ul>
-                <li><strong>In-App Deletion:</strong> Open <em>Settings &rarr; Account Section &rarr; Tap "ELIMINAR CUENTA"</em>. Confirming this dialog will immediately wipe all locally stored cache, revoke provisioning credentials, and sign you out.</li>
+                <li><strong>In-App Deletion:</strong> Open <em>Settings &rarr; Account Section &rarr; Tap "ELIMINAR CUENTA"</em>. Confirming this dialog submits a server-side account deletion request, immediately wipes all locally stored cache, revokes provisioning credentials, and signs you out.</li>
                 <li><strong>Web-Based Deletion Request:</strong> You can submit a permanent server-side data erasure request at any time without having the app installed by visiting our deletion portal: <a href="https://elysium-vanguard.app/delete-account">https://elysium-vanguard.app/delete-account</a>.</li>
             </ul>
         </div>

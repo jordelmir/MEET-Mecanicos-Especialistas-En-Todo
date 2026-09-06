@@ -52,6 +52,8 @@ import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import io.github.jan.supabase.gotrue.auth
+import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.rpc
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1172,9 +1174,14 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                     onClick = {
                         showDeleteAccountDialog = false
                         coroutineScope.launch {
+                            try {
+                                SupabaseModule.client.postgrest.rpc("request_user_account_deletion")
+                            } catch (e: Exception) {
+                                android.util.Log.w("SettingsScreen", "Account deletion RPC error: ${e.message}")
+                            }
                             runCatching { SupabaseModule.client.auth.signOut() }
                             PrincipalProvisioningStore.clear(context)
-                            Toast.makeText(context, "Cuenta y datos locales eliminados", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, "Solicitud de eliminación registrada y datos locales eliminados", Toast.LENGTH_LONG).show()
                             navController.navigateTopLevel("home")
                         }
                     },

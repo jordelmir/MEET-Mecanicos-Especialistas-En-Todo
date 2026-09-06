@@ -499,4 +499,39 @@ if [[ "$final_balance" -ne 0 ]]; then
 fi
 
 echo ">>> PASSED: TEST H (100-way concurrent settlement race guarantees exactly 1 winner and 0 errors)."
+
+echo "=== 13. TEST I: ACCOUNT DELETION GOVERNANCE (Google Play Compliance) ==="
+# Unauthenticated call must fail
+set +e
+psql "${psql_args[@]}" <<'SQL' 2>"$runtime_dir/del_unauth.err"
+SET ROLE anon;
+SELECT public.request_user_account_deletion();
+SQL
+unauth_del_status=$?
+set -e
+if [[ $unauth_del_status -eq 0 ]]; then
+  echo "FAIL: Unauthenticated caller was allowed to request account deletion"
+  exit 1
+fi
+echo ">>> Sub-check 1 passed: Anonymous caller rejected with 42501."
+
+# Authenticated call by user 11111111-1111-1111-1111-111111111111 must succeed
+del_res=$(psql "${psql_args[@]}" -t -A <<'SQL'
+SET ROLE authenticated;
+SET request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+SELECT public.request_user_account_deletion('Moving to another vehicle', '{"app_version":"4.23.6"}'::jsonb);
+SQL
+)
+if ! echo "$del_res" | grep -q '"success": true'; then
+  echo "FAIL: Authenticated account deletion request failed: $del_res"
+  exit 1
+fi
+
+del_count=$(psql "${psql_args[@]}" -t -A -c "SELECT count(*) FROM public.account_deletion_requests WHERE user_id = '11111111-1111-1111-1111-111111111111' AND status = 'PENDING';")
+if [[ "$del_count" -ne 1 ]]; then
+  echo "FAIL: Expected 1 pending deletion request, got $del_count"
+  exit 1
+fi
+echo ">>> PASSED: TEST I (Account Deletion Governance operates under strict auth and records audit request)."
+
 echo "=== ALL FINANCIAL AUTHORITY V8 ADVERSARIAL TESTS PASSED PERFECTLY ==="

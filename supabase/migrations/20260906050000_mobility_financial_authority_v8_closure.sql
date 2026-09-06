@@ -878,3 +878,120 @@ GRANT ALL ON public.ledger_transactions TO service_role;
 GRANT ALL ON public.ledger_entries TO service_role;
 GRANT ALL ON public.payment_provider_events TO service_role;
 GRANT ALL ON public.ride_route_evidence TO service_role;
+
+-- =============================================================================
+-- GOOGLE PLAY COMPLIANCE: ACCOUNT & DATA DELETION GOVERNANCE
+-- Mandate: User Data Policy (In-App + Web Deletion of User Account and Data)
+-- =============================================================================
+
+CREATE TABLE IF NOT EXISTS public.account_deletion_requests (
+    request_id UUID PRIMARY KEY DEFAULT extensions.gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    reason TEXT,
+    status TEXT NOT NULL CHECK (status IN ('PENDING', 'PROCESSING', 'COMPLETED', 'CANCELLED')) DEFAULT 'PENDING',
+    source TEXT NOT NULL CHECK (source IN ('IN_APP', 'WEB_PORTAL', 'SUPPORT')) DEFAULT 'IN_APP',
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    processed_at TIMESTAMPTZ
+);
+
+ALTER TABLE public.account_deletion_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.account_deletion_requests FORCE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'public' 
+          AND tablename = 'account_deletion_requests' 
+          AND policyname = 'account_deletion_requests_insert'
+    ) THEN
+        CREATE POLICY account_deletion_requests_insert ON public.account_deletion_requests
+            FOR INSERT TO authenticated
+            WITH CHECK (user_id = auth.uid());
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'public' 
+          AND tablename = 'account_deletion_requests' 
+          AND policyname = 'account_deletion_requests_select'
+    ) THEN
+        CREATE POLICY account_deletion_requests_select ON public.account_deletion_requests
+            FOR SELECT TO authenticated
+            USING (user_id = auth.uid());
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE schemaname = 'public' 
+          AND tablename = 'account_deletion_requests' 
+          AND policyname = 'account_deletion_requests_service'
+    ) THEN
+        CREATE POLICY account_deletion_requests_service ON public.account_deletion_requests
+            FOR ALL TO service_role
+            USING (true)
+            WITH CHECK (true);
+    END IF;
+END $$;
+
+GRANT SELECT, INSERT ON public.account_deletion_requests TO authenticated;
+GRANT ALL ON public.account_deletion_requests TO service_role;
+
+CREATE OR REPLACE FUNCTION public.request_user_account_deletion(
+    p_reason TEXT DEFAULT NULL,
+    p_metadata JSONB DEFAULT '{}'::jsonb
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, extensions, pg_temp
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_request_id UUID;
+    v_now TIMESTAMPTZ := clock_timestamp();
+BEGIN
+    v_user_id := auth.uid();
+    IF v_user_id IS NULL THEN
+        RAISE EXCEPTION 'UNAUTHENTICATED: user session required to request deletion' USING ERRCODE = '42501';
+    END IF;
+
+    -- Deactivate principal if exists
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'principals') THEN
+        EXECUTE 'UPDATE public.principals SET status = ''DEACTIVATED'' WHERE id = $1' USING v_user_id;
+    END IF;
+
+    -- Deactivate driver operating profile if exists
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'ride_driver_operating_profiles') THEN
+        EXECUTE 'UPDATE public.ride_driver_operating_profiles SET active = false WHERE driver_id = $1' USING v_user_id;
+    END IF;
+
+    -- Record deletion request
+    INSERT INTO public.account_deletion_requests (
+        user_id,
+        reason,
+        status,
+        source,
+        metadata,
+        requested_at
+    ) VALUES (
+        v_user_id,
+        p_reason,
+        'PENDING',
+        'IN_APP',
+        p_metadata,
+        v_now
+    ) RETURNING request_id INTO v_request_id;
+
+    RETURN jsonb_build_object(
+        'success', true,
+        'request_id', v_request_id,
+        'status', 'PENDING',
+        'requested_at', v_now
+    );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.request_user_account_deletion(TEXT, JSONB) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.request_user_account_deletion(TEXT, JSONB) TO authenticated, service_role;
