@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -248,6 +249,55 @@ fun PassengerRideRequestScreen(
                     val curDropoff = dropoff
                     val curQuote = fareQuote
                     val canViewLive = curReq?.requestId != null && curPickup != null && curDropoff != null && curQuote != null
+
+                    curReq?.boardingPin?.let { pin ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, MeetColors.electricBlue.copy(alpha = 0.6f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "PIN DE ABORDAJE SEGURO",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MeetColors.electricBlue,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        "Díctalo a tu conductor al subir al vehículo",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MeetColors.textSecondary
+                                    )
+                                }
+                                Surface(
+                                    modifier = Modifier,
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MeetColors.electricBlue.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, MeetColors.electricBlue)
+                                ) {
+                                    Text(
+                                        text = pin,
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Black,
+                                        color = MeetColors.electricBlue,
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Button(
                         onClick = {
                             if (!canViewLive) return@Button

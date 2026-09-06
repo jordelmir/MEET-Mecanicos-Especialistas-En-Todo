@@ -27,26 +27,45 @@ export interface ReportVerifierProps {
 type Phase = 'idle' | 'verifying' | 'ok' | 'fail' | 'miss' | 'error';
 
 function parsePayload(raw: string): { reportId: string; integrityHash: string } | null {
-  // Accept either `meet://verify?reportId=...&hash=...` or a bare
-  // `reportId:hash` pair.
   if (!raw) return null;
+  const trimmed = raw.trim();
   try {
-    if (raw.startsWith('meet://')) {
-      const url = new URL(raw);
-      const reportId = url.searchParams.get('reportId') ?? '';
-      const hash = url.searchParams.get('hash') ?? '';
-      if (!reportId || !hash) return null;
-      return { reportId, integrityHash: hash };
+    // 1. Standard pipe format: v1|reportId|integrityHash|...
+    if (trimmed.startsWith('v1|')) {
+      const parts = trimmed.split('|');
+      if (parts.length >= 3 && parts[1] && parts[2]) {
+        return { reportId: parts[1], integrityHash: parts[2] };
+      }
     }
-    if (raw.startsWith('http')) {
-      const url = new URL(raw);
+
+    // 2. Custom URI scheme: meet://verify?reportId=...&hash=...
+    if (trimmed.startsWith('meet://')) {
+      const url = new URL(trimmed);
       const reportId = url.searchParams.get('reportId') ?? '';
-      const hash = url.searchParams.get('hash') ?? '';
-      if (!reportId || !hash) return null;
-      return { reportId, integrityHash: hash };
+      const hash = url.searchParams.get('hash') ?? url.searchParams.get('integrityHash') ?? '';
+      if (reportId && hash) return { reportId, integrityHash: hash };
     }
-    const [rid, hash] = raw.split(':');
-    if (rid && hash) return { reportId: rid, integrityHash: hash };
+
+    // 3. HTTP / HTTPS URL
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      const url = new URL(trimmed);
+      const reportId = url.searchParams.get('reportId') ?? '';
+      const hash = url.searchParams.get('hash') ?? url.searchParams.get('integrityHash') ?? '';
+      if (reportId && hash) return { reportId, integrityHash: hash };
+      if (url.hash) {
+        const hashStr = decodeURIComponent(url.hash.replace(/^#/, ''));
+        if (hashStr.startsWith('v1|')) {
+          return parsePayload(hashStr);
+        }
+      }
+    }
+
+    // 4. Colon-separated pair: reportId:hash
+    if (trimmed.includes(':')) {
+      const [rid, hash] = trimmed.split(':');
+      if (rid && hash) return { reportId: rid, integrityHash: hash };
+    }
+
     return null;
   } catch {
     return null;
@@ -63,8 +82,28 @@ export function ReportVerifier({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!initialPayload) return;
-    void runVerify(initialPayload);
+    let toVerify = initialPayload;
+    if (!toVerify && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const repId = params.get('reportId');
+      const hash = params.get('hash') || params.get('integrityHash');
+      if (repId && hash) {
+        toVerify = `${repId}:${hash}`;
+      } else if (params.get('payload')) {
+        toVerify = params.get('payload')!;
+      } else if (params.get('qr')) {
+        toVerify = params.get('qr')!;
+      } else if (window.location.hash) {
+        const h = decodeURIComponent(window.location.hash.replace(/^#/, ''));
+        if (h.startsWith('v1|') || h.includes(':')) {
+          toVerify = h;
+        }
+      }
+    }
+    if (toVerify) {
+      setPayload(toVerify);
+      void runVerify(toVerify);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialPayload]);
 

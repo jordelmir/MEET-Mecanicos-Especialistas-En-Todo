@@ -374,19 +374,21 @@ class CertifiedReportPdfRenderer(private val context: Context) {
         }
     }
 
-    private fun renderQr(payload: String, size: Int): Bitmap {
-        val hints = mapOf(
-            EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
-            EncodeHintType.MARGIN to 1,
-        )
-        val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, size, size, hints)
-        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-        for (x in 0 until size) {
-            for (y in 0 until size) {
-                bmp.setPixel(x, y, if (matrix[x, y]) Color.BLACK else Color.WHITE)
+    companion object {
+        fun renderQr(payload: String, size: Int = 256): Bitmap {
+            val hints = mapOf(
+                EncodeHintType.ERROR_CORRECTION to ErrorCorrectionLevel.M,
+                EncodeHintType.MARGIN to 1,
+            )
+            val matrix = QRCodeWriter().encode(payload, BarcodeFormat.QR_CODE, size, size, hints)
+            val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            for (x in 0 until size) {
+                for (y in 0 until size) {
+                    bmp.setPixel(x, y, if (matrix[x, y]) Color.BLACK else Color.WHITE)
+                }
             }
+            return bmp
         }
-        return bmp
     }
 
     private fun formatTimestamp(ms: Long): String =

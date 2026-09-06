@@ -45,11 +45,18 @@ object ReportsModule {
     @Provides
     @Singleton
     fun provideReportHashingService(): ReportHashingService = ReportHashingService()
+
+    @Provides
+    @Singleton
+    fun provideCertifiedReportPdfRenderer(
+        @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context
+    ): com.elysium369.meet.core.export.CertifiedReportPdfRenderer =
+        com.elysium369.meet.core.export.CertifiedReportPdfRenderer(context)
 }
 
 /**
  * Hilt entry point used by Compose screens that don't have access to a
- * `@HiltViewModel` for [ReportHashingService]. Use
+ * `@HiltViewModel` for [ReportHashingService] or [CertifiedReportPdfRenderer]. Use
  * `EntryPointAccessors.fromApplication(context, ReportsEntryPoint::class.java)`
  * inside a `@Composable` `remember { ... }` block.
  */
@@ -58,4 +65,6 @@ object ReportsModule {
 interface ReportsEntryPoint {
     fun reportHashingService(): ReportHashingService
     fun hashEngine(): HashEngine
+    fun certifiedReportPdfRenderer(): com.elysium369.meet.core.export.CertifiedReportPdfRenderer
+    fun certifiedReportRepository(): com.elysium369.meet.data.local.CertifiedReportRepository
 }

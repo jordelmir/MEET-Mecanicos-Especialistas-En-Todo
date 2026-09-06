@@ -1,6 +1,8 @@
 package com.elysium369.meet.ui.screens
 
 import android.app.Application
+import android.content.Intent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -12,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.rememberScrollState
@@ -32,7 +35,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.QrCode2
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -47,10 +52,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
+import com.elysium369.meet.core.export.CertifiedReportPdfRenderer
 import com.elysium369.meet.core.reports.EvidenceType
 import com.elysium369.meet.core.reports.QrPayload
 import com.elysium369.meet.core.reports.ReportIntegrityCard
@@ -58,6 +66,9 @@ import com.elysium369.meet.core.reports.ReportType
 import com.elysium369.meet.core.reports.rememberReportHashingService
 import com.elysium369.meet.data.local.CertifiedReportRepository
 import com.elysium369.meet.data.local.ReportMappers
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.elysium369.meet.data.local.dao.CertifiedReportDao
 import com.elysium369.meet.data.local.dao.DiagnosticSnapshotDao
 import com.elysium369.meet.data.local.dao.RepairActionDao
@@ -180,6 +191,7 @@ fun InspectionSessionScreen(
                 integrityHash = lastSignedHash!!,
                 qrPayload = lastQr,
                 hashing = hashing,
+                repo = repo,
             )
         }
 
@@ -458,7 +470,14 @@ private fun SignedReportPanel(
     integrityHash: String,
     qrPayload: String?,
     hashing: com.elysium369.meet.core.reports.ReportHashingService,
+    repo: CertifiedReportRepository? = null,
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var isExporting by remember { mutableStateOf(false) }
+    var exportError by remember { mutableStateOf<String?>(null) }
+    var exportSuccessMsg by remember { mutableStateOf<String?>(null) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
@@ -481,17 +500,93 @@ private fun SignedReportPanel(
                 Divider()
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Filled.QrCode2, contentDescription = null)
-                    Text("QR de verificación", fontWeight = FontWeight.SemiBold)
+                    Text("QR de verificación forense (ZXing)", fontWeight = FontWeight.SemiBold)
                 }
-                // Phase 6 will render the QR as a ZXing PNG. Until then
-                // we show the raw payload so the operator can verify
-                // it byte-for-byte against the receiver.
+
+                val qrBitmap = remember(qr) {
+                    try {
+                        CertifiedReportPdfRenderer.renderQr(qr, 320)
+                    } catch (e: Exception) {
+                        null
+                    }
+                }
+
+                if (qrBitmap != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            bitmap = qrBitmap.asImageBitmap(),
+                            contentDescription = "Código QR de verificación forense",
+                            modifier = Modifier
+                                .size(180.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.White)
+                                .padding(8.dp)
+                        )
+                    }
+                }
+
                 Text(qr, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
-                Text(
-                    "Pendiente: renderizar QR como PNG (Phase 6 — ZXing).",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            }
+
+            if (repo != null) {
+                Divider()
+                Button(
+                    onClick = {
+                        scope.launch {
+                            isExporting = true
+                            exportError = null
+                            exportSuccessMsg = null
+                            try {
+                                val reportsDir = File(context.cacheDir, "reports").apply { mkdirs() }
+                                val target = File(reportsDir, "reporte_${reportId.take(8)}.pdf")
+                                val resultFile = withContext(Dispatchers.IO) {
+                                    repo.exportPdf(reportId, target)
+                                }
+                                exportSuccessMsg = "PDF generado con éxito: ${resultFile.name}"
+                                val uri = FileProvider.getUriForFile(
+                                    context,
+                                    "${context.packageName}.fileprovider",
+                                    resultFile
+                                )
+                                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "application/pdf"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    putExtra(Intent.EXTRA_SUBJECT, "Reporte Certificado MEET - $reportId")
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(shareIntent, "Compartir Reporte PDF"))
+                            } catch (e: Exception) {
+                                exportError = "Error al exportar PDF: ${e.localizedMessage ?: e.message}"
+                            } finally {
+                                isExporting = false
+                            }
+                        }
+                    },
+                    enabled = !isExporting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (isExporting) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Generando PDF certificado...")
+                    } else {
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Exportar y Compartir PDF Certificado")
+                    }
+                }
+
+                exportSuccessMsg?.let {
+                    Text(it, color = Color(0xFF00897B), style = MaterialTheme.typography.bodySmall)
+                }
+                exportError?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                }
             }
         }
     }

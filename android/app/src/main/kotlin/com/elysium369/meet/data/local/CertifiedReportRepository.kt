@@ -56,6 +56,7 @@ class CertifiedReportRepository @Inject constructor(
     private val snapshotDao: DiagnosticSnapshotDao,
     private val hashing: ReportHashingService,
     private val transactions: ReportTransactionRunner = DirectReportTransactionRunner,
+    private val pdfRenderer: com.elysium369.meet.core.export.CertifiedReportPdfRenderer? = null,
 ) {
 
     // ── draft lifecycle ──────────────────────────────────────────────────
@@ -267,6 +268,53 @@ class CertifiedReportRepository @Inject constructor(
                 ?: throw IllegalStateException("Report $reportId does not exist")
             reportDao.updateStatus(report, ReportStatus.VOIDED, nowMs)
         }
+    }
+
+    /**
+     * Renders a multi-page certified PDF report, stamps it with the QR code and
+     * integrity hash, saves to [outputFile], and transitions the report status
+     * to EXPORTED.
+     */
+    suspend fun exportPdf(
+        reportId: String,
+        outputFile: java.io.File,
+        privacyPolicy: com.elysium369.meet.core.reports.ReportPrivacyPolicy = com.elysium369.meet.core.reports.ReportPrivacyPolicy.OWNER_COPY,
+        vehicleLabel: String? = null,
+        vehicleOdometerKm: Long? = null,
+        vehicleScore: Int? = null,
+        peritajeVerdict: String? = null,
+        renderer: com.elysium369.meet.core.export.CertifiedReportPdfRenderer? = null,
+    ): java.io.File {
+        val report = reportDao.getById(reportId)
+            ?: throw IllegalStateException("Report $reportId does not exist")
+        val evidence = evidenceDao.listForReport(reportId)
+        val repairs = repairDao.listForReport(reportId)
+        val snapshots = snapshotDao.listForReport(reportId)
+
+        val content = com.elysium369.meet.core.export.CertifiedReportPdfRenderer.PageContent(
+            report = report,
+            evidence = evidence,
+            repairs = repairs,
+            snapshots = snapshots,
+            vehicleLabel = vehicleLabel ?: "Vehículo ${report.vehicleId}",
+            vehicleOdometerKm = vehicleOdometerKm ?: report.odometerKm?.toLong(),
+            vehicleScore = vehicleScore,
+            peritajeVerdict = peritajeVerdict,
+            privacyPolicy = privacyPolicy,
+        )
+
+        val activeRenderer = renderer ?: pdfRenderer
+            ?: throw IllegalStateException("No CertifiedReportPdfRenderer available for PDF export")
+        activeRenderer.render(content, outputFile)
+
+        val nowMs = System.currentTimeMillis()
+        transactions.run {
+            val freshReport = reportDao.getById(reportId) ?: report
+            if (freshReport.status == ReportStatus.SIGNED) {
+                reportDao.updateStatus(freshReport, ReportStatus.EXPORTED, nowMs)
+            }
+        }
+        return outputFile
     }
 }
 

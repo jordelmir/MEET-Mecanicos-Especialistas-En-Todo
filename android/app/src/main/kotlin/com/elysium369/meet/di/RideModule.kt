@@ -18,8 +18,12 @@ import com.elysium369.meet.ride.reputation.RideReputationGateway
 import com.elysium369.meet.ride.reputation.SupabaseRideReputationGateway
 import com.elysium369.meet.ride.safety.RideSafetyGateway
 import com.elysium369.meet.ride.safety.SupabaseRideSafetyGateway
+import com.elysium369.meet.mobility.data.gateway.MobilityCommandGateway
+import com.elysium369.meet.mobility.data.gateway.SupabaseMobilityCommandGateway
+import com.elysium369.meet.mobility.domain.realtime.AggregateVersionGate
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -27,6 +31,12 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RideModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindMobilityCommandGateway(
+        impl: SupabaseMobilityCommandGateway
+    ): MobilityCommandGateway
 
     @Binds
     @Singleton
@@ -81,4 +91,10 @@ abstract class RideModule {
     abstract fun bindRideSafetyGateway(
         impl: SupabaseRideSafetyGateway
     ): RideSafetyGateway
+
+    companion object {
+        @Provides
+        @Singleton
+        fun provideAggregateVersionGate(): AggregateVersionGate = AggregateVersionGate()
+    }
 }

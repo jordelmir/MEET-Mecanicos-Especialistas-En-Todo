@@ -33,6 +33,7 @@ import { generatePredictiveAlerts } from './services/garageEngine';
 import { VisualDiagnosticsView } from './components/VisualDiagnosticsView';
 import { PartsRepairsCatalog } from './components/PartsRepairsCatalog';
 import { AnalyticsDebugPanel } from './components/analytics/AnalyticsDebugPanel';
+import { ReportVerifier } from './components/ReportVerifier';
 import { analytics } from './src/analytics/analyticsClient';
 import { AnalyticsConsentManager } from './src/analytics/analyticsConsent';
 import { ANALYTICS_EVENTS } from './src/analytics/analyticsEvents';
@@ -329,6 +330,14 @@ export default function App() {
   const isAnalyticsDebugRoute = typeof window !== 'undefined' &&
     import.meta.env.VITE_ENABLE_ANALYTICS_DEBUG === 'true' &&
     window.location.pathname === '/analytics-debug';
+
+  const isVerifyRoute = typeof window !== 'undefined' && (
+    window.location.pathname === '/verify' ||
+    window.location.pathname.startsWith('/verify') ||
+    new URLSearchParams(window.location.search).get('verify') === 'true' ||
+    (new URLSearchParams(window.location.search).has('reportId') && (new URLSearchParams(window.location.search).has('hash') || new URLSearchParams(window.location.search).has('integrityHash'))) ||
+    (typeof window.location.hash === 'string' && (window.location.hash.startsWith('#v1|') || window.location.hash.includes('reportId=')))
+  );
 
   // ── DERIVED STATE ──
   const visibleMechanics = useMemo(() => {
@@ -889,6 +898,31 @@ export default function App() {
   // ── RENDER ──
   if (isAnalyticsDebugRoute) {
     return <AnalyticsDebugPanel />;
+  }
+
+  if (isVerifyRoute) {
+    return (
+      <div className="min-h-screen bg-steel-950 text-gray-100 flex flex-col items-center justify-center p-4">
+        <IndustrialBackground />
+        <div className="relative z-10 w-full max-w-2xl">
+          <div className="flex items-center justify-between mb-4 px-2">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-sm font-bold text-forge-500 tracking-wider">MEET</span>
+              <span className="text-xs text-steel-400">Portal Público de Verificación Forense</span>
+            </div>
+            <a
+              href="/"
+              className="text-xs font-mono text-cyan-400 hover:underline"
+            >
+              Ir a la App
+            </a>
+          </div>
+          <div className="bg-steel-900/90 border border-steel-700/60 rounded-2xl shadow-2xl backdrop-blur-md overflow-hidden">
+            <ReportVerifier />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
