@@ -104,7 +104,7 @@ data class TowJob(
     val pickupAddress: String,
     val destinationLocation: GeoPoint? = null,
     val destinationAddress: String? = null,
-    val requiredCapabilities: Set<TowCapabilities> = setOf(TowCapabilities.FLATBED),
+    val requiredCapabilities: Set<TowCapabilities> = emptySet(),
     val assignedUnit: TowUnit? = null,
     val assignedOperatorName: String? = null,
     val assignedOperatorPhone: String? = null,

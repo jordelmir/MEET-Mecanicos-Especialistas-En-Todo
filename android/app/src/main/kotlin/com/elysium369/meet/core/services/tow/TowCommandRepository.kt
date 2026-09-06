@@ -198,7 +198,7 @@ class TowCommandRepository(
         pickupAddress: String,
         destinationLocation: GeoPoint? = null,
         destinationAddress: String? = null,
-        requiredCapabilities: Set<TowCapabilities> = setOf(TowCapabilities.FLATBED),
+        requiredCapabilities: Set<TowCapabilities> = emptySet(),
         estimatedPrice: Money? = null,
         correlationId: String = UUID.randomUUID().toString(),
     ): TowJob = runBlocking {

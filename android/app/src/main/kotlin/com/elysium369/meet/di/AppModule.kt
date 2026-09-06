@@ -4732,6 +4732,12 @@ object AppModule {
     ): com.elysium369.meet.ride.data.remote.RideDriverEnrollmentGateway = gateway
 
     @Provides
+    @Singleton
+    fun provideTowCommandGateway(
+        gateway: com.elysium369.meet.core.services.tow.remote.SupabaseTowCommandGateway
+    ): com.elysium369.meet.core.services.tow.remote.TowCommandGateway = gateway
+
+    @Provides
     fun provideVanguardTelemetryDao(db: MeetDatabase): VanguardTelemetryDao = db.vanguardTelemetryDao()
 
     @Provides

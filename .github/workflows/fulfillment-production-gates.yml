@@ -39,6 +39,8 @@ jobs:
           sudo apt-get install -y postgresql postgresql-contrib
       - name: Execute Tow Authority V5 Integration Test Suite
         run: bash tests/tow/verify-tow-authority-postgres.sh
+      - name: Execute 100-Way Concurrent Claims and Idempotency Suite
+        run: bash tests/tow/test-100-concurrent-claims.sh
 
   cross-runtime-parity-gate:
     name: Cross-Runtime Parity Verification

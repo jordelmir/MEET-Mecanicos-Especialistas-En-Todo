@@ -64,25 +64,46 @@ Executed via automated ephemeral cluster test runner:
 
 ---
 
-## 4. Elimination of Synthetic Truth
+## 4. 100-Way Distributed Concurrency & Idempotency Matrix (PostgreSQL 16)
 
-1. **TowUnit Rig Modeling**:
-   - Removed synthetic defaults (`"Unidad Asignada"`, `"GRUA-..."`, `setOf(FLATBED)`).
-   - All fields (`brandModel`, `licensePlate`, `maxWeightKg`) are properly nullable and bound to physical verification.
-2. **Custody Checkpoints**:
-   - `TowCustodyRecord` requires non-null `canonicalEvidenceId: UUID` and `evidenceHashSha256: String`.
-3. **GPS Accuracy**:
-   - Removed `0f` fallbacks; accuracy is modeled as `Float? = null` when unobserved or unavailable.
-4. **Driver Reputation**:
-   - Replaced `0.0` rating coercions with honest nullability (`Double? = null`).
+Executed via automated parallel stress runner:  
+`bash tests/tow/test-100-concurrent-claims.sh`
+
+| Test Scenario | Concurrency Level | Invariant Required | Empirically Observed Result |
+|---|---|---|---|
+| **Contested Claim Race** | 100 simultaneous distinct verified operators & units targeting single job | Exactly 1 winner (`ASSIGNED`, version 2), exactly 99 conflicts | **PASSED: 1 winner, 99 conflicts, 0 errors** |
+| **Concurrent Idempotency** | 100 simultaneous calls with identical actor, key, and request hash | Exactly 1 domain mutation, 100 identical receipts returned | **PASSED: 100 identical replies, exactly 1 DB receipt** |
+| **Payload Tampering** | Replayed key with altered request hash | Rejection with PostgreSQL error `23505` | **PASSED (Error 23505 raised)** |
 
 ---
 
-## 5. Artifacts and Commits
+## 5. Elimination of Synthetic Truth & Online Remote Gateway
 
+1. **Remote Gateway Authority**:
+   - Implemented `TowCommandGateway` and `SupabaseTowCommandGateway` routing `requestTow`, `claimTow`, `transition`, and `discoverJobs` over the internet via Supabase PostgREST RPCs.
+   - Bound in `AppModule.kt`.
+2. **TowUnit Rig Modeling**:
+   - Removed synthetic defaults (`"Unidad Asignada"`, `"GRUA-..."`, `setOf(FLATBED)`). Default required capabilities changed to `emptySet()`.
+   - All fields (`brandModel`, `licensePlate`, `maxWeightKg`) are properly nullable and bound to physical verification.
+3. **Custody Checkpoints**:
+   - `TowCustodyRecord` requires non-null `canonicalEvidenceId: UUID` and `evidenceHashSha256: String`.
+4. **GPS Accuracy & Reputation**:
+   - Removed `0f` fallbacks; accuracy is modeled as `Float? = null` when unobserved or unavailable.
+   - Replaced `0.0` rating coercions with honest nullability (`Double? = null`).
+5. **GitHub Branch Protection**:
+   - Configured and active on branch `main` via GitHub REST API.
+   - Required checks enforced: `PostgreSQL Tow Server Authority V5 Integration`, `Android Fulfillment OS & Truth Guard Tests`, `Cross-Runtime Parity Verification`.
+   - Force-pushes and branch deletions disabled.
+
+---
+
+## 6. Artifacts, Test Scripts & CI Gates
+
+- **Remote Gateway**: `TowCommandGateway.kt`, `SupabaseTowCommandGateway.kt`
 - **Android Domain**: `TowDomainModels.kt`, `TowCommandRepository.kt`, `TowStateEngine.kt`, `RideUiModels.kt`
-- **Android Instrumentation**: `TowRoomConcurrencyAndCasTest.kt`
+- **Android Instrumentation**: `TowRoomConcurrencyAndCasTest.kt` (4/4 on Honor VER-N49 Android 16)
 - **Supabase Migration**: `supabase/migrations/20260905180000_tow_fulfillment_authority.sql`
-- **PostgreSQL Tests**: `tests/supabase/tow_authority_v5.sql`, `tests/tow/verify-tow-authority-postgres.sh`
+- **PostgreSQL Suites**: `tests/supabase/tow_authority_v5.sql`, `tests/tow/verify-tow-authority-postgres.sh`, `tests/tow/test-100-concurrent-claims.sh`
 - **CI Production Gates**: `.github/workflows/fulfillment-production-gates.yml`
 - **Audit Reports**: `docs/audits/FULFILLMENT-V4-IMPLEMENTATION-REPORT.md`, `docs/audits/FULFILLMENT-V5-CLOSURE-REPORT.md`
+
