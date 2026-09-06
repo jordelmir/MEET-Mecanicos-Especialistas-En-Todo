@@ -24,6 +24,8 @@ jobs:
         run: bash tests/mobility/verify-mobility-finance-postgres.sh
       - name: Execute Mobility Safety Center, Reserve & Guest Rides Suite
         run: bash tests/mobility/verify-mobility-safety-reserve-postgres.sh
+      - name: Execute Mobility Comms, Reputation & Dynamic Surge Suite
+        run: bash tests/mobility/verify-mobility-comms-reputation-surge-postgres.sh
 
   android-mobility-gates:
     name: Android Mobility OS Domain & Outbox Tests
