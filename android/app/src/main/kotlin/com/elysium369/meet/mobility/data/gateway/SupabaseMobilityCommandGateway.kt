@@ -20,8 +20,10 @@ import com.elysium369.meet.mobility.domain.models.RideStopType
 import com.elysium369.meet.mobility.domain.models.ServiceCategoryId
 import com.elysium369.meet.mobility.domain.models.Trip
 import com.elysium369.meet.mobility.domain.models.TripState
+import com.elysium369.meet.mobility.domain.result.GatewayFailure
 import com.elysium369.meet.mobility.domain.result.MobilityCommandResult
 import com.elysium369.meet.mobility.domain.result.MobilityErrorCode
+import com.elysium369.meet.mobility.domain.result.MobilityFailureClassifier
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -30,10 +32,15 @@ import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.double
+import kotlinx.serialization.json.floatOrNull
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -44,6 +51,16 @@ import kotlinx.serialization.json.put
 class SupabaseMobilityCommandGateway @Inject constructor(
     private val supabase: SupabaseClient,
 ) : MobilityCommandGateway {
+
+    private fun <T> handleFailure(t: Throwable): MobilityCommandResult<T> {
+        val classified = MobilityFailureClassifier.classify(t)
+        return when (classified) {
+            is GatewayFailure.Retryable -> MobilityCommandResult.RetryableFailure(t)
+            is GatewayFailure.Authentication -> MobilityCommandResult.Rejected(MobilityErrorCode.UNAUTHENTICATED, classified.message)
+            is GatewayFailure.Protocol -> MobilityCommandResult.Rejected(MobilityErrorCode.UNKNOWN_ERROR, classified.message)
+            is GatewayFailure.Terminal -> MobilityCommandResult.Rejected(MobilityErrorCode.UNKNOWN_ERROR, classified.message)
+        }
+    }
 
     override suspend fun requestRide(command: RequestRideCommand): MobilityCommandResult<RideRequest> {
         val user = supabase.auth.currentUserOrNull() ?: return MobilityCommandResult.Rejected(
@@ -88,14 +105,24 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                 val rideRequestId = UUID.fromString(response["ride_request_id"]!!.jsonPrimitive.content)
                 val state = RideRequestState.valueOf(response["state"]!!.jsonPrimitive.content)
                 val version = response["version"]!!.jsonPrimitive.longOrNull ?: 1L
+                val stopsArray = response["stops"]?.jsonArray
+                val parsedStops = stopsArray?.map { stopElem ->
+                    val s = stopElem.jsonObject
+                    RideStop(
+                        stopId = UUID.fromString(s["stop_id"]!!.jsonPrimitive.content),
+                        sequence = s["sequence"]!!.jsonPrimitive.int,
+                        latitude = s["latitude"]!!.jsonPrimitive.double,
+                        longitude = s["longitude"]!!.jsonPrimitive.double,
+                        accuracyMeters = s["accuracy_meters"]?.jsonPrimitive?.floatOrNull,
+                        displayName = s["display_name"]?.jsonPrimitive?.contentOrNull,
+                        address = s["address"]?.jsonPrimitive?.contentOrNull,
+                        placeId = s["place_id"]?.jsonPrimitive?.contentOrNull,
+                        type = RideStopType.valueOf(s["stop_type"]!!.jsonPrimitive.content),
+                    )
+                } ?: emptyList()
 
-                val rideRequest = RideRequest(
-                    rideRequestId = rideRequestId,
-                    riderId = UUID.fromString(user.id),
-                    marketId = command.marketId,
-                    serviceCategoryId = command.serviceCategoryId,
-                    dispatchMode = command.dispatchMode,
-                    pickup = RideStop(
+                val pickupStop = parsedStops.firstOrNull { it.type == RideStopType.PICKUP }
+                    ?: RideStop(
                         stopId = UUID.randomUUID(),
                         sequence = 0,
                         latitude = command.pickup.latitude,
@@ -105,23 +132,29 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                         address = command.pickup.address,
                         placeId = command.pickup.placeId,
                         type = RideStopType.PICKUP,
-                    ),
-                    intermediateStops = command.intermediateStops.mapIndexed { idx, stop ->
-                        RideStop(
-                            stopId = UUID.randomUUID(),
-                            sequence = idx + 1,
-                            latitude = stop.latitude,
-                            longitude = stop.longitude,
-                            accuracyMeters = stop.accuracyMeters,
-                            displayName = stop.displayName,
-                            address = stop.address,
-                            placeId = stop.placeId,
-                            type = RideStopType.INTERMEDIATE,
-                        )
-                    },
-                    destination = RideStop(
+                    )
+
+                val intermediateStops = parsedStops.filter { it.type == RideStopType.INTERMEDIATE }
+                    .ifEmpty {
+                        command.intermediateStops.mapIndexed { idx, stop ->
+                            RideStop(
+                                stopId = UUID.randomUUID(),
+                                sequence = idx + 1,
+                                latitude = stop.latitude,
+                                longitude = stop.longitude,
+                                accuracyMeters = stop.accuracyMeters,
+                                displayName = stop.displayName,
+                                address = stop.address,
+                                placeId = stop.placeId,
+                                type = RideStopType.INTERMEDIATE,
+                            )
+                        }
+                    }
+
+                val destinationStop = parsedStops.firstOrNull { it.type == RideStopType.DESTINATION }
+                    ?: RideStop(
                         stopId = UUID.randomUUID(),
-                        sequence = command.intermediateStops.size + 1,
+                        sequence = intermediateStops.size + 1,
                         latitude = command.destination.latitude,
                         longitude = command.destination.longitude,
                         accuracyMeters = command.destination.accuracyMeters,
@@ -129,7 +162,17 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                         address = command.destination.address,
                         placeId = command.destination.placeId,
                         type = RideStopType.DESTINATION,
-                    ),
+                    )
+
+                val rideRequest = RideRequest(
+                    rideRequestId = rideRequestId,
+                    riderId = UUID.fromString(user.id),
+                    marketId = command.marketId,
+                    serviceCategoryId = command.serviceCategoryId,
+                    dispatchMode = command.dispatchMode,
+                    pickup = pickupStop,
+                    intermediateStops = intermediateStops,
+                    destination = destinationStop,
                     requestedPrice = command.requestedPrice,
                     state = state,
                     scheduledFor = command.scheduledFor,
@@ -149,8 +192,10 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                 val message = response["message"]?.jsonPrimitive?.content
                 MobilityCommandResult.Rejected(errorCode, message)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
-            MobilityCommandResult.RetryableFailure(t)
+            handleFailure(t)
         }
     }
 
@@ -198,8 +243,10 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                 val message = response["message"]?.jsonPrimitive?.content
                 MobilityCommandResult.Rejected(errorCode, message)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
-            MobilityCommandResult.RetryableFailure(t)
+            handleFailure(t)
         }
     }
 
@@ -229,8 +276,10 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                     MobilityCommandResult.Rejected(errorCode, message)
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
-            MobilityCommandResult.RetryableFailure(t)
+            handleFailure(t)
         }
     }
 
@@ -261,8 +310,10 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                     MobilityCommandResult.Rejected(errorCode, message)
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
-            MobilityCommandResult.RetryableFailure(t)
+            handleFailure(t)
         }
     }
 
@@ -293,8 +344,10 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                     MobilityCommandResult.Rejected(errorCode, message)
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
-            MobilityCommandResult.RetryableFailure(t)
+            handleFailure(t)
         }
     }
 
@@ -318,8 +371,10 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                 val message = response["message"]?.jsonPrimitive?.content
                 MobilityCommandResult.Rejected(errorCode, message)
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
-            MobilityCommandResult.RetryableFailure(t)
+            handleFailure(t)
         }
     }
 

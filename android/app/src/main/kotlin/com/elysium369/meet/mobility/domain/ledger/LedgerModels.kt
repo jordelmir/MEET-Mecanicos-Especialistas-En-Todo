@@ -36,9 +36,32 @@ data class LedgerTransaction(
     val createdAt: Instant,
 ) {
     init {
-        require(entries.isNotEmpty()) { "LedgerTransaction requires at least two entries" }
-        val sum = entries.sumOf { it.amount.minorUnits }
-        require(sum == 0L) { "Double-entry ledger must be balanced: sum of amounts must be 0, got $sum" }
+        require(entries.size >= 2) {
+            "Double-entry transaction requires >= 2 entries"
+        }
+
+        require(entries.all { it.amount.currency == currency }) {
+            "Every ledger entry must use transaction currency=$currency"
+        }
+
+        val balance = entries.fold(0L) { accumulator, entry ->
+            Math.addExact(
+                accumulator,
+                entry.amount.minorUnits,
+            )
+        }
+
+        require(balance == 0L) {
+            "Unbalanced ledger transaction: balance=$balance"
+        }
+
+        require(entries.any { it.amount.minorUnits > 0L }) {
+            "Ledger requires at least one debit"
+        }
+
+        require(entries.any { it.amount.minorUnits < 0L }) {
+            "Ledger requires at least one credit"
+        }
     }
 }
 
@@ -55,12 +78,30 @@ data class TripSettlement(
     val createdAt: Instant,
 ) {
     init {
-        require(grossFare.currency == platformFee.currency) { "Currency mismatch in settlement" }
-        require(grossFare.currency == driverEarnings.currency) { "Currency mismatch in settlement" }
-        // grossFare must equal platformFee + driverEarnings + tax + toll
-        val calculatedGross = platformFee.minorUnits + driverEarnings.minorUnits + tax.minorUnits + toll.minorUnits
-        require(grossFare.minorUnits == calculatedGross) {
-            "Gross fare (${grossFare.minorUnits}) must equal sum of components ($calculatedGross)"
+        val expectedCurrency = grossFare.currency
+
+        require(
+            listOf(
+                platformFee,
+                driverEarnings,
+                tax,
+                toll,
+            ).all { it.currency == expectedCurrency }
+        ) {
+            "Settlement currency mismatch"
+        }
+
+        val components = listOf(
+            platformFee.minorUnits,
+            driverEarnings.minorUnits,
+            tax.minorUnits,
+            toll.minorUnits,
+        )
+
+        val calculated = components.fold(0L, Math::addExact)
+
+        require(calculated == grossFare.minorUnits) {
+            "Settlement invariant violated: gross=${grossFare.minorUnits}, components=$calculated"
         }
     }
 }

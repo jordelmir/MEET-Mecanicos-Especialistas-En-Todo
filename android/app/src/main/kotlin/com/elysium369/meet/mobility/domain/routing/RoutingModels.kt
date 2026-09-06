@@ -1,5 +1,6 @@
 package com.elysium369.meet.mobility.domain.routing
 
+import kotlinx.coroutines.CancellationException
 import java.time.Instant
 
 data class GeoCoordinate(
@@ -32,6 +33,52 @@ data class RoutingResult(
     }
 }
 
+sealed class RoutingProviderFailure(
+    message: String,
+    cause: Throwable? = null,
+) : RuntimeException(message, cause) {
+
+    abstract val failoverAllowed: Boolean
+
+    class Network(
+        cause: Throwable,
+    ) : RoutingProviderFailure(
+        message = "Routing network unavailable",
+        cause = cause,
+    ) {
+        override val failoverAllowed = true
+    }
+
+    class ProviderUnavailable(
+        message: String,
+    ) : RoutingProviderFailure(message) {
+        override val failoverAllowed = true
+    }
+
+    class RateLimited(
+        val retryAfterMillis: Long? = null,
+    ) : RoutingProviderFailure("Routing provider rate limited") {
+        override val failoverAllowed = true
+    }
+
+    class Unauthorized :
+        RoutingProviderFailure("Routing credentials rejected") {
+        override val failoverAllowed = false
+    }
+
+    class InvalidRequest(
+        message: String,
+    ) : RoutingProviderFailure(message) {
+        override val failoverAllowed = false
+    }
+
+    class ProtocolViolation(
+        message: String,
+    ) : RoutingProviderFailure(message) {
+        override val failoverAllowed = false
+    }
+}
+
 class RoutingUnavailableException(
     message: String,
     cause: Throwable? = null,
@@ -59,14 +106,29 @@ class RoutingProviderChain(
         destination: GeoCoordinate,
         profile: RoutingProfile,
     ): RoutingResult {
-        var lastFailure: Throwable? = null
+        var lastRetryableFailure: Throwable? = null
         for (provider in providers) {
             try {
-                return provider.route(origin, stops, destination, profile)
+                return provider.route(
+                    origin = origin,
+                    stops = stops,
+                    destination = destination,
+                    profile = profile,
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (failure: RoutingProviderFailure) {
+                if (!failure.failoverAllowed) {
+                    throw failure
+                }
+                lastRetryableFailure = failure
             } catch (t: Throwable) {
-                lastFailure = t
+                lastRetryableFailure = t
             }
         }
-        throw RoutingUnavailableException("All routing providers in chain failed", lastFailure)
+        throw RoutingUnavailableException(
+            message = "All routing providers unavailable",
+            cause = lastRetryableFailure,
+        )
     }
 }

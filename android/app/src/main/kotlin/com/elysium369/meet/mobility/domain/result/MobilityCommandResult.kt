@@ -45,3 +45,51 @@ sealed interface MobilityCommandResult<out T> {
         val message: String? = cause.message,
     ) : MobilityCommandResult<Nothing>
 }
+
+sealed interface GatewayFailure {
+    data class Retryable(
+        val cause: Throwable,
+        val retryAfterMillis: Long? = null,
+    ) : GatewayFailure
+
+    data class Authentication(
+        val message: String,
+    ) : GatewayFailure
+
+    data class Protocol(
+        val message: String,
+        val cause: Throwable? = null,
+    ) : GatewayFailure
+
+    data class Terminal(
+        val message: String,
+    ) : GatewayFailure
+}
+
+object MobilityFailureClassifier {
+    fun classify(t: Throwable): GatewayFailure {
+        return when (t) {
+            is kotlinx.coroutines.CancellationException -> throw t
+
+            is java.net.SocketTimeoutException ->
+                GatewayFailure.Retryable(t)
+
+            is java.net.ConnectException ->
+                GatewayFailure.Retryable(t)
+
+            is java.net.UnknownHostException ->
+                GatewayFailure.Retryable(t)
+
+            is kotlinx.serialization.SerializationException ->
+                GatewayFailure.Protocol(
+                    message = "Server response violates mobility protocol",
+                    cause = t,
+                )
+
+            else ->
+                GatewayFailure.Terminal(
+                    message = "Unclassified mobility failure: ${t::class.java.name}",
+                )
+        }
+    }
+}

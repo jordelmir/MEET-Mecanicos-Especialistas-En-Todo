@@ -168,8 +168,173 @@ END $$;
 CREATE INDEX IF NOT EXISTS idx_mobility_driver_presence_state ON public.driver_presence_snapshot (market_id, current_state);
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- 5. RIDE REQUESTS & STOPS
+-- 5. RIDE REQUESTS & STOPS (WITH RECONCILIATION & SYNC)
 -- ─────────────────────────────────────────────────────────────────────────────
+
+DO $$
+BEGIN
+    -- Reconcile pre-existing public.ride_requests if present
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'ride_requests'
+    ) THEN
+        -- Add ride_request_id if missing
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'ride_request_id'
+        ) THEN
+            ALTER TABLE public.ride_requests ADD COLUMN ride_request_id UUID DEFAULT extensions.gen_random_uuid();
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'id'
+            ) THEN
+                UPDATE public.ride_requests SET ride_request_id = id WHERE ride_request_id IS NULL;
+            END IF;
+            ALTER TABLE public.ride_requests ALTER COLUMN ride_request_id SET NOT NULL;
+        END IF;
+
+        -- Ensure unique constraint on ride_request_id so foreign keys can reference it
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conrelid = 'public.ride_requests'::regclass 
+              AND contype = 'u' 
+              AND conname = 'uq_ride_requests_ride_request_id'
+        ) AND NOT EXISTS (
+            SELECT 1 FROM pg_constraint 
+            WHERE conrelid = 'public.ride_requests'::regclass 
+              AND contype = 'p' 
+              AND (SELECT attname FROM pg_attribute WHERE attrelid = conrelid AND attnum = ANY(conkey)) = 'ride_request_id'
+        ) THEN
+            ALTER TABLE public.ride_requests ADD CONSTRAINT uq_ride_requests_ride_request_id UNIQUE (ride_request_id);
+        END IF;
+
+        -- Add missing columns
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS rider_id UUID REFERENCES auth.users(id) ON DELETE RESTRICT;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS market_id TEXT REFERENCES public.mobility_markets(market_id) ON DELETE RESTRICT;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS service_category_id TEXT REFERENCES public.mobility_service_categories(service_category_id) ON DELETE RESTRICT;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS dispatch_mode TEXT;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS state TEXT;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS pickup_location extensions.geography;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS pickup_accuracy_meters REAL;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS pickup_address TEXT;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS destination_location extensions.geography;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS destination_accuracy_meters REAL;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS destination_address TEXT;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS requested_price_minor BIGINT;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS currency_code TEXT;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS scheduled_for TIMESTAMPTZ;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS correlation_id UUID;
+        ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS version BIGINT NOT NULL DEFAULT 1;
+
+        -- Relax legacy NOT NULL columns that new code won't supply
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'passenger_id') THEN
+            ALTER TABLE public.ride_requests ALTER COLUMN passenger_id DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'customer_profile_id') THEN
+            ALTER TABLE public.ride_requests ALTER COLUMN customer_profile_id DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'pickup_latitude') THEN
+            ALTER TABLE public.ride_requests ALTER COLUMN pickup_latitude DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'pickup_longitude') THEN
+            ALTER TABLE public.ride_requests ALTER COLUMN pickup_longitude DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'destination_latitude') THEN
+            ALTER TABLE public.ride_requests ALTER COLUMN destination_latitude DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'destination_longitude') THEN
+            ALTER TABLE public.ride_requests ALTER COLUMN destination_longitude DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'offered_fare_minor') THEN
+            ALTER TABLE public.ride_requests ALTER COLUMN offered_fare_minor DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_requests' AND column_name = 'currency') THEN
+            ALTER TABLE public.ride_requests ALTER COLUMN currency DROP NOT NULL;
+        END IF;
+
+        -- Drop restrictive legacy CHECK constraints
+        ALTER TABLE public.ride_requests DROP CONSTRAINT IF EXISTS ride_requests_state_check;
+        ALTER TABLE public.ride_requests DROP CONSTRAINT IF EXISTS ride_requests_status_check;
+        ALTER TABLE public.ride_requests DROP CONSTRAINT IF EXISTS ride_requests_dispatch_mode_check;
+    END IF;
+
+    -- Reconcile pre-existing public.ride_request_stops if present
+    IF EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'ride_request_stops'
+    ) THEN
+        -- Add stop_id if missing
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'stop_id'
+        ) THEN
+            ALTER TABLE public.ride_request_stops ADD COLUMN stop_id UUID DEFAULT extensions.gen_random_uuid();
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'id'
+            ) THEN
+                UPDATE public.ride_request_stops SET stop_id = id WHERE stop_id IS NULL;
+            END IF;
+            ALTER TABLE public.ride_request_stops ALTER COLUMN stop_id SET NOT NULL;
+        END IF;
+
+        -- Add ride_request_id if missing
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'ride_request_id'
+        ) THEN
+            ALTER TABLE public.ride_request_stops ADD COLUMN ride_request_id UUID REFERENCES public.ride_requests(ride_request_id) ON DELETE CASCADE;
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'request_id'
+            ) THEN
+                UPDATE public.ride_request_stops SET ride_request_id = request_id WHERE ride_request_id IS NULL;
+            END IF;
+        END IF;
+
+        -- Add sequence if missing
+        IF NOT EXISTS (
+            SELECT 1 FROM information_schema.columns 
+            WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'sequence'
+        ) THEN
+            ALTER TABLE public.ride_request_stops ADD COLUMN sequence INTEGER;
+            IF EXISTS (
+                SELECT 1 FROM information_schema.columns 
+                WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'stop_order'
+            ) THEN
+                UPDATE public.ride_request_stops SET sequence = stop_order WHERE sequence IS NULL;
+            END IF;
+        END IF;
+
+        -- Relax legacy NOT NULL columns and CHECK constraints
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'request_id') THEN
+            ALTER TABLE public.ride_request_stops ALTER COLUMN request_id DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'stop_order') THEN
+            ALTER TABLE public.ride_request_stops ALTER COLUMN stop_order DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'label') THEN
+            ALTER TABLE public.ride_request_stops ALTER COLUMN label DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'latitude') THEN
+            ALTER TABLE public.ride_request_stops ALTER COLUMN latitude DROP NOT NULL;
+        END IF;
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'ride_request_stops' AND column_name = 'longitude') THEN
+            ALTER TABLE public.ride_request_stops ALTER COLUMN longitude DROP NOT NULL;
+        END IF;
+
+        ALTER TABLE public.ride_request_stops DROP CONSTRAINT IF EXISTS ride_request_stops_stop_order_check;
+        ALTER TABLE public.ride_request_stops DROP CONSTRAINT IF EXISTS ride_request_stops_label_check;
+
+        -- Add missing columns
+        ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS stop_type TEXT;
+        ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS location extensions.geography;
+        ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS accuracy_meters REAL;
+        ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS address TEXT;
+        ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS place_id TEXT;
+        ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS display_name TEXT;
+    END IF;
+END $$;
 
 CREATE TABLE IF NOT EXISTS public.ride_requests (
     ride_request_id UUID PRIMARY KEY DEFAULT extensions.gen_random_uuid(),
@@ -193,6 +358,55 @@ CREATE TABLE IF NOT EXISTS public.ride_requests (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp()
 );
 
+-- Ensure backwards-compatibility columns on ride_requests
+ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS id UUID UNIQUE DEFAULT extensions.gen_random_uuid();
+ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS passenger_id UUID;
+ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS pickup_latitude DOUBLE PRECISION;
+ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS pickup_longitude DOUBLE PRECISION;
+ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS destination_latitude DOUBLE PRECISION;
+ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS destination_longitude DOUBLE PRECISION;
+ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS offered_fare_minor BIGINT;
+ALTER TABLE public.ride_requests ADD COLUMN IF NOT EXISTS currency TEXT;
+
+CREATE OR REPLACE FUNCTION public.sync_ride_requests_id_columns()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.id IS NULL AND NEW.ride_request_id IS NOT NULL THEN
+        NEW.id := NEW.ride_request_id;
+    ELSIF NEW.ride_request_id IS NULL AND NEW.id IS NOT NULL THEN
+        NEW.ride_request_id := NEW.id;
+    ELSIF NEW.id IS NULL AND NEW.ride_request_id IS NULL THEN
+        NEW.id := extensions.gen_random_uuid();
+        NEW.ride_request_id := NEW.id;
+    END IF;
+
+    IF NEW.rider_id IS NOT NULL AND NEW.passenger_id IS NULL THEN
+        NEW.passenger_id := NEW.rider_id;
+    ELSIF NEW.passenger_id IS NOT NULL AND NEW.rider_id IS NULL THEN
+        NEW.rider_id := NEW.passenger_id;
+    END IF;
+
+    IF NEW.currency_code IS NOT NULL AND NEW.currency IS NULL THEN
+        NEW.currency := NEW.currency_code;
+    ELSIF NEW.currency IS NOT NULL AND NEW.currency_code IS NULL THEN
+        NEW.currency_code := NEW.currency;
+    END IF;
+
+    IF NEW.requested_price_minor IS NOT NULL AND NEW.offered_fare_minor IS NULL THEN
+        NEW.offered_fare_minor := NEW.requested_price_minor;
+    ELSIF NEW.offered_fare_minor IS NOT NULL AND NEW.requested_price_minor IS NULL THEN
+        NEW.requested_price_minor := NEW.offered_fare_minor;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sync_ride_requests_id_columns ON public.ride_requests;
+CREATE TRIGGER trg_sync_ride_requests_id_columns
+BEFORE INSERT OR UPDATE ON public.ride_requests
+FOR EACH ROW EXECUTE FUNCTION public.sync_ride_requests_id_columns();
+
 CREATE TABLE IF NOT EXISTS public.ride_request_stops (
     stop_id UUID PRIMARY KEY DEFAULT extensions.gen_random_uuid(),
     ride_request_id UUID NOT NULL REFERENCES public.ride_requests(ride_request_id) ON DELETE CASCADE,
@@ -205,6 +419,38 @@ CREATE TABLE IF NOT EXISTS public.ride_request_stops (
     display_name TEXT,
     UNIQUE (ride_request_id, sequence)
 );
+
+-- Ensure backwards-compatibility columns and unique index on ride_request_stops
+ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS id UUID UNIQUE DEFAULT extensions.gen_random_uuid();
+ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS request_id UUID;
+ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS stop_order INTEGER;
+ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS label TEXT;
+ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
+ALTER TABLE public.ride_request_stops ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_ride_request_stops_ride_seq 
+ON public.ride_request_stops (ride_request_id, sequence) 
+WHERE ride_request_id IS NOT NULL AND sequence IS NOT NULL;
+
+CREATE OR REPLACE FUNCTION public.sync_ride_request_stops_columns()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.stop_id := COALESCE(NEW.stop_id, NEW.id, extensions.gen_random_uuid());
+    NEW.id := COALESCE(NEW.id, NEW.stop_id);
+    NEW.ride_request_id := COALESCE(NEW.ride_request_id, NEW.request_id);
+    NEW.request_id := COALESCE(NEW.request_id, NEW.ride_request_id);
+    NEW.sequence := COALESCE(NEW.sequence, NEW.stop_order, 0);
+    NEW.stop_order := COALESCE(NEW.stop_order, NEW.sequence);
+    NEW.address := COALESCE(NEW.address, NEW.label);
+    NEW.label := COALESCE(NEW.label, NEW.address, NEW.display_name, 'Stop');
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sync_ride_request_stops_columns ON public.ride_request_stops;
+CREATE TRIGGER trg_sync_ride_request_stops_columns
+BEFORE INSERT OR UPDATE ON public.ride_request_stops
+FOR EACH ROW EXECUTE FUNCTION public.sync_ride_request_stops_columns();
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 6. DISPATCH OFFERS & IN-DRIVE MARKETPLACE OFFERS

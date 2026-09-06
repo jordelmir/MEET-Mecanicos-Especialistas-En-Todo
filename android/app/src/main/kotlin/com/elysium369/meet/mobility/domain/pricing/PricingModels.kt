@@ -3,6 +3,7 @@ package com.elysium369.meet.mobility.domain.pricing
 import com.elysium369.meet.mobility.domain.models.MarketId
 import com.elysium369.meet.mobility.domain.models.Money
 import com.elysium369.meet.mobility.domain.models.ServiceCategoryId
+import java.math.BigInteger
 import java.time.Instant
 import java.util.UUID
 
@@ -22,9 +23,68 @@ data class Rate(
     }
 }
 
-fun Money.multiply(rate: Rate): Money {
-    val product = Math.multiplyExact(minorUnits, rate.numerator)
-    return copy(minorUnits = product / rate.denominator)
+enum class FinancialRounding {
+    DOWN,
+    HALF_UP,
+    HALF_EVEN,
+}
+
+fun Money.multiply(
+    rate: Rate,
+    rounding: FinancialRounding = FinancialRounding.DOWN,
+): Money {
+    val numerator =
+        BigInteger.valueOf(minorUnits)
+            .multiply(
+                BigInteger.valueOf(rate.numerator)
+            )
+
+    val denominator =
+        BigInteger.valueOf(rate.denominator)
+
+    val division =
+        numerator.divideAndRemainder(
+            denominator
+        )
+
+    var quotient = division[0]
+    val remainder = division[1]
+
+    when (rounding) {
+        FinancialRounding.DOWN -> Unit
+
+        FinancialRounding.HALF_UP -> {
+            if (
+                remainder
+                    .multiply(BigInteger.TWO)
+                    >= denominator
+            ) {
+                quotient += BigInteger.ONE
+            }
+        }
+
+        FinancialRounding.HALF_EVEN -> {
+            val doubled =
+                remainder.multiply(
+                    BigInteger.TWO
+                )
+
+            if (
+                doubled > denominator ||
+                (
+                    doubled == denominator &&
+                    quotient.testBit(0)
+                )
+            ) {
+                quotient += BigInteger.ONE
+            }
+        }
+    }
+
+    return Money(
+        minorUnits = quotient.longValueExact(),
+        currency = currency,
+    )
 }
 
 enum class PricingMode {

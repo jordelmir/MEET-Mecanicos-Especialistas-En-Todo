@@ -17,8 +17,9 @@ enum class OutboxState {
     tableName = "mobility_command_outbox",
     indices = [
         Index(value = ["commandId"], unique = true),
-        Index(value = ["state"]),
-        Index(value = ["nextAttemptAtEpochMs"]),
+        Index(value = ["state", "nextAttemptAtEpochMs"]),
+        Index(value = ["leaseExpiresAtEpochMs"]),
+        Index(value = ["correlationId"]),
     ],
 )
 data class MobilityCommandOutboxEntity(
@@ -34,4 +35,8 @@ data class MobilityCommandOutboxEntity(
     val createdAtEpochMs: Long,
     val lastAttemptAtEpochMs: Long?,
     val nextAttemptAtEpochMs: Long?,
+    val leaseOwner: String? = null,
+    val leaseExpiresAtEpochMs: Long? = null,
+    val lastErrorCode: String? = null,
+    val schemaVersion: Int = 1,
 )
