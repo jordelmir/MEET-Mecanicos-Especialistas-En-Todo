@@ -44,7 +44,7 @@ ENGINEERING CONSOLE & DIGITAL VEHICLE ACCESS
 
 PRIVACY, SECURITY & INTEGRITY FIRST
 • Local-First: Diagnostic telemetry and vehicle data stay under your control on your local device.
-• End-to-end encryption in transit (TLS 1.3) for cloud synchronization and media sessions.
+• Strong encryption in transit using standard HTTPS and TLS protocols for cloud synchronization and media sessions.
 • Transparent data lifecycle with an instant in-app account and data deletion path.
 
 Equip your garage with professional automotive intelligence. Download MEET today.

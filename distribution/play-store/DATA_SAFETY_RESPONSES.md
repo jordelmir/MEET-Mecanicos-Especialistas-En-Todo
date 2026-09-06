@@ -9,9 +9,9 @@ Este documento contiene las respuestas exactas que deben seleccionarse en el cue
 * **¿Tu aplicación recopila o comparte alguno de los tipos de datos de usuario obligatorios?**
   👉 **SÍ**
 * **¿Todos los datos de usuario recopilados por tu aplicación están cifrados en tránsito?**
-  👉 **SÍ** (Cumple TLS 1.3 de extremo a extremo para todas las conexiones de red).
+  👉 **SÍ** (Cumple cifrado en tránsito mediante protocolos estándar HTTPS/TLS para todas las conexiones de red).
 * **¿Proporcionas un mecanismo para que los usuarios soliciten la eliminación de sus datos?**
-  👉 **SÍ** (Ruta nativa en la app: *Ajustes > Eliminar Cuenta* y URL web pública: ).
+  👉 **SÍ** (Ruta nativa en la app: *Ajustes > ELIMINAR CUENTA* y portal web público: https://elysium-vanguard.app/delete-account).
 
 ---
 
