@@ -24,16 +24,36 @@ enum class TowCapabilities(val displayName: String) {
 }
 
 /**
+ * Authority source for tow unit capabilities and specifications.
+ */
+enum class TowUnitAuthority {
+    SERVER_AUTHORITATIVE,
+    ROOM_PERSISTED,
+    UNRESOLVED,
+}
+
+/**
+ * Resolution status for a tow unit.
+ */
+sealed interface TowUnitResolution {
+    data class Authoritative(
+        val unit: TowUnit,
+        val authority: TowUnitAuthority = TowUnitAuthority.SERVER_AUTHORITATIVE
+    ) : TowUnitResolution
+    data class Unresolved(val unitId: String, val reason: String) : TowUnitResolution
+}
+
+/**
  * Physical tow rig representation.
  * Invariant: TowOperator != TowUnit (an operator may operate different physical rigs).
  */
 data class TowUnit(
     val towUnitId: String,
     val operatorId: UUID,
-    val brandModel: String,
-    val licensePlate: String,
-    val capabilities: Set<TowCapabilities>,
-    val maxWeightKg: Int = 3500,
+    val brandModel: String? = null,
+    val licensePlate: String? = null,
+    val capabilities: Set<TowCapabilities> = emptySet(),
+    val maxWeightKg: Int? = null,
     val isVerified: Boolean = false,
     val isAvailable: Boolean = false,
 )
@@ -57,7 +77,7 @@ data class TowCustodyRecord(
     val evidenceHash: String,
     val recordedAtEpochMs: Long,
     val recordedByActorId: UUID,
-    val canonicalEvidenceId: UUID? = null,
+    val canonicalEvidenceId: UUID,
     val notes: String? = null,
 ) {
     init {

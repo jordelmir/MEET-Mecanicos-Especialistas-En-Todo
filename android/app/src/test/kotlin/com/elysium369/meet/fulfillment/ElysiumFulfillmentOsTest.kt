@@ -6,6 +6,8 @@ import com.elysium369.meet.core.services.kernel.Money
 import com.elysium369.meet.core.services.kernel.ServiceRole
 import com.elysium369.meet.core.services.kernel.ServiceVertical
 import com.elysium369.meet.core.services.tow.*
+import com.elysium369.meet.data.local.dao.TowJobDao
+import com.elysium369.meet.data.local.entities.TowJobEntity
 import com.elysium369.meet.fulfillment.adapters.RideFulfillmentAdapter
 import com.elysium369.meet.fulfillment.adapters.TowFulfillmentAdapter
 import com.elysium369.meet.fulfillment.domain.FulfillmentMode
@@ -13,10 +15,14 @@ import com.elysium369.meet.fulfillment.domain.FulfillmentPhase
 import com.elysium369.meet.fulfillment.domain.FulfillmentPricing
 import com.elysium369.meet.ride.domain.RideState
 import com.elysium369.meet.ui.screens.ride.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import org.junit.Assert.*
 import org.junit.Test
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 class ElysiumFulfillmentOsTest {
 
@@ -59,10 +65,10 @@ class ElysiumFulfillmentOsTest {
         )
         assertEquals(TowState.LOADING, s4)
 
-        // 5. LOADING -> LOADED (Requires cryptographic evidence hash)
+        // 5. LOADING -> LOADED (Requires cryptographic evidence hash and canonical evidence ID)
         val s5 = TowStateEngine.getNextState(
             fromState = TowState.LOADING,
-            action = TowAction.ConfirmLoaded("a".repeat(64)),
+            action = TowAction.ConfirmLoaded(UUID.randomUUID(), "a".repeat(64)),
             actorRole = ServiceRole.TOW_OPERATOR
         )
         assertEquals(TowState.LOADED, s5)
@@ -91,10 +97,10 @@ class ElysiumFulfillmentOsTest {
         )
         assertEquals(TowState.UNLOADING, s8)
 
-        // 9. UNLOADING -> DELIVERED (Requires delivery evidence hash)
+        // 9. UNLOADING -> DELIVERED (Requires delivery evidence hash and canonical evidence ID)
         val s9 = TowStateEngine.getNextState(
             fromState = TowState.UNLOADING,
-            action = TowAction.ConfirmDelivered("b".repeat(64)),
+            action = TowAction.ConfirmDelivered(UUID.randomUUID(), "b".repeat(64)),
             actorRole = ServiceRole.TOW_OPERATOR
         )
         assertEquals(TowState.DELIVERED, s9)
@@ -132,7 +138,7 @@ class ElysiumFulfillmentOsTest {
         // Customer cannot declare themselves as loaded
         val customerLoaded = TowStateEngine.getNextState(
             fromState = TowState.LOADING,
-            action = TowAction.ConfirmLoaded("c".repeat(64)),
+            action = TowAction.ConfirmLoaded(UUID.randomUUID(), "c".repeat(64)),
             actorRole = ServiceRole.CUSTOMER
         )
         assertNull(customerLoaded)
@@ -151,14 +157,14 @@ class ElysiumFulfillmentOsTest {
         // Blank evidence hash MUST be rejected
         val blankEvidence = TowStateEngine.getNextState(
             fromState = TowState.LOADING,
-            action = TowAction.ConfirmLoaded("   "),
+            action = TowAction.ConfirmLoaded(UUID.randomUUID(), "   "),
             actorRole = ServiceRole.TOW_OPERATOR
         )
         assertNull(blankEvidence)
 
         val blankDeliveryEvidence = TowStateEngine.getNextState(
             fromState = TowState.UNLOADING,
-            action = TowAction.ConfirmDelivered(""),
+            action = TowAction.ConfirmDelivered(UUID.randomUUID(), ""),
             actorRole = ServiceRole.TOW_OPERATOR
         )
         assertNull(blankDeliveryEvidence)
@@ -418,7 +424,8 @@ class ElysiumFulfillmentOsTest {
 
     @Test
     fun towCommandRepositoryCasAndRoomMappingTest() {
-        val repo = TowCommandRepository()
+        val dao = FakeTowJobDao()
+        val repo = TowCommandRepository(dao)
 
         val job = repo.requestTowBlocking(
             customerId = UUID.randomUUID(),
@@ -517,7 +524,8 @@ class ElysiumFulfillmentOsTest {
 
     @Test
     fun towAtomicCasRejectsStaleVersionTest() {
-        val repo = TowCommandRepository()
+        val dao = FakeTowJobDao()
+        val repo = TowCommandRepository(dao)
         val job = repo.requestTowBlocking(
             customerId = UUID.randomUUID(),
             customerName = "CAS Test",
@@ -602,4 +610,56 @@ class ElysiumFulfillmentOsTest {
             // Success: overflow detected safely without silent wraparound
         }
     }
+}
+
+private class FakeTowJobDao : TowJobDao {
+    private val store = ConcurrentHashMap<String, TowJobEntity>()
+    private val flow = MutableStateFlow<List<TowJobEntity>>(emptyList())
+
+    override fun getAllJobsFlow(): Flow<List<TowJobEntity>> = flow
+    override fun getActiveJobsFlow(): Flow<List<TowJobEntity>> = flow.map { list ->
+        list.filter { it.state !in setOf("COMPLETED", "CANCELLED", "DISPUTED") }
+    }
+    override suspend fun getJobById(jobId: String): TowJobEntity? = store[jobId]
+    override suspend fun insertJob(job: TowJobEntity): Long {
+        store[job.jobId] = job
+        flow.value = store.values.toList()
+        return 1L
+    }
+    override suspend fun updateJob(job: TowJobEntity): Int {
+        store[job.jobId] = job
+        flow.value = store.values.toList()
+        return 1
+    }
+    override suspend fun compareAndSwapState(
+        jobId: String,
+        expectedVersion: Long,
+        newState: String,
+        updatedAtEpochMs: Long,
+        operatorName: String?,
+        operatorPhone: String?,
+        custodyRecordsJson: String,
+        assignedUnitJson: String?
+    ): Int {
+        val current = store[jobId] ?: return 0
+        if (current.serverVersion != expectedVersion) return 0
+        val updated = current.copy(
+            state = newState,
+            serverVersion = current.serverVersion + 1,
+            updatedAtEpochMs = updatedAtEpochMs,
+            assignedOperatorName = operatorName,
+            assignedOperatorPhone = operatorPhone,
+            custodyRecordsJson = custodyRecordsJson,
+            assignedUnitJson = assignedUnitJson
+        )
+        store[jobId] = updated
+        flow.value = store.values.toList()
+        return 1
+    }
+    override suspend fun deleteJob(jobId: String): Int {
+        val removed = store.remove(jobId) != null
+        flow.value = store.values.toList()
+        return if (removed) 1 else 0
+    }
+    override suspend fun purgeOldJobs(cutoffEpochMs: Long): Int = 0
 }

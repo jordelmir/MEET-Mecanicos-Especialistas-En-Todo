@@ -27,15 +27,23 @@ enum class TowState(val displayName: String) {
 }
 
 sealed interface TowAction {
-    data class AssignOperator(val operatorId: UUID, val towUnitId: String) : TowAction
+    data class AssignOperator(
+        val operatorId: UUID,
+        val towUnitId: String,
+        val brandModel: String? = null,
+        val licensePlate: String? = null,
+        val capabilities: Set<TowCapabilities> = emptySet(),
+        val maxWeightKg: Int? = null,
+        val isVerified: Boolean = false,
+    ) : TowAction
     object StartEnRoute : TowAction
     object ConfirmArrival : TowAction
     object StartLoading : TowAction
-    data class ConfirmLoaded(val secureEvidenceHash: String) : TowAction
+    data class ConfirmLoaded(val canonicalEvidenceId: UUID, val secureEvidenceHash: String) : TowAction
     object StartTransit : TowAction
     object ArrivedAtDestination : TowAction
     object StartUnloading : TowAction
-    data class ConfirmDelivered(val deliveryEvidenceHash: String) : TowAction
+    data class ConfirmDelivered(val canonicalEvidenceId: UUID, val deliveryEvidenceHash: String) : TowAction
     object CompleteService : TowAction
     data class Cancel(val reason: String) : TowAction
     data class RaiseDispute(val reason: String) : TowAction

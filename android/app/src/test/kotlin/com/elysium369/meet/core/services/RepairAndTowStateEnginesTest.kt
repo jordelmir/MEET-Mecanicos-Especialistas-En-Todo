@@ -141,7 +141,7 @@ class RepairAndTowStateEnginesTest {
         val loading = TowStateEngine.getNextState(TowState.ARRIVED, TowAction.StartLoading, ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.LOADING, loading)
 
-        val loaded = TowStateEngine.getNextState(TowState.LOADING, TowAction.ConfirmLoaded("sha256_load_photo"), ServiceRole.TOW_OPERATOR)
+        val loaded = TowStateEngine.getNextState(TowState.LOADING, TowAction.ConfirmLoaded(UUID.randomUUID(), "sha256_load_photo"), ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.LOADED, loaded)
 
         val inTransit = TowStateEngine.getNextState(TowState.LOADED, TowAction.StartTransit, ServiceRole.TOW_OPERATOR)
@@ -153,7 +153,7 @@ class RepairAndTowStateEnginesTest {
         val unloading = TowStateEngine.getNextState(TowState.ARRIVED_DESTINATION, TowAction.StartUnloading, ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.UNLOADING, unloading)
 
-        val delivered = TowStateEngine.getNextState(TowState.UNLOADING, TowAction.ConfirmDelivered("sha256_drop_photo"), ServiceRole.TOW_OPERATOR)
+        val delivered = TowStateEngine.getNextState(TowState.UNLOADING, TowAction.ConfirmDelivered(UUID.randomUUID(), "sha256_drop_photo"), ServiceRole.TOW_OPERATOR)
         assertEquals(TowState.DELIVERED, delivered)
 
         val completed = TowStateEngine.getNextState(TowState.DELIVERED, TowAction.CompleteService, ServiceRole.CUSTOMER)

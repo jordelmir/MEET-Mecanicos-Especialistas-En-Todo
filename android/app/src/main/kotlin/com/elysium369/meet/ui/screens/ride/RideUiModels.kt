@@ -74,10 +74,16 @@ data class PassengerInfo(
     val phone: String? = null,
 )
 
+sealed interface RideEta {
+    data class Heuristic(val minutes: Int) : RideEta
+    data class RoutingService(val minutes: Int, val distanceMeters: Int) : RideEta
+    object Unknown : RideEta
+}
+
 data class RideLocationPoint(
     val latitude: Double,
     val longitude: Double,
-    val accuracy: Float = 5.0f,
+    val accuracy: Float? = null,
     val timestamp: Long = System.currentTimeMillis(),
     val speed: Float? = null,
     val heading: Float? = null,

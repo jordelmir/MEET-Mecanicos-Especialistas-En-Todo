@@ -84,32 +84,45 @@ class TowCommandRepository(
         // Hydrate from durable Room TowJobDao (primary) or legacy TowTruckDao
         towJobDao?.let { dao ->
             scope.launch {
-                dao.getAllJobsFlow().collect { entities ->
-                    entities.forEach { entity ->
-                        val job = entity.toTowJob()
-                        jobHistory[job.jobId] = job
-                        if (job.state.isActive && _activeTowJob.value == null) {
-                            _activeTowJob.value = job
+                try {
+                    dao.getAllJobsFlow().collect { entities ->
+                        entities.forEach { entity ->
+                            val job = entity.toTowJob()
+                            jobHistory[job.jobId] = job
+                            if (job.state.isActive && _activeTowJob.value == null) {
+                                _activeTowJob.value = job
+                            }
                         }
                     }
+                } catch (t: Throwable) {
+                    // Ignored on repository disposal or database closure
                 }
             }
         } ?: towTruckDao?.let { dao ->
             scope.launch {
-                dao.getRequestsFlow().collect { entities ->
-                    entities.forEach { entity ->
-                        val job = entity.toTowJob()
-                        jobHistory[job.jobId] = job
-                        if (job.state.isActive && _activeTowJob.value == null) {
-                            _activeTowJob.value = job
+                try {
+                    dao.getRequestsFlow().collect { entities ->
+                        entities.forEach { entity ->
+                            val job = entity.toTowJob()
+                            jobHistory[job.jobId] = job
+                            if (job.state.isActive && _activeTowJob.value == null) {
+                                _activeTowJob.value = job
+                            }
                         }
                     }
+                } catch (t: Throwable) {
+                    // Ignored on repository disposal
                 }
             }
         }
     }
 
     fun getJobById(jobId: UUID): TowJob? = _activeTowJob.value?.takeIf { it.jobId == jobId } ?: jobHistory[jobId]
+
+    suspend fun fetchJob(jobId: UUID): TowJob? =
+        _activeTowJob.value?.takeIf { it.jobId == jobId }
+            ?: jobHistory[jobId]
+            ?: towJobDao?.getJobById(jobId.toString())?.toTowJob()
 
     fun observeAllJobs(): Flow<List<TowJob>> {
         return towJobDao?.getAllJobsFlow()?.map { list ->
@@ -171,9 +184,7 @@ class TowCommandRepository(
                 TowRequestResult.Failed(t)
             }
         } else {
-            _activeTowJob.value = job
-            jobHistory[job.jobId] = job
-            TowRequestResult.PersistedLocally(job)
+            TowRequestResult.Failed(IllegalStateException("Tow Room DAO not initialized; local persistence required"))
         }
     }
 
@@ -233,10 +244,11 @@ class TowCommandRepository(
                     updatedUnit = TowUnit(
                         towUnitId = action.towUnitId,
                         operatorId = action.operatorId,
-                        brandModel = "Unidad Asignada",
-                        licensePlate = "GRUA-${action.towUnitId.take(4).uppercase()}",
-                        capabilities = setOf(TowCapabilities.FLATBED),
-                        isVerified = false,
+                        brandModel = action.brandModel,
+                        licensePlate = action.licensePlate,
+                        capabilities = action.capabilities,
+                        maxWeightKg = action.maxWeightKg,
+                        isVerified = action.isVerified,
                         isAvailable = false
                     )
                 }
@@ -252,7 +264,7 @@ class TowCommandRepository(
                             evidenceHash = action.secureEvidenceHash,
                             recordedAtEpochMs = System.currentTimeMillis(),
                             recordedByActorId = actorId,
-                            canonicalEvidenceId = null,
+                            canonicalEvidenceId = action.canonicalEvidenceId,
                             notes = "Vehículo cargado y anclado conforme a inspección técnica."
                         )
                     )
@@ -269,7 +281,7 @@ class TowCommandRepository(
                             evidenceHash = action.deliveryEvidenceHash,
                             recordedAtEpochMs = System.currentTimeMillis(),
                             recordedByActorId = actorId,
-                            canonicalEvidenceId = null,
+                            canonicalEvidenceId = action.canonicalEvidenceId,
                             notes = "Vehículo entregado en destino acordado."
                         )
                     )
@@ -331,11 +343,11 @@ class TowCommandRepository(
             caps.joinToString(",") { it.name }
 
         fun deserializeCapabilities(raw: String): Set<TowCapabilities> =
-            if (raw.isBlank()) setOf(TowCapabilities.FLATBED)
+            if (raw.isBlank()) emptySet()
             else raw.split(",").mapNotNull { runCatching { TowCapabilities.valueOf(it.trim()) }.getOrNull() }.toSet()
 
         fun serializeUnit(unit: TowUnit?): String? = unit?.let {
-            "${it.towUnitId}::${it.operatorId}::${it.brandModel}::${it.licensePlate}::${serializeCapabilities(it.capabilities)}::${it.maxWeightKg}::${it.isVerified}::${it.isAvailable}"
+            "${it.towUnitId}::${it.operatorId}::${it.brandModel ?: ""}::${it.licensePlate ?: ""}::${serializeCapabilities(it.capabilities)}::${it.maxWeightKg ?: ""}::${it.isVerified}::${it.isAvailable}"
         }
 
         fun deserializeUnit(raw: String?): TowUnit? {
@@ -345,10 +357,10 @@ class TowCommandRepository(
             return TowUnit(
                 towUnitId = parts[0],
                 operatorId = runCatching { UUID.fromString(parts[1]) }.getOrElse { return null },
-                brandModel = parts[2],
-                licensePlate = parts[3],
+                brandModel = parts[2].takeIf { it.isNotBlank() },
+                licensePlate = parts[3].takeIf { it.isNotBlank() },
                 capabilities = deserializeCapabilities(parts[4]),
-                maxWeightKg = parts[5].toIntOrNull() ?: 3500,
+                maxWeightKg = parts[5].toIntOrNull(),
                 isVerified = parts[6].toBoolean(),
                 isAvailable = parts[7].toBoolean(),
             )
@@ -357,7 +369,7 @@ class TowCommandRepository(
         fun serializeCustodyRecords(records: List<TowCustodyRecord>): String {
             if (records.isEmpty()) return "[]"
             return records.joinToString(";;") { rec ->
-                "${rec.checkpoint.name}::${rec.evidenceHash}::${rec.recordedAtEpochMs}::${rec.recordedByActorId}::${rec.canonicalEvidenceId ?: ""}::${rec.notes ?: ""}"
+                "${rec.checkpoint.name}::${rec.evidenceHash}::${rec.recordedAtEpochMs}::${rec.recordedByActorId}::${rec.canonicalEvidenceId}::${rec.notes ?: ""}"
             }
         }
 
@@ -370,7 +382,9 @@ class TowCommandRepository(
                     val hash = parts[1]
                     val ms = parts[2].toLongOrNull() ?: return@mapNotNull null
                     val actorId = runCatching { UUID.fromString(parts[3]) }.getOrNull() ?: return@mapNotNull null
-                    val canonicalId = parts.getOrNull(4)?.takeIf { it.isNotBlank() }?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                    val canonicalId = parts.getOrNull(4)?.takeIf { it.isNotBlank() }
+                        ?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+                        ?: UUID.nameUUIDFromBytes("${cp.name}:${hash}".toByteArray())
                     val notes = parts.getOrNull(5)?.takeIf { it.isNotBlank() }
                     TowCustodyRecord(
                         checkpoint = cp,
@@ -519,9 +533,10 @@ class TowCommandRepository(
                     TowUnit(
                         towUnitId = drvId,
                         operatorId = runCatching { UUID.fromString(drvId) }.getOrElse { UUID.nameUUIDFromBytes(drvId.toByteArray()) },
-                        brandModel = "Unidad Asignada",
-                        licensePlate = "---",
-                        capabilities = setOf(TowCapabilities.FLATBED),
+                        brandModel = null,
+                        licensePlate = null,
+                        capabilities = emptySet(),
+                        maxWeightKg = null,
                         isVerified = false,
                         isAvailable = false
                     )

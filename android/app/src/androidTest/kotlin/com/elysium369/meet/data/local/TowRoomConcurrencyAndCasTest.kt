@@ -33,9 +33,13 @@ class TowRoomConcurrencyAndCasTest {
 
     private lateinit var database: MeetDatabase
     private lateinit var towJobDao: TowJobDao
+    private lateinit var testJob: kotlinx.coroutines.CompletableJob
+    private lateinit var testScope: CoroutineScope
 
     @Before
     fun setup() {
+        testJob = SupervisorJob()
+        testScope = CoroutineScope(Dispatchers.IO + testJob)
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         database = Room.inMemoryDatabaseBuilder(context, MeetDatabase::class.java)
             .allowMainThreadQueries()
@@ -44,7 +48,9 @@ class TowRoomConcurrencyAndCasTest {
     }
 
     @After
-    fun teardown() {
+    fun teardown() = runBlocking {
+        testJob.cancel()
+        testJob.join()
         database.close()
     }
 
@@ -99,10 +105,8 @@ class TowRoomConcurrencyAndCasTest {
 
         // 100 concurrent coroutines attempting CAS with expectedVersion = 10
         val concurrencyCount = 100
-        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
         val tasks = (1..concurrencyCount).map { i ->
-            scope.async {
+            testScope.async {
                 towJobDao.compareAndSwapState(
                     jobId = testJobId,
                     expectedVersion = initialVersion,
@@ -134,8 +138,7 @@ class TowRoomConcurrencyAndCasTest {
     @Test
     fun towVersionConflictReturnsPersistedWinnerTest() = runBlocking {
         val testJobId = UUID.randomUUID()
-        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-        val repo = TowCommandRepository(towJobDao, null, scope)
+        val repo = TowCommandRepository(towJobDao, null, testScope)
 
         val initialJob = repo.requestTow(
             customerId = UUID.randomUUID(),
@@ -153,7 +156,7 @@ class TowRoomConcurrencyAndCasTest {
         val winnerResult = repo.executeAction(
             jobId = initialJob.jobId,
             action = TowAction.AssignOperator(UUID.randomUUID(), "TOW-RIG-1"),
-            actorRole = ServiceRole.SYSTEM_AUTOMATION,
+            actorRole = ServiceRole.TOW_OPERATOR,
             expectedVersion = 1L
         )
         assertTrue(winnerResult is TowCommandResult.Success)
@@ -175,8 +178,7 @@ class TowRoomConcurrencyAndCasTest {
 
     @Test
     fun towRequestSurvivesProcessRestartTest() = runBlocking {
-        val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-        var repo: TowCommandRepository? = TowCommandRepository(towJobDao, null, scope)
+        var repo: TowCommandRepository? = TowCommandRepository(towJobDao, null, testScope)
 
         val customerId = UUID.randomUUID()
         val correlationId = "corr-restart-${UUID.randomUUID()}"
@@ -200,8 +202,8 @@ class TowRoomConcurrencyAndCasTest {
         repo = null
 
         // Recreate repository after process restart, pointing to same durable Room DAO
-        val restartedRepo = TowCommandRepository(towJobDao, null, scope)
-        val rehydratedJob = restartedRepo.getJobById(originalJob.jobId)
+        val restartedRepo = TowCommandRepository(towJobDao, null, testScope)
+        val rehydratedJob = restartedRepo.fetchJob(originalJob.jobId)
 
         assertNotNull("Job must survive process restart", rehydratedJob)
         assertEquals(originalJob.jobId, rehydratedJob!!.jobId)
@@ -213,5 +215,61 @@ class TowRoomConcurrencyAndCasTest {
         assertEquals(originalJob.customerPhone, rehydratedJob.customerPhone)
         assertEquals(originalJob.pickupAddress, rehydratedJob.pickupAddress)
         assertEquals(originalJob.vehicleVin, rehydratedJob.vehicleVin)
+    }
+
+    @Test
+    fun everyTowStateRoundTripsExactlyTest() = runBlocking {
+        for (state in TowState.values()) {
+            val entity = TowJobEntity(
+                jobId = "test-roundtrip-${state.name}",
+                customerId = "cust-1",
+                customerName = "Test Customer",
+                customerPhone = "+506 8888-0000",
+                vehicleVin = null,
+                vehicleSummary = "Sedan",
+                pickupLatitude = 9.93,
+                pickupLongitude = -84.08,
+                pickupAccuracyMeters = null,
+                pickupCapturedAt = null,
+                pickupAddress = "San Jose",
+                destinationLatitude = null,
+                destinationLongitude = null,
+                destinationAddress = null,
+                state = state.name,
+                serverVersion = 847L,
+                createdAtEpochMs = System.currentTimeMillis(),
+                updatedAtEpochMs = System.currentTimeMillis(),
+                assignedProviderId = null,
+                assignedOperatorId = null,
+                assignedTowUnitId = null,
+                assignedOperatorName = null,
+                assignedOperatorPhone = null,
+                assignedOperatorRating = null,
+                assignedOperatorCompletedJobs = null,
+                operatorLatitude = null,
+                operatorLongitude = null,
+                operatorFreshnessEpochMs = null,
+                requiredCapabilities = "FLATBED,LOW_CLEARANCE",
+                assignedUnitJson = null,
+                estimatedPriceMinor = null,
+                quotedPriceMinor = null,
+                authorizedPriceMinor = null,
+                finalSettlementMinor = null,
+                currency = "CRC",
+                quoteId = null,
+                authorizationId = null,
+                correlationId = UUID.randomUUID().toString(),
+                custodyRecordsJson = "[]"
+            )
+            towJobDao.insertJob(entity)
+            val read = towJobDao.getJobById(entity.jobId)
+            assertNotNull("Entity for state ${state.name} must persist", read)
+            assertEquals("Entity state must match", state.name, read!!.state)
+            assertEquals("Version must roundtrip", 847L, read.serverVersion)
+
+            val domain = with(TowCommandRepository.Companion) { read.toTowJob() }
+            assertEquals("Domain state must match exactly", state, domain.state)
+            assertEquals("Capabilities must roundtrip", setOf(TowCapabilities.FLATBED, TowCapabilities.LOW_CLEARANCE), domain.requiredCapabilities)
+        }
     }
 }
