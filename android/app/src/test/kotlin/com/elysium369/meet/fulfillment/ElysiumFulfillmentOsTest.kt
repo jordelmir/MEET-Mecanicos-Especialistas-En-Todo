@@ -420,7 +420,7 @@ class ElysiumFulfillmentOsTest {
     fun towCommandRepositoryCasAndRoomMappingTest() {
         val repo = TowCommandRepository()
 
-        val job = repo.requestTow(
+        val job = repo.requestTowBlocking(
             customerId = UUID.randomUUID(),
             customerName = "Maria Rojas",
             customerPhone = "+506 7000-0000",
@@ -518,7 +518,7 @@ class ElysiumFulfillmentOsTest {
     @Test
     fun towAtomicCasRejectsStaleVersionTest() {
         val repo = TowCommandRepository()
-        val job = repo.requestTow(
+        val job = repo.requestTowBlocking(
             customerId = UUID.randomUUID(),
             customerName = "CAS Test",
             customerPhone = "+506 8888-7777",

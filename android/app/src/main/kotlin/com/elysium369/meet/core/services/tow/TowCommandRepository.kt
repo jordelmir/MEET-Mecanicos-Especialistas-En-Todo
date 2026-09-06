@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -30,7 +31,11 @@ sealed interface TowCommandResult {
     data class InvalidTransition(val currentState: TowState, val action: String) : TowCommandResult
     data class Unauthorized(val actorRole: ServiceRole, val requiredAction: String) : TowCommandResult
     data class JobNotFound(val jobId: UUID) : TowCommandResult
-    data class ConcurrencyConflict(val expectedVersion: Long, val actualVersion: Long) : TowCommandResult
+    data class ConcurrencyConflict(
+        val expectedVersion: Long,
+        val actualVersion: Long,
+        val actualState: TowState? = null
+    ) : TowCommandResult
     data class InvalidEvidence(val reason: String) : TowCommandResult
 }
 
@@ -116,7 +121,7 @@ class TowCommandRepository(
         } ?: flowOf(jobHistory.values.sortedByDescending { it.createdAtEpochMs })
     }
 
-    fun requestTow(
+    suspend fun requestTow(
         customerId: UUID,
         customerName: String,
         customerPhone: String,
@@ -129,7 +134,7 @@ class TowCommandRepository(
         requiredCapabilities: Set<TowCapabilities> = setOf(TowCapabilities.FLATBED),
         estimatedPrice: Money? = null,
         correlationId: String = UUID.randomUUID().toString(),
-    ): TowJob {
+    ): TowRequestResult = withContext(Dispatchers.IO) {
         val job = TowJob(
             jobId = UUID.randomUUID(),
             customerId = customerId,
@@ -149,22 +154,48 @@ class TowCommandRepository(
             createdAtEpochMs = System.currentTimeMillis(),
             updatedAtEpochMs = System.currentTimeMillis(),
         )
-        _activeTowJob.value = job
-        jobHistory[job.jobId] = job
 
         val entity = job.toTowJobEntity()
-        towJobDao?.let { dao ->
-            scope.launch {
-                dao.insertJob(entity)
+        if (towJobDao != null) {
+            try {
+                towJobDao.insertJob(entity)
+                val persisted = towJobDao.getJobById(entity.jobId)
+                if (persisted != null) {
+                    _activeTowJob.value = job
+                    jobHistory[job.jobId] = job
+                    TowRequestResult.PersistedLocally(job)
+                } else {
+                    TowRequestResult.Failed(IllegalStateException("Failed to verify persisted TowJob in Room"))
+                }
+            } catch (t: Throwable) {
+                TowRequestResult.Failed(t)
             }
+        } else {
+            _activeTowJob.value = job
+            jobHistory[job.jobId] = job
+            TowRequestResult.PersistedLocally(job)
         }
-        towTruckDao?.let { dao ->
-            scope.launch {
-                dao.insertRequest(job.toLegacyEntity())
-            }
-        }
+    }
 
-        return job
+    fun requestTowBlocking(
+        customerId: UUID,
+        customerName: String,
+        customerPhone: String,
+        vehicleVin: String? = null,
+        vehicleSummary: String,
+        pickupLocation: GeoPoint,
+        pickupAddress: String,
+        destinationLocation: GeoPoint? = null,
+        destinationAddress: String? = null,
+        requiredCapabilities: Set<TowCapabilities> = setOf(TowCapabilities.FLATBED),
+        estimatedPrice: Money? = null,
+        correlationId: String = UUID.randomUUID().toString(),
+    ): TowJob = runBlocking {
+        requestTow(
+            customerId, customerName, customerPhone, vehicleVin, vehicleSummary,
+            pickupLocation, pickupAddress, destinationLocation, destinationAddress,
+            requiredCapabilities, estimatedPrice, correlationId
+        ).jobOrNull ?: throw IllegalStateException("Failed to create tow job")
     }
 
     fun executeAction(
@@ -180,9 +211,11 @@ class TowCommandRepository(
 
             // Concurrency guard: version must match exactly
             if (currentJob.serverVersion != expectedVersion) {
+                val persisted = towJobDao?.getJobById(jobId.toString())?.toTowJob()
                 return@withLock TowCommandResult.ConcurrencyConflict(
                     expectedVersion = expectedVersion,
-                    actualVersion = currentJob.serverVersion
+                    actualVersion = persisted?.serverVersion ?: currentJob.serverVersion,
+                    actualState = persisted?.state ?: currentJob.state
                 )
             }
 
@@ -267,16 +300,18 @@ class TowCommandRepository(
                     assignedUnitJson = serializeUnit(updatedJob.assignedUnit)
                 )
                 if (rows == 0) {
+                    val persisted = towJobDao.getJobById(jobId.toString())?.toTowJob()
+                    if (persisted != null) {
+                        jobHistory[jobId] = persisted
+                        if (_activeTowJob.value?.jobId == jobId) {
+                            _activeTowJob.value = if (persisted.state in setOf(TowState.COMPLETED, TowState.CANCELLED)) null else persisted
+                        }
+                    }
                     return@withLock TowCommandResult.ConcurrencyConflict(
                         expectedVersion = expectedVersion,
-                        actualVersion = currentJob.serverVersion
+                        actualVersion = persisted?.serverVersion ?: currentJob.serverVersion,
+                        actualState = persisted?.state ?: currentJob.state
                     )
-                }
-            }
-
-            towTruckDao?.let { dao ->
-                scope.launch {
-                    dao.insertRequest(updatedJob.toLegacyEntity())
                 }
             }
 

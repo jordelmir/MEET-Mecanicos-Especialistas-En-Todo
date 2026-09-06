@@ -26,6 +26,7 @@ import com.elysium369.meet.fulfillment.domain.FulfillmentUiAction
 import com.elysium369.meet.fulfillment.ui.FulfillmentScaffold
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
+import kotlinx.coroutines.launch
 import java.util.UUID
 
 @Composable
@@ -35,6 +36,7 @@ fun TowFulfillmentScreen(
     onBack: () -> Unit = {},
 ) {
     val activeJob by towRepository.activeTowJob.collectAsState()
+    val scope = rememberCoroutineScope()
 
     if (activeJob != null) {
         val projection = remember(activeJob) {
@@ -85,19 +87,21 @@ fun TowFulfillmentScreen(
                 val passenger = viewModel.passengerVerification.value
                 val selectedVeh = viewModel.selectedVehicle.value ?: return@TowRequestConfigScreen
 
-                towRepository.requestTow(
-                    customerId = customerId,
-                    customerName = passenger?.fullName ?: "Cliente",
-                    customerPhone = passenger?.phone ?: "",
-                    vehicleVin = selectedVeh.vin,
-                    vehicleSummary = "${selectedVeh.make} ${selectedVeh.model} ${selectedVeh.year}",
-                    pickupLocation = originPoint,
-                    pickupAddress = originAddr.ifBlank { "Ubicación GPS actual" },
-                    destinationLocation = destPoint,
-                    destinationAddress = destAddr.takeIf { it.isNotBlank() },
-                    requiredCapabilities = capabilities,
-                    estimatedPrice = price
-                )
+                scope.launch {
+                    towRepository.requestTow(
+                        customerId = customerId,
+                        customerName = passenger?.fullName ?: "Cliente",
+                        customerPhone = passenger?.phone ?: "",
+                        vehicleVin = selectedVeh.vin,
+                        vehicleSummary = "${selectedVeh.make} ${selectedVeh.model} ${selectedVeh.year}",
+                        pickupLocation = originPoint,
+                        pickupAddress = originAddr.ifBlank { "Ubicación GPS actual" },
+                        destinationLocation = destPoint,
+                        destinationAddress = destAddr.takeIf { it.isNotBlank() },
+                        requiredCapabilities = capabilities,
+                        estimatedPrice = price
+                    )
+                }
             }
         )
     }

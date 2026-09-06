@@ -108,3 +108,21 @@ data class TowJob(
         require(vehicleSummary.isNotBlank()) { "Vehicle summary cannot be blank" }
     }
 }
+
+/**
+ * Result of requesting a tow job, enforcing lifecycle distinction between local persistence and server acceptance.
+ */
+sealed interface TowRequestResult {
+    data class PersistedLocally(val job: TowJob) : TowRequestResult
+    data class AcceptedByServer(val job: TowJob) : TowRequestResult
+    data class Rejected(val reason: String) : TowRequestResult
+    data class Failed(val error: Throwable) : TowRequestResult
+
+    val jobOrNull: TowJob?
+        get() = when (this) {
+            is PersistedLocally -> job
+            is AcceptedByServer -> job
+            else -> null
+        }
+}
+

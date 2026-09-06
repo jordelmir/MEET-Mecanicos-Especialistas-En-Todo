@@ -58,4 +58,8 @@ interface TowJobDao {
 
     @Query("DELETE FROM tow_jobs WHERE jobId = :jobId")
     suspend fun deleteJob(jobId: String): Int
+
+    @Query("DELETE FROM tow_jobs WHERE state IN ('COMPLETED', 'CANCELLED') AND updatedAtEpochMs < :cutoffEpochMs")
+    suspend fun purgeOldJobs(cutoffEpochMs: Long): Int
 }
+

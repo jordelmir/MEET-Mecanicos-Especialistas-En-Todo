@@ -7415,19 +7415,21 @@ class ObdViewModel @Inject constructor(
             .getOrElse { java.util.UUID.nameUUIDFromBytes((currentUserId ?: "anon").toByteArray()) }
         val veh = _selectedVehicle.value
         val summary = vehicleInfoOverride ?: buildVehicleInfoForRequest()
-        towCommandRepository.requestTow(
-            customerId = custId,
-            customerName = passengerVerification.value?.fullName ?: "Cliente",
-            customerPhone = phone,
-            vehicleVin = veh?.vin,
-            vehicleSummary = summary,
-            pickupLocation = com.elysium369.meet.core.geo.GeoPoint(latitude, longitude),
-            pickupAddress = locationName,
-            destinationLocation = if (destLat != null && destLng != null) com.elysium369.meet.core.geo.GeoPoint(destLat, destLng) else null,
-            destinationAddress = destName,
-            requiredCapabilities = setOf(com.elysium369.meet.core.services.tow.TowCapabilities.FLATBED),
-            estimatedPrice = if (priceOffer > 0.0) com.elysium369.meet.core.services.kernel.Money.ofCrc(priceOffer.toLong()) else null
-        )
+        viewModelScope.launch {
+            towCommandRepository.requestTow(
+                customerId = custId,
+                customerName = passengerVerification.value?.fullName ?: "Cliente",
+                customerPhone = phone,
+                vehicleVin = veh?.vin,
+                vehicleSummary = summary,
+                pickupLocation = com.elysium369.meet.core.geo.GeoPoint(latitude, longitude),
+                pickupAddress = locationName,
+                destinationLocation = if (destLat != null && destLng != null) com.elysium369.meet.core.geo.GeoPoint(destLat, destLng) else null,
+                destinationAddress = destName,
+                requiredCapabilities = setOf(com.elysium369.meet.core.services.tow.TowCapabilities.FLATBED),
+                estimatedPrice = if (priceOffer > 0.0) com.elysium369.meet.core.services.kernel.Money.ofCrc(priceOffer.toLong()) else null
+            )
+        }
     }
 
     /** Driver/mechanic takes an open request via authoritative TowCommandRepository */
@@ -7470,6 +7472,7 @@ class ObdViewModel @Inject constructor(
     /** User manually deletes a completed/cancelled request */
     fun deleteTowTruckRequest(requestId: String) {
         viewModelScope.launch {
+            towJobDao.deleteJob(requestId)
             towTruckDao.deleteRequest(requestId)
         }
     }
@@ -7517,6 +7520,7 @@ class ObdViewModel @Inject constructor(
             while (true) {
                 try {
                     val seventyTwoHoursAgo = System.currentTimeMillis() - (72 * 60 * 60 * 1000L)
+                    towJobDao.purgeOldJobs(seventyTwoHoursAgo)
                     towTruckDao.purgeOldRequests(seventyTwoHoursAgo)
                     diagnosticEvidenceDao.purgeExpiredUnreferencedExchanges(System.currentTimeMillis())
                     diagnosticEvidenceDao.purgeOrphanedEncryptedBlobs()
