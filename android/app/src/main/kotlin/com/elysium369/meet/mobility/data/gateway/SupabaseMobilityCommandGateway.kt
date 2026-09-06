@@ -20,6 +20,17 @@ import com.elysium369.meet.mobility.domain.models.RideStopType
 import com.elysium369.meet.mobility.domain.models.ServiceCategoryId
 import com.elysium369.meet.mobility.domain.models.Trip
 import com.elysium369.meet.mobility.domain.models.TripState
+import com.elysium369.meet.mobility.data.protocol.ProtocolViolation
+import com.elysium369.meet.mobility.data.protocol.optionalFloat
+import com.elysium369.meet.mobility.data.protocol.optionalInstant
+import com.elysium369.meet.mobility.data.protocol.optionalLong
+import com.elysium369.meet.mobility.data.protocol.optionalString
+import com.elysium369.meet.mobility.data.protocol.optionalUuid
+import com.elysium369.meet.mobility.data.protocol.requireDouble
+import com.elysium369.meet.mobility.data.protocol.requireInstant
+import com.elysium369.meet.mobility.data.protocol.requireLong
+import com.elysium369.meet.mobility.data.protocol.requireString
+import com.elysium369.meet.mobility.data.protocol.requireUuid
 import com.elysium369.meet.mobility.domain.result.GatewayFailure
 import com.elysium369.meet.mobility.domain.result.MobilityCommandResult
 import com.elysium369.meet.mobility.domain.result.MobilityErrorCode
@@ -102,67 +113,34 @@ class SupabaseMobilityCommandGateway @Inject constructor(
             val response = supabase.postgrest.rpc("mobility_request_ride", params).decodeAs<JsonObject>()
             val success = response["success"]?.jsonPrimitive?.booleanOrNull ?: false
             if (success) {
-                val rideRequestId = UUID.fromString(response["ride_request_id"]!!.jsonPrimitive.content)
-                val state = RideRequestState.valueOf(response["state"]!!.jsonPrimitive.content)
-                val version = response["version"]!!.jsonPrimitive.longOrNull ?: 1L
+                val rideRequestId = response.requireUuid("ride_request_id")
+                val state = RideRequestState.valueOf(response.requireString("state"))
+                val version = response.requireLong("version")
                 val stopsArray = response["stops"]?.jsonArray
-                val parsedStops = stopsArray?.map { stopElem ->
+                    ?: throw ProtocolViolation("stops", "missing stops array in response")
+                val parsedStops = stopsArray.map { stopElem ->
                     val s = stopElem.jsonObject
                     RideStop(
-                        stopId = UUID.fromString(s["stop_id"]!!.jsonPrimitive.content),
-                        sequence = s["sequence"]!!.jsonPrimitive.int,
-                        latitude = s["latitude"]!!.jsonPrimitive.double,
-                        longitude = s["longitude"]!!.jsonPrimitive.double,
-                        accuracyMeters = s["accuracy_meters"]?.jsonPrimitive?.floatOrNull,
-                        displayName = s["display_name"]?.jsonPrimitive?.contentOrNull,
-                        address = s["address"]?.jsonPrimitive?.contentOrNull,
-                        placeId = s["place_id"]?.jsonPrimitive?.contentOrNull,
-                        type = RideStopType.valueOf(s["stop_type"]!!.jsonPrimitive.content),
+                        stopId = s.requireUuid("stop_id"),
+                        sequence = s["sequence"]?.jsonPrimitive?.int
+                            ?: throw ProtocolViolation("sequence", "missing or invalid sequence"),
+                        latitude = s.requireDouble("latitude"),
+                        longitude = s.requireDouble("longitude"),
+                        accuracyMeters = s.optionalFloat("accuracy_meters"),
+                        displayName = s.optionalString("display_name"),
+                        address = s.optionalString("address"),
+                        placeId = s.optionalString("place_id"),
+                        type = RideStopType.valueOf(s.requireString("stop_type")),
                     )
-                } ?: emptyList()
+                }
 
                 val pickupStop = parsedStops.firstOrNull { it.type == RideStopType.PICKUP }
-                    ?: RideStop(
-                        stopId = UUID.randomUUID(),
-                        sequence = 0,
-                        latitude = command.pickup.latitude,
-                        longitude = command.pickup.longitude,
-                        accuracyMeters = command.pickup.accuracyMeters,
-                        displayName = command.pickup.displayName,
-                        address = command.pickup.address,
-                        placeId = command.pickup.placeId,
-                        type = RideStopType.PICKUP,
-                    )
+                    ?: throw ProtocolViolation("stops", "missing required PICKUP stop in response")
 
                 val intermediateStops = parsedStops.filter { it.type == RideStopType.INTERMEDIATE }
-                    .ifEmpty {
-                        command.intermediateStops.mapIndexed { idx, stop ->
-                            RideStop(
-                                stopId = UUID.randomUUID(),
-                                sequence = idx + 1,
-                                latitude = stop.latitude,
-                                longitude = stop.longitude,
-                                accuracyMeters = stop.accuracyMeters,
-                                displayName = stop.displayName,
-                                address = stop.address,
-                                placeId = stop.placeId,
-                                type = RideStopType.INTERMEDIATE,
-                            )
-                        }
-                    }
 
                 val destinationStop = parsedStops.firstOrNull { it.type == RideStopType.DESTINATION }
-                    ?: RideStop(
-                        stopId = UUID.randomUUID(),
-                        sequence = intermediateStops.size + 1,
-                        latitude = command.destination.latitude,
-                        longitude = command.destination.longitude,
-                        accuracyMeters = command.destination.accuracyMeters,
-                        displayName = command.destination.displayName,
-                        address = command.destination.address,
-                        placeId = command.destination.placeId,
-                        type = RideStopType.DESTINATION,
-                    )
+                    ?: throw ProtocolViolation("stops", "missing required DESTINATION stop in response")
 
                 val rideRequest = RideRequest(
                     rideRequestId = rideRequestId,
@@ -380,66 +358,99 @@ class SupabaseMobilityCommandGateway @Inject constructor(
 
     private fun parseTripJson(json: JsonObject): Trip {
         return Trip(
-            tripId = UUID.fromString(json["trip_id"]!!.jsonPrimitive.content),
-            rideRequestId = UUID.fromString(json["ride_request_id"]!!.jsonPrimitive.content),
-            riderId = UUID.fromString(json["rider_id"]!!.jsonPrimitive.content),
-            driverId = UUID.fromString(json["driver_id"]!!.jsonPrimitive.content),
-            vehicleId = UUID.fromString(json["vehicle_id"]!!.jsonPrimitive.content),
-            state = TripState.valueOf(json["state"]!!.jsonPrimitive.content),
-            verificationPinHash = json["verification_pin_hash"]?.jsonPrimitive?.content,
-            quoteId = json["quote_id"]?.jsonPrimitive?.content?.let { UUID.fromString(it) },
-            paymentAuthorizationId = json["payment_authorization_id"]?.jsonPrimitive?.content?.let { UUID.fromString(it) },
-            settlementId = json["settlement_id"]?.jsonPrimitive?.content?.let { UUID.fromString(it) },
-            serverVersion = json["version"]!!.jsonPrimitive.longOrNull ?: 1L,
-            assignedAt = Instant.parse(json["assigned_at"]!!.jsonPrimitive.content),
-            startedAt = json["started_at"]?.jsonPrimitive?.content?.let { Instant.parse(it) },
-            completedAt = json["completed_at"]?.jsonPrimitive?.content?.let { Instant.parse(it) },
-            createdAt = Instant.parse(json["created_at"]!!.jsonPrimitive.content),
-            updatedAt = Instant.parse(json["updated_at"]!!.jsonPrimitive.content),
+            tripId = json.requireUuid("trip_id"),
+            rideRequestId = json.requireUuid("ride_request_id"),
+            riderId = json.requireUuid("rider_id"),
+            driverId = json.requireUuid("driver_id"),
+            vehicleId = json.requireUuid("vehicle_id"),
+            state = TripState.valueOf(json.requireString("state")),
+            quoteId = json.optionalUuid("quote_id"),
+            paymentAuthorizationId = json.optionalUuid("payment_authorization_id"),
+            settlementId = json.optionalUuid("settlement_id"),
+            serverVersion = json.requireLong("version"),
+            assignedAt = json.requireInstant("assigned_at"),
+            startedAt = json.optionalInstant("started_at"),
+            completedAt = json.optionalInstant("completed_at"),
+            createdAt = json.requireInstant("created_at"),
+            updatedAt = json.requireInstant("updated_at"),
         )
     }
 
     private fun parseRideRequestJson(json: JsonObject): RideRequest {
-        val pickup = RideStop(
-            stopId = UUID.randomUUID(),
-            sequence = 0,
-            latitude = json["pickup_lat"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.0,
-            longitude = json["pickup_lng"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.0,
-            accuracyMeters = null,
-            displayName = null,
-            address = json["pickup_address"]?.jsonPrimitive?.content,
-            placeId = null,
-            type = RideStopType.PICKUP,
-        )
-        val dest = RideStop(
-            stopId = UUID.randomUUID(),
-            sequence = 1,
-            latitude = json["dest_lat"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.0,
-            longitude = json["dest_lng"]?.jsonPrimitive?.content?.toDoubleOrNull() ?: 0.0,
-            accuracyMeters = null,
-            displayName = null,
-            address = json["destination_address"]?.jsonPrimitive?.content,
-            placeId = null,
-            type = RideStopType.DESTINATION,
-        )
+        val rideRequestId = json.requireUuid("ride_request_id")
+        val stopsArray = json["stops"]?.jsonArray
+        val (pickup, intermediateStops, destination) = if (stopsArray != null) {
+            val parsed = stopsArray.map { stopElem ->
+                val s = stopElem.jsonObject
+                RideStop(
+                    stopId = s.requireUuid("stop_id"),
+                    sequence = s["sequence"]?.jsonPrimitive?.int
+                        ?: throw ProtocolViolation("sequence", "missing sequence"),
+                    latitude = s.requireDouble("latitude"),
+                    longitude = s.requireDouble("longitude"),
+                    accuracyMeters = s.optionalFloat("accuracy_meters"),
+                    displayName = s.optionalString("display_name"),
+                    address = s.optionalString("address"),
+                    placeId = s.optionalString("place_id"),
+                    type = RideStopType.valueOf(s.requireString("stop_type")),
+                )
+            }
+            val p = parsed.firstOrNull { it.type == RideStopType.PICKUP }
+                ?: throw ProtocolViolation("stops", "missing PICKUP stop")
+            val d = parsed.firstOrNull { it.type == RideStopType.DESTINATION }
+                ?: throw ProtocolViolation("stops", "missing DESTINATION stop")
+            val i = parsed.filter { it.type == RideStopType.INTERMEDIATE }
+            Triple(p, i, d)
+        } else {
+            val pickupStopId = json.optionalUuid("pickup_stop_id")
+                ?: UUID.nameUUIDFromBytes("${rideRequestId}:pickup".toByteArray())
+            val destStopId = json.optionalUuid("destination_stop_id")
+                ?: UUID.nameUUIDFromBytes("${rideRequestId}:dest".toByteArray())
+            val p = RideStop(
+                stopId = pickupStopId,
+                sequence = 0,
+                latitude = json.requireDouble("pickup_latitude", "pickup_lat"),
+                longitude = json.requireDouble("pickup_longitude", "pickup_lng"),
+                accuracyMeters = json.optionalFloat("pickup_accuracy_meters"),
+                displayName = json.optionalString("pickup_display_name"),
+                address = json.optionalString("pickup_address"),
+                placeId = json.optionalString("pickup_place_id"),
+                type = RideStopType.PICKUP,
+            )
+            val d = RideStop(
+                stopId = destStopId,
+                sequence = 1,
+                latitude = json.requireDouble("destination_latitude", "dest_lat"),
+                longitude = json.requireDouble("destination_longitude", "dest_lng"),
+                accuracyMeters = json.optionalFloat("destination_accuracy_meters"),
+                displayName = json.optionalString("destination_display_name"),
+                address = json.optionalString("destination_address"),
+                placeId = json.optionalString("destination_place_id"),
+                type = RideStopType.DESTINATION,
+            )
+            Triple(p, emptyList<RideStop>(), d)
+        }
+
         return RideRequest(
-            rideRequestId = UUID.fromString(json["ride_request_id"]!!.jsonPrimitive.content),
-            riderId = UUID.fromString(json["rider_id"]!!.jsonPrimitive.content),
-            marketId = MarketId(json["market_id"]!!.jsonPrimitive.content),
-            serviceCategoryId = ServiceCategoryId(json["service_category_id"]!!.jsonPrimitive.content),
-            dispatchMode = DispatchMode.valueOf(json["dispatch_mode"]!!.jsonPrimitive.content),
+            rideRequestId = rideRequestId,
+            riderId = json.requireUuid("rider_id"),
+            marketId = MarketId(json.requireString("market_id")),
+            serviceCategoryId = ServiceCategoryId(json.requireString("service_category_id")),
+            dispatchMode = DispatchMode.valueOf(json.requireString("dispatch_mode")),
             pickup = pickup,
-            intermediateStops = emptyList(),
-            destination = dest,
-            requestedPrice = json["requested_price_minor"]?.jsonPrimitive?.longOrNull?.let {
-                Money(it, CurrencyCode.of(json["currency_code"]!!.jsonPrimitive.content))
+            intermediateStops = intermediateStops,
+            destination = destination,
+            requestedPrice = json.optionalLong("requested_price_minor")?.let {
+                val currency = json.optionalString("currency_code") ?: json.requireString("currency")
+                Money(it, CurrencyCode.of(currency))
             },
-            state = RideRequestState.valueOf(json["state"]!!.jsonPrimitive.content),
-            scheduledFor = json["scheduled_for"]?.jsonPrimitive?.content?.let { Instant.parse(it) },
-            serverVersion = json["version"]!!.jsonPrimitive.longOrNull ?: 1L,
-            correlationId = json["correlation_id"]?.jsonPrimitive?.content?.let { UUID.fromString(it) } ?: UUID.randomUUID(),
-            createdAt = Instant.parse(json["created_at"]!!.jsonPrimitive.content),
-            updatedAt = Instant.parse(json["updated_at"]!!.jsonPrimitive.content),
+            state = RideRequestState.valueOf(json.requireString("state")),
+            scheduledFor = json.optionalInstant("scheduled_for"),
+            serverVersion = json.requireLong("version"),
+            correlationId = json.requireUuid("correlation_id"),
+            createdAt = json.requireInstant("created_at"),
+            updatedAt = json.requireInstant("updated_at"),
         )
     }
 }
+
