@@ -20,6 +20,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- LiveKit screen sharing is unused in MEET; strip media projection FGS to comply with Google Play policies -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" tools:node="remove" />
     
     <!-- WiFi and Network control (Normal permissions that satisfy FGS connectedDevice "any of" check) -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -152,6 +154,11 @@
                 android:name="android.nfc.cardemulation.host_apdu_service"
                 android:resource="@xml/apduservice" />
         </service>
+
+        <!-- Strip unused LiveKit ScreenCaptureService to avoid Google Play media projection audit flag -->
+        <service
+            android:name="io.livekit.android.room.track.screencapture.ScreenCaptureService"
+            tools:node="remove" />
 
     </application>
 
