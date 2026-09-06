@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ElysiumGlobalMobilityStates",
+  "description": "Cross-runtime canonical state contracts for Elysium Global Mobility OS (Kotlin ≡ PostgreSQL)",
+  "version": "6.0.0",
+  "aggregates": {
+    "RideRequestState": [
+      "REQUESTED",
+      "SEARCHING",
+      "MATCHED",
+      "EXPIRED",
+      "CANCELLED"
+    ],
+    "DispatchMode": [
+      "AUTO_DISPATCH",
+      "MARKETPLACE_OFFERS"
+    ],
+    "RideStopType": [
+      "PICKUP",
+      "INTERMEDIATE",
+      "DESTINATION"
+    ],
+    "DriverOfferState": [
+      "OPEN",
+      "SELECTED",
+      "REJECTED",
+      "WITHDRAWN",
+      "EXPIRED"
+    ],
+    "DispatchOfferState": [
+      "PENDING",
+      "ACCEPTED",
+      "REJECTED",
+      "EXPIRED",
+      "SUPERSEDED"
+    ],
+    "TripState": [
+      "ASSIGNED",
+      "DRIVER_EN_ROUTE",
+      "DRIVER_ARRIVED",
+      "WAITING_FOR_RIDER",
+      "RIDER_ONBOARD",
+      "IN_PROGRESS",
+      "ARRIVED_DESTINATION",
+      "COMPLETED",
+      "CANCELLED",
+      "DISPUTED"
+    ],
+    "OutboxState": [
+      "PENDING",
+      "SENDING",
+      "SERVER_ACCEPTED",
+      "SERVER_REJECTED",
+      "CONFLICT",
+      "FAILED_RETRYABLE"
+    ]
+  }
+}

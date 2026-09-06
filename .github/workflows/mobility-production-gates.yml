@@ -1,0 +1,60 @@
+name: mobility-production-gates
+
+on:
+  push:
+    branches: [main, feature/**]
+  pull_request:
+    branches: [main]
+
+jobs:
+  postgres-mobility-authority-gates:
+    name: PostgreSQL Mobility Server Authority V6 Integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install PostgreSQL server and client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql postgresql-contrib
+      - name: Execute Mobility Authority V6 Integration Test Suite
+        run: bash tests/mobility/verify-mobility-authority-postgres.sh
+      - name: Execute 100-Way Concurrent Dispatch and Idempotency Suite
+        run: bash tests/mobility/test-100-concurrent-dispatches.sh
+
+  android-mobility-gates:
+    name: Android Mobility OS Domain & Outbox Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+      - name: Compile Kotlin Debug
+        run: ./gradlew :app:compileDebugKotlin
+      - name: Run Mobility OS Unit & Parity Tests
+        run: ./gradlew :app:testDebugUnitTest --tests "com.elysium369.meet.mobility.*"
+
+  cross-runtime-parity-gate:
+    name: Cross-Runtime Parity Verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install Node Dependencies
+        run: npm ci
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+      - name: Verify TS ≡ Kotlin Parity Harness
+        run: bash tests/parity/ci-verify.sh
