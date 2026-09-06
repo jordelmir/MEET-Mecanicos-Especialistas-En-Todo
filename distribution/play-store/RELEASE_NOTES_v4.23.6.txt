@@ -1,0 +1,17 @@
+<es-419>
+Novedades de la versión 4.23.6:
+• Diagnóstico OBD-II mejorado para adaptadores Bluetooth y WiFi con mayor velocidad de lectura.
+• Emisión de Reportes Certificados de Inspección con sello criptográfico SHA-256 y código QR verificable.
+• Nuevo catálogo técnico de refacciones con compatibilidad por código DTC y motor.
+• Optimización de permisos para Android 14, 15 y 16 (Target SDK 36).
+• Mejoras de estabilidad en navegación por mapa y auxilio vial Vanguard.
+</es-419>
+
+<en-US>
+What's new in version 4.23.6:
+• Enhanced OBD-II diagnostic engine for Bluetooth & WiFi adapters with faster PID polling.
+• Certified Inspection Reports with canonical SHA-256 integrity hash & tamper-evident QR.
+• Technical parts marketplace with active DTC and engine-level compatibility checks.
+• Updated system compliance for Android 14, 15, and 16 (Target SDK 36).
+• Stability and performance enhancements across live MapLibre navigation and Vanguard roadside dispatch.
+</en-US>
