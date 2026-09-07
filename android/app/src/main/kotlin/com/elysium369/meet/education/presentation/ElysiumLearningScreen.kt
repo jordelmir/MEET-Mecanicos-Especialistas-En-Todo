@@ -35,6 +35,9 @@ import com.elysium369.meet.education.presentation.components.CertifiedDiplomaDia
 import com.elysium369.meet.education.presentation.components.SocraticTutorBottomSheet
 import com.elysium369.meet.education.presentation.sandboxes.AnalyticalGeometrySandbox
 import com.elysium369.meet.education.presentation.sandboxes.ElectricalCircuitSandbox
+import com.elysium369.meet.education.presentation.sandboxes.StoichiometricInjectionSandbox
+import com.elysium369.meet.education.presentation.sandboxes.BrakingDynamicsAbsSandbox
+import com.elysium369.meet.education.presentation.sandboxes.CanBusOscilloscopeSandbox
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -212,6 +215,37 @@ fun ElysiumLearningScreen(
                 item {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         ElectricalCircuitSandbox()
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                }
+            }
+
+            if (state.track == CurriculumTrack.QUIMICA_BXM ||
+                state.track == CurriculumTrack.CIENCIAS_9) {
+                item {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        StoichiometricInjectionSandbox()
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                }
+            }
+
+            if (state.track == CurriculumTrack.FISICA_BXM ||
+                state.track == CurriculumTrack.CIENCIAS_9) {
+                item {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        BrakingDynamicsAbsSandbox()
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                }
+            }
+
+            if (state.track == CurriculumTrack.ELECTRICIDAD_9 ||
+                state.track == CurriculumTrack.FISICA_BXM ||
+                state.track == CurriculumTrack.INGLES_BXM) {
+                item {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        CanBusOscilloscopeSandbox()
                         Spacer(modifier = Modifier.height(14.dp))
                     }
                 }

@@ -187,6 +187,7 @@ private fun quoteTagLabel(tag: QuotePrimaryTag?): String? = when (tag) {
     QuotePrimaryTag.CHEAPEST -> "MEJOR PRECIO"
     QuotePrimaryTag.FASTEST -> "MAS RAPIDA"
     QuotePrimaryTag.TOP_RATED -> "TOP REPUESTERA"
+    QuotePrimaryTag.CERTIFIED_EXPERT_FIT -> "EXPERTO CERTIFICADO"
     null -> null
 }
 

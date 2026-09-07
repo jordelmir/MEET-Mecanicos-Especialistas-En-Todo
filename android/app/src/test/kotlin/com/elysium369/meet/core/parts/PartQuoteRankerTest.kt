@@ -68,4 +68,47 @@ class PartQuoteRankerTest {
         assertEquals(QuotePrimaryTag.CHEAPEST, ranked.first { it.id == "cheap" }.primaryTag)
         assertTrue(ranked.any { it.primaryTag == QuotePrimaryTag.FASTEST })
     }
+
+    @Test
+    fun `certified competence bonus boosts score and tags leader as CERTIFIED_EXPERT_FIT`() {
+        val expertQuote = baseQuote.copy(
+            id = "expert_mep",
+            compatibilityConfidence = CompatibilityConfidence.EXACT,
+            certifiedCompetenceBonus = 1.0,
+        )
+        val standardQuote = baseQuote.copy(
+            id = "standard",
+            compatibilityConfidence = CompatibilityConfidence.EXACT,
+            certifiedCompetenceBonus = 0.0,
+        )
+
+        val scoreExpert = PartQuoteRanker.scoreQuote(expertQuote)
+        val scoreStandard = PartQuoteRanker.scoreQuote(standardQuote)
+        assertEquals(0.05, scoreExpert - scoreStandard, 0.001)
+
+        val ranked = PartQuoteRanker.rankQuotes(listOf(expertQuote, standardQuote))
+        assertEquals("expert_mep", ranked.first().id)
+        assertEquals(QuotePrimaryTag.CERTIFIED_EXPERT_FIT, ranked.first().primaryTag)
+    }
+
+    @Test
+    fun `alternative with verified competence receives CERTIFIED_EXPERT_FIT tag`() {
+        val leader = baseQuote.copy(
+            id = "leader",
+            compatibilityConfidence = CompatibilityConfidence.EXACT,
+            ratingAvg = 5.0,
+            certifiedCompetenceBonus = 0.0,
+        )
+        val expertAlternative = baseQuote.copy(
+            id = "expert_alt",
+            compatibilityConfidence = CompatibilityConfidence.HIGH,
+            ratingAvg = 4.2,
+            certifiedCompetenceBonus = 0.95,
+        )
+
+        val ranked = PartQuoteRanker.rankQuotes(listOf(leader, expertAlternative))
+        assertEquals(QuotePrimaryTag.BEST_COMPAT, ranked.first { it.id == "leader" }.primaryTag)
+        assertEquals(QuotePrimaryTag.CERTIFIED_EXPERT_FIT, ranked.first { it.id == "expert_alt" }.primaryTag)
+    }
 }
+

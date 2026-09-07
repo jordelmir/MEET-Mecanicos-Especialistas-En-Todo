@@ -1,7 +1,7 @@
 package com.elysium369.meet.core.parts
 
 enum class QuotePrimaryTag {
-    BEST_COMPAT, CHEAPEST, FASTEST, TOP_RATED
+    BEST_COMPAT, CHEAPEST, FASTEST, TOP_RATED, CERTIFIED_EXPERT_FIT
 }
 
 data class RankablePartQuote(
@@ -11,6 +11,7 @@ data class RankablePartQuote(
     val estimatedDeliveryHours: Int,
     val compatibilityConfidence: CompatibilityConfidence,
     val ratingAvg: Double,
+    val certifiedCompetenceBonus: Double = 0.0,
 )
 
 data class RankedPartQuote(
@@ -43,10 +44,12 @@ object PartQuoteRanker {
     fun scoreQuote(quote: RankablePartQuote): Double {
         val reputation = (quote.ratingAvg / 5.0).coerceIn(0.0, 1.0)
         val delivery = (1.0 - quote.estimatedDeliveryHours / 168.0).coerceIn(0.0, 1.0)
+        val competenceBonus = (quote.certifiedCompetenceBonus * 0.05).coerceIn(0.0, 0.05)
         return compatScore(quote.compatibilityConfidence) * WEIGHT_COMPAT +
             reputation * WEIGHT_REPUTATION +
             delivery * WEIGHT_DELIVERY +
-            warrantyScore(quote.warrantyDays) * WEIGHT_WARRANTY
+            warrantyScore(quote.warrantyDays) * WEIGHT_WARRANTY +
+            competenceBonus
     }
 
     fun rankQuotes(candidates: List<RankablePartQuote>): List<RankedPartQuote> {
@@ -76,7 +79,12 @@ object PartQuoteRanker {
         if (top.quote.compatibilityConfidence == CompatibilityConfidence.EXACT ||
             top.quote.compatibilityConfidence == CompatibilityConfidence.HIGH
         ) {
-            scored[0] = scored[0].copy(primaryTag = QuotePrimaryTag.BEST_COMPAT)
+            val leaderTag = if (top.quote.certifiedCompetenceBonus >= 0.8) {
+                QuotePrimaryTag.CERTIFIED_EXPERT_FIT
+            } else {
+                QuotePrimaryTag.BEST_COMPAT
+            }
+            scored[0] = scored[0].copy(primaryTag = leaderTag)
         }
 
         val alternatives = scored.filter(::worthyAlternative)
@@ -90,6 +98,10 @@ object PartQuoteRanker {
             alternatives.maxByOrNull { it.quote.ratingAvg }?.let { topRated ->
                 if (topRated.quote.id != top.quote.id) tagIfEmpty(scored, topRated.quote.id, QuotePrimaryTag.TOP_RATED)
             }
+            alternatives.filter { it.quote.certifiedCompetenceBonus >= 0.8 }
+                .maxByOrNull { it.quote.certifiedCompetenceBonus }?.let { expert ->
+                    if (expert.quote.id != top.quote.id) tagIfEmpty(scored, expert.quote.id, QuotePrimaryTag.CERTIFIED_EXPERT_FIT)
+                }
         }
 
         return scored.map {
