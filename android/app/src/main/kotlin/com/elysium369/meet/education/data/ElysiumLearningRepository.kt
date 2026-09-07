@@ -49,8 +49,9 @@ class ElysiumLearningRepository(
     private val canSyncToCloud: Boolean
         get() = principalProvider?.current()?.canSyncToCloud ?: false
 
-    // Canonical Prerequisites DAG
+    // Canonical Prerequisites DAG across cycles and grades
     private val canonicalPrerequisites = listOf(
+        // Primary 1.º - 6.º
         CurriculumPrerequisite(
             conceptId = "cr_mat1_c_addition_sub",
             prerequisiteConceptId = "cr_mat1_c_counting_100",
@@ -61,23 +62,86 @@ class ElysiumLearningRepository(
             prerequisiteConceptId = "cr_mat1_c_counting_100",
             relationshipType = "STRICT_PREREQUISITE",
         ),
+        CurriculumPrerequisite(
+            conceptId = "cr_mat2_c_centenas",
+            prerequisiteConceptId = "cr_mat1_c_counting_100",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_mat3_c_multiplicacion",
+            prerequisiteConceptId = "cr_mat2_c_centenas",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_mat4_c_fracciones",
+            prerequisiteConceptId = "cr_mat3_c_multiplicacion",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_mat5_c_decimales",
+            prerequisiteConceptId = "cr_mat4_c_fracciones",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_mat6_c_porcentajes",
+            prerequisiteConceptId = "cr_mat5_c_decimales",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        // Secondary III Ciclo 7.º - 9.º
+        CurriculumPrerequisite(
+            conceptId = "cr_mat7_c_enteros",
+            prerequisiteConceptId = "cr_mat6_c_porcentajes",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_mat8_c_algebra",
+            prerequisiteConceptId = "cr_mat7_c_enteros",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_mat9_c_notables",
+            prerequisiteConceptId = "cr_mat8_c_algebra",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        // Technical bridges
+        CurriculumPrerequisite(
+            conceptId = "cr_art_c_dibujo_tecnico",
+            prerequisiteConceptId = "cr_font7_c_pvc_joinery",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_art_c_electricidad",
+            prerequisiteConceptId = "cr_art_c_dibujo_tecnico",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        // Diversificada / Bachillerato por Madurez 10.º - 11.º
+        CurriculumPrerequisite(
+            conceptId = "cr_mat_bxm_c_circunferencia",
+            prerequisiteConceptId = "cr_mat9_c_notables",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_mat_bxm_c_funciones",
+            prerequisiteConceptId = "cr_mat9_c_notables",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_qui_bxm_c_estequiometria",
+            prerequisiteConceptId = "cr_cie3_c_materia_energia",
+            relationshipType = "RECOMMENDED",
+        ),
     )
 
     fun getCurriculumUnits(track: CurriculumTrack): List<CourseUnitData> {
-        return when (track) {
-            CurriculumTrack.MATEMATICA_1 -> CourseZeroCurriculumSeed.MATEMATICA_1_UNITS
-            CurriculumTrack.FONTANERIA_7 -> CourseZeroCurriculumSeed.FONTANERIA_7_UNITS
-        }
+        return NationalCurriculumCatalogSeed.getUnitsForTrack(track)
     }
 
     fun getConceptById(conceptId: String): CurriculumConceptData? {
-        val allUnits = CourseZeroCurriculumSeed.MATEMATICA_1_UNITS + CourseZeroCurriculumSeed.FONTANERIA_7_UNITS
-        return allUnits.flatMap { it.concepts }.firstOrNull { it.id == conceptId }
+        return NationalCurriculumCatalogSeed.ALL_UNITS.flatMap { it.concepts }.firstOrNull { it.id == conceptId }
     }
 
     fun getTaskById(taskId: String): InteractiveTaskData? {
-        val allUnits = CourseZeroCurriculumSeed.MATEMATICA_1_UNITS + CourseZeroCurriculumSeed.FONTANERIA_7_UNITS
-        return allUnits.flatMap { it.concepts }.flatMap { it.tasks }.firstOrNull { it.id == taskId }
+        return NationalCurriculumCatalogSeed.ALL_UNITS.flatMap { it.concepts }.flatMap { it.tasks }.firstOrNull { it.id == taskId }
     }
 
     fun getLocalConceptState(conceptId: String): ConceptKnowledgeState {
@@ -237,11 +301,21 @@ class ElysiumLearningRepository(
         subject: String,
         grade: Int,
     ): PersonalLearningFrontier {
-        val units = if (grade == 7) {
-            CourseZeroCurriculumSeed.FONTANERIA_7_UNITS
-        } else {
-            CourseZeroCurriculumSeed.MATEMATICA_1_UNITS
+        val matchingTracks = CurriculumTrack.values().filter {
+            it.gradeNumber == grade && (
+                it.subjectName.equals(subject, ignoreCase = true) ||
+                subject.contains(it.subjectName, ignoreCase = true) ||
+                it.subjectName.contains(subject, ignoreCase = true)
+            )
+        }.ifEmpty {
+            CurriculumTrack.values().filter { it.gradeNumber == grade }
+        }.ifEmpty {
+            CurriculumTrack.values().filter { it.subjectName.equals(subject, ignoreCase = true) }
+        }.ifEmpty {
+            listOf(CurriculumTrack.MATEMATICA_1)
         }
+
+        val units = matchingTracks.flatMap { NationalCurriculumCatalogSeed.getUnitsForTrack(it) }
 
         val concepts = units.flatMap { unit ->
             unit.concepts.map { c ->

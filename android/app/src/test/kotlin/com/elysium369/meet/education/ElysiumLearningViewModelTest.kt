@@ -23,7 +23,7 @@ class ElysiumLearningViewModelTest {
         val state = viewModel.uiState.value
         assertEquals(CurriculumTrack.MATEMATICA_1, state.track)
         assertEquals(1, state.activeGrade)
-        assertEquals("Matemática 1.º Año (MEP 2026)", state.activeSubject)
+        assertEquals("1.º Matemática (I Ciclo)", state.activeSubject)
         assertEquals(10, state.units.size) // 10 official MEP months
         assertEquals("cr_mat1_u02", state.selectedUnitId)
         assertEquals("cr_mat1_c_spatial_pos", state.selectedConceptId)
@@ -157,5 +157,65 @@ class ElysiumLearningViewModelTest {
         assertTrue("Transfer task breaks through 0.75 cap", finalState.currentMasteryEstimate > 0.75)
         assertTrue("With transfer, mastery reaches full mastery", finalState.currentMasteryEstimate >= 0.85)
         assertTrue("Concept is officially mastered with transfer", finalState.isTransferUnlocked)
+    }
+
+    @Test
+    fun `switching track across national curriculum from Grade 1 to Grade 2, Grade 8 CAD and Grade 11 BxM`() = runBlocking {
+        val repository = ElysiumLearningRepository()
+        val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val viewModel = ElysiumLearningViewModel(repository, testScope)
+
+        // 1. Grade 2 Matemática
+        viewModel.selectTrack(CurriculumTrack.MATEMATICA_2)
+        assertEquals(CurriculumTrack.MATEMATICA_2, viewModel.uiState.value.track)
+        assertEquals(2, viewModel.uiState.value.activeGrade)
+        assertTrue(viewModel.uiState.value.units.isNotEmpty())
+        assertEquals("cr_mat2_c_centenas", viewModel.uiState.value.selectedConceptId)
+
+        // 2. Grade 8 Dibujo Técnico CAD
+        viewModel.selectTrack(CurriculumTrack.DIBUJO_TECNICO_8)
+        assertEquals(CurriculumTrack.DIBUJO_TECNICO_8, viewModel.uiState.value.track)
+        assertEquals(8, viewModel.uiState.value.activeGrade)
+        assertEquals("cr_art_c_dibujo_tecnico", viewModel.uiState.value.selectedConceptId)
+
+        // 3. Grade 11 Matemática BxM
+        viewModel.selectTrack(CurriculumTrack.MATEMATICA_BXM)
+        assertEquals(CurriculumTrack.MATEMATICA_BXM, viewModel.uiState.value.track)
+        assertEquals(11, viewModel.uiState.value.activeGrade)
+        assertEquals("cr_mat_bxm_c_circunferencia", viewModel.uiState.value.selectedConceptId)
+    }
+
+    @Test
+    fun `all 22 tracks load official curriculum units and concepts without exception`() = runBlocking {
+        val repository = ElysiumLearningRepository()
+        val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val viewModel = ElysiumLearningViewModel(repository, testScope)
+
+        for (track in CurriculumTrack.values()) {
+            viewModel.selectTrack(track)
+            val state = viewModel.uiState.value
+            assertEquals("Track should match requested track", track, state.track)
+            assertTrue("Track ${track.name} must have at least one unit", state.units.isNotEmpty())
+            assertNotNull("Track ${track.name} must have selected unit", state.selectedUnitId)
+            assertNotNull("Track ${track.name} must have selected concept", state.selectedConceptId)
+        }
+    }
+
+    @Test
+    fun `verifying multi-grade economic bridges for ISCO 3118 CAD and ISCO 7411 Electrician`() = runBlocking {
+        val repository = ElysiumLearningRepository()
+        val mappings = repository.getEconomicBridgeMappings()
+
+        val isco3118 = mappings.firstOrNull { it.iscoCode == "3118" }
+        assertNotNull("Must include ISCO 3118 CAD mapping", isco3118)
+        assertEquals("ARCHITECTURAL_AND_TECHNICAL_CAD", isco3118?.serviceVertical)
+
+        val isco7411 = mappings.firstOrNull { it.iscoCode == "7411" }
+        assertNotNull("Must include ISCO 7411 Electrician mapping", isco7411)
+        assertEquals("RESIDENTIAL_ELECTRICAL_SERVICES", isco7411?.serviceVertical)
+
+        val isco7126 = mappings.firstOrNull { it.iscoCode == "7126" }
+        assertNotNull("Must include ISCO 7126 Plumbing mapping", isco7126)
+        assertEquals("RESIDENTIAL_PLUMBING", isco7126?.serviceVertical)
     }
 }

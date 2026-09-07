@@ -7,10 +7,6 @@ import com.elysium369.meet.education.domain.CurriculumSourceKind
 import com.elysium369.meet.education.domain.EpistemicTruthState
 import com.elysium369.meet.education.domain.StageType
 
-enum class CurriculumTrack {
-    MATEMATICA_1,
-    FONTANERIA_7,
-}
 
 enum class TaskType {
     SPATIAL_PLACEMENT,
