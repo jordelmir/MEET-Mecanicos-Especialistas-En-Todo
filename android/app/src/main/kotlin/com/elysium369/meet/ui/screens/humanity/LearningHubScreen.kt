@@ -32,6 +32,7 @@ fun LearningHubScreen(
     onOpenMissionDetail: (String) -> Unit = {},
     onOpenMultimeterSimulation: () -> Unit = {},
     onOpenCapabilityPassport: () -> Unit = {},
+    onOpenElysiumLearningOs: () -> Unit = {},
 ) {
     val activeDtcs by viewModel.detectedDtcs.collectAsState()
     val connectionState by viewModel.connectionState.collectAsState()
@@ -163,6 +164,59 @@ fun LearningHubScreen(
                                 Text("INICIAR MISIÓN DE AISLAMIENTO")
                             }
                         }
+                    }
+                }
+            }
+
+            // 2.5 Elysium Learning OS: MEP 2026 Curriculum & Economic Bridge
+            item {
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = "🏫", fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = "ELYSIUM LEARNING OS",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.Black,
+                                        ),
+                                    )
+                                    Text(
+                                        text = "MEP 2026 · Matemática 1.º & 7.º Fontanería",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.Bold,
+                                        ),
+                                    )
+                                }
+                            }
+                            FilledTonalButton(
+                                onClick = onOpenElysiumLearningOs,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            ) {
+                                Text("INGRESAR", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Aprende con el programa escolar oficial, simulaciones 3D, desafíos de transferencia y puente hacia oficios reales verificados con SHA-256.",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            ),
+                        )
                     }
                 }
             }
