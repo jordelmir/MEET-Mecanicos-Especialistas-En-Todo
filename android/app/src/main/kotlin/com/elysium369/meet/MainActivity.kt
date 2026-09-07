@@ -48,6 +48,8 @@ import com.elysium369.meet.ui.screens.humanity.CapabilityPassportScreen
 import com.elysium369.meet.ui.screens.humanity.LearningHubScreen
 import com.elysium369.meet.ui.screens.humanity.MissionDetailScreen
 import com.elysium369.meet.ui.screens.humanity.MultimeterSimulationScreen
+import com.elysium369.meet.education.presentation.ElysiumLearningScreen
+import com.elysium369.meet.education.presentation.ElysiumLearningViewModel
 import com.elysium369.meet.ui.screens.marketos.FuelRewardsHub
 import com.elysium369.meet.ui.screens.marketos.LegalVanguardHub
 import com.elysium369.meet.ui.screens.marketos.PropertiesHub
@@ -937,6 +939,14 @@ fun MeetApp(
                     onOpenMissionDetail = { missionId -> navController.navigate("mission_detail/$missionId") },
                     onOpenMultimeterSimulation = { navController.navigate("multimeter_simulation") },
                     onOpenCapabilityPassport = { navController.navigate("capability_passport") },
+                    onOpenElysiumLearningOs = { navController.navigate("elysium_learning_os") },
+                )
+            }
+            composable("elysium_learning_os") {
+                val elysiumLearningViewModel: ElysiumLearningViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                ElysiumLearningScreen(
+                    viewModel = elysiumLearningViewModel,
+                    onBack = { navController.backOrHome() },
                 )
             }
             composable(

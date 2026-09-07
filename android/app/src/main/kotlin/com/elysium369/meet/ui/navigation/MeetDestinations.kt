@@ -42,6 +42,7 @@ object MeetDestinations {
     const val BATTERY_HEALTH = "health_score"
     const val CONNECT = "connect"
     const val LEARNING_HUB = "learning_hub"
+    const val ELYSIUM_LEARNING_OS = "elysium_learning_os"
     const val MISSION_DETAIL = "mission_detail"
     const val MULTIMETER_SIMULATION = "multimeter_simulation"
     const val CAPABILITY_PASSPORT = "capability_passport"

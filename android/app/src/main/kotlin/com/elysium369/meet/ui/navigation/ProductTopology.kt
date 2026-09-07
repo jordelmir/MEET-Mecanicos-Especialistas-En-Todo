@@ -71,6 +71,8 @@ enum class ProductUniverse(
                 "rides" -> MOBILITY
 
                 MeetDestinations.PRO_HUB,
+                MeetDestinations.LEARNING_HUB,
+                MeetDestinations.ELYSIUM_LEARNING_OS,
                 MeetDestinations.TERMINAL,
                 MeetDestinations.DVIR,
                 MeetDestinations.MULTIMETER_SIMULATION,
