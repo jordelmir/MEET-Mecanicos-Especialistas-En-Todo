@@ -72,12 +72,14 @@ object PlayBillingCatalog {
         MeetBillingProduct(OFFLINE_MANUAL_TOOLS_LIFETIME, MeetProductType.InApp, EntitlementKey.MANUALS_OFFLINE)
     )
 
-    fun product(productId: String): MeetBillingProduct {
-        return products.firstOrNull { it.productId == productId }
-            ?: MeetBillingProduct(productId, MeetProductType.InApp, EntitlementKey.PRO_ACCESS, isConsumable = false)
-    }
+    fun productOrNull(productId: String): MeetBillingProduct? = products.firstOrNull { it.productId == productId }
 
-    fun productType(productId: String): String = product(productId).type.playType
+    fun requireProduct(productId: String): MeetBillingProduct =
+        requireNotNull(productOrNull(productId)) { "Unknown Google Play product: $productId" }
 
-    fun isConsumable(productId: String): Boolean = product(productId).isConsumable
+    fun product(productId: String): MeetBillingProduct = requireProduct(productId)
+
+    fun productType(productId: String): String = requireProduct(productId).type.playType
+
+    fun isConsumable(productId: String): Boolean = requireProduct(productId).isConsumable
 }
