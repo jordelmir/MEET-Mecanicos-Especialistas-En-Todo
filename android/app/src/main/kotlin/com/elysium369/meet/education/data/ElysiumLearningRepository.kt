@@ -42,6 +42,30 @@ class ElysiumLearningRepository(
 
     private val json = Json { ignoreUnknownKeys = true }
     private val localConceptStates = mutableMapOf<String, ConceptKnowledgeState>()
+    private val recordedEvidenceHashes = mutableListOf<String>()
+    private val fsrsCards = mutableMapOf<String, com.elysium369.meet.education.domain.FsrsCardState>()
+
+    fun getRecentEvidenceHashesForTrack(track: CurriculumTrack): List<String> {
+        return recordedEvidenceHashes.toList()
+    }
+
+    fun getFsrsCard(conceptId: String): com.elysium369.meet.education.domain.FsrsCardState {
+        return fsrsCards.getOrPut(conceptId) {
+            com.elysium369.meet.education.domain.FsrsCardState(conceptId = conceptId)
+        }
+    }
+
+    fun updateFsrsCard(conceptId: String, isCorrect: Boolean, latencyMs: Int? = null) {
+        val currentCard = getFsrsCard(conceptId)
+        val rating = if (isCorrect) {
+            if ((latencyMs ?: 2000) < 1500) com.elysium369.meet.education.domain.ReviewRating.EASY
+            else com.elysium369.meet.education.domain.ReviewRating.GOOD
+        } else {
+            com.elysium369.meet.education.domain.ReviewRating.AGAIN
+        }
+        val updatedCard = com.elysium369.meet.education.domain.FsrsMemoryEngine.review(currentCard, rating)
+        fsrsCards[conceptId] = updatedCard
+    }
 
     private val principalId: String
         get() = principalProvider?.current()?.id ?: "local_student_cr_001"
@@ -292,6 +316,9 @@ class ElysiumLearningRepository(
                 Unit
             }
         }
+
+        recordedEvidenceHashes.add(evidenceRecord.rawEvidenceHash)
+        updateFsrsCard(conceptId, isCorrect, responseLatencyMs)
 
         Result.success(evidenceRecord)
     }

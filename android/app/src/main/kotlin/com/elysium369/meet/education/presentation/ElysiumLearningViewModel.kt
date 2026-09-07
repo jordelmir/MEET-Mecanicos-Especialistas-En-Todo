@@ -2,10 +2,15 @@ package com.elysium369.meet.education.presentation
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elysium369.meet.education.ai.SocraticDialogueMessage
+import com.elysium369.meet.education.ai.SocraticMode
+import com.elysium369.meet.education.ai.SocraticTutorEngine
+import com.elysium369.meet.education.data.ConceptDeepKnowledge
 import com.elysium369.meet.education.data.CourseUnitData
 import com.elysium369.meet.education.data.CurriculumTrack
 import com.elysium369.meet.education.data.ElysiumLearningRepository
 import com.elysium369.meet.education.data.InteractiveTaskData
+import com.elysium369.meet.education.data.NationalCurriculumDeepKnowledge
 import com.elysium369.meet.education.data.TaskType
 import com.elysium369.meet.education.domain.FrontierConcept
 import com.elysium369.meet.education.domain.LearnerPrivacyLevel
@@ -41,16 +46,37 @@ data class ElysiumLearningUiState(
     val isTransferUnlocked: Boolean = false,
     val isEvidenceModalVisible: Boolean = false,
     val isLoading: Boolean = false,
+    val isSocraticSheetVisible: Boolean = false,
+    val socraticDialogue: List<SocraticDialogueMessage> = emptyList(),
+    val isSocraticLoading: Boolean = false,
+    val socraticHintTierCount: Int = 1,
+    val currentDeepKnowledge: ConceptDeepKnowledge? = null,
+    val activeDiploma: com.elysium369.meet.education.domain.CertifiedCompetencyDiploma? = null,
+    val isDiplomaDialogVisible: Boolean = false,
+    val isGeometrySandboxVisible: Boolean = false,
+    val isElectricalSandboxVisible: Boolean = false,
+    val linkedDtcBridge: com.elysium369.meet.education.domain.DtcEducationalBridge? = null,
 )
 
 @HiltViewModel
 class ElysiumLearningViewModel(
     private val repository: ElysiumLearningRepository,
+    private val socraticTutorEngine: SocraticTutorEngine,
     private val externalScope: kotlinx.coroutines.CoroutineScope?,
 ) : ViewModel() {
 
     @Inject
-    constructor(repository: ElysiumLearningRepository) : this(repository, null)
+    constructor(
+        repository: ElysiumLearningRepository,
+        socraticTutorEngine: SocraticTutorEngine,
+    ) : this(repository, socraticTutorEngine, null)
+
+    constructor(
+        repository: ElysiumLearningRepository,
+        externalScope: kotlinx.coroutines.CoroutineScope?,
+    ) : this(repository, SocraticTutorEngine(), externalScope)
+
+    constructor(repository: ElysiumLearningRepository) : this(repository, SocraticTutorEngine(), null)
 
     private val scope: kotlinx.coroutines.CoroutineScope
         get() = externalScope ?: viewModelScope
@@ -81,6 +107,7 @@ class ElysiumLearningViewModel(
 
         val grade = track.gradeNumber
         val subject = "${track.displayName} (${track.cycleName})"
+        val deepKnowledge = initialConcept?.let { NationalCurriculumDeepKnowledge.getKnowledgeForConcept(it) }
 
         _uiState.update { current ->
             current.copy(
@@ -96,6 +123,10 @@ class ElysiumLearningViewModel(
                 feedbackMessage = null,
                 misconceptionDetected = null,
                 isEvidenceModalVisible = false,
+                isSocraticSheetVisible = false,
+                socraticDialogue = emptyList(),
+                socraticHintTierCount = 1,
+                currentDeepKnowledge = deepKnowledge,
             )
         }
 
@@ -107,6 +138,7 @@ class ElysiumLearningViewModel(
         val unit = _uiState.value.units.firstOrNull { it.id == unitId } ?: return
         val concept = unit.concepts.firstOrNull()
         val task = concept?.tasks?.firstOrNull()
+        val deepKnowledge = concept?.let { NationalCurriculumDeepKnowledge.getKnowledgeForConcept(it) }
 
         _uiState.update {
             it.copy(
@@ -117,6 +149,9 @@ class ElysiumLearningViewModel(
                 accumulatedColones = 0,
                 feedbackMessage = null,
                 misconceptionDetected = null,
+                socraticDialogue = emptyList(),
+                socraticHintTierCount = 1,
+                currentDeepKnowledge = deepKnowledge,
             )
         }
         taskStartTimeMs = System.currentTimeMillis()
@@ -126,6 +161,7 @@ class ElysiumLearningViewModel(
     fun selectConcept(conceptId: String) {
         val concept = repository.getConceptById(conceptId) ?: return
         val task = concept.tasks.firstOrNull()
+        val deepKnowledge = NationalCurriculumDeepKnowledge.getKnowledgeForConcept(concept)
 
         _uiState.update {
             it.copy(
@@ -135,6 +171,9 @@ class ElysiumLearningViewModel(
                 accumulatedColones = 0,
                 feedbackMessage = null,
                 misconceptionDetected = null,
+                socraticDialogue = emptyList(),
+                socraticHintTierCount = 1,
+                currentDeepKnowledge = deepKnowledge,
             )
         }
         taskStartTimeMs = System.currentTimeMillis()
@@ -150,6 +189,8 @@ class ElysiumLearningViewModel(
                 accumulatedColones = 0,
                 feedbackMessage = null,
                 misconceptionDetected = null,
+                socraticDialogue = emptyList(),
+                socraticHintTierCount = 1,
             )
         }
         taskStartTimeMs = System.currentTimeMillis()
@@ -275,6 +316,251 @@ class ElysiumLearningViewModel(
                 currentMasteryEstimate = state.masteryEstimate,
                 currentConfidence = state.confidence,
                 isTransferUnlocked = state.isMastered,
+            )
+        }
+    }
+
+    // ── TUTOR SOCRÁTICO DE IA ───────────────────────────────────────────────
+    fun openSocraticTutor() {
+        _uiState.update { it.copy(isSocraticSheetVisible = true) }
+    }
+
+    fun dismissSocraticTutor() {
+        _uiState.update { it.copy(isSocraticSheetVisible = false) }
+    }
+
+    fun requestSocraticHint() {
+        scope.launch { requestSocraticHintSync() }
+    }
+
+    suspend fun requestSocraticHintSync() {
+        val current = _uiState.value
+        val task = current.activeTask ?: return
+        val concept = current.selectedConceptId?.let { repository.getConceptById(it) } ?: return
+        val tier = current.socraticHintTierCount
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = true,
+                isSocraticSheetVisible = true,
+                socraticDialogue = it.socraticDialogue + SocraticDialogueMessage(
+                    id = "user_${System.currentTimeMillis()}",
+                    isUser = true,
+                    text = "💡 Dame una pista socrática (Nivel $tier)",
+                    mode = SocraticMode.HINT,
+                )
+            )
+        }
+
+        val tutorReply = socraticTutorEngine.consultTutor(
+            concept = concept,
+            task = task,
+            mode = SocraticMode.HINT,
+            hintTier = tier
+        )
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = false,
+                socraticHintTierCount = (tier % 3) + 1,
+                socraticDialogue = it.socraticDialogue + tutorReply
+            )
+        }
+    }
+
+    fun requestRealWorldAnalogy() {
+        scope.launch { requestRealWorldAnalogySync() }
+    }
+
+    suspend fun requestRealWorldAnalogySync() {
+        val current = _uiState.value
+        val task = current.activeTask ?: return
+        val concept = current.selectedConceptId?.let { repository.getConceptById(it) } ?: return
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = true,
+                isSocraticSheetVisible = true,
+                socraticDialogue = it.socraticDialogue + SocraticDialogueMessage(
+                    id = "user_${System.currentTimeMillis()}",
+                    isUser = true,
+                    text = "🔧 Explícamelo con una analogía práctica / taller",
+                    mode = SocraticMode.REAL_WORLD_ANALOGY,
+                )
+            )
+        }
+
+        val tutorReply = socraticTutorEngine.consultTutor(
+            concept = concept,
+            task = task,
+            mode = SocraticMode.REAL_WORLD_ANALOGY
+        )
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = false,
+                socraticDialogue = it.socraticDialogue + tutorReply
+            )
+        }
+    }
+
+    fun requestMisconceptionHelp() {
+        scope.launch { requestMisconceptionHelpSync() }
+    }
+
+    suspend fun requestMisconceptionHelpSync() {
+        val current = _uiState.value
+        val task = current.activeTask ?: return
+        val concept = current.selectedConceptId?.let { repository.getConceptById(it) } ?: return
+        val code = current.misconceptionDetected
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = true,
+                isSocraticSheetVisible = true,
+                socraticDialogue = it.socraticDialogue + SocraticDialogueMessage(
+                    id = "user_${System.currentTimeMillis()}",
+                    isUser = true,
+                    text = "🔍 ¿Por qué me equivoqué? Analiza mi error",
+                    mode = SocraticMode.MISCONCEPTION_HELP,
+                )
+            )
+        }
+
+        val tutorReply = socraticTutorEngine.consultTutor(
+            concept = concept,
+            task = task,
+            mode = SocraticMode.MISCONCEPTION_HELP,
+            misconceptionCode = code
+        )
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = false,
+                socraticDialogue = it.socraticDialogue + tutorReply
+            )
+        }
+    }
+
+    fun requestStepByStep() {
+        scope.launch { requestStepByStepSync() }
+    }
+
+    suspend fun requestStepByStepSync() {
+        val current = _uiState.value
+        val task = current.activeTask ?: return
+        val concept = current.selectedConceptId?.let { repository.getConceptById(it) } ?: return
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = true,
+                isSocraticSheetVisible = true,
+                socraticDialogue = it.socraticDialogue + SocraticDialogueMessage(
+                    id = "user_${System.currentTimeMillis()}",
+                    isUser = true,
+                    text = "🧩 Divide el problema en pasos simples",
+                    mode = SocraticMode.STEP_BY_STEP,
+                )
+            )
+        }
+
+        val tutorReply = socraticTutorEngine.consultTutor(
+            concept = concept,
+            task = task,
+            mode = SocraticMode.STEP_BY_STEP
+        )
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = false,
+                socraticDialogue = it.socraticDialogue + tutorReply
+            )
+        }
+    }
+
+    fun sendSocraticQuery(query: String) {
+        scope.launch { sendSocraticQuerySync(query) }
+    }
+
+    suspend fun sendSocraticQuerySync(query: String) {
+        if (query.isBlank()) return
+        val current = _uiState.value
+        val task = current.activeTask ?: return
+        val concept = current.selectedConceptId?.let { repository.getConceptById(it) } ?: return
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = true,
+                isSocraticSheetVisible = true,
+                socraticDialogue = it.socraticDialogue + SocraticDialogueMessage(
+                    id = "user_${System.currentTimeMillis()}",
+                    isUser = true,
+                    text = query.trim(),
+                    mode = SocraticMode.FREE_INQUIRY,
+                )
+            )
+        }
+
+        val tutorReply = socraticTutorEngine.consultTutor(
+            concept = concept,
+            task = task,
+            mode = SocraticMode.FREE_INQUIRY,
+            userQuery = query.trim()
+        )
+
+        _uiState.update {
+            it.copy(
+                isSocraticLoading = false,
+                socraticDialogue = it.socraticDialogue + tutorReply
+            )
+        }
+    }
+
+    // ── DIPLOMAS CRIPTOGRÁFICOS Y SIMULADORES ──────────────────────────────
+    fun openDiplomaDialog() {
+        if (_uiState.value.activeDiploma == null) {
+            mintDiplomaForCurrentTrack()
+        }
+        _uiState.update { it.copy(isDiplomaDialogVisible = true) }
+    }
+
+    fun dismissDiplomaDialog() {
+        _uiState.update { it.copy(isDiplomaDialogVisible = false) }
+    }
+
+    fun mintDiplomaForCurrentTrack() {
+        val current = _uiState.value
+        val track = current.track
+        val evidenceHashes = repository.getRecentEvidenceHashesForTrack(track)
+            .ifEmpty { listOf(current.lastEvidenceHash ?: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855") }
+
+        val diploma = com.elysium369.meet.education.domain.ElysiumDiplomaService.mintDiploma(
+            principalId = current.learnerId.ifBlank { "elysium_learner_me" },
+            trackTitle = track.displayName,
+            trackCode = track.name,
+            academicCycle = track.cycleName,
+            mastery = current.currentMasteryEstimate.coerceAtLeast(0.85),
+            confidence = current.currentConfidence.coerceAtLeast(0.90),
+            evidenceHashes = evidenceHashes
+        )
+        _uiState.update { it.copy(activeDiploma = diploma, isDiplomaDialogVisible = true) }
+    }
+
+    fun toggleGeometrySandbox() {
+        _uiState.update { it.copy(isGeometrySandboxVisible = !it.isGeometrySandboxVisible) }
+    }
+
+    fun toggleElectricalSandbox() {
+        _uiState.update { it.copy(isElectricalSandboxVisible = !it.isElectricalSandboxVisible) }
+    }
+
+    fun connectDtcToCurriculum(dtcCode: String) {
+        val bridge = com.elysium369.meet.education.domain.DtcCurriculumBridge.getBridgeForDtc(dtcCode)
+        _uiState.update {
+            it.copy(
+                linkedDtcBridge = bridge,
+                isElectricalSandboxVisible = bridge?.sandboxType == "ELECTRICAL",
+                isGeometrySandboxVisible = bridge?.sandboxType == "GEOMETRY"
             )
         }
     }
