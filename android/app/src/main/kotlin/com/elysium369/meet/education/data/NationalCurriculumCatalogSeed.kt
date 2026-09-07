@@ -924,6 +924,105 @@ object NationalCurriculumCatalogSeed {
                     )
                 )
             )
+        ),
+        CourseUnitData(
+            id = "cr_ing_c1_u02",
+            track = CurriculumTrack.INGLES_BXM,
+            unitNumber = 2,
+            targetMonth = 4,
+            monthName = "Abril",
+            title = "C1 Advanced Syntactic Mastery: Inversion, Clefts & Mixed Conditionals",
+            description = "Estructuras gramaticales complejas C1 para peritajes forenses, oraciones hendidas e inversión tras adverbiales negativos.",
+            estimatedLessons = 10,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_ing_c1_c_inversion_cleft",
+                    conceptCode = "CR_ING_C1_INVERSION_CLEFT",
+                    title = "Inversion and Cleft Structures for Forensic Emphasis",
+                    description = "Inversión sintáctica obligatoria (under no circumstances, not only) y oraciones hendidas para identificar causas raíz.",
+                    targetMonth = 4,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_ing_c1_negative_inversion",
+                            conceptId = "cr_ing_c1_c_inversion_cleft",
+                            title = "Negative Adverbial Inversion in Safety Protocol",
+                            prompt = "Complete the official EV safety protocol sentence: 'Under no circumstances _______ the high-voltage interlock loop while the contactor is energized.'",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "should the technician probe",
+                                "the technician should probe",
+                                "the technician probes",
+                                "should probe the technician"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "When an English sentence begins with a negative or restrictive adverbial like 'Under no circumstances', subject-auxiliary inversion is mandatory ('should the technician probe')."
+                        )
+                    )
+                ),
+                CurriculumConceptData(
+                    id = "cr_ing_c1_c_mixed_conditionals",
+                    conceptCode = "CR_ING_C1_MIXED_CONDITIONALS",
+                    title = "Mixed Conditionals and Root-Cause Counterfactuals",
+                    description = "Análisis contrafáctico de causas pasadas con consecuencias en el presente o condiciones permanentes en fallos históricos.",
+                    targetMonth = 4,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_ing_c1_root_cause_conditional",
+                            conceptId = "cr_ing_c1_c_mixed_conditionals",
+                            title = "Forensic Root-Cause Mixed Conditional",
+                            prompt = "Select the grammatically correct C1 mixed conditional analyzing an engine failure: 'If the mechanic _______ the cylinder head to 85 Nm yesterday, the engine _______ coolant right now.'",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "had torqued / would not be leaking",
+                                "torqued / would not leak",
+                                "had torqued / would not have leaked",
+                                "would torque / had not leaked"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "A past action (Past Perfect: 'had torqued') generating an ongoing present state (would + continuous infinitive: 'would not be leaking') is a canonical Type 3 + Type 2 mixed conditional."
+                        )
+                    )
+                )
+            )
+        ),
+        CourseUnitData(
+            id = "cr_ing_c1_u03",
+            track = CurriculumTrack.INGLES_BXM,
+            unitNumber = 3,
+            targetMonth = 5,
+            monthName = "Mayo",
+            title = "C1 Professional STEM Diagnostics & Telemetry Reports",
+            description = "Lectura de telemetría CAN-bus, decodificación de tramas UDS y redacción de dictámenes técnicos con lenguaje cauto (hedging).",
+            estimatedLessons = 10,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_ing_c1_c_telemetry_hedging",
+                    conceptCode = "CR_ING_C1_TELEMETRY_HEDGING",
+                    title = "Technical Telemetry Interpretation & Forensic Hedging",
+                    description = "Uso de lenguaje cauto y matizado (hedging) en dictámenes de ingeniería sin juicios de valor subjetivos.",
+                    targetMonth = 5,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_ing_c1_forensic_hedging",
+                            conceptId = "cr_ing_c1_c_telemetry_hedging",
+                            title = "C1 Forensic Diagnostic Hedging",
+                            prompt = "Which statement represents acceptable C1 forensic engineering style avoiding unprofessional absolute claims?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "The telemetry logs suggest that excessive thermal cycles may have contributed to premature IGBT solder fatigue.",
+                                "The driver definitely destroyed the whole inverter by driving recklessly.",
+                                "It is 100% obvious that the vehicle was ruined by bad maintenance.",
+                                "The shop clearly forgot how to repair electrical systems."
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "C1 professional engineering English mandates cautious hedging ('suggest that... may have contributed to...') to produce legally defensible affidavits."
+                        )
+                    )
+                )
+            )
         )
     )
 

@@ -645,6 +645,141 @@ object NationalCurriculumDeepKnowledge {
             reflectionPrompt = "Why do international engineering service manuals avoid personal pronouns like 'I' and 'we'?"
         ),
 
+        // ── INGLÉS C1: ADVANCED SYNTACTIC MASTERY (INVERSION & CLEFTS) ───────────
+        "cr_ing_c1_c_inversion_cleft" to ConceptDeepKnowledge(
+            conceptId = "cr_ing_c1_c_inversion_cleft",
+            coreIntuition = "In high-stakes technical, safety and legal documentation, standard word order is inverted after negative adverbials (under no circumstances, seldom, not only) to signal absolute mandates, while cleft sentences pinpoint root causes.",
+            expertMentalModel = listOf(
+                "1. Recognize the initial restrictive or negative adverbial trigger (under no circumstances, not only, seldom).",
+                "2. Position the auxiliary verb immediately before the grammatical subject (auxiliary + subject + main verb).",
+                "3. In cleft structures, place the focal root-cause element into the cleft clause ('It was X that...' or 'What X did was...').",
+                "4. Verify that no double negatives or incorrect auxiliary inflections are introduced.",
+                "5. Ensure the sentence delivers unambiguous, authoritative professional emphasis."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_INVERSION_OMISSION",
+                    title = "Omisión de inversión auxiliar-sujeto tras adverbiales negativos",
+                    studentFaultyAssumption = "Mantener el orden sintáctico afirmativo (sujeto + verbo) al iniciar con frases como 'Under no circumstances' o 'Seldom'.",
+                    counterExample = "Writing 'Under no circumstances the technician should probe' violates formal C1 syntax; it must be 'Under no circumstances should the technician probe'.",
+                    socraticRemediationPrompt = "When an English sentence begins with a restrictive negative adverbial, what happens to the auxiliary verb? Does it stay after the subject or move before it?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Adverbial Trigger",
+                    socraticQuestion = "When a sentence starts with 'Under no circumstances', does the subject come before or after the modal verb 'should'?",
+                    conceptualScaffold = "Invert the subject and auxiliary verb: 'should the technician probe'."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Question Order Pattern",
+                    socraticQuestion = "Notice how negative inversion mirrors formal question word order: 'Should you do it?' -> 'Under no circumstances should you do it.'",
+                    conceptualScaffold = "Use standard question syntax after negative introductory adverbials."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "High-Voltage Safety",
+                    socraticQuestion = "How does inverted syntax communicate non-negotiable safety in an EV high-voltage service manual?",
+                    conceptualScaffold = "It creates immediate grammatical prominence, ensuring critical safety rules cannot be misunderstood."
+                )
+            ),
+            realWorldApplication = "Writing safety-critical operational procedures, forensic accident affidavits, and international patent claims.",
+            vocationalEngineeringBridge = "ISCO 2144 / 7231: Automotive and mechanical engineers drafting technical compliance documents and OEM bulletins.",
+            reflectionPrompt = "How does inverted syntax alter the perceived authority and legal liability of a safety warning compared to a standard declarative sentence?"
+        ),
+
+        // ── INGLÉS C1: MIXED CONDITIONALS & FORENSIC CAUSALITY ───────────────────
+        "cr_ing_c1_c_mixed_conditionals" to ConceptDeepKnowledge(
+            conceptId = "cr_ing_c1_c_mixed_conditionals",
+            coreIntuition = "Mixed conditionals bridge asynchronous temporal frames. They connect a counterfactual past decision (Past Perfect) with an ongoing present reality (would + infinitive), or an inherent permanent condition with a past breakdown.",
+            expertMentalModel = listOf(
+                "1. Determine whether the hypothesis is in the past (Past Perfect) or represents an enduring characteristic (Past Simple).",
+                "2. Determine whether the consequence is an ongoing present condition (would + infinitive) or a past event (would have + participle).",
+                "3. Formulate the mixed conditional pair: Past condition + Present result (Type 3 + Type 2).",
+                "4. In formal registers, apply conditional inversion omitting 'if' ('Had the technician torqued...').",
+                "5. Verify logical cause-and-effect consistency in root-cause fault tracing."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_RIGID_CONDITIONALS",
+                    title = "Creer que las oraciones condicionales no pueden mezclar tiempos",
+                    studentFaultyAssumption = "Asumir que las condicionales solo pueden ser Tipo 1, 2 o 3 rígidas sin combinar pasado y presente.",
+                    counterExample = "'If I had won the lottery yesterday, I would be rich today' perfectly combines a past event with a present state of being.",
+                    socraticRemediationPrompt = "Can an action that failed yesterday produce a consequence that is still happening right now? Which tenses express that relationship?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Timeframes Separation",
+                    socraticQuestion = "Did the bolt tightening happen yesterday or right now? Is the engine leaking yesterday or right now?",
+                    conceptualScaffold = "Combine the past action (had torqued) with the present consequence (would not be leaking)."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Conditional Inversion",
+                    socraticQuestion = "How do you rewrite 'If the mechanic had verified the clearance' in a formal C1 register without 'if'?",
+                    conceptualScaffold = "Omit 'if' and invert: 'Had the mechanic verified the clearance...'"
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Forensic Root-Cause",
+                    socraticQuestion = "How does mixed conditional phrasing establish causal liability in a vehicle warranty claim dispute?",
+                    conceptualScaffold = "It demonstrates beyond reasonable doubt that a specific maintenance omission directly produced the ongoing physical defect."
+                )
+            ),
+            realWorldApplication = "Root-cause failure analysis (RCFA), insurance forensic investigations, and warranty arbitration proceedings.",
+            vocationalEngineeringBridge = "ISCO 7231 / 3115: Lead diagnostic technicians, forensic assessors, and engineering warranty auditors.",
+            reflectionPrompt = "Why is counterfactual conditional analysis essential when defending a warranty denial before a judicial arbiter?"
+        ),
+
+        // ── INGLÉS C1: PROFESSIONAL STEM TELEMETRY & HEDGING ─────────────────────
+        "cr_ing_c1_c_telemetry_hedging" to ConceptDeepKnowledge(
+            conceptId = "cr_ing_c1_c_telemetry_hedging",
+            coreIntuition = "C1 professional discourse avoids categorical overstatements. Objective engineers use modal hedging to separate empirically measured physical data from causal hypotheses, protecting their credibility and legal defensibility.",
+            expertMentalModel = listOf(
+                "1. Present verified sensor readings and telemetry data in exact quantitative terms.",
+                "2. Transition from raw data to causal deduction using cautious epistemic verbs (suggest, indicate, appear to).",
+                "3. Qualify the extent of certainty using modal auxiliaries (may have, might indicate, would suggest).",
+                "4. Eliminate emotive, subjective, or accusatory language from the formal technical brief.",
+                "5. Conclude with verifiable, actionable remediation recommendations."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_BLUNT_CATEGORICAL_ASSERTION",
+                    title = "Uso de afirmaciones absolutas no demostradas en reportes periciales",
+                    studentFaultyAssumption = "Creer que sonar autoritario requiere hacer afirmaciones categóricas como 'el conductor definitivamente destruyó el motor'.",
+                    counterExample = "In judicial and insurance cross-examinations, unhedged absolute statements are easily overturned by defense counsel; hedged assertions remain bulletproof.",
+                    socraticRemediationPrompt = "Is there room for another plausible physical cause based solely on this single sensor reading? How can you express deduction without declaring unverified certainty?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Distinguishing Data from Claims",
+                    socraticQuestion = "Is a sensor reading of 4.8V a physical fact or an opinion? Is the claim that the sensor is damaged a fact or a deduction?",
+                    conceptualScaffold = "The voltage is raw data; the diagnosis is an inference that requires hedged phrasing."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Modal Hedging Tools",
+                    socraticQuestion = "Which modal phrases soften an assertion into a scientifically defensible deduction?",
+                    conceptualScaffold = "Use 'The evidence suggests that...', 'This would appear to indicate...', 'may have contributed to...'."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Affidavit Admissibility",
+                    socraticQuestion = "Why do international arbitration panels prefer hedged engineering reports over emotionally charged accusations?",
+                    conceptualScaffold = "Because hedged reports rely strictly on reproducible empirical data, maintaining objective scientific integrity."
+                )
+            ),
+            realWorldApplication = "Authoring forensic mechanical affidavits, engineering change proposals, and international arbitration submissions.",
+            vocationalEngineeringBridge = "ISCO 2422 / 3115: Technical inspectors, expert witnesses, and international engineering consultants.",
+            reflectionPrompt = "How does modal hedging enhance, rather than weaken, the scientific credibility and legal resilience of a diagnostic report?"
+        ),
+
         // ── 8.º AÑO: DIBUJO TÉCNICO CAD Y PROYECCIONES ORTOGONALES ──────────────
         "cr_art_c_dibujo_tecnico" to ConceptDeepKnowledge(
             conceptId = "cr_art_c_dibujo_tecnico",
