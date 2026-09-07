@@ -2,6 +2,7 @@ package com.elysium369.meet.core.billing
 
 import android.content.Context
 import com.elysium369.meet.BuildConfig
+import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -52,6 +53,13 @@ class GooglePlayPurchaseVerifier(
                 }
             """.trimIndent()
 
+            val userToken = try {
+                com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentSessionOrNull()?.accessToken
+            } catch (_: Exception) {
+                null
+            }
+            val authBearer = userToken?.takeIf { it.isNotBlank() } ?: supabaseKey
+
             val connection = (URL("$supabaseUrl/functions/v1/verify-google-play-purchase").openConnection() as HttpURLConnection).apply {
                 requestMethod = "POST"
                 connectTimeout = 15_000
@@ -59,7 +67,7 @@ class GooglePlayPurchaseVerifier(
                 doOutput = true
                 setRequestProperty("Content-Type", "application/json")
                 setRequestProperty("apikey", supabaseKey)
-                setRequestProperty("Authorization", "Bearer $supabaseKey")
+                setRequestProperty("Authorization", "Bearer $authBearer")
             }
 
             OutputStreamWriter(connection.outputStream).use { it.write(body) }
