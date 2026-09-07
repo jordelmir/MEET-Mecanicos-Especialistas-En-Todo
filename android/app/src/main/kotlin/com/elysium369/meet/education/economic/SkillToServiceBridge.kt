@@ -63,6 +63,18 @@ object SkillToServiceBridge {
             iscoCode = "7126",
             serviceVertical = "RESIDENTIAL_PLUMBING",
             isRegulatedLicenseRequired = false,
+        ),
+        SkillToServiceMapping(
+            skillId = "cr_art_s_vistas",
+            iscoCode = "3118",
+            serviceVertical = "ARCHITECTURAL_AND_TECHNICAL_CAD",
+            isRegulatedLicenseRequired = false,
+        ),
+        SkillToServiceMapping(
+            skillId = "cr_art_s_circuito_simple",
+            iscoCode = "7411",
+            serviceVertical = "RESIDENTIAL_ELECTRICAL_SERVICES",
+            isRegulatedLicenseRequired = false,
         )
     )
 }

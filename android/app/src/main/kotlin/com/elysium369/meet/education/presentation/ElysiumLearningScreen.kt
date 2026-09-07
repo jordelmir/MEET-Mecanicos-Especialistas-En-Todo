@@ -97,35 +97,63 @@ fun ElysiumLearningScreen(
                 SafeguardsBanner()
             }
 
-            // 2. Track Selector Tabs
+            // 2. Cycle and Track Selector
             item {
-                PrimaryTabRow(
-                    selectedTabIndex = if (state.track == CurriculumTrack.MATEMATICA_1) 0 else 1,
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    modifier = Modifier.clip(RoundedCornerShape(12.dp)),
-                ) {
-                    Tab(
-                        selected = state.track == CurriculumTrack.MATEMATICA_1,
-                        onClick = { viewModel.selectTrack(CurriculumTrack.MATEMATICA_1) },
-                        text = {
-                            Text(
-                                text = "📐 Matemática 1.º (MEP)",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Cycle Filter Chips
+                    val cycles = listOf("Todos", "I Ciclo", "II Ciclo", "III Ciclo", "Diversificada")
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        items(cycles) { cycle ->
+                            val isSelected = cycle == state.selectedCycle
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.selectCycle(cycle) },
+                                label = {
+                                    Text(
+                                        text = when (cycle) {
+                                            "I Ciclo" -> "I Ciclo (1.º-3.º)"
+                                            "II Ciclo" -> "II Ciclo (4.º-6.º)"
+                                            "III Ciclo" -> "III Ciclo (7.º-9.º)"
+                                            "Diversificada" -> "Bachillerato (BxM)"
+                                            else -> "Todos los Ciclos"
+                                        },
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 12.sp,
+                                    )
+                                },
                             )
-                        },
-                    )
-                    Tab(
-                        selected = state.track == CurriculumTrack.FONTANERIA_7,
-                        onClick = { viewModel.selectTrack(CurriculumTrack.FONTANERIA_7) },
-                        text = {
-                            Text(
-                                text = "🔧 7.º Fontanería (Oficio)",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
+                        }
+                    }
+
+                    // Track selector chips
+                    val filteredTracks = if (state.selectedCycle == "Todos") {
+                        CurriculumTrack.values().toList()
+                    } else {
+                        CurriculumTrack.values().filter { it.cycleName.contains(state.selectedCycle) || state.selectedCycle.contains(it.cycleName) }
+                    }
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        items(filteredTracks) { track ->
+                            val isSelected = track == state.track
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.selectTrack(track) },
+                                label = {
+                                    Text(
+                                        text = track.displayName,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 12.sp,
+                                    )
+                                },
                             )
-                        },
-                    )
+                        }
+                    }
                 }
             }
 
@@ -138,10 +166,12 @@ fun ElysiumLearningScreen(
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
-                        text = if (state.track == CurriculumTrack.MATEMATICA_1) {
-                            "DISTRIBUCIÓN MENSUAL OFICIAL (10 MESES)"
+                        text = if (state.track.isPrimary && state.track.subjectName == "MATEMATICA") {
+                            "DISTRIBUCIÓN MENSUAL OFICIAL MEP (10 MESES)"
+                        } else if (state.track.isDiversifiedOrAdult) {
+                            "TEMARIOS OFICIALES DGEC (BACHILLERATO POR MADUREZ)"
                         } else {
-                            "UNIDADES FORMATIVAS Y TALLER (III CICLO)"
+                            "UNIDADES Y TALLERES FORMATIVOS OFICIALES"
                         },
                         style = MaterialTheme.typography.labelMedium.copy(
                             fontWeight = FontWeight.Bold,
@@ -217,10 +247,12 @@ fun ElysiumLearningScreen(
                 }
             }
 
-            // 7. Economic Bridge Card (if Fontanería track)
-            if (state.track == CurriculumTrack.FONTANERIA_7) {
+            // 7. Economic Bridge Card (for technical / vocational tracks)
+            if (state.track == CurriculumTrack.FONTANERIA_7 ||
+                state.track == CurriculumTrack.DIBUJO_TECNICO_8 ||
+                state.track == CurriculumTrack.ELECTRICIDAD_9) {
                 item {
-                    EconomicBridgeCard()
+                    EconomicBridgeCard(track = state.track)
                 }
             }
 
@@ -291,14 +323,20 @@ private fun MepCalendarRibbon(track: CurriculumTrack) {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "🇨🇷 CALENDARIO ESCOLAR MEP 2026",
+                    text = if (track.isDiversifiedOrAdult) {
+                        "🇨🇷 DGEC BxM CONVOCATORIAS 2026"
+                    } else if (track.isSecondaryBasic) {
+                        "🇨🇷 CALENDARIO MEP 2026 (III CICLO)"
+                    } else {
+                        "🇨🇷 CALENDARIO ESCOLAR MEP 2026"
+                    },
                     style = MaterialTheme.typography.labelMedium.copy(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                     ),
                 )
                 Text(
-                    text = "39 Semanas",
+                    text = if (track.isDiversifiedOrAdult) "Ed. Abierta" else "39 Semanas",
                     style = MaterialTheme.typography.labelSmall.copy(
                         color = MaterialTheme.colorScheme.outline,
                         fontWeight = FontWeight.SemiBold,
@@ -310,9 +348,15 @@ private fun MepCalendarRibbon(track: CurriculumTrack) {
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                CalendarPill(title = "Periodo 1", range = "23 Feb – 3 Jul", count = "19 sem")
-                CalendarPill(title = "Receso", range = "6 Jul – 17 Jul", count = "2 sem")
-                CalendarPill(title = "Periodo 2", range = "20 Jul – 9 Dic", count = "20 sem")
+                if (track.isDiversifiedOrAdult) {
+                    CalendarPill(title = "Conv. 01-2026", range = "Insc: Ene · Ex: Abr", count = "Fase 1")
+                    CalendarPill(title = "Pruebas", range = "Sábados y Domingos", count = "DGEC")
+                    CalendarPill(title = "Conv. 02-2026", range = "Insc: Jun · Ex: Sep", count = "Fase 2")
+                } else {
+                    CalendarPill(title = "Periodo 1", range = "23 Feb – 3 Jul", count = "19 sem")
+                    CalendarPill(title = "Receso", range = "6 Jul – 17 Jul", count = "2 sem")
+                    CalendarPill(title = "Periodo 2", range = "20 Jul – 9 Dic", count = "20 sem")
+                }
             }
         }
     }
@@ -779,7 +823,13 @@ private fun MultipleChoiceArena(
 }
 
 @Composable
-private fun EconomicBridgeCard() {
+private fun EconomicBridgeCard(track: CurriculumTrack) {
+    val (iscoCode, occupationTitle, serviceVertical) = when (track) {
+        CurriculumTrack.DIBUJO_TECNICO_8 -> Triple("3118", "Delineantes y dibujantes técnicos CAD", "ARCHITECTURAL_AND_TECHNICAL_CAD")
+        CurriculumTrack.ELECTRICIDAD_9 -> Triple("7411", "Electricistas de obras y afines", "RESIDENTIAL_ELECTRICAL_SERVICES")
+        else -> Triple("7126", "Fontaneros y montadores de tuberías", "RESIDENTIAL_PLUMBING")
+    }
+
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(
@@ -792,7 +842,7 @@ private fun EconomicBridgeCard() {
                 Text(text = "💼", fontSize = 18.sp)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "PUENTE EDUCATIVO-ECONÓMICO (7.º → SERVICIO)",
+                    text = "PUENTE EDUCATIVO-ECONÓMICO (${track.displayName} → SERVICIO)",
                     style = MaterialTheme.typography.labelSmall.copy(
                         fontWeight = FontWeight.Black,
                         color = MaterialTheme.colorScheme.onTertiaryContainer,
@@ -801,11 +851,11 @@ private fun EconomicBridgeCard() {
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Ocupación ISCO-08: 7126 (Fontaneros y montadores de tuberías)",
+                text = "Ocupación ISCO-08: $iscoCode ($occupationTitle)",
                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
             )
             Text(
-                text = "Vertical de Servicio: RESIDENTIAL_PLUMBING · Estado: DEMONSTRATED",
+                text = "Vertical de Servicio: $serviceVertical · Estado: DEMONSTRATED",
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
             )
             Spacer(modifier = Modifier.height(6.dp))

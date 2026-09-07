@@ -19,8 +19,9 @@ import kotlinx.coroutines.launch
 
 data class ElysiumLearningUiState(
     val track: CurriculumTrack = CurriculumTrack.MATEMATICA_1,
+    val selectedCycle: String = "Todos",
     val activeGrade: Int = 1,
-    val activeSubject: String = "Matemática 1.º Año (MEP 2026)",
+    val activeSubject: String = "1.º Matemática (I Ciclo)",
     val learnerId: String = "",
     val isMinor: Boolean = true,
     val privacyLevel: LearnerPrivacyLevel = LearnerPrivacyLevel.PROTECTED_STUDENT,
@@ -63,6 +64,10 @@ class ElysiumLearningViewModel(
         loadTrack(CurriculumTrack.MATEMATICA_1)
     }
 
+    fun selectCycle(cycle: String) {
+        _uiState.update { it.copy(selectedCycle = cycle) }
+    }
+
     fun selectTrack(track: CurriculumTrack) {
         if (_uiState.value.track == track) return
         loadTrack(track)
@@ -74,12 +79,8 @@ class ElysiumLearningViewModel(
         val initialConcept = initialUnit?.concepts?.firstOrNull()
         val initialTask = initialConcept?.tasks?.firstOrNull()
 
-        val grade = if (track == CurriculumTrack.FONTANERIA_7) 7 else 1
-        val subject = if (track == CurriculumTrack.FONTANERIA_7) {
-            "7.º Artes Industriales Fontanería"
-        } else {
-            "Matemática 1.º Año (MEP 2026)"
-        }
+        val grade = track.gradeNumber
+        val subject = "${track.displayName} (${track.cycleName})"
 
         _uiState.update { current ->
             current.copy(
@@ -231,7 +232,7 @@ class ElysiumLearningViewModel(
             }
 
             // Refresh personal frontier
-            val subject = if (currentState.track == CurriculumTrack.FONTANERIA_7) "ARTES_INDUSTRIALES" else "MATEMATICA"
+            val subject = currentState.track.subjectName
             refreshFrontierSync(currentState.activeGrade, subject)
         }.onFailure { err ->
             _uiState.update {
@@ -253,7 +254,7 @@ class ElysiumLearningViewModel(
 
     fun refreshFrontier() {
         val current = _uiState.value
-        val subject = if (current.track == CurriculumTrack.FONTANERIA_7) "ARTES_INDUSTRIALES" else "MATEMATICA"
+        val subject = current.track.subjectName
         scope.launch {
             refreshFrontierSync(current.activeGrade, subject)
         }
