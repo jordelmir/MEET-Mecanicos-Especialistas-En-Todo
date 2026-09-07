@@ -43,8 +43,7 @@
       "IN_PROGRESS",
       "ARRIVED_DESTINATION",
       "COMPLETED",
-      "CANCELLED",
-      "DISPUTED"
+      "CANCELLED"
     ],
     "OutboxState": [
       "PENDING",

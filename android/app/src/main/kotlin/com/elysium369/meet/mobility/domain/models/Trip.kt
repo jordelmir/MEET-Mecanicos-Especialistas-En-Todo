@@ -13,7 +13,6 @@ enum class TripState {
     ARRIVED_DESTINATION,
     COMPLETED,
     CANCELLED,
-    DISPUTED,
 }
 
 data class Trip(
@@ -23,7 +22,6 @@ data class Trip(
     val driverId: UUID,
     val vehicleId: UUID,
     val state: TripState,
-    val verificationPinHash: String?,
     val quoteId: UUID?,
     val paymentAuthorizationId: UUID?,
     val settlementId: UUID?,

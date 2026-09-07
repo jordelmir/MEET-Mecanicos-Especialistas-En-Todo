@@ -1,6 +1,7 @@
 package com.elysium369.meet.ui.screens
 
 import com.elysium369.meet.ui.navigation.backOrHome
+import com.elysium369.meet.ui.navigation.MeetDestinations
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -1467,6 +1468,26 @@ fun DtcRepairGuideScreen(
                                             border = BorderStroke(1.dp, MeetColors.cyberCyan),
                                         ) {
                                             Text("COTIZAR PIEZA", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        OutlinedButton(
+                                            onClick = { navController.navigate(MeetDestinations.MECHANIC_SERVICES) },
+                                            modifier = Modifier.weight(1f),
+                                            border = BorderStroke(1.dp, MeetColors.neonGreen),
+                                        ) {
+                                            Text("RED DE TALLERES", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        }
+                                        OutlinedButton(
+                                            onClick = { navController.navigate(MeetDestinations.TOW_TRUCK) },
+                                            modifier = Modifier.weight(1f),
+                                            border = BorderStroke(1.dp, MeetColors.warning),
+                                        ) {
+                                            Text("SOLICITAR GRÚA", color = MeetColors.warning, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                         }
                                     }
                                 }

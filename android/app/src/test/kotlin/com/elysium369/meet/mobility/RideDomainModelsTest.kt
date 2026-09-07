@@ -14,6 +14,10 @@ import com.elysium369.meet.mobility.domain.models.RideStopType
 import com.elysium369.meet.mobility.domain.models.ServiceCategoryId
 import com.elysium369.meet.mobility.domain.models.Trip
 import com.elysium369.meet.mobility.domain.models.TripState
+import com.elysium369.meet.mobility.data.protocol.ProtocolViolation
+import com.elysium369.meet.mobility.data.protocol.requireDouble
+import com.elysium369.meet.mobility.data.protocol.requireString
+import com.elysium369.meet.mobility.data.protocol.requireUuid
 import java.time.Instant
 import java.util.UUID
 import org.junit.Assert.assertEquals
@@ -139,7 +143,6 @@ class RideDomainModelsTest {
             driverId = UUID.randomUUID(),
             vehicleId = UUID.randomUUID(),
             state = TripState.ASSIGNED,
-            verificationPinHash = null,
             quoteId = null,
             paymentAuthorizationId = null,
             settlementId = null,
@@ -156,4 +159,42 @@ class RideDomainModelsTest {
             trip.copy(serverVersion = 0L)
         }
     }
+
+    @Test
+    fun tripDisputeLifecycle() {
+        val now = Instant.now()
+        val dispute = com.elysium369.meet.mobility.domain.models.TripDispute(
+            disputeId = UUID.randomUUID(),
+            tripId = UUID.randomUUID(),
+            openedBy = UUID.randomUUID(),
+            state = com.elysium369.meet.mobility.domain.models.TripDisputeState.OPEN,
+            createdAt = now,
+            updatedAt = now,
+        )
+        assertEquals(com.elysium369.meet.mobility.domain.models.TripDisputeState.OPEN, dispute.state)
+    }
+
+    @Test
+    fun jsonContractFailClosedValidation() {
+        val emptyObj = kotlinx.serialization.json.buildJsonObject {}
+        assertThrows(ProtocolViolation::class.java) {
+            emptyObj.requireString("missing_field")
+        }
+
+        val invalidUuidObj = kotlinx.serialization.json.buildJsonObject {
+            put("uuid_field", kotlinx.serialization.json.JsonPrimitive("not-a-uuid"))
+        }
+        assertThrows(ProtocolViolation::class.java) {
+            invalidUuidObj.requireUuid("uuid_field")
+        }
+
+        val invalidDoubleObj = kotlinx.serialization.json.buildJsonObject {
+            put("num_field", kotlinx.serialization.json.JsonPrimitive("abc"))
+        }
+        assertThrows(ProtocolViolation::class.java) {
+            invalidDoubleObj.requireDouble("num_field")
+        }
+    }
 }
+
+
