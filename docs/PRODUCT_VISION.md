@@ -1,14 +1,108 @@
-# MEET — Visión de Producto
+# MEET / ELYSIUM — Visión de Producto
 
-**Status:** Active principle (Jor, 2026-07-04)
+**Status:** Active principle (Jor, 2026-07-04; expanded 2026-09-07)
 **One-liner:** *"Todo en uno. Siempre a más, nunca a menos. Al máximo nivel de la humanidad."*
 
 ---
 
-## El principio rector
+## North Star
 
-MEET es **un solo producto**, no un catálogo de features opcionales. Cada
-sección existe porque sirve a las demás:
+> **ELYSIUM shall progressively make the world's useful knowledge learnable,
+> human capability discoverable and developable, real-world needs computable,
+> and economic exchange easier to coordinate, execute and verify.**
+
+```
+ANY HUMAN
++
+ANY LEGITIMATE NEED
++
+ANY LEARNABLE CAPABILITY
++
+ANY LAWFUL PRODUCT OR SERVICE
+        ↓
+     ELYSIUM
+        ↓
+LEARN / FIND / CREATE / PROVIDE / BUY / SELL / HIRE / WORK
+        ↓
+VERIFIED REAL-WORLD OUTCOME
+```
+
+### The Civilizational Loop
+
+```
+LEARN → REMEMBER → ACT → EARN → VERIFY → IMPROVE → LEARN AGAIN
+```
+
+---
+
+## Platform Architecture
+
+ELYSIUM is not one app. It is a **Human Operating Platform** with five
+conceptual layers:
+
+```
+┌───────────────────────────────────────────────┐
+│            ELYSIUM COGNITIVE OS               │
+├───────────────────────────────────────────────┤
+│ KNOWLEDGE │ MEMORY │ LEARNING │ CAPABILITY    │
+├───────────────────────────────────────────────┤
+│             FORGE REALITY ENGINE              │
+├───────────────────────────────────────────────┤
+│ SERVICES │ JOBS │ COMMERCE │ MOBILITY │ B2B   │
+├───────────────────────────────────────────────┤
+│ PAYMENTS │ LEDGER │ IDENTITY │ TRUST │ DATA   │
+└───────────────────────────────────────────────┘
+```
+
+Three conceptual engines power this:
+
+| Engine | Purpose |
+|--------|---------|
+| **ELYSIUM** | Cognitive and orchestration control plane: identity, intent, knowledge, memory, context, evidence, state, risk, permissions, history |
+| **FORGE** | Spatial representation, visualization, simulation engine for any domain |
+| **MEET** | Human/business/economic fulfillment network: services, commerce, mobility, logistics |
+
+---
+
+## Constitutional Invariants
+
+Three invariants that **MUST NEVER be broken**:
+
+### 1. KNOWLEDGE ≠ COMPETENCE ≠ CREDENTIAL
+
+A completed course is not a demonstrated skill.
+A demonstrated skill is not a professional license.
+A simulation is not a physical verification.
+
+### 2. DEMAND SIGNAL ≠ GUARANTEED INCOME
+
+The platform may show that demand exists for a capability.
+It must NEVER promise employment or income.
+
+### 3. PLATFORM COORDINATION ≠ CONTROL OF THE HUMAN
+
+ELYSIUM augments. It does not own. Data portability, explicit consent,
+revocable sharing, encrypted sensitive data, user-controlled memory,
+auditability, least privilege, deletion controls — by design.
+
+---
+
+## Constitutional Priority Order
+
+```
+TRUTH > CORRECTNESS > SAFETY > SECURITY > PRIVACY > DATA INTEGRITY
+> FINANCIAL INTEGRITY > USEFUL HUMAN OUTCOME > REAL REVENUE
+> RETENTION > MARKETPLACE LIQUIDITY > GROWTH > SCALABILITY
+> GLOBALIZATION > COSMETICS
+```
+
+A lower priority NEVER overrides a violated higher-order invariant.
+
+---
+
+## Domain Zero — The Automotive Closed Loop
+
+MEET began here and this remains its most hardened domain:
 
 ```
 Onboarding
@@ -37,98 +131,104 @@ Share: cliente / taller / flotilla / compra-venta / aseguradora
 **Cada paso bloquea al siguiente si le falta evidencia.** No se puede
 pedir un repuesto sin DTC o sin pieza identificada. No se puede firmar
 un Post-Scan sin foto-antes/foto-después. No se puede exportar un PDF
-sin hash verificable. Eso es lo que hace que MEET sea serio, no un
-scanner bonito.
+sin hash verificable.
 
 ---
 
-## "Todo en uno" significa
+## Domain One — Learning OS (Costa Rica 2026)
 
-1. **Las dos specs V2 conviven.** No son A vs B, son A + B + sync:
-   - `docs/reports/V2-CERTIFIED-PDF-AND-HISTORY.md` — reportes
-     certificados, hash chain, QR, historial del vehículo, evidencia
-     fotográfica, firma.
-   - `docs/parts-marketplace/V2-TECHNICAL-MARKETPLACE.md` — marketplace
-     de repuestos con compatibilidad VIN-DTC, ranking no-por-precio,
-     antifraude, panel de repuestera.
-   - El reporte PDF **referencia** las cotizaciones aceptadas. La
-     cotización aceptada **referencia** el reporte que la cerró. La
-     compra queda en el historial. El historial es el flujo entero
-     cerrado.
+Costa Rica's 2026 MEP national curriculum is the **first authoritative
+dataset and proving ground** for the Universal Learning Engine.
 
-2. **Siempre a más.** Cuando llegue una nueva sección, no se reemplaza
-   una vieja. Se suma, se integra, se hace coherente. Los agentes
-   (Codex + Mavis + Google Antigravity) **agregan al mismo árbol**, no
-   compiten por el mismo slot.
+```
+AUTHORITATIVE CURRICULUM
+        ↓
+CURRICULUM COMPILER
+        ↓
+KNOWLEDGE GRAPH
+        ↓
+LEARNER DIGITAL TWIN
+        ↓
+PERSONAL LEARNING FRONTIER
+        ↓
+ADAPTIVE TEACHING (Socratic AI)
+        ↓
+FORGE EXPERIENCES
+        ↓
+MASTERY ENGINE (FSRS)
+        ↓
+VERIFIED SKILL EVIDENCE
+```
 
-3. **Nunca a menos.** Cuando algo ya funciona (e.g. `ReportIntegrityCard`
-   mostrando MATCH byte-exact), no se quita. Se amplía. Si la nueva
-   sección necesita más espacio en pantalla, se reorganiza la
-   navegación — pero la card sigue ahí.
+Course Zero: **Matemática 1.º — Costa Rica 2026** (official MEP monthly
+distribution).
 
-4. **El máximo nivel de la humanidad** es el techo, no el suelo.
-   "Bueno para un MVP" no es un argumento para MEET. El estándar
-   acá es: si un perito forense independiente puede verificar el
-   reporte en 30 segundos con el QR, está al nivel. Si no, falta.
-
----
-
-## Implicaciones prácticas para cualquier sesión de trabajo
-
-| Situación | Qué hacer |
-|---|---|
-| Codex, Mavis o Antigravity traen cambios en paralelo | Todos los avances se auditan y, si hay unión real pendiente, se integran en `sync/codex-mavis-antigravity-*` antes de APK. Nunca se descarta uno. |
-| Una sección parece "más importante" que otra | Falso. Son parte del mismo flujo comercial. Ver el diagrama arriba. |
-| Hay que elegir entre specs (A o B) | Mal planteada. La pregunta correcta es "¿cómo viven A y B juntas?" |
-| Hay que reducir scope para llegar a release | Solo reducir features nuevas, nunca quitar las ya integradas. |
-| Una integración "no es urgente" | Si está en el diagrama, es urgente. Si no está, no se construye. |
+Economic Bridge: **7.º Artes Industriales — Fontanería** (LEARN → FORGE →
+SKILL → Elysium Services).
 
 ---
 
-## Lo que ya está ship-ready esta noche (2026-07-04)
+## Universal Economic OS
 
-| Componente | Tag / commit | Estado |
-|---|---|---|
-| HashEngine + DiagnosticSnapshot byte-exact con TS | PR-7 (merged main) | ✅ |
-| ReportHashingService Hilt-wired | `e1076723` | ✅ local commit |
-| ReportIntegrityCard visible en ReportScreen | `e1076723` | ✅ local commit |
-| ci-verify.sh green end-to-end | `91662aa2` | ✅ local commit |
-| Tag `v0.6.0-report-hashing` con paridad verificada | tag anotado | ✅ local tag |
-| Skill `codex-mavis-sync` para Codex, Mavis y Antigravity | `~/.mavis/skills/` + `~/.gemini/config/skills/` | ✅ instalado y validado |
-| Spec V2 Reportes Certificados + Historial | `896eea09` | ✅ local commit |
-| Spec V2 Parts Marketplace | `b6bb99f2` | ✅ local commit |
+The same fulfillment kernel that powers mechanics, towing, and mobility
+generalizes to:
+
+```
+HUMAN NEED → INTENT → SERVICE TYPE → PROVIDER MATCH →
+QUOTE → JOB → EXECUTION → EVIDENCE →
+PAYMENT → VERIFIED OUTCOME → HISTORY / REPUTATION
+```
+
+35+ service verticals across 12 domains are cataloged. The architecture
+must prove universality by running at least TWO materially different
+domains (automotive + plumbing) through the same `ServiceIntent →
+ServiceJob → Outcome` pipeline without destroying domain-specific
+invariants.
 
 ---
 
-## Cómo se ve "al máximo nivel de la humanidad" en términos concretos
+## "Todo en uno" means
 
-- **Antifraude**: una pieza usada sin foto se rechaza. Una cotización
-  EXACT sin VIN se downgradea a HIGH con advertencia. Un reporte
-  firmado se invalida si alguien intenta editarlo.
-- **Compatibilidad**: nunca "compatible garantizado", siempre
+1. **All specs coexist.** Reports + Parts + Services + Learning +
+   Mobility + Property — they are not alternatives. They are
+   complementary and all ship together.
+
+2. **Siempre a más.** When a new section arrives, it adds to the tree.
+   Never replaces what already works.
+
+3. **Nunca a menos.** When reducing scope, only defer NEW features.
+   Never remove already-integrated ones.
+
+4. **Al máximo nivel de la humanidad.** If a forensic inspector can
+   verify a report independently with just the QR and SHA-256, it's
+   at the right level. If not, it's not done.
+
+---
+
+## How "máximo nivel" looks concretely
+
+- **Antifraude**: used part without photo → rejected. EXACT quote
+  without VIN → downgraded to HIGH with warning.
+- **Compatibilidad**: never "guaranteed compatible", always
   "compatibilidad probable, requiere confirmación por VIN/OEM/foto".
-- **Offline-first**: el mecánico en un sótano sin señal puede firmar
-  un reporte. Cuando llegue la señal, sincroniza.
-- **Trazabilidad**: cada DTC tiene un viaje completo — desde que el
-  escáner lo leyó hasta que la pieza que lo arregló fue comprada y
-  el post-scan confirmó que el código desapareció.
-- **Independencia verificable**: un perito externo con el QR puede
-  confirmar el hash sin tener cuenta en MEET, sin internet, sin
-  instalar nada. Solo necesita el algoritmo SHA-256 y el hash en la
-  base de datos pública (cuando haya backend) o el algoritmo
-  re-ejecutable localmente.
-
-Eso es el techo. Cualquier feature nueva se mide contra eso.
+- **Offline-first**: mechanic in a basement with no signal can sign
+  a report. Syncs when connectivity returns.
+- **Trazabilidad**: every DTC has a complete journey from scan to
+  part purchase to post-scan confirmation.
+- **Independencia verificable**: external inspector with QR can verify
+  hash without MEET account, internet, or installation.
+- **Education truth**: AI-generated explanation → GENERATED.
+  OBD measurement → MEASURED. MEP curriculum → AUTHORITATIVE.
+  Student self-report → REPORTED. Simulation → SIMULATED.
 
 ---
 
 ## Refs
 
-- `docs/PRODUCT_OS_ROADMAP.md` — reglas de producto (no inventar
-  datos reales, modo guiado vs denso, etc.). Vive junto a este doc.
+- `docs/ASTRA_V6_PROTOCOL.md` — the complete 85-section engineering
+  protocol governing the platform's evolution.
+- `docs/PRODUCT_OS_ROADMAP.md` — product rules (no fake data, guided
+  vs dense mode, etc.).
 - `docs/reports/V2-CERTIFIED-PDF-AND-HISTORY.md`
 - `docs/parts-marketplace/V2-TECHNICAL-MARKETPLACE.md`
-- `docs/adr/0004-report-hashing-service.md`
-- `~/.mavis/skills/codex-mavis-sync/SKILL.md`
-- `~/.gemini/config/skills/codex-mavis-sync` (Google Antigravity,
-  enlace a la implementacion canonica)
+- `AGENTS.md` — cross-agent coordination rules.

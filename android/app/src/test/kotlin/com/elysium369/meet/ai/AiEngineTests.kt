@@ -182,8 +182,8 @@ End of analysis."""
     }
 
     @Test
-    fun `AiFeature enum has all 15 required features`() {
-        assertEquals(15, AiFeature.values().size)
+    fun `AiFeature enum has all 16 required features`() {
+        assertEquals(16, AiFeature.values().size)
         assertNotNull(AiFeature.valueOf("DIAGNOSTIC_DTC"))
         assertNotNull(AiFeature.valueOf("AI_COPILOT"))
         assertNotNull(AiFeature.valueOf("LIVE_PID_ANALYSIS"))
