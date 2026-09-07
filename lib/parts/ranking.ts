@@ -24,12 +24,13 @@ export interface RankableQuote {
   compatibilityConfidence: CompatibilityConfidence;
   ratingAvg: number;
   photoUrls?: string[];
+  certifiedCompetenceBonus?: number;
 }
 
 export interface RankedQuote extends RankableQuote {
   compositeScore: number;
   /** Marketing-friendly tag for the wizard UI. */
-  primaryTag: 'BEST_COMPAT' | 'CHEAPEST' | 'FASTEST' | 'TOP_RATED' | null;
+  primaryTag: 'BEST_COMPAT' | 'CHEAPEST' | 'FASTEST' | 'TOP_RATED' | 'CERTIFIED_EXPERT_FIT' | null;
 }
 
 const WEIGHT_COMPAT = 0.55;
@@ -72,20 +73,23 @@ export function scoreQuote(
   const sRep = Math.max(0, Math.min(1, q.ratingAvg / 5));
   const sDel = Math.max(0, 1 - q.estimatedDeliveryHours / 168);
   const sWar = warrantyScore(q.warrantyDays);
+  const competenceBonus = Math.max(0, Math.min(0.05, (q.certifiedCompetenceBonus ?? 0) * 0.05));
   return (
     sCompat * WEIGHT_COMPAT +
     sRep * WEIGHT_REPUTATION +
     sDel * WEIGHT_DELIVERY +
-    sWar * WEIGHT_WARRANTY
+    sWar * WEIGHT_WARRANTY +
+    competenceBonus
   );
 }
 
 /**
  * Rank the candidates. Tags are mutually exclusive per item:
- *   BEST_COMPAT  -> highest composite score AND compat >= HIGH.
- *   CHEAPEST     -> lowest price among alternatives within 50% of the leader.
- *   FASTEST      -> lowest ETA   among alternatives within 50% of the leader.
- *   TOP_RATED    -> highest rating among alternatives within 50% of the leader.
+ *   CERTIFIED_EXPERT_FIT -> highest composite score AND compat >= HIGH AND competence >= 0.8.
+ *   BEST_COMPAT          -> highest composite score AND compat >= HIGH (standard).
+ *   CHEAPEST             -> lowest price among alternatives within 50% of the leader.
+ *   FASTEST              -> lowest ETA   among alternatives within 50% of the leader.
+ *   TOP_RATED            -> highest rating among alternatives within 50% of the leader.
  *
  * "Alternative" here means: composite >= 50% of the leader AND compat is
  * MEDIUM or better. We intentionally do not recommend LOW / UNKNOWN
@@ -115,12 +119,16 @@ export function rankQuotes(
       q.compatibilityConfidence === 'HIGH' ||
       q.compatibilityConfidence === 'MEDIUM');
 
-  // BEST_COMPAT
+  // Leader tag: CERTIFIED_EXPERT_FIT if verified competence >= 0.8, otherwise BEST_COMPAT
   if (
     top.compatibilityConfidence === 'EXACT' ||
     top.compatibilityConfidence === 'HIGH'
   ) {
-    scored[0].primaryTag = 'BEST_COMPAT';
+    if ((top.certifiedCompetenceBonus ?? 0) >= 0.8) {
+      scored[0].primaryTag = 'CERTIFIED_EXPERT_FIT';
+    } else {
+      scored[0].primaryTag = 'BEST_COMPAT';
+    }
   }
 
   const alternatives = scored.filter(isWorthyAlternative);
@@ -148,6 +156,22 @@ export function rankQuotes(
     );
     if (topRated.id !== top.id && topRated.primaryTag === null) {
       topRated.primaryTag = 'TOP_RATED';
+    }
+  }
+  // CERTIFIED_EXPERT_FIT among alternatives
+  if (alternatives.length > 0) {
+    const experts = alternatives.filter(
+      (q) => (q.certifiedCompetenceBonus ?? 0) >= 0.8,
+    );
+    if (experts.length > 0) {
+      const topExpert = experts.reduce((max, q) =>
+        (q.certifiedCompetenceBonus ?? 0) > (max.certifiedCompetenceBonus ?? 0)
+          ? q
+          : max,
+      );
+      if (topExpert.id !== top.id && topExpert.primaryTag === null) {
+        topExpert.primaryTag = 'CERTIFIED_EXPERT_FIT';
+      }
     }
   }
 

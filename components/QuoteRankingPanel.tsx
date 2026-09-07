@@ -10,7 +10,7 @@
  */
 
 import React from 'react';
-import { Award, DollarSign, Clock, Star } from 'lucide-react';
+import { Award, DollarSign, Clock, Star, ShieldCheck } from 'lucide-react';
 
 import { RankedQuote } from '../lib/parts';
 
@@ -21,6 +21,13 @@ const TAG_LABEL: Record<NonNullable<RankedQuote['primaryTag']>, {
   text_color: string;
   icon: React.ReactNode;
 }> = {
+  CERTIFIED_EXPERT_FIT: {
+    text: 'EXPERTO CERTIFICADO',
+    bg: 'bg-amber-500/20',
+    border: 'border-amber-400/60',
+    text_color: 'text-amber-300',
+    icon: <ShieldCheck size={12} />,
+  },
   BEST_COMPAT: {
     text: 'MEJOR COMPATIBILIDAD',
     bg: 'bg-emerald-500/10',

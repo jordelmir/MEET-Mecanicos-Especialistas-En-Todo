@@ -151,4 +151,48 @@ describe('rankQuotes', () => {
     ]);
     expect(ranked.find((r) => r.id === 'rated')?.primaryTag).toBe('TOP_RATED');
   });
+
+  it('tags CERTIFIED_EXPERT_FIT to leader with competence >= 0.8', () => {
+    const expertQuote: RankableQuote = {
+      ...baseQuote,
+      id: 'expert_mep',
+      compatibilityConfidence: 'EXACT',
+      certifiedCompetenceBonus: 1.0,
+    };
+    const standardQuote: RankableQuote = {
+      ...baseQuote,
+      id: 'standard',
+      compatibilityConfidence: 'EXACT',
+      certifiedCompetenceBonus: 0.0,
+    };
+
+    const diff = scoreQuote(expertQuote) - scoreQuote(standardQuote);
+    expect(diff).toBeCloseTo(0.05, 3);
+
+    const ranked = rankQuotes([expertQuote, standardQuote]);
+    expect(ranked[0].id).toBe('expert_mep');
+    expect(ranked[0].primaryTag).toBe('CERTIFIED_EXPERT_FIT');
+  });
+
+  it('tags CERTIFIED_EXPERT_FIT to alternative with verified competence', () => {
+    const leader: RankableQuote = {
+      ...baseQuote,
+      id: 'leader',
+      compatibilityConfidence: 'EXACT',
+      ratingAvg: 5.0,
+      certifiedCompetenceBonus: 0.0,
+    };
+    const expertAlt: RankableQuote = {
+      ...baseQuote,
+      id: 'expert_alt',
+      compatibilityConfidence: 'HIGH',
+      ratingAvg: 4.2,
+      certifiedCompetenceBonus: 0.95,
+    };
+
+    const ranked = rankQuotes([leader, expertAlt]);
+    expect(ranked.find((r) => r.id === 'leader')?.primaryTag).toBe('BEST_COMPAT');
+    expect(ranked.find((r) => r.id === 'expert_alt')?.primaryTag).toBe('CERTIFIED_EXPERT_FIT');
+  });
 });
+

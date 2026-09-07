@@ -2,20 +2,24 @@ import React, { useRef, useEffect, useCallback } from 'react';
 
 interface OscilloscopeCanvasProps {
   data: number[];
+  secondaryData?: number[];
   isRunning: boolean;
   timeDiv: number;
   voltsDiv: number;
   triggerLevel: number;
   color: string;
+  secondaryColor?: string;
   showGrid: boolean;
   signalUnit: string;
   minNominal: number;
   maxNominal: number;
+  differentialMode?: boolean;
 }
 
 export function OscilloscopeCanvas({
-  data, isRunning, timeDiv, voltsDiv, triggerLevel,
-  color, showGrid, signalUnit, minNominal, maxNominal
+  data, secondaryData, isRunning, timeDiv, voltsDiv, triggerLevel,
+  color, secondaryColor = 'rgb(255, 165, 0)', showGrid, signalUnit,
+  minNominal, maxNominal, differentialMode = false
 }: OscilloscopeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const afterglowRef = useRef<ImageData | null>(null);
@@ -139,7 +143,7 @@ export function OscilloscopeCanvas({
       ctx.fillText(`T: ${triggerLevel.toFixed(1)}`, pad.left + plotW + 2, trigY + 3);
     }
 
-    // Waveform
+    // Waveform Channel A
     if (data.length > 1) {
       const stepX = plotW / (data.length - 1);
 
@@ -173,6 +177,59 @@ export function OscilloscopeCanvas({
       ctx.shadowBlur = 0;
     }
 
+    // Waveform Channel B (Secondary Trace, e.g. CAN-Low)
+    if (secondaryData && secondaryData.length > 1) {
+      const stepX = plotW / (secondaryData.length - 1);
+
+      ctx.beginPath();
+      ctx.strokeStyle = secondaryColor.replace(')', ',0.2)').replace('rgb', 'rgba');
+      ctx.lineWidth = 5;
+      ctx.lineJoin = 'round';
+      for (let i = 0; i < secondaryData.length; i++) {
+        const x = pad.left + i * stepX;
+        const normY = (secondaryData[i] - yMin) / yRange;
+        const y = pad.top + plotH - normY * plotH;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.strokeStyle = secondaryColor;
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      ctx.shadowColor = secondaryColor;
+      ctx.shadowBlur = 8;
+      for (let i = 0; i < secondaryData.length; i++) {
+        const x = pad.left + i * stepX;
+        const normY = (secondaryData[i] - yMin) / yRange;
+        const y = pad.top + plotH - normY * plotH;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // Waveform Differential Mode (V_diff = ChA - ChB)
+    if (differentialMode && secondaryData && data.length > 1 && secondaryData.length > 1) {
+      const minLen = Math.min(data.length, secondaryData.length);
+      const stepX = plotW / (minLen - 1);
+      const diffColor = 'rgb(190, 80, 255)';
+
+      ctx.beginPath();
+      ctx.strokeStyle = diffColor;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([4, 2]);
+      for (let i = 0; i < minLen; i++) {
+        const diffV = data[i] - secondaryData[i];
+        const x = pad.left + i * stepX;
+        const normY = (diffV - yMin) / yRange;
+        const y = pad.top + plotH - normY * plotH;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     // Scanning beam
     if (isRunning && data.length > 1) {
       const beamX = pad.left + plotW;
@@ -184,11 +241,22 @@ export function OscilloscopeCanvas({
     }
 
     // Corner HUD info
-    ctx.fillStyle = 'rgba(0,255,100,0.6)';
+    ctx.fillStyle = 'rgba(0,255,100,0.8)';
     ctx.font = 'bold 9px monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(`TIME/DIV: ${timeDiv}ms`, pad.left + 5, pad.top + 12);
-    ctx.fillText(`UNIT: ${signalUnit}`, pad.left + 5, pad.top + 24);
+    ctx.fillText(`CH-A: ${data[data.length - 1]?.toFixed(2) ?? '--'} ${signalUnit}`, pad.left + 5, pad.top + 12);
+    if (secondaryData && secondaryData.length > 0) {
+      ctx.fillStyle = secondaryColor;
+      ctx.fillText(`CH-B: ${secondaryData[secondaryData.length - 1]?.toFixed(2) ?? '--'} ${signalUnit}`, pad.left + 5, pad.top + 24);
+      if (differentialMode) {
+        ctx.fillStyle = 'rgb(210, 120, 255)';
+        const diff = (data[data.length - 1] ?? 0) - (secondaryData[secondaryData.length - 1] ?? 0);
+        ctx.fillText(`DIFF: ${diff.toFixed(2)} ${signalUnit}`, pad.left + 5, pad.top + 36);
+      }
+    } else {
+      ctx.fillText(`TIME/DIV: ${timeDiv}ms`, pad.left + 5, pad.top + 24);
+    }
+
     ctx.textAlign = 'right';
     ctx.fillText(isRunning ? '● REC' : '■ STOP', pad.left + plotW - 5, pad.top + 12);
     if (isRunning) {
@@ -204,7 +272,7 @@ export function OscilloscopeCanvas({
     if (isRunning) {
       animRef.current = requestAnimationFrame(draw);
     }
-  }, [data, isRunning, timeDiv, voltsDiv, triggerLevel, color, showGrid, signalUnit, minNominal, maxNominal]);
+  }, [data, secondaryData, isRunning, timeDiv, voltsDiv, triggerLevel, color, secondaryColor, showGrid, signalUnit, minNominal, maxNominal, differentialMode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
