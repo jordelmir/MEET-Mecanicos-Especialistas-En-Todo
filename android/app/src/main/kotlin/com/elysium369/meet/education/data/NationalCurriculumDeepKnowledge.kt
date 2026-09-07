@@ -418,6 +418,366 @@ object NationalCurriculumDeepKnowledge {
             realWorldApplication = "Inspección técnica vehicular (DEKRA/Cosevi), educación vial comunitaria y prevención de accidentes en rutas nacionales.",
             vocationalEngineeringBridge = "Certificación de inspección previa a la entrega de un vehículo en talleres mecánicos profesionales.",
             reflectionPrompt = "¿Qué pasaría en una ciudad donde cada conductor decidiera libremente a qué velocidad viajar y si enciende o no las luces de noche?"
+        ),
+
+        // ── QUÍMICA BXM: ESTEQUIOMETRÍA Y REACCIONES ─────────────────────────────
+        "cr_quim_bxm_c_estequiometria" to ConceptDeepKnowledge(
+            conceptId = "cr_quim_bxm_c_estequiometria",
+            coreIntuition = "La masa no se crea ni se destruye; se reorganiza a nivel atómico. El mol es el puente matemático que conecta el microcosmos molecular con la balanza macroscópica de laboratorio y los sistemas de inyección.",
+            expertMentalModel = listOf(
+                "1. Escribir la ecuación química completa y balancearla rigurosamente asegurando la conservación de masa.",
+                "2. Convertir las masas conocidas en gramos a moles dividiendo entre la masa molar (g/mol).",
+                "3. Comparar las razones molares de la ecuación para identificar el reactivo limitante que agotará la reacción.",
+                "4. Calcular los moles teóricos de producto esperados a partir del reactivo limitante.",
+                "5. Convertir los moles de producto a gramos y aplicar el porcentaje de rendimiento experimental si aplica."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_MASS_CONSERVATION_COEFFICIENTS",
+                    title = "Confusión entre coeficientes estequiométricos y gramos",
+                    studentFaultyAssumption = "El estudiante asume que los coeficientes de una ecuación química representan masas directamente en gramos en vez de moles de moléculas.",
+                    counterExample = "En 2H2 + O2 -> 2H2O, 4 g de hidrógeno reaccionan con 32 g de oxígeno; los números 2 y 1 indican moles, no proporciones directas de peso.",
+                    socraticRemediationPrompt = "¿Los coeficientes balanceados indican cuántos gramos pesan las sustancias o cuántos paquetes de moléculas (moles) están interactuando?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Balanceo Inicial",
+                    socraticQuestion = "¿La ecuación química tiene el mismo número de átomos de cada elemento a la izquierda y a la derecha?",
+                    conceptualScaffold = "Verifica primero el balance de materia antes de realizar cualquier cálculo numérico."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Conversión a Moles",
+                    socraticQuestion = "¿Cuántos moles representa la masa de reactivo que te proporciona el problema?",
+                    conceptualScaffold = "Divide los gramos dados entre el peso molecular de la sustancia: n = m / PM."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Analogía de Taller",
+                    socraticQuestion = "¿Cómo se calcula la relación estequiométrica aire-combustible (14.7:1) en la combustión de gasolina?",
+                    conceptualScaffold = "1 mol de octano requiere exactamente 12.5 moles de O2 para combustión completa; una mezcla rica genera hidrocarburos sin quemar."
+                )
+            ),
+            realWorldApplication = "Dosificación de aditivos industriales, control de emisiones de escape y cálculo estequiométrico en combustión interna.",
+            vocationalEngineeringBridge = "ISCO 7231: Diagnóstico de sistemas de inyección electrónica, sensores Lambda y lectura de corrección de combustible (Fuel Trim).",
+            reflectionPrompt = "¿Qué consecuencias físicas y ambientales tiene en el catalizador un motor que trabaja constantemente con mezcla rica en combustible?"
+        ),
+
+        // ── BIOLOGÍA BXM: GENÉTICA Y CUADROS DE PUNNETT ─────────────────────────
+        "cr_bio_bxm_c_genetica" to ConceptDeepKnowledge(
+            conceptId = "cr_bio_bxm_c_genetica",
+            coreIntuition = "La información biológica se codifica en secuencias de nucleótidos que se transmiten según probabilidades combinatorias discretas. Los alelos dominantes enmascaran a los recesivos en el fenotipo, pero no los alteran en el genotipo.",
+            expertMentalModel = listOf(
+                "1. Identificar el genotipo de ambos progenitores (homocigoto dominante AA, heterocigoto Aa, o recesivo aa).",
+                "2. Determinar los alelos que cada progenitor puede aportar a través de sus gametos.",
+                "3. Construir el cuadro de Punnett colocando los gametos parentales en los ejes vertical y horizontal.",
+                "4. Completar las combinaciones genotípicas de la descendencia en las celdas interiores.",
+                "5. Calcular las proporciones genotípicas y fenotípicas porcentuales esperadas."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_DOMINANT_EQUALS_COMMON",
+                    title = "Confusión de dominancia genética con frecuencia poblacional",
+                    studentFaultyAssumption = "Creer que un alelo dominante es siempre el más abundante o ventajoso en una población silvestre.",
+                    counterExample = "La polidactilia (dedos extra) es causada por un alelo dominante, pero la inmensa mayoría de la población posee cinco dedos por ser homocigota recesiva.",
+                    socraticRemediationPrompt = "¿Que un alelo enmascare a otro cuando ambos están presentes significa necesariamente que sea más común en la naturaleza?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Identificación de Alelos",
+                    socraticQuestion = "¿Cuáles son los alelos que porta cada progenitor para el rasgo estudiado?",
+                    conceptualScaffold = "Usa mayúsculas para alelos dominantes (A) y minúsculas para recesivos (a)."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Cuadro de Punnett",
+                    socraticQuestion = "¿Cuáles combinaciones resultan al cruzar dos individuos heterocigotos (Aa x Aa)?",
+                    conceptualScaffold = "Obtendrás 1 AA : 2 Aa : 1 aa (relación fenotípica 3:1 dominante a recesivo)."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Analogía Digital",
+                    socraticQuestion = "¿Cómo se asemeja el código genético a una palabra binaria con bits de control de paridad?",
+                    conceptualScaffold = "Cada triplete de nucleótidos (codón) codifica un aminoácido exacto con redundancia para proteger contra mutaciones letales."
+                )
+            ),
+            realWorldApplication = "Medicina forense, pruebas de paternidad con marcadores STR y mejoramiento agronómico de semillas en Costa Rica.",
+            vocationalEngineeringBridge = "ISCO 2131: Biólogos, genetistas y técnicos de laboratorio de control biológico.",
+            reflectionPrompt = "¿Por qué dos personas con fenotipo dominante pueden tener un hijo con fenotipo recesivo sin contradecir las leyes de Mendel?"
+        ),
+
+        // ── ESTUDIOS SOCIALES BXM: COSTA RICA EN EL SIGLO XX ─────────────────────
+        "cr_soc_bxm_c_cr_siglo_xx" to ConceptDeepKnowledge(
+            conceptId = "cr_soc_bxm_c_cr_siglo_xx",
+            coreIntuition = "El modelo social costarricense contemporáneo no fue un accidente fortuito; fue el fruto de un pacto sociopolítico visionario en 1940 y la refundación constitucional de 1949 que abolió el ejército para blindar la inversión en educación y salud.",
+            expertMentalModel = listOf(
+                "1. Analizar el contexto de vulnerabilidad del modelo agroexportador cafetalero y bananero ante la crisis mundial.",
+                "2. Comprender la alianza tripartita de 1940: Dr. Rafael Ángel Calderón Guardia, Monseñor Sanabria y Manuel Mora.",
+                "3. Evaluar las tres grandes instituciones creadas: CCSS (1941), Universidad de Costa Rica (1940) y Código de Trabajo (1943).",
+                "4. Analizar la Guerra Civil de 1948 y las decisiones de la Junta Fundadora de José Figueres Ferrer.",
+                "5. Sintetizar los pilares de la Constitución de 1949: abolición del ejército, creación del TSE y sufragio universal femenino."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_ARMY_ABOLISHED_1821",
+                    title = "Confusión cronológica en la abolición del ejército",
+                    studentFaultyAssumption = "El estudiante asume que Costa Rica nunca tuvo fuerzas armadas o que el ejército se abolió en la independencia colonial.",
+                    counterExample = "Costa Rica tuvo ejército durante todo el siglo XIX y combatió con honor en la Campaña Nacional de 1856; el ejército fue abolido el 1 de diciembre de 1948.",
+                    socraticRemediationPrompt = "¿En qué año y quién dio el histórico mazazo en el Cuartel Bellavista que transformó el cuartel militar en el Museo Nacional?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Las Garantías Sociales",
+                    socraticQuestion = "¿Cuáles tres grandes reformas sociales se aprobaron en la administración del Dr. Calderón Guardia?",
+                    conceptualScaffold = "Recuerda la CCSS, el Código de Trabajo y la refundación de la Universidad de Costa Rica."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Pacto Constitucional",
+                    socraticQuestion = "¿Qué impacto tuvo incluir las Garantías Sociales en el texto de la Constitución Política de 1949?",
+                    conceptualScaffold = "Se convirtieron en derechos fundamentales de rango constitucional que ningún gobierno ordinario puede suprimir."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Impacto Económico Real",
+                    socraticQuestion = "¿Cómo influye la ausencia de gasto militar en la disponibilidad de fondos para la red hospitalaria y escuelas públicas?",
+                    conceptualScaffold = "El gasto que otros países destinan a defensa en Costa Rica se reconvirtió en capital humano productivo."
+                )
+            ),
+            realWorldApplication = "Participación ciudadana informada, valoración del seguro social universal y preservación de la estabilidad institucional.",
+            vocationalEngineeringBridge = "ISCO 3353: Especialistas en gestión de la seguridad social, normativa laboral y auditoría del Estado.",
+            reflectionPrompt = "¿Qué ventajas competitivas ofrece a las empresas internacionales instalarse en un país con paz social y sin presupuesto bélico?"
+        ),
+
+        // ── EDUCACIÓN CÍVICA BXM: RÉGIMEN DEMOCRÁTICO Y DEFENSA CONSTITUCIONAL ───
+        "cr_civ_bxm_c_democracia" to ConceptDeepKnowledge(
+            conceptId = "cr_civ_bxm_c_democracia",
+            coreIntuition = "La democracia plena exige frenos, contrapesos e instrumentos jurídicos de acceso universal. La Sala Constitucional permite a cualquier habitante exigir la tutela de sus derechos fundamentales sin formalismos ni intermediación obligatoria de abogados.",
+            expertMentalModel = listOf(
+                "1. Comprender la división tripartita clásica de poderes y el rango autónomo constitucional del TSE.",
+                "2. Identificar la naturaleza del derecho vulnerado (libertad ambulatoria vs. otros derechos fundamentales).",
+                "3. Distinguir la vía procesal idónea: Hábeas Corpus para la libertad física; Recurso de Amparo para salud, educación, trabajo y ambiente.",
+                "4. Redactar el memorial con hechos claros, prueba testimonial o documental y petición concreta.",
+                "5. Reconocer el carácter vinculante erga omnes de las resoluciones de la Sala Constitucional."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_AMPARO_LAWYER_REQUIRED",
+                    title = "Falso requisito de patrocinio letrado en la Sala IV",
+                    studentFaultyAssumption = "Creer que interponer un recurso de amparo requiere contratar a un abogado y pagar timbres judiciales costosos.",
+                    counterExample = "Cualquier ciudadano, incluso un menor de edad o persona extranjera, puede presentar un amparo en una servilleta escrita a mano sin abogado.",
+                    socraticRemediationPrompt = "¿Por qué la Ley de la Jurisdicción Constitucional eliminó los requisitos formales y el costo para interponer un amparo?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Derecho en Peligro",
+                    socraticQuestion = "¿Qué derecho fundamental está siendo amenazado o desconocido por el acto de la autoridad?",
+                    conceptualScaffold = "Identifica si es la salud, la educación, el debido proceso o la libertad física."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Vía Procesal Correcta",
+                    socraticQuestion = "Si a un paciente la CCSS le retrasa una cirugía urgente, ¿cuál recurso debe interponer ante la Sala IV?",
+                    conceptualScaffold = "Corresponde un Recurso de Amparo para tutelar el derecho fundamental a la vida y la salud."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Parada de Emergencia",
+                    socraticQuestion = "¿Por qué la interposición de un amparo suspende de inmediato los efectos del acto lesivo?",
+                    conceptualScaffold = "Funciona como el botón de paro de emergencia de un taller: congela el daño mientras se analiza la legalidad."
+                )
+            ),
+            realWorldApplication = "Defensa efectiva de los derechos de usuarios de servicios públicos, cumplimiento de la Ley 7600 y protección ambiental.",
+            vocationalEngineeringBridge = "ISCO 2422: Asesores en cumplimiento legal, derechos laborales y relaciones de servicio en talleres e industrias.",
+            reflectionPrompt = "¿Cómo protege la existencia de la Sala Constitucional a las minorías frente a decisiones arbitrarias de las mayorías parlamentarias?"
+        ),
+
+        // ── INGLÉS BXM: TECHNICAL READING & PASSIVE VOICE ────────────────────────
+        "cr_ing_bxm_c_reading" to ConceptDeepKnowledge(
+            conceptId = "cr_ing_bxm_c_reading",
+            coreIntuition = "In international technical and STEM documentation, passive voice ensures clinical objectivity. By putting the physical system or component before the human operator, engineering instructions highlight the procedure over the person.",
+            expertMentalModel = listOf(
+                "1. Identify passive voice structure: Target Object + Form of 'to be' + Past Participle.",
+                "2. Scan the technical document for quantitative values, tolerances, torque specs, and diagnostic codes.",
+                "3. Use root words, prefixes, and suffixes to deduce technical terminology without word-for-word translation.",
+                "4. Identify causal and sequential transition words (subsequently, therefore, provided that).",
+                "5. Translate technical instructions into verifiable workshop verification actions."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_PASSIVE_CONFUSION",
+                    title = "Confusión entre el sujeto gramatical y el ejecutor de la acción",
+                    studentFaultyAssumption = "Asumir que el primer sustantivo de la frase pasiva es quien realiza el trabajo físico.",
+                    counterExample = "In 'The brake rotors were replaced', the rotors did not replace anything; they received the replacement action.",
+                    socraticRemediationPrompt = "Who or what is performing the action in this sentence? Is the alternator testing the technician or being tested?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Target Identification",
+                    socraticQuestion = "What component receives the action described in the sentence?",
+                    conceptualScaffold = "Look for the noun immediately before the auxiliary verb 'was/were/is/are'."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Grammar Pattern",
+                    socraticQuestion = "Which verb tense follows the auxiliary 'must be' or 'has been'?",
+                    conceptualScaffold = "Passive voice always uses the past participle form of the main action verb."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "OEM Workshop Manuals",
+                    socraticQuestion = "How does 'The cylinder head bolts must be torqued to 85 Nm' guide your mechanical tool setting?",
+                    conceptualScaffold = "Set the torque wrench to 85 Nm before tightening the bolts in the specified star pattern."
+                )
+            ),
+            realWorldApplication = "Reading OEM Factory Service Manuals, international technical service bulletins (TSBs), and vehicle diagnostic scanner outputs.",
+            vocationalEngineeringBridge = "ISCO 3512 / 7231: Bilingual automotive technician and technical support specialist for diagnostic telemetry.",
+            reflectionPrompt = "Why do international engineering service manuals avoid personal pronouns like 'I' and 'we'?"
+        ),
+
+        // ── 8.º AÑO: DIBUJO TÉCNICO CAD Y PROYECCIONES ORTOGONALES ──────────────
+        "cr_art_c_dibujo_tecnico" to ConceptDeepKnowledge(
+            conceptId = "cr_art_c_dibujo_tecnico",
+            coreIntuition = "El dibujo técnico es el lenguaje geométrico universal de la ingeniería. Permite proyectar objetos tridimensionales en planos bidimensionales normalizados sin distorsión óptica, garantizando que una pieza diseñada en Costa Rica se manufacture idéntica en cualquier torno o fresadora del mundo.",
+            expertMentalModel = listOf(
+                "1. Seleccionar la vista frontal (alzado) que revele la mayor cantidad de rasgos característicos de la pieza.",
+                "2. Proyectar rayos paralelos a 90 grados sobre los planos principales de proyección.",
+                "3. Disponer la vista superior (planta) y la lateral manteniendo estricta correspondencia dimensional.",
+                "4. Representar aristas ocultas con líneas de trazos cortos continuos y ejes con línea y punto.",
+                "5. Acotar dimensiones siguiendo las normas ISO/ANSI sin redundancias ni cruces de líneas de cota."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_PERSPECTIVE_VS_ORTHOGONAL",
+                    title = "Confusión entre perspectiva artística y proyección ortogonal",
+                    studentFaultyAssumption = "Dibujar las vistas proyectando líneas convergentes a un punto de fuga en lugar de rayos paralelos a 90 grados.",
+                    counterExample = "Si un plano técnico convergiera a un punto de fuga, el extremo posterior de un pistón mediría menos en el plano que el frontal.",
+                    socraticRemediationPrompt = "¿En una proyección ortogonal las líneas de proyección son paralelas entre sí o se juntan en un punto de fuga?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Selección de Vista",
+                    socraticQuestion = "¿Cuál vista del objeto muestra la mayor cantidad de información y contornos?",
+                    conceptualScaffold = "Esa vista debe elegirse como la vista frontal o principal."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Correspondencia de Aristas",
+                    socraticQuestion = "Si trazas una línea vertical desde el extremo derecho de la vista frontal hacia arriba, ¿con qué debe coincidir?",
+                    conceptualScaffold = "Debe coincidir exactamente con el límite derecho de la vista superior."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Mecanizado en Taller",
+                    socraticQuestion = "¿Qué sucedería si omites las líneas de trazo discontinuo que representan un canal interno en una pieza?",
+                    conceptualScaffold = "El tornero o fresador no sabrá que debe perforar el interior y la pieza quedará sólida e inservible."
+                )
+            ),
+            realWorldApplication = "Diseño de partes mecánicas, planos estructurales, matricería y corte por plasma/láser CNC.",
+            vocationalEngineeringBridge = "ISCO 3118: Delineantes técnicos y diseñadores CAD/CAM mecánicos e industriales.",
+            reflectionPrompt = "¿Por qué es una falta grave en dibujo técnico acotar la misma medida dos veces en vistas diferentes?"
+        ),
+
+        // ── 9.º AÑO: METROLOGÍA Y ELECTRICIDAD RESIDENCIAL / TALLER ─────────────
+        "cr_art_c_electricidad" to ConceptDeepKnowledge(
+            conceptId = "cr_art_c_electricidad",
+            coreIntuition = "La energía eléctrica en circuitos cerrados obedece a leyes físicas deterministas. La tensión empuja la corriente a través de una resistencia; cualquier resistencia parásita por corrosión o falso contacto provoca caída de tensión y calor indeseado según la Ley de Joule.",
+            expertMentalModel = listOf(
+                "1. Identificar la fuente de tensión y verificar la polaridad o tipo de corriente (DC en baterías, AC en red pública).",
+                "2. Rastrear el circuito cerrado: línea activa (fase o positivo), carga de trabajo y retorno (neutro o tierra a chasis).",
+                "3. Verificar la capacidad de los elementos de protección (fusibles o disyuntores termomagnéticos).",
+                "4. Medir caídas de tensión a lo largo de conductores y contactos usando un multímetro digital en voltios.",
+                "5. Comprobar la continuidad de tierra física para garantizar la disipación segura de corrientes de falla."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_VOLTAGE_FLOWS_THROUGH",
+                    title = "Creer que 'el voltaje fluye' por el cable",
+                    studentFaultyAssumption = "Confundir la tensión eléctrica (diferencia de potencial) con la corriente eléctrica (flujo de electrones).",
+                    counterExample = "Un tomacorriente tiene 120 voltios presentes constantemente aunque no haya ningún aparato conectado y la corriente sea cero amperios.",
+                    socraticRemediationPrompt = "¿El voltaje es la velocidad a la que viajan los electrones o la fuerza/presión con la que la fuente los empuja?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Lazo Cerrado",
+                    socraticQuestion = "¿El circuito eléctrico tiene un camino continuo de ida y vuelta a la fuente de poder?",
+                    conceptualScaffold = "Si hay un cable roto o un interruptor abierto, la corriente es exactamente cero."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Ley de Ohm",
+                    socraticQuestion = "Si la resistencia de un contacto sulfatado sube a 10 ohmios en un circuito de 12V, ¿cuánta corriente puede pasar?",
+                    conceptualScaffold = "Aplica I = V / R. Al aumentar la resistencia, la corriente útil se reduce drásticamente."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Caída de Tensión Automotriz",
+                    socraticQuestion = "¿Cómo se utiliza la prueba de caída de tensión para detectar un cable de masa oxidado sin desmontarlo?",
+                    conceptualScaffold = "Coloca las puntas del multímetro entre el borne negativo de la batería y el bloque del motor mientras das arranque: debe marcar menos de 0.2V."
+                )
+            ),
+            realWorldApplication = "Instalaciones eléctricas residenciales según Código Eléctrico de Costa Rica (RTCR/NEC), diagnóstico de arneses y tableros de control.",
+            vocationalEngineeringBridge = "ISCO 7412: Mecánicos y ajustadores electricistas residenciales y automotrices.",
+            reflectionPrompt = "¿Por qué un disyuntor termomagnético protege al cableado de un incendio pero no necesariamente protege a una persona de una descarga letal (requiriéndose un GFCI)?"
+        ),
+
+        // ── CIENCIAS 7.º/8.º AÑO: LA CÉLULA Y LA VIDA ────────────────────────────
+        "cr_cien_c_celula" to ConceptDeepKnowledge(
+            conceptId = "cr_cien_c_celula",
+            coreIntuition = "La célula es la unidad morfológica, funcional y genética más pequeña dotada de vida independiente. En su interior, una maquinaria molecular altamente coordinada procesa nutrientes, replica información genética y genera energía química en forma de ATP.",
+            expertMentalModel = listOf(
+                "1. Diferenciar si la célula posee núcleo delimitado por membrana (eucariota) o no (procariota).",
+                "2. Reconocer las organelas distintivas: mitocondrias (energía), cloroplastos (fotosíntesis vegetal), ribosomas (proteínas).",
+                "3. Comprender la función de la membrana plasmática como barrera semipermeable selectiva.",
+                "4. Rastrear la respiración celular: glucosa + oxígeno -> dióxido de carbono + agua + ATP.",
+                "5. Conectar la fisiología celular con el impacto de toxinas ambientales y gases de escape en la respiración de los tejidos."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_ANIMAL_CELL_WALL",
+                    title = "Atribuir pared celular a las células de origen animal",
+                    studentFaultyAssumption = "Creer que las células animales tienen pared de celulosa como las vegetales.",
+                    counterExample = "Si las células animales tuvieran pared rígida de celulosa, los músculos no podrían contraerse ni los seres vivos moverse con flexibilidad.",
+                    socraticRemediationPrompt = "¿Qué estructura permite a las plantas mantenerse erguidas sin huesos, y por qué las células de tu piel son flexibles?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Centro de Control",
+                    socraticQuestion = "¿En qué organela se almacena el material genético (ADN) en las células eucariotas?",
+                    conceptualScaffold = "El núcleo celular alberga las instrucciones maestras para la síntesis de proteínas."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Central de Energía",
+                    socraticQuestion = "¿Cuál organela realiza la combustión biológica de nutrientes mediante respiración celular?",
+                    conceptualScaffold = "Las mitocondrias producen el ATP necesario para todas las funciones vitales."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Toxicología en Taller",
+                    socraticQuestion = "¿Por qué el monóxido de carbono (CO) de los motores de gasolina es letal a nivel celular?",
+                    conceptualScaffold = "El CO se une a la hemoglobina 200 veces más fuerte que el oxígeno, impidiendo que las mitocondrias celulares reciban oxígeno para producir ATP."
+                )
+            ),
+            realWorldApplication = "Biología ambiental, toxicología ocupacional y protocolos de bioseguridad en ambientes de trabajo.",
+            vocationalEngineeringBridge = "ISCO 3257: Inspectores de salud ambiental y seguridad ocupacional en industrias y talleres.",
+            reflectionPrompt = "¿Qué ventajas evolutivas tienen las células eucariotas compartimentadas frente a las bacterias procariotas primitivas?"
         )
     )
 

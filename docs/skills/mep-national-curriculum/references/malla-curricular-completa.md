@@ -2,6 +2,15 @@
 
 Esta referencia documenta los 40 tracks curriculares normalizados en MEET / Elysium OS, sus códigos de concepto, áreas temáticas y programas oficiales del Ministerio de Educación Pública de Costa Rica.
 
+### 📚 Guías de Desarrollo Pedagógico y Técnico Exhaustivo por Materia
+Para el desarrollo detallado de contenidos, habilidades específicas, conceptos epistémicos, topología de errores (misconceptions), andamiaje socrático (tiers 1-3), rúbricas REA y puentes productivos ISCO-08, consulte los módulos especializados:
+- **Matemáticas (1.º a 11.º y BxM)**: [`materia-matematicas-1-a-bxm.md`](file:///Users/jordelmirsdevhome/.agents/skills/mep-national-curriculum/references/materia-matematicas-1-a-bxm.md)
+- **Ciencias, Física, Química y Biología**: [`materia-ciencias-fisica-quimica-biologia.md`](file:///Users/jordelmirsdevhome/.agents/skills/mep-national-curriculum/references/materia-ciencias-fisica-quimica-biologia.md)
+- **Español, Literatura y Redacción**: [`materia-espanol-literatura-redaccion.md`](file:///Users/jordelmirsdevhome/.agents/skills/mep-national-curriculum/references/materia-espanol-literatura-redaccion.md)
+- **Estudios Sociales y Educación Cívica**: [`materia-estudios-sociales-y-civica.md`](file:///Users/jordelmirsdevhome/.agents/skills/mep-national-curriculum/references/materia-estudios-sociales-y-civica.md)
+- **Inglés y Lenguas Extranjeras (MCER)**: [`materia-ingles-lengua-extranjera.md`](file:///Users/jordelmirsdevhome/.agents/skills/mep-national-curriculum/references/materia-ingles-lengua-extranjera.md)
+- **Artes Industriales, CAD y Metrología**: [`materia-artes-industriales-y-tecnica.md`](file:///Users/jordelmirsdevhome/.agents/skills/mep-national-curriculum/references/materia-artes-industriales-y-tecnica.md)
+
 ---
 
 ## I Ciclo de Educación General Básica (1.º, 2.º, 3.º Año)
