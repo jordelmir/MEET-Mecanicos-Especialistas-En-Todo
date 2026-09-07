@@ -218,4 +218,49 @@ class ElysiumLearningViewModelTest {
         assertNotNull("Must include ISCO 7126 Plumbing mapping", isco7126)
         assertEquals("RESIDENTIAL_PLUMBING", isco7126?.serviceVertical)
     }
+
+    @Test
+    fun `socratic tutor bottom sheet opens, updates dialogue with hints, analogies and closes cleanly`() = runBlocking {
+        val repository = ElysiumLearningRepository()
+        val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val viewModel = ElysiumLearningViewModel(repository, testScope)
+
+        assertFalse(viewModel.uiState.value.isSocraticSheetVisible)
+        viewModel.openSocraticTutor()
+        assertTrue(viewModel.uiState.value.isSocraticSheetVisible)
+
+        // Request hint synchronously
+        viewModel.requestSocraticHintSync()
+        val stateAfterHint = viewModel.uiState.value
+        assertEquals(2, stateAfterHint.socraticHintTierCount) // Incremented to tier 2 for next time
+        assertTrue(stateAfterHint.socraticDialogue.isNotEmpty())
+        assertFalse(stateAfterHint.socraticDialogue.last().isUser)
+
+        // Request real world analogy synchronously
+        viewModel.requestRealWorldAnalogySync()
+        val stateAfterAnalogy = viewModel.uiState.value
+        assertTrue(stateAfterAnalogy.socraticDialogue.size >= 2)
+
+        // Dismiss
+        viewModel.dismissSocraticTutor()
+        assertFalse(viewModel.uiState.value.isSocraticSheetVisible)
+    }
+
+    @Test
+    fun `socratic free inquiry records student message and responds with pedagogical guide`() = runBlocking {
+        val repository = ElysiumLearningRepository()
+        val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val viewModel = ElysiumLearningViewModel(repository, testScope)
+
+        viewModel.openSocraticTutor()
+        viewModel.sendSocraticQuerySync("¿Dónde queda la parte de atrás?")
+
+        val dialogue = viewModel.uiState.value.socraticDialogue
+        assertTrue("Dialogue should have at least 2 entries (user query and tutor reply)", dialogue.size >= 2)
+        val userEntry = dialogue[dialogue.size - 2]
+        val tutorEntry = dialogue[dialogue.size - 1]
+        assertTrue(userEntry.isUser)
+        assertEquals("¿Dónde queda la parte de atrás?", userEntry.text)
+        assertFalse(tutorEntry.isUser)
+    }
 }

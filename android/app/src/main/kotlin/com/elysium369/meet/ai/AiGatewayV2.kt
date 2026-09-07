@@ -13,6 +13,7 @@ enum class AiTaskClass(
     DEEP_REPAIR_REASONING(defaultDeadlineMs = 12000L, maxTokenBudget = 3000, allowsCloudFallback = true),
     VOICE_INTENT(defaultDeadlineMs = 800L, maxTokenBudget = 100, allowsCloudFallback = false),
     CATALOG_MAPPING(defaultDeadlineMs = 3000L, maxTokenBudget = 1000, allowsCloudFallback = true),
+    EDUCATION_SOCRATIC_TUTOR(defaultDeadlineMs = 8000L, maxTokenBudget = 2000, allowsCloudFallback = true),
 }
 
 enum class CircuitState {

@@ -31,6 +31,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.education.data.CurriculumTrack
 import com.elysium369.meet.education.data.TaskType
+import com.elysium369.meet.education.presentation.components.CertifiedDiplomaDialog
+import com.elysium369.meet.education.presentation.components.SocraticTutorBottomSheet
+import com.elysium369.meet.education.presentation.sandboxes.AnalyticalGeometrySandbox
+import com.elysium369.meet.education.presentation.sandboxes.ElectricalCircuitSandbox
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,6 +73,25 @@ fun ElysiumLearningScreen(
                     }
                 },
                 actions = {
+                    if (state.isTransferUnlocked || state.currentMasteryEstimate >= 0.75) {
+                        FilledTonalButton(
+                            onClick = { viewModel.openDiplomaDialog() },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.height(34.dp),
+                            colors = ButtonDefaults.filledTonalButtonColors(
+                                containerColor = Color(0xFFD4AF37).copy(alpha = 0.25f)
+                            )
+                        ) {
+                            Text(text = "📜 Diploma", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB8860B))
+                        }
+                    }
+                    FilledTonalButton(
+                        onClick = { viewModel.openSocraticTutor() },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(34.dp),
+                    ) {
+                        Text(text = "🧠 Tutor IA", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                     IconButton(onClick = { viewModel.refreshFrontier() }) {
                         Icon(
                             imageVector = Icons.Default.Refresh,
@@ -219,6 +242,29 @@ fun ElysiumLearningScreen(
                 )
             }
 
+            // 5b. Explorable Physical & Mathematical Sandboxes
+            if (state.track == CurriculumTrack.MATEMATICA_BXM ||
+                state.track == CurriculumTrack.DIBUJO_TECNICO_8 ||
+                state.isGeometrySandboxVisible) {
+                item {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        AnalyticalGeometrySandbox()
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                }
+            }
+
+            if (state.track == CurriculumTrack.ELECTRICIDAD_9 ||
+                state.isElectricalSandboxVisible ||
+                state.linkedDtcBridge != null) {
+                item {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ElectricalCircuitSandbox()
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
+                }
+            }
+
             // 6. Interactive Task Arena
             item {
                 state.activeTask?.let { task ->
@@ -229,6 +275,7 @@ fun ElysiumLearningScreen(
                         onAddColones = { viewModel.addColones(it) },
                         onResetColones = { viewModel.resetColones() },
                         onSubmit = { viewModel.submitAnswer() },
+                        onOpenSocraticTutor = { viewModel.openSocraticTutor() },
                     )
                 } ?: run {
                     Card(
@@ -270,6 +317,27 @@ fun ElysiumLearningScreen(
             confidence = state.currentConfidence,
             isTransferUnlocked = state.isTransferUnlocked,
             onDismiss = { viewModel.dismissFeedback() },
+        )
+    }
+
+    // Socratic AI Pedagogical Sheet
+    if (state.isSocraticSheetVisible) {
+        SocraticTutorBottomSheet(
+            state = state,
+            onDismiss = { viewModel.dismissSocraticTutor() },
+            onRequestHint = { viewModel.requestSocraticHint() },
+            onRequestAnalogy = { viewModel.requestRealWorldAnalogy() },
+            onRequestMisconceptionHelp = { viewModel.requestMisconceptionHelp() },
+            onRequestStepByStep = { viewModel.requestStepByStep() },
+            onSendQuery = { viewModel.sendSocraticQuery(it) },
+        )
+    }
+
+    // Certified Cryptographic Competency Diploma Dialog
+    if (state.isDiplomaDialogVisible && state.activeDiploma != null) {
+        CertifiedDiplomaDialog(
+            diploma = state.activeDiploma!!,
+            onDismiss = { viewModel.dismissDiplomaDialog() },
         )
     }
 }
@@ -510,6 +578,7 @@ private fun InteractiveTaskArena(
     onAddColones: (Int) -> Unit,
     onResetColones: () -> Unit,
     onSubmit: () -> Unit,
+    onOpenSocraticTutor: () -> Unit,
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -587,6 +656,23 @@ private fun InteractiveTaskArena(
             }
 
             Spacer(modifier = Modifier.height(16.dp))
+
+            // Socratic Assistant Access Button
+            OutlinedButton(
+                onClick = onOpenSocraticTutor,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary,
+                ),
+            ) {
+                Text(
+                    text = "🧠 Consultar Tutor Socrático (IA)",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Submit Button
             Button(

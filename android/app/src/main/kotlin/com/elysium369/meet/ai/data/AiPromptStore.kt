@@ -24,6 +24,7 @@ class AiPromptStore @Inject constructor() {
             AiFeature.MECHANIC_MARKETPLACE -> SystemPrompts.MECHANICS
             AiFeature.GAUGE_MARKET -> SystemPrompts.MARKETPLACE
             AiFeature.MANUAL_CENTER -> SystemPrompts.AUTOMOTIVE_CLINICAL
+            AiFeature.EDUCATION_SOCRATIC_TUTOR -> SystemPrompts.EDUCATION_SOCRATIC
         }
     }
 }
