@@ -75,6 +75,12 @@ object SkillToServiceBridge {
             iscoCode = "7411",
             serviceVertical = "RESIDENTIAL_ELECTRICAL_SERVICES",
             isRegulatedLicenseRequired = false,
+        ),
+        SkillToServiceMapping(
+            skillId = "cr_fis_s_vehicular_dynamics",
+            iscoCode = "7231",
+            serviceVertical = "AUTOMOTIVE_MECHANICAL_DIAGNOSTICS",
+            isRegulatedLicenseRequired = false,
         )
     )
 }

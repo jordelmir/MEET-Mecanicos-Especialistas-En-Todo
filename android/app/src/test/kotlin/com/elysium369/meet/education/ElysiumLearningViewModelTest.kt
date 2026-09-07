@@ -186,10 +186,12 @@ class ElysiumLearningViewModelTest {
     }
 
     @Test
-    fun `all 22 tracks load official curriculum units and concepts without exception`() = runBlocking {
+    fun `all 40 tracks load official curriculum units and concepts without exception`() = runBlocking {
         val repository = ElysiumLearningRepository()
         val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
         val viewModel = ElysiumLearningViewModel(repository, testScope)
+
+        assertEquals("Total tracks must equal 40", 40, CurriculumTrack.values().size)
 
         for (track in CurriculumTrack.values()) {
             viewModel.selectTrack(track)
@@ -202,7 +204,32 @@ class ElysiumLearningViewModelTest {
     }
 
     @Test
-    fun `verifying multi-grade economic bridges for ISCO 3118 CAD and ISCO 7411 Electrician`() = runBlocking {
+    fun `selectGrade dynamically sets cycle and defaults to corresponding grade track`() = runBlocking {
+        val repository = ElysiumLearningRepository()
+        val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val viewModel = ElysiumLearningViewModel(repository, testScope)
+
+        // Select Grade 7
+        viewModel.selectGrade(7)
+        assertEquals(7, viewModel.uiState.value.activeGrade)
+        assertEquals("III Ciclo", viewModel.uiState.value.selectedCycle)
+        assertEquals(7, viewModel.uiState.value.track.gradeNumber)
+
+        // Select Grade 11 / BxM
+        viewModel.selectGrade(11)
+        assertEquals(11, viewModel.uiState.value.activeGrade)
+        assertEquals("Diversificada", viewModel.uiState.value.selectedCycle)
+        assertTrue(viewModel.uiState.value.track.isDiversifiedOrAdult)
+
+        // Select Grade 3
+        viewModel.selectGrade(3)
+        assertEquals(3, viewModel.uiState.value.activeGrade)
+        assertEquals("I Ciclo", viewModel.uiState.value.selectedCycle)
+        assertEquals(CurriculumTrack.MATEMATICA_3, viewModel.uiState.value.track)
+    }
+
+    @Test
+    fun `verifying multi-grade economic bridges for ISCO 3118 CAD, ISCO 7411 Electrician and ISCO 7231 Automotive`() = runBlocking {
         val repository = ElysiumLearningRepository()
         val mappings = repository.getEconomicBridgeMappings()
 
@@ -217,6 +244,10 @@ class ElysiumLearningViewModelTest {
         val isco7126 = mappings.firstOrNull { it.iscoCode == "7126" }
         assertNotNull("Must include ISCO 7126 Plumbing mapping", isco7126)
         assertEquals("RESIDENTIAL_PLUMBING", isco7126?.serviceVertical)
+
+        val isco7231 = mappings.firstOrNull { it.iscoCode == "7231" }
+        assertNotNull("Must include ISCO 7231 Automotive Diagnostics mapping", isco7231)
+        assertEquals("AUTOMOTIVE_MECHANICAL_DIAGNOSTICS", isco7231?.serviceVertical)
     }
 
     @Test

@@ -8,25 +8,52 @@ enum class CurriculumTrack(
     val gradeNumber: Int,
     val subjectName: String
 ) {
+    // ── I CICLO (1.º, 2.º, 3.º Primaria) ───────────────────────────────────
     MATEMATICA_1("1.º Matemática", "I Ciclo", 1, "MATEMATICA"),
     MATEMATICA_2("2.º Matemática", "I Ciclo", 2, "MATEMATICA"),
     MATEMATICA_3("3.º Matemática", "I Ciclo", 3, "MATEMATICA"),
     CIENCIAS_PRIMARIA("Ciencias Primaria", "I y II Ciclos", 1, "CIENCIAS"),
     ESPANOL_PRIMARIA("Español Primaria", "I y II Ciclos", 1, "ESPANOL"),
+    ESTUDIOS_SOCIALES_PRIMARIA("Estudios Sociales Primaria", "I y II Ciclos", 1, "ESTUDIOS_SOCIALES"),
+    INGLES_PRIMARIA("Inglés Primaria", "I y II Ciclos", 1, "INGLES"),
+
+    // ── II CICLO (4.º, 5.º, 6.º Primaria) ──────────────────────────────────
     MATEMATICA_4("4.º Matemática", "II Ciclo", 4, "MATEMATICA"),
     MATEMATICA_5("5.º Matemática", "II Ciclo", 5, "MATEMATICA"),
     MATEMATICA_6("6.º Matemática", "II Ciclo", 6, "MATEMATICA"),
+
+    // ── III CICLO (7.º, 8.º, 9.º Secundaria / EGB) ─────────────────────────
     MATEMATICA_7("7.º Matemática (Zapandí)", "III Ciclo", 7, "MATEMATICA"),
     FONTANERIA_7("7.º Fontanería (Artes Ind.)", "III Ciclo", 7, "ARTES_INDUSTRIALES"),
+    ESPANOL_7("7.º Español", "III Ciclo", 7, "ESPANOL"),
+    CIENCIAS_7("7.º Ciencias", "III Ciclo", 7, "CIENCIAS"),
+    ESTUDIOS_SOCIALES_7("7.º Estudios Sociales", "III Ciclo", 7, "ESTUDIOS_SOCIALES"),
+    CIVICA_7("7.º Educación Cívica", "III Ciclo", 7, "EDUCACION_CIVICA"),
+    INGLES_7("7.º Inglés", "III Ciclo", 7, "INGLES"),
+
     MATEMATICA_8("8.º Matemática (Ujarrás)", "III Ciclo", 8, "MATEMATICA"),
     DIBUJO_TECNICO_8("8.º Dibujo Técnico (CAD)", "III Ciclo", 8, "ARTES_INDUSTRIALES"),
+    ESPANOL_8("8.º Español", "III Ciclo", 8, "ESPANOL"),
+    CIENCIAS_8("8.º Ciencias", "III Ciclo", 8, "CIENCIAS"),
+    ESTUDIOS_SOCIALES_8("8.º Estudios Sociales", "III Ciclo", 8, "ESTUDIOS_SOCIALES"),
+    CIVICA_8("8.º Educación Cívica", "III Ciclo", 8, "EDUCACION_CIVICA"),
+    INGLES_8("8.º Inglés", "III Ciclo", 8, "INGLES"),
+
     MATEMATICA_9("9.º Matemática (Tárcoles)", "III Ciclo", 9, "MATEMATICA"),
     ELECTRICIDAD_9("9.º Electricidad Residencial", "III Ciclo", 9, "ARTES_INDUSTRIALES"),
+    ESPANOL_9("9.º Español", "III Ciclo", 9, "ESPANOL"),
+    CIENCIAS_9("9.º Ciencias", "III Ciclo", 9, "CIENCIAS"),
+    ESTUDIOS_SOCIALES_9("9.º Estudios Sociales", "III Ciclo", 9, "ESTUDIOS_SOCIALES"),
+    CIVICA_9("9.º Educación Cívica", "III Ciclo", 9, "EDUCACION_CIVICA"),
+    INGLES_9("9.º Inglés", "III Ciclo", 9, "INGLES"),
     CIENCIAS_III_CICLO("Ciencias III Ciclo", "III Ciclo", 7, "CIENCIAS"),
+
+    // ── DIVERSIFICADA & BACHILLERATO POR MADUREZ (10.º - 11.º / BxM) ───────
     MATEMATICA_BXM("Matemática (BxM 10.º-11.º)", "Diversificada", 11, "MATEMATICA"),
     ESPANOL_BXM("Español (BxM 10.º-11.º)", "Diversificada", 11, "ESPANOL"),
     BIOLOGIA_BXM("Biología (BxM 10.º-11.º)", "Diversificada", 10, "BIOLOGIA"),
     QUIMICA_BXM("Química (BxM 10.º-11.º)", "Diversificada", 11, "QUIMICA"),
+    FISICA_BXM("Física (BxM 10.º-11.º)", "Diversificada", 11, "FISICA"),
     SOCIALES_BXM("Estudios Sociales (BxM)", "Diversificada", 11, "ESTUDIOS_SOCIALES"),
     CIVICA_BXM("Educación Cívica (BxM)", "Diversificada", 11, "EDUCACION_CIVICA"),
     INGLES_BXM("Inglés (BxM 10.º-11.º)", "Diversificada", 11, "INGLES");
@@ -49,16 +76,34 @@ object NationalCurriculumCatalogSeed {
             CurriculumTrack.MATEMATICA_6 -> MATEMATICA_6_UNITS
             CurriculumTrack.CIENCIAS_PRIMARIA -> CIENCIAS_PRIMARIA_UNITS
             CurriculumTrack.ESPANOL_PRIMARIA -> ESPANOL_PRIMARIA_UNITS
+            CurriculumTrack.ESTUDIOS_SOCIALES_PRIMARIA -> ESTUDIOS_SOCIALES_PRIMARIA_UNITS
+            CurriculumTrack.INGLES_PRIMARIA -> INGLES_PRIMARIA_UNITS
             CurriculumTrack.MATEMATICA_7 -> MATEMATICA_7_UNITS
+            CurriculumTrack.ESPANOL_7 -> ESPANOL_7_UNITS
+            CurriculumTrack.CIENCIAS_7 -> CIENCIAS_7_UNITS
+            CurriculumTrack.ESTUDIOS_SOCIALES_7 -> ESTUDIOS_SOCIALES_7_UNITS
+            CurriculumTrack.CIVICA_7 -> CIVICA_7_UNITS
+            CurriculumTrack.INGLES_7 -> INGLES_7_UNITS
             CurriculumTrack.MATEMATICA_8 -> MATEMATICA_8_UNITS
             CurriculumTrack.DIBUJO_TECNICO_8 -> DIBUJO_TECNICO_8_UNITS
+            CurriculumTrack.ESPANOL_8 -> ESPANOL_8_UNITS
+            CurriculumTrack.CIENCIAS_8 -> CIENCIAS_8_UNITS
+            CurriculumTrack.ESTUDIOS_SOCIALES_8 -> ESTUDIOS_SOCIALES_8_UNITS
+            CurriculumTrack.CIVICA_8 -> CIVICA_8_UNITS
+            CurriculumTrack.INGLES_8 -> INGLES_8_UNITS
             CurriculumTrack.MATEMATICA_9 -> MATEMATICA_9_UNITS
             CurriculumTrack.ELECTRICIDAD_9 -> ELECTRICIDAD_9_UNITS
+            CurriculumTrack.ESPANOL_9 -> ESPANOL_9_UNITS
+            CurriculumTrack.CIENCIAS_9 -> CIENCIAS_9_UNITS
+            CurriculumTrack.ESTUDIOS_SOCIALES_9 -> ESTUDIOS_SOCIALES_9_UNITS
+            CurriculumTrack.CIVICA_9 -> CIVICA_9_UNITS
+            CurriculumTrack.INGLES_9 -> INGLES_9_UNITS
             CurriculumTrack.CIENCIAS_III_CICLO -> CIENCIAS_III_CICLO_UNITS
             CurriculumTrack.MATEMATICA_BXM -> MATEMATICA_BXM_UNITS
             CurriculumTrack.ESPANOL_BXM -> ESPANOL_BXM_UNITS
             CurriculumTrack.BIOLOGIA_BXM -> BIOLOGIA_BXM_UNITS
             CurriculumTrack.QUIMICA_BXM -> QUIMICA_BXM_UNITS
+            CurriculumTrack.FISICA_BXM -> FISICA_BXM_UNITS
             CurriculumTrack.SOCIALES_BXM -> SOCIALES_BXM_UNITS
             CurriculumTrack.CIVICA_BXM -> CIVICA_BXM_UNITS
             CurriculumTrack.INGLES_BXM -> INGLES_BXM_UNITS
@@ -875,6 +920,797 @@ object NationalCurriculumCatalogSeed {
                             ),
                             correctOptionIndex = 0,
                             explanation = "The sentence explicitly states that zero tailpipe emissions reduce urban air pollution."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── FÍSICA BXM (10.º - 11.º / DGEC) ──────────────────────────────────────
+    val FISICA_BXM_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_fis_bxm_u01",
+            track = CurriculumTrack.FISICA_BXM,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Cinemática y Dinámica Clásica Newtoniana",
+            description = "Vectores, leyes del movimiento de Newton, fuerza neta, masa inercial y fricción.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_fis_bxm_c_newton",
+                    conceptCode = "CR_FIS_BXM_NEWTON",
+                    title = "Leyes del Movimiento de Newton y Fricción",
+                    description = "Segunda ley (F = m*a), fuerza de rozamiento estática y dinámica.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_fis_bxm_fuerza_neta",
+                            conceptId = "cr_fis_bxm_c_newton",
+                            title = "Cálculo de Desaceleración en Frenado",
+                            prompt = "Un vehículo de masa m = 1200 kg frena aplicando una fuerza neta constante de fricción de 6000 N. ¿Cuál es su aceleración (desaceleración)?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "-5 m/s² en sentido contrario al movimiento",
+                                "-0.2 m/s²",
+                                "7200 m/s²",
+                                "-2 m/s²"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "Por la 2da Ley de Newton (a = F/m): a = -6000 N / 1200 kg = -5 m/s²."
+                        ),
+                        InteractiveTaskData(
+                            id = "task_fis_bxm_transfer_friccion",
+                            conceptId = "cr_fis_bxm_c_newton",
+                            title = "Dinámica de Adherencia en Asfalto Mojado",
+                            prompt = "Si el coeficiente de fricción neumático-asfalto cae de μ = 0.8 (seco) a μ = 0.4 (mojado), ¿qué ocurre con la distancia requerida de frenado a igual velocidad inicial?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Se duplica exactamente, porque la desaceleración máxima disponible se reduce a la mitad.",
+                                "Se reduce a la mitad.",
+                                "Permanece idéntica.",
+                                "Se multiplica por cuatro."
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "La distancia de frenado d = v²/(2*μ*g). Al ser inversamente proporcional a μ, si μ se divide por 2, la distancia de detención se duplica."
+                        )
+                    )
+                )
+            )
+        ),
+        CourseUnitData(
+            id = "cr_fis_bxm_u02",
+            track = CurriculumTrack.FISICA_BXM,
+            unitNumber = 2,
+            targetMonth = 5,
+            monthName = "Mayo",
+            title = "Termodinámica y Transferencia de Calor",
+            description = "Primera ley de la termodinámica, calorimetría, conducción, convección y radiación.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_fis_bxm_c_termo",
+                    conceptCode = "CR_FIS_BXM_TERMO",
+                    title = "Balance Térmico e Intercambio de Calor",
+                    description = "Q = m * c * ΔT y disipación térmica en sistemas cerrados y abiertos.",
+                    targetMonth = 5,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_fis_bxm_calor_latente",
+                            conceptId = "cr_fis_bxm_c_termo",
+                            title = "Transferencia de Calor por Convección",
+                            prompt = "En el radiador de un motor, el líquido refrigerante caliente disipa calor hacia el aire forzado por el electroventilador. ¿Qué mecanismo de transferencia predomina?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Convección forzada líquido-sólido y sólido-aire con aletas de conducción de aluminio",
+                                "Radiación electromagnética pura exclusivamente",
+                                "Conducción en el vacío",
+                                "Fisión térmica"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "El calor pasa por conducción en las paredes de aluminio de los tubos y es extraído por convección forzada del aire."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 7.º AÑO: ESPAÑOL ─────────────────────────────────────────────────────
+    val ESPANOL_7_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_esp7_u01",
+            track = CurriculumTrack.ESPANOL_7,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Géneros Literarios y Comprensión del Texto Expositivo",
+            description = "Estructura del texto informativo, coherencia, cohesión y análisis de ideas principales.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_esp7_c_texto_exp",
+                    conceptCode = "CR_ESP7_TEXTO_EXP",
+                    title = "Estructura y Coherencia del Texto Informativo",
+                    description = "Identificación de tesis, ideas de soporte y vocabulario contextual.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_esp7_idea_principal",
+                            conceptId = "cr_esp7_c_texto_exp",
+                            title = "Extracción de Idea Principal",
+                            prompt = "En un manual técnico que detalla: 'Antes de desconectar la batería, asegúrese de apagar el switch para evitar picos de voltaje que dañen la ECU.' ¿Cuál es la idea central?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "Prevenir sobretensiones apagando el interruptor previo a desconectar la fuente eléctrica.",
+                                "Comprar una batería nueva.",
+                                "La ECU no sufre daños por voltaje.",
+                                "Desconectar la batería con el vehículo encendido."
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "La instrucción central estipula apagar el switch como medida preventiva obligatoria ante picos de tensión."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 8.º AÑO: ESPAÑOL ─────────────────────────────────────────────────────
+    val ESPANOL_8_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_esp8_u01",
+            track = CurriculumTrack.ESPANOL_8,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "La Narrativa Costarricense y la Oración Compuesta",
+            description = "Oraciones coordinadas, subordinadas y conectores de causa y consecuencia.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_esp8_c_oracion_comp",
+                    conceptCode = "CR_ESP8_ORACION_COMP",
+                    title = "Sintaxis de Oraciones Coordinadas y Subordinadas",
+                    description = "Uso de nexos sintácticos en la redacción formal.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_esp8_conector_causal",
+                            conceptId = "cr_esp8_c_oracion_comp",
+                            title = "Identificación de Conector Causal",
+                            prompt = "En la frase: 'El motor falló puesto que la bomba de combustible perdió presión', ¿qué tipo de nexo es 'puesto que'?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "Conector subordinante causal",
+                                "Conector coordinante disyuntivo",
+                                "Adverbio de tiempo",
+                                "Preposición simple"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "'Puesto que' introduce la causa u origen del fallo mecánico."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 9.º AÑO: ESPAÑOL ─────────────────────────────────────────────────────
+    val ESPANOL_9_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_esp9_u01",
+            track = CurriculumTrack.ESPANOL_9,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "El Ensayo Crítico y la Argumentación Formal",
+            description = "Tesis, premisas lógicas, contraargumentos y vicios del lenguaje.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_esp9_c_ensayo",
+                    conceptCode = "CR_ESP9_ENSAYO",
+                    title = "Estructura Argumentativa y Análisis Crítico",
+                    description = "Construcción de argumentos válidos y detección de falacias.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_esp9_tesis_argumento",
+                            conceptId = "cr_esp9_c_ensayo",
+                            title = "Justificación Técnica en Informe Pericial",
+                            prompt = "¿Qué elemento convierte una afirmación en un argumento técnico sólido en un reporte pericial?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "El respaldo empírico con mediciones, tolerancias del fabricante y evidencia física verificable.",
+                                "La opinión personal sin mediciones.",
+                                "El uso de adjetivos emotivos.",
+                                "La longitud en páginas del documento."
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "Un argumento pericial sólido se fundamenta en evidencia empírica cuantitativa y normas técnicas contrastables."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 7.º AÑO: ESTUDIOS SOCIALES ───────────────────────────────────────────
+    val ESTUDIOS_SOCIALES_7_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_soc7_u01",
+            track = CurriculumTrack.ESTUDIOS_SOCIALES_7,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Geografía Física y Gestión del Riesgo en Costa Rica",
+            description = "Cordilleras, valles, cuencas hidrográficas y vulnerabilidad ante eventos naturales.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_soc7_c_geografia_cr",
+                    conceptCode = "CR_SOC7_GEOGRAFIA_CR",
+                    title = "Relieve, Clima y Cuencas Hidrográficas Nacionales",
+                    description = "Estructura orográfica de Costa Rica y su impacto socioeconómico.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_soc7_cordilleras",
+                            conceptId = "cr_soc7_c_geografia_cr",
+                            title = "Eje Montañoso Central",
+                            prompt = "¿Cuáles son las cordilleras volcánicas que conforman el eje central de Costa Rica?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "Guanacaste, Tilarán, Volcánica Central y Talamanca",
+                                "Himalaya, Andes y Rocosas",
+                                "Sierra Nevada y Escandinava",
+                                "Cordillera de la Muerte y Alpes"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "El sistema montañoso costarricense se subdivide en Guanacaste, Tilarán, Volcánica Central y Talamanca."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 8.º AÑO: ESTUDIOS SOCIALES ───────────────────────────────────────────
+    val ESTUDIOS_SOCIALES_8_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_soc8_u01",
+            track = CurriculumTrack.ESTUDIOS_SOCIALES_8,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Sociedades Precolombinas y Régimen Colonial",
+            description = "Culturas autóctonas de Costa Rica (Diquís, Nicoya) y la colonización española.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_soc8_c_colonial",
+                    conceptCode = "CR_SOC8_COLONIAL",
+                    title = "Organización Social y Económica en la Costa Rica Colonial",
+                    description = "Mestizaje, encomiendas, economía de subsistencia en el Valle Central.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_soc8_valle_central",
+                            conceptId = "cr_soc8_c_colonial",
+                            title = "Características Coloniales de Cartago",
+                            prompt = "¿Cuál era la principal característica económica de la provincia de Costa Rica durante gran parte de la colonia?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "Una provincia aislada con economía agrícola de subsistencia y escasa minería",
+                                "Un emporio minero de oro y plata a gran escala",
+                                "Un puerto marítimo industrial con astilleros mundiales",
+                                "Una monarquía feudal independiente"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "Costa Rica fue la provincia más austral y pobre de la Capitanía General de Guatemala, basada en agricultura de subsistencia."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 9.º AÑO: ESTUDIOS SOCIALES ───────────────────────────────────────────
+    val ESTUDIOS_SOCIALES_9_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_soc9_u01",
+            track = CurriculumTrack.ESTUDIOS_SOCIALES_9,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Costa Rica en el Siglo XX: Del Estado Liberal a las Reformas Sociales",
+            description = "Crisis de los años 30, reformas sociales de 1943 (CCSS, UCR, Código de Trabajo) y Guerra Civil de 1948.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_soc9_c_reformas43",
+                    conceptCode = "CR_SOC9_REFORMAS43",
+                    title = "Reformas Sociales de los Años 40 y el Estado Benefactor",
+                    description = "Alianza histórica y creación de la institucionalidad social costarricense.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_soc9_alianza43",
+                            conceptId = "cr_soc9_c_reformas43",
+                            title = "Pilares de las Garantías Sociales de 1943",
+                            prompt = "¿Quiénes lideraron la alianza social que promulgó las Garantías Sociales y el Código de Trabajo en 1943?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "Rafael Ángel Calderón Guardia, Manuel Mora Valverde y Monseñor Víctor Sanabria Martínez",
+                                "Juan Rafael Mora Porras y William Walker",
+                                "José María Castro Madriz y Braulio Carrillo",
+                                "Tomás Guardia y Bernardo Soto"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "La alianza entre el gobierno de Calderón Guardia, el Partido Vanguardia Popular (Manuel Mora) y la Iglesia Católica (Monseñor Sanabria) forjó las reformas sociales de 1943."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 7.º AÑO: EDUCACIÓN CÍVICA ────────────────────────────────────────────
+    val CIVICA_7_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_civ7_u01",
+            track = CurriculumTrack.CIVICA_7,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Seguridad Vial y Responsabilidad Ciudadana en el Espacio Público",
+            description = "Ley de Tránsito 9078, prevención de accidentes, señalización y convivencia vial.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_civ7_c_seguridad_vial",
+                    conceptCode = "CR_CIV7_SEGURIDAD_VIAL",
+                    title = "Seguridad Vial como Deber y Derecho Ciudadano",
+                    description = "Factores humano, vehicular y ambiental en la prevención de siniestros viales.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_civ7_mantenimiento_preventivo",
+                            conceptId = "cr_civ7_c_seguridad_vial",
+                            title = "Inspección de Seguridad del Vehículo",
+                            prompt = "Bajo el principio de responsabilidad civil ciudadana, ¿por qué es obligatorio mantener frenos, llantas y luces en perfecto estado?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Para proteger la vida propia y la de terceros en las vías públicas compartidas.",
+                                "Únicamente para evitar multas económicas.",
+                                "Para que el auto se vea más limpio.",
+                                "No es obligatorio si no se viaja de noche."
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "La seguridad vial es un imperativo ético y legal de protección colectiva del derecho a la vida."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 8.º AÑO: EDUCACIÓN CÍVICA ────────────────────────────────────────────
+    val CIVICA_8_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_civ8_u01",
+            track = CurriculumTrack.CIVICA_8,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Derechos Humanos, Equidad y No Discriminación",
+            description = "Declaración Universal de Derechos Humanos, igualdad de género, inclusión y Ley 7600.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_civ8_c_derechos_hum",
+                    conceptCode = "CR_CIV8_DERECHOS_HUM",
+                    title = "Derechos Humanos Fundamentales e Inclusión Social",
+                    description = "Universalidad, indivisibilidad y garantías de accesibilidad para todas las personas.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_civ8_ley7600",
+                            conceptId = "cr_civ8_c_derechos_hum",
+                            title = "Accesibilidad en Comercios y Talleres",
+                            prompt = "Según la Ley 7600 de Igualdad de Oportunidades, ¿qué obligación tienen los establecimientos abiertos al público?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Garantizar accesibilidad física universal sin barreras arquitectónicas.",
+                                "Cobrar tarifas diferenciadas a personas con discapacidad.",
+                                "Exigir permisos especiales para ingresar.",
+                                "Atender únicamente por cita telefónica."
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "La Ley 7600 exige accesibilidad física sin barreras en todos los locales de atención al público."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 9.º AÑO: EDUCACIÓN CÍVICA ────────────────────────────────────────────
+    val CIVICA_9_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_civ9_u01",
+            track = CurriculumTrack.CIVICA_9,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "El Régimen Municipal y la Participación Cantonal",
+            description = "Código Municipal, funciones de alcaldes, regidores, síndicos y rendición de cuentas cantonal.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_civ9_c_municipal",
+                    conceptCode = "CR_CIV9_MUNICIPAL",
+                    title = "Organización Municipal y Autonomía de los Gobiernos Locales",
+                    description = "Competencias de los cantones en ordenamiento territorial, patentes y servicios comunitarios.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_civ9_patente_taller",
+                            conceptId = "cr_civ9_c_municipal",
+                            title = "Permisos Comerciales y Regulación Cantonal",
+                            prompt = "¿Qué entidad pública otorga la licencia comercial (patente) para operar un taller o negocio en un cantón?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "La Municipalidad del respectivo cantón",
+                                "La Asamblea Legislativa directamente",
+                                "La Fuerza Pública local",
+                                "El Ministerio de Hacienda exclusivamente"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "Las municipalidades poseen potestad constitucional y legal para regular y otorgar licencias comerciales cantonales."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 7.º AÑO: INGLÉS ──────────────────────────────────────────────────────
+    val INGLES_7_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_ing7_u01",
+            track = CurriculumTrack.INGLES_7,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Personal Identity, School Life & Daily Routines",
+            description = "Present simple tense, daily activities, basic questions and classroom vocabulary (A1+).",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_ing7_c_routines",
+                    conceptCode = "CR_ING7_ROUTINES",
+                    title = "Daily Routines and Time Expressions",
+                    description = "Describing habits, schedules, and safety instructions using Present Simple.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_ing7_routine_order",
+                            conceptId = "cr_ing7_c_routines",
+                            title = "Workshop Safety Routine Expression",
+                            prompt = "Complete the sentence: 'A responsible apprentice always _______ safety goggles before operating machinery.'",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "wears",
+                                "wearing",
+                                "wore",
+                                "wear"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "Third-person singular 'apprentice' requires 'wears' in the Present Simple tense."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 8.º AÑO: INGLÉS ──────────────────────────────────────────────────────
+    val INGLES_8_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_ing8_u01",
+            track = CurriculumTrack.INGLES_8,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Travel, Environment & Community Interactions",
+            description = "Past simple vs past continuous, giving directions, eco-tourism and national parks (A2).",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_ing8_c_environment",
+                    conceptCode = "CR_ING8_ENVIRONMENT",
+                    title = "Environmental Actions and Past Experiences",
+                    description = "Expressing past actions, conservation policies and technical directions.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_ing8_directions",
+                            conceptId = "cr_ing8_c_environment",
+                            title = "Giving Mechanical Assistance in English",
+                            prompt = "A tourist asks: 'Excuse me, where can I check my tire pressure?' Which response is correct?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "'Go straight for 200 meters; the service station has an air pump on the right.'",
+                                "'Yesterday I was checking my phone.'",
+                                "'Tires are made of rubber.'",
+                                "'I like driving fast.'"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "The answer provides clear, polite imperative directions to the nearest service point."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 9.º AÑO: INGLÉS ──────────────────────────────────────────────────────
+    val INGLES_9_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_ing9_u01",
+            track = CurriculumTrack.INGLES_9,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Science, Technology, Careers & Workplace Communication",
+            description = "Modal verbs (must, should, have to), future plans, interpreting technical alerts and datasheets (B1).",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_ing9_c_workplace",
+                    conceptCode = "CR_ING9_WORKPLACE",
+                    title = "Technical Alerts and Modal Verbs in Engineering",
+                    description = "Understanding imperative manuals and technical safety standards.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_ing9_modal_safety",
+                            conceptId = "cr_ing9_c_workplace",
+                            title = "Interpreting Warning Labels",
+                            prompt = "Warning label: 'High Voltage! Technicians must isolate power supply prior to servicing.' What is mandatory?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Disconnecting electrical power before performing maintenance.",
+                                "Leaving the circuit live during inspection.",
+                                "Replacing wires without gloves.",
+                                "Ignoring the indicator light."
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "'Must isolate power supply' establishes an absolute safety obligation before starting service."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 7.º AÑO: CIENCIAS ────────────────────────────────────────────────────
+    val CIENCIAS_7_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_cie7_u01",
+            track = CurriculumTrack.CIENCIAS_7,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Materia, Sustancias Puras, Mezclas y Métodos de Separación",
+            description = "Propiedades físicas y químicas, elementos, compuestos, mezclas homogéneas y heterogéneas.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_cie7_c_materia",
+                    conceptCode = "CR_CIE7_MATERIA",
+                    title = "Clasificación de la Materia y Procesos de Separación",
+                    description = "Filtración, decantación, destilación y cambios físicos vs químicos.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_cie7_separacion_mezclas",
+                            conceptId = "cr_cie7_c_materia",
+                            title = "Filtrado y Decantación de Combustible",
+                            prompt = "En un motor diésel con trampa de agua en el filtro, ¿qué propiedad física permite que el agua se separe del combustible y se asiente en el fondo?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "La mayor densidad del agua respecto al diésel e inmiscibilidad entre ambos líquidos (decantación)",
+                                "La solubilidad total del agua en el hidrocarburo",
+                                "La evaporación instantánea del agua a temperatura ambiente",
+                                "La atracción magnética"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "El agua es más densa que el diésel (~1.0 g/cm³ vs ~0.84 g/cm³) y no se disuelve, sedimentando por gravedad en la trampa decantadora."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 8.º AÑO: CIENCIAS ────────────────────────────────────────────────────
+    val CIENCIAS_8_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_cie8_u01",
+            track = CurriculumTrack.CIENCIAS_8,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "La Célula y Fisiología de los Sistemas del Cuerpo Humano",
+            description = "Organelas celulares, respiración aerobia, sistemas circulatorio, respiratorio y locomotor.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_cie8_c_celula",
+                    conceptCode = "CR_CIE8_CELULA",
+                    title = "Respiración Celular y Toxicología Ocupacional",
+                    description = "Mitocondrias, ATP e impacto de gases tóxicos en la fisiología humana.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_cie8_toxicologia_co",
+                            conceptId = "cr_cie8_c_celula",
+                            title = "Peligro del Monóxido de Carbono (CO)",
+                            prompt = "¿Por qué es mortal operar un motor de combustión en un taller cerrado sin extractor de gases?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "El monóxido de carbono (CO) se une irreversiblemente a la hemoglobina, bloqueando el transporte de oxígeno a las células.",
+                                "El motor consume todo el nitrógeno del aire.",
+                                "El vapor de agua generado destruye los glóbulos blancos.",
+                                "El dióxido de carbono congela los pulmones."
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "El CO tiene una afinidad ~200 veces mayor que el O₂ por la hemoglobina (formando carboxihemoglobina), provocando hipoxia y asfixia celular celular rápida."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── 9.º AÑO: CIENCIAS ────────────────────────────────────────────────────
+    val CIENCIAS_9_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_cie9_u01",
+            track = CurriculumTrack.CIENCIAS_9,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "El Átomo, Tabla Periódica, Reacciones Químicas y Genética",
+            description = "Estructura atómica, enlaces, electronegatividad, leyes de la herencia y reacciones redox.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_cie9_c_atomo",
+                    conceptCode = "CR_CIE9_ATOMO",
+                    title = "Estructura Atómica y Reacciones de Óxido-Reducción",
+                    description = "Electrones de valencia, flujo de corriente y electroquímica de baterías.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_cie9_bateria_redox",
+                            conceptId = "cr_cie9_c_atomo",
+                            title = "Electroquímica en Baterías de Plomo-Ácido",
+                            prompt = "En la batería de un vehículo (Pb + PbO₂ + 2H₂SO₄ ⇌ 2PbSO₄ + 2H₂O), ¿qué fenómeno químico produce la corriente de 12V?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Una reacción de óxido-reducción que genera transferencia espontánea de electrones entre los electrodos.",
+                                "Una fricción mecánica interna entre las placas.",
+                                "La evaporación de ácido sulfúrico hacia los bornes.",
+                                "Una fisión nuclear del núcleo de plomo."
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "La reacción redox convierte energía química en energía eléctrica mediante transferencia de electrones entre el ánodo de plomo y el cátodo de óxido de plomo."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── ESTUDIOS SOCIALES PRIMARIA ───────────────────────────────────────────
+    val ESTUDIOS_SOCIALES_PRIMARIA_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_soc_pri_u01",
+            track = CurriculumTrack.ESTUDIOS_SOCIALES_PRIMARIA,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Mi Comunidad, Costa Rica y sus Símbolos Patrios",
+            description = "Puntos cardinales, paisaje geográfico, provincias de Costa Rica y emblemas nacionales.",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_soc_pri_c_comunidad",
+                    conceptCode = "CR_SOC_PRI_COMUNIDAD",
+                    title = "Identidad Cantonal y Símbolos de Costa Rica",
+                    description = "Orientación espacial, respeto comunitario e historia patria elemental.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_soc_pri_simbolos",
+                            conceptId = "cr_soc_pri_c_comunidad",
+                            title = "Símbolos Nacionales de Costa Rica",
+                            prompt = "¿Cuál es el ave nacional de Costa Rica reconocida por su canto al inicio de las lluvias?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "El Yigüirro (Turdus grayi)",
+                                "La Lapa Roja",
+                                "El Tucán pico iris",
+                                "El Colibrí"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "El Yigüirro fue declarado Ave Nacional de Costa Rica en 1977 como tributo a su canto anunciador de la temporada de lluvias."
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    // ── INGLÉS PRIMARIA ──────────────────────────────────────────────────────
+    val INGLES_PRIMARIA_UNITS = listOf(
+        CourseUnitData(
+            id = "cr_ing_pri_u01",
+            track = CurriculumTrack.INGLES_PRIMARIA,
+            unitNumber = 1,
+            targetMonth = 3,
+            monthName = "Marzo",
+            title = "Welcome: Colors, Numbers, Family & Basic Commands",
+            description = "Greetings, primary colors, numbers 1 to 20, everyday school items (Pre-A1).",
+            estimatedLessons = 8,
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_ing_pri_c_basics",
+                    conceptCode = "CR_ING_PRI_BASICS",
+                    title = "Everyday Vocabulary and Polite Expressions",
+                    description = "Fundamental words, polite greetings, color recognition and counting.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_ing_pri_colors_signs",
+                            conceptId = "cr_ing_pri_c_basics",
+                            title = "Safety Color Recognition",
+                            prompt = "What color is standard on emergency stop buttons worldwide?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Red (Rojo)",
+                                "Green (Verde)",
+                                "Blue (Azul)",
+                                "Yellow (Amarillo)"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "Red is universally used for STOP and danger alerts."
                         )
                     )
                 )

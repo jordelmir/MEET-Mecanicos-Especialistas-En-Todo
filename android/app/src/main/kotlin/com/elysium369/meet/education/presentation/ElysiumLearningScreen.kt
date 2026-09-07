@@ -120,64 +120,14 @@ fun ElysiumLearningScreen(
                 SafeguardsBanner()
             }
 
-            // 2. Cycle and Track Selector
+            // 2. National Curriculum Matrix Navigator (MEP 2026: 1.º a 11.º & BxM)
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Cycle Filter Chips
-                    val cycles = listOf("Todos", "I Ciclo", "II Ciclo", "III Ciclo", "Diversificada")
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        items(cycles) { cycle ->
-                            val isSelected = cycle == state.selectedCycle
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { viewModel.selectCycle(cycle) },
-                                label = {
-                                    Text(
-                                        text = when (cycle) {
-                                            "I Ciclo" -> "I Ciclo (1.º-3.º)"
-                                            "II Ciclo" -> "II Ciclo (4.º-6.º)"
-                                            "III Ciclo" -> "III Ciclo (7.º-9.º)"
-                                            "Diversificada" -> "Bachillerato (BxM)"
-                                            else -> "Todos los Ciclos"
-                                        },
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        fontSize = 12.sp,
-                                    )
-                                },
-                            )
-                        }
-                    }
-
-                    // Track selector chips
-                    val filteredTracks = if (state.selectedCycle == "Todos") {
-                        CurriculumTrack.values().toList()
-                    } else {
-                        CurriculumTrack.values().filter { it.cycleName.contains(state.selectedCycle) || state.selectedCycle.contains(it.cycleName) }
-                    }
-
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        items(filteredTracks) { track ->
-                            val isSelected = track == state.track
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { viewModel.selectTrack(track) },
-                                label = {
-                                    Text(
-                                        text = track.displayName,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        fontSize = 12.sp,
-                                    )
-                                },
-                            )
-                        }
-                    }
-                }
+                GradeAndSubjectMatrixNavigator(
+                    currentTrack = state.track,
+                    activeGrade = state.activeGrade,
+                    onSelectTrack = { viewModel.selectTrack(it) },
+                    onSelectGrade = { viewModel.selectGrade(it) },
+                )
             }
 
             // 3. Official MEP 2026 Academic Calendar Card
@@ -244,6 +194,7 @@ fun ElysiumLearningScreen(
 
             // 5b. Explorable Physical & Mathematical Sandboxes
             if (state.track == CurriculumTrack.MATEMATICA_BXM ||
+                state.track == CurriculumTrack.FISICA_BXM ||
                 state.track == CurriculumTrack.DIBUJO_TECNICO_8 ||
                 state.isGeometrySandboxVisible) {
                 item {
@@ -255,6 +206,7 @@ fun ElysiumLearningScreen(
             }
 
             if (state.track == CurriculumTrack.ELECTRICIDAD_9 ||
+                state.track == CurriculumTrack.FISICA_BXM ||
                 state.isElectricalSandboxVisible ||
                 state.linkedDtcBridge != null) {
                 item {
@@ -297,7 +249,8 @@ fun ElysiumLearningScreen(
             // 7. Economic Bridge Card (for technical / vocational tracks)
             if (state.track == CurriculumTrack.FONTANERIA_7 ||
                 state.track == CurriculumTrack.DIBUJO_TECNICO_8 ||
-                state.track == CurriculumTrack.ELECTRICIDAD_9) {
+                state.track == CurriculumTrack.ELECTRICIDAD_9 ||
+                state.track == CurriculumTrack.FISICA_BXM) {
                 item {
                     EconomicBridgeCard(track = state.track)
                 }
@@ -913,6 +866,7 @@ private fun EconomicBridgeCard(track: CurriculumTrack) {
     val (iscoCode, occupationTitle, serviceVertical) = when (track) {
         CurriculumTrack.DIBUJO_TECNICO_8 -> Triple("3118", "Delineantes y dibujantes técnicos CAD", "ARCHITECTURAL_AND_TECHNICAL_CAD")
         CurriculumTrack.ELECTRICIDAD_9 -> Triple("7411", "Electricistas de obras y afines", "RESIDENTIAL_ELECTRICAL_SERVICES")
+        CurriculumTrack.FISICA_BXM -> Triple("7231", "Mecánicos y ajustadores de vehículos de motor", "AUTOMOTIVE_MECHANICAL_DIAGNOSTICS")
         else -> Triple("7126", "Fontaneros y montadores de tuberías", "RESIDENTIAL_PLUMBING")
     }
 
@@ -987,7 +941,7 @@ private fun EvidenceProofDialog(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(text = feedback, style = MaterialTheme.typography.bodyMedium)
 
-                Divider()
+                HorizontalDivider()
 
                 Text(
                     text = "Dominio de Concepto: ${(mastery * 100).toInt()}% · Confianza: ${(confidence * 100).toInt()}%",
@@ -1030,4 +984,136 @@ private fun EvidenceProofDialog(
             }
         },
     )
+}
+
+@Composable
+private fun GradeAndSubjectMatrixNavigator(
+    currentTrack: CurriculumTrack,
+    activeGrade: Int,
+    onSelectTrack: (CurriculumTrack) -> Unit,
+    onSelectGrade: (Int) -> Unit,
+) {
+    val grades = listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11)
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "MATRIZ CURRICULAR NACIONAL MEP 2026",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                ),
+            )
+            Surface(
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(12.dp),
+            ) {
+                Text(
+                    text = "1.º A 11.º & BXM",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                    ),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                )
+            }
+        }
+
+        // Grades selector row (1.º to 11.º)
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(grades) { grade ->
+                val isSelected = grade == activeGrade
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelectGrade(grade) },
+                    label = {
+                        Text(
+                            text = if (grade == 11) "11.º / BxM" else "${grade}.º Año",
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                            fontSize = 12.sp,
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                    )
+                )
+            }
+        }
+
+        // Cycle explanatory context
+        val cycleLabel = when (activeGrade) {
+            in 1..3 -> "I Ciclo de la Educación General Básica (1.º-3.º Primaria)"
+            in 4..6 -> "II Ciclo de la Educación General Básica (4.º-6.º Primaria)"
+            in 7..9 -> "III Ciclo de la Educación General Básica (7.º-9.º Secundaria)"
+            else -> "Educación Diversificada & Bachillerato por Madurez DGEC"
+        }
+        Text(
+            text = "Asignaturas oficiales para $cycleLabel:",
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 11.sp,
+            ),
+        )
+
+        // Grade-specific subjects
+        val gradeTracks = CurriculumTrack.values().filter { track ->
+            if (activeGrade in 1..6) {
+                track.gradeNumber == activeGrade || (track.isPrimary && (track.subjectName != "MATEMATICA" || track.gradeNumber == activeGrade))
+            } else if (activeGrade in 7..9) {
+                track.gradeNumber == activeGrade
+            } else {
+                track.isDiversifiedOrAdult
+            }
+        }.distinct()
+
+        LazyRow(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            items(gradeTracks) { track ->
+                val isSelected = track == currentTrack
+                val icon = when (track.subjectName) {
+                    "MATEMATICA" -> "🧮"
+                    "ESPANOL" -> "📖"
+                    "CIENCIAS", "BIOLOGIA" -> "🔬"
+                    "QUIMICA" -> "🧪"
+                    "FISICA" -> "⚡"
+                    "ESTUDIOS_SOCIALES" -> "🗺️"
+                    "EDUCACION_CIVICA" -> "⚖️"
+                    "INGLES" -> "🇬🇧"
+                    "ARTES_INDUSTRIALES" -> "🛠️"
+                    else -> "📚"
+                }
+
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelectTrack(track) },
+                    leadingIcon = {
+                        Text(text = icon, fontSize = 12.sp)
+                    },
+                    label = {
+                        Text(
+                            text = track.displayName,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            fontSize = 12.sp,
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    )
+                )
+            }
+        }
+    }
 }

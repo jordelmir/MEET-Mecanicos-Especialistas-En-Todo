@@ -69,7 +69,7 @@ CREATE OR REPLACE FUNCTION auth.role() RETURNS TEXT AS $$
 $$ LANGUAGE sql STABLE;
 EOSQL
 
-echo "=== 3. Applying Cumulative Migrations (V6 through V16) ==="
+echo "=== 3. Applying Cumulative Migrations (V6 through V17) ==="
 migrations=(
   "20260906000000_mobility_market_authority.sql"
   "20260906010000_mobility_financial_authority.sql"
@@ -85,6 +85,7 @@ migrations=(
   "20260906110000_ai_profit_engine_diagnostic_cases_v14.sql"
   "20260906120000_elysium_learning_os_mep_2026_v15.sql"
   "20260906130000_elysium_curriculum_national_registry_v16.sql"
+  "20260907000000_elysium_curriculum_national_registry_v17.sql"
 )
 
 for m in "${migrations[@]}"; do
@@ -223,33 +224,33 @@ RESET ROLE;
 EOSQL
 echo "  [PASS] Cross-grade learning frontier progression (ZDP) correctly enforces prerequisite DAG across years."
 
-echo "=== 7. TEST 4: Extended Technical Bridges (CAD Draughtspersons & Residential Electricians) ==="
+echo "=== 7. TEST 4: Extended Technical Bridges (CAD, Electricians & Automotive Physics) ==="
 bridges_count="$(psql "${psql_args[@]}" -t -A << 'EOSQL'
 SELECT COUNT(*) FROM public.skill_to_service_mappings 
-WHERE isco_code IN ('3118', '7411', '7126');
+WHERE isco_code IN ('3118', '7411', '7126', '7231');
 EOSQL
 )"
 
 echo "  Active Vocational Service Bridges: $bridges_count"
-if [[ "$bridges_count" -ge 3 ]]; then
-  echo "  [PASS] Technical skills from 7.º, 8.º, and 9.º correctly mapped to ISCO-08 occupational codes."
+if [[ "$bridges_count" -ge 4 ]]; then
+  echo "  [PASS] Technical skills from 7.º, 8.º, 9.º, and BxM correctly mapped to ISCO-08 occupational codes."
 else
-  echo "  [FAIL] Missing vocational bridges: count=$bridges_count (expected >= 3)."
+  echo "  [FAIL] Missing vocational bridges: count=$bridges_count (expected >= 4)."
   exit 1
 fi
 
-echo "=== 8. TEST 5: Bachillerato por Madurez 6-Subject Catalog Immutability ==="
+echo "=== 8. TEST 5: Bachillerato por Madurez 7-Subject Complete Catalog Immutability ==="
 bxm_subjects="$(psql "${psql_args[@]}" -t -A << 'EOSQL'
 SELECT COUNT(DISTINCT subject) FROM public.curriculum_sources 
 WHERE education_plan = 'ADULTOS' AND education_level = 'DIVERSIFICADA';
 EOSQL
 )"
 
-echo "  BxM Verified Subjects: $bxm_subjects (Matemática, Español, Estudios Sociales, Cívica, Biología, Química, Inglés)"
-if [[ "$bxm_subjects" -ge 6 ]]; then
-  echo "  [PASS] Complete 6-subject Bachillerato por Madurez catalog registered with verified provenance."
+echo "  BxM Verified Subjects: $bxm_subjects (Matemática, Español, Estudios Sociales, Cívica, Biología, Química, Física, Inglés)"
+if [[ "$bxm_subjects" -ge 7 ]]; then
+  echo "  [PASS] Complete 7-subject Bachillerato por Madurez catalog registered with verified provenance."
 else
-  echo "  [FAIL] Incomplete BxM subject catalog: count=$bxm_subjects (expected >= 6)."
+  echo "  [FAIL] Incomplete BxM subject catalog: count=$bxm_subjects (expected >= 7)."
   exit 1
 fi
 

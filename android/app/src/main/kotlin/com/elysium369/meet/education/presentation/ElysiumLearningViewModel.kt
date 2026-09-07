@@ -94,6 +94,19 @@ class ElysiumLearningViewModel(
         _uiState.update { it.copy(selectedCycle = cycle) }
     }
 
+    fun selectGrade(grade: Int) {
+        val cycle = when (grade) {
+            in 1..3 -> "I Ciclo"
+            in 4..6 -> "II Ciclo"
+            in 7..9 -> "III Ciclo"
+            else -> "Diversificada"
+        }
+        val targetTrack = CurriculumTrack.values().firstOrNull { it.gradeNumber == grade }
+            ?: CurriculumTrack.MATEMATICA_1
+        _uiState.update { it.copy(selectedCycle = cycle, activeGrade = grade) }
+        loadTrack(targetTrack)
+    }
+
     fun selectTrack(track: CurriculumTrack) {
         if (_uiState.value.track == track) return
         loadTrack(track)

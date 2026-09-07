@@ -297,6 +297,127 @@ object NationalCurriculumDeepKnowledge {
             realWorldApplication = "Geolocalización GPS (triangulación satelital), radar de tráfico aéreo en el Aeropuerto Juan Santamaría y zonas de cobertura de antenas 5G.",
             vocationalEngineeringBridge = "Mecanizado CNC y torneado automotriz: definición de tolerancias de concentricidad en cilindros de motor y discos de freno.",
             reflectionPrompt = "¿Si el radio de cobertura de una antena celular se duplica, en cuánto se multiplica el área de cobertura territorial?"
+        ),
+
+        // ── FÍSICA BXM: LEYES DE NEWTON Y FRICCIÓN ──────────────────────────────
+        "cr_fis_bxm_c_newton" to ConceptDeepKnowledge(
+            conceptId = "cr_fis_bxm_c_newton",
+            coreIntuition = "La aceleración de un cuerpo no depende sólo de la fuerza que aplicas, sino de la fuerza NETA resultante dividida por su inercia (masa). Sin fricción en las llantas, ninguna fuerza de frenado puede desacelerar el vehículo.",
+            expertMentalModel = listOf(
+                "1. Aislar el sistema físico y construir el Diagrama de Cuerpo Libre (DCL).",
+                "2. Identificar fuerzas actuantes: peso (P = m*g), normal (N), tracción (F) y fricción (f_r = μ*N).",
+                "3. Sumar vectorialmente las fuerzas en cada eje (ΣFx = m*a_x, ΣFy = 0).",
+                "4. Despejar la aceleración neta y verificar si el movimiento es acelerado o retardado.",
+                "5. Relacionar la desaceleración con la distancia de detención y el coeficiente de fricción."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_FORCE_PROPORTIONAL_VELOCITY",
+                    title = "Confundir fuerza neta con velocidad",
+                    studentFaultyAssumption = "El estudiante asume que para moverse a gran velocidad se necesita una fuerza neta grande, o que si la fuerza cesa, el objeto se detiene instantáneamente.",
+                    counterExample = "Por la 1ra Ley de Newton, en el vacío un objeto viaja a 1000 km/h indefinidamente con fuerza neta exactamente igual a CERO.",
+                    socraticRemediationPrompt = "Si vas en carretera a 90 km/h y sueltas el acelerador, ¿qué fuerza específica causa que el auto se frene: la falta de acelerador o la fricción con el aire y el asfalto?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Segunda Ley de Newton",
+                    socraticQuestion = "¿Cuál es la relación matemática fundamental entre fuerza neta, masa y aceleración?",
+                    conceptualScaffold = "F_neta = m * a, por lo que a = F_neta / m."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Signo de la Aceleración",
+                    socraticQuestion = "Si la fuerza de fricción se opone al avance del auto, ¿qué signo debe llevar la aceleración?",
+                    conceptualScaffold = "Debe ser negativa (desaceleración retardatriz) respecto al vector velocidad."
+                ),
+                SocraticHintTier(
+                    tierLevel = 3,
+                    title = "Cálculo Numérico",
+                    socraticQuestion = "Divide -6000 N entre 1200 kg: ¿cuánto da el cociente exacto?",
+                    conceptualScaffold = "-6000 / 1200 = -5 m/s²."
+                )
+            ),
+            realWorldApplication = "Sistemas de frenos antibloqueo (ABS), cálculo de distancia segura entre vehículos en la Ruta 27 y homologación técnica de vehículos.",
+            vocationalEngineeringBridge = "Diagnóstico pericial de colisiones de tránsito y verificación del coeficiente de adherencia en el banco de frenado.",
+            reflectionPrompt = "¿Por qué un tráiler cargado de 40 toneladas requiere mucha mayor distancia de frenado que un automóvil liviano a la misma velocidad?"
+        ),
+
+        // ── 7.º ESPAÑOL: TEXTO EXPOSITIVO ─────────────────────────────────────────
+        "cr_esp7_c_texto_exp" to ConceptDeepKnowledge(
+            conceptId = "cr_esp7_c_texto_exp",
+            coreIntuition = "El texto expositivo no busca persuadir con emociones ni embellecer poéticamente, sino transmitir información objetiva, verificable y estructurada con precisión léxica.",
+            expertMentalModel = listOf(
+                "1. Identificar el propósito comunicativo (informar, instruir o explicar).",
+                "2. Localizar la idea principal o premisa central del párrafo.",
+                "3. Distinguir las ideas secundarias (ejemplos, aclaraciones, datos técnicos).",
+                "4. Verificar el léxico técnico y la ausencia de subjetividades."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_FIRST_SENTENCE_ALWAYS_MAIN",
+                    title = "Creer que la idea principal siempre es la primera frase",
+                    studentFaultyAssumption = "El estudiante subraya siempre la primera línea sin analizar si es sólo una introducción contextual.",
+                    counterExample = "Un texto puede comenzar con una anécdota y enunciar la instrucción técnica crucial al final del párrafo.",
+                    socraticRemediationPrompt = "¿Si eliminas esa primera frase, el resto del texto sigue teniendo sentido completo y conserva su advertencia fundamental?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Propósito Central",
+                    socraticQuestion = "¿Cuál es la acción crítica que el técnico debe realizar antes de tocar la batería?",
+                    conceptualScaffold = "Fíjate en la advertencia de apagar el interruptor."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Causa y Consecuencia",
+                    socraticQuestion = "¿Qué riesgo se busca evitar al apagar el switch?",
+                    conceptualScaffold = "Prevenir sobretensiones que quemen la computadora del vehículo (ECU)."
+                )
+            ),
+            realWorldApplication = "Interpretación de boletines de servicio técnico (TSB), manuales de taller automotriz y fichas técnicas de seguridad.",
+            vocationalEngineeringBridge = "Redacción de bitácoras de servicio y órdenes de reparación con validez legal y de garantía comercial.",
+            reflectionPrompt = "¿Cómo redactarías una instrucción de seguridad para que un aprendiz novato no cometa un error peligroso en el taller?"
+        ),
+
+        // ── 7.º CÍVICA: SEGURIDAD VIAL (LEY 9078) ─────────────────────────────────
+        "cr_civ7_c_seguridad_vial" to ConceptDeepKnowledge(
+            conceptId = "cr_civ7_c_seguridad_vial",
+            coreIntuition = "La vía pública es un bien común. Conducir o circular por ella exige un pacto social ético y legal: la libertad de tránsito termina donde comienza el derecho a la vida y la integridad física de los demás.",
+            expertMentalModel = listOf(
+                "1. Reconocer la trilogía vial: factor humano, factor vehicular y factor ambiental.",
+                "2. Identificar las normas de tránsito como mecanismos de protección colectiva.",
+                "3. Analizar cómo el estado mecánico del vehículo impacta directamente en el riesgo vial.",
+                "4. Asumir la cultura del autocuidado y la prevención activa de siniestros."
+            ),
+            misconceptions = listOf(
+                CognitiveMisconceptionDetail(
+                    code = "MISCONCEPTION_VIAL_PUNITIVE_ONLY",
+                    title = "Visión punitiva en lugar de preventiva",
+                    studentFaultyAssumption = "Pensar que revisar el auto o respetar señales sólo sirve para que el oficial de tránsito no aplique una boleta económica.",
+                    counterExample = "Una llanta lisa a 80 km/h bajo un aguacero en el Zurquí provoca hidroplaneo fatal, exista o no un policía presente.",
+                    socraticRemediationPrompt = "¿El peligro de muerte depende de la presencia de un inspector o de las leyes físicas de fricción sobre el asfalto mojado?"
+                )
+            ),
+            socraticHintTiers = listOf(
+                SocraticHintTier(
+                    tierLevel = 1,
+                    title = "Deber Cívico",
+                    socraticQuestion = "¿Por qué la Ley de Tránsito 9078 tipifica el buen estado del vehículo como una obligación legal?",
+                    conceptualScaffold = "Porque un fallo mecánico en carretera afecta a peatones y a otros conductores inocentes."
+                ),
+                SocraticHintTier(
+                    tierLevel = 2,
+                    title = "Protección de la Vida",
+                    socraticQuestion = "¿Cuál es el bien jurídico supremo tutelado en la legislación de seguridad vial costarricense?",
+                    conceptualScaffold = "El derecho constitucional a la vida y la salud pública."
+                )
+            ),
+            realWorldApplication = "Inspección técnica vehicular (DEKRA/Cosevi), educación vial comunitaria y prevención de accidentes en rutas nacionales.",
+            vocationalEngineeringBridge = "Certificación de inspección previa a la entrega de un vehículo en talleres mecánicos profesionales.",
+            reflectionPrompt = "¿Qué pasaría en una ciudad donde cada conductor decidiera libremente a qué velocidad viajar y si enciende o no las luces de noche?"
         )
     )
 

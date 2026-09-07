@@ -154,6 +154,61 @@ class ElysiumLearningRepository(
             prerequisiteConceptId = "cr_cie3_c_materia_energia",
             relationshipType = "RECOMMENDED",
         ),
+        CurriculumPrerequisite(
+            conceptId = "cr_fis_bxm_c_newton",
+            prerequisiteConceptId = "cr_mat9_c_notables",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_esp8_c_oracion_comp",
+            prerequisiteConceptId = "cr_esp7_c_texto_exp",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_esp9_c_ensayo",
+            prerequisiteConceptId = "cr_esp8_c_oracion_comp",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_soc8_c_colonial",
+            prerequisiteConceptId = "cr_soc7_c_geografia_cr",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_soc9_c_reformas43",
+            prerequisiteConceptId = "cr_soc8_c_colonial",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_civ8_c_derechos_hum",
+            prerequisiteConceptId = "cr_civ7_c_seguridad_vial",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_civ9_c_municipal",
+            prerequisiteConceptId = "cr_civ8_c_derechos_hum",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_ing8_c_environment",
+            prerequisiteConceptId = "cr_ing7_c_routines",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_ing9_c_workplace",
+            prerequisiteConceptId = "cr_ing8_c_environment",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_cie8_c_celula",
+            prerequisiteConceptId = "cr_cie7_c_materia",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
+        CurriculumPrerequisite(
+            conceptId = "cr_cie9_c_atomo",
+            prerequisiteConceptId = "cr_cie8_c_celula",
+            relationshipType = "STRICT_PREREQUISITE",
+        ),
     )
 
     fun getCurriculumUnits(track: CurriculumTrack): List<CourseUnitData> {
