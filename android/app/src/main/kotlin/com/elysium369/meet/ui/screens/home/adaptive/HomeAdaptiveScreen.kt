@@ -73,6 +73,7 @@ fun HomeAdaptiveScreen(
     val maintenanceAlerts by viewModel.maintenanceAlerts.collectAsState()
     val activeJourneys by viewModel.activeJourneys.collectAsState()
     val activePttChannels by viewModel.activePttChannels.collectAsState()
+    val pendingMessageCount by viewModel.pendingMessageCount.collectAsState()
 
     val totalDtcs = activeDtcs.size
     val readyCount = readiness?.monitors?.count { it.complete } ?: 0
@@ -256,7 +257,7 @@ fun HomeAdaptiveScreen(
                 dtcAlerts + maintenanceAlertItems
             }
 
-            val activityStrip = remember(activeRide, vehicleAlerts, activeJourneys, activePttChannels) {
+            val activityStrip = remember(activeRide, vehicleAlerts, activeJourneys, activePttChannels, pendingMessageCount) {
                 HomeActivityStripPolicy.buildFromState(
                     activeRides = listOfNotNull(
                         activeRide?.let { ride ->
@@ -270,7 +271,7 @@ fun HomeAdaptiveScreen(
                     fuelAlerts = emptyList(),
                     activeJourneys = activeJourneys,
                     activePttChannels = activePttChannels,
-                    pendingMessages = 0,
+                    pendingMessages = pendingMessageCount,
                     activeListings = 0,
                     vehicleAlerts = vehicleAlerts
                 )

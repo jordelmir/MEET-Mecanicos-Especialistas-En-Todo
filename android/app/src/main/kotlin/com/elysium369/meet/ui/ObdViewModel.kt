@@ -494,6 +494,7 @@ class ObdViewModel @Inject constructor(
     private val ratingDao: RatingDao,
     private val providerProfileDao: ProviderProfileDao,
     private val rideDao: com.elysium369.meet.data.local.dao.RideDao,
+    private val chatDao: com.elysium369.meet.data.local.dao.ChatDao,
     private val rideCommandRepository: RideCommandRepository,
     private val rideRemoteProjectionRepository: RideRemoteProjectionRepository,
     private val activePrincipalKernel: ActivePrincipalKernel,
@@ -7696,6 +7697,23 @@ class ObdViewModel @Inject constructor(
             }
         }
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // Pending Messages (ChatDao → HomeActivityStrip)
+    // ═══════════════════════════════════════════════════════════════
+
+    val pendingMessageCount: StateFlow<Int> = flow {
+        while (true) {
+            val userId = currentCloudUserId() ?: run {
+                emit(0)
+                kotlinx.coroutines.delay(10_000L)
+                return@flow
+            }
+            val count = chatDao.observeUnreadCount(userId).first()
+            emit(count)
+            kotlinx.coroutines.delay(15_000L)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(10_000), 0)
 
     // ═══════════════════════════════════════════════════════════════
     // Elysium Vanguard Viajes business logic

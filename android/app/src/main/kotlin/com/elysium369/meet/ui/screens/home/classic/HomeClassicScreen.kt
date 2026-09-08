@@ -251,6 +251,7 @@ fun HomeClassicScreen(
             val maintenanceAlerts by viewModel.maintenanceAlerts.collectAsState()
             val activeJourneys by viewModel.activeJourneys.collectAsState()
             val activePttChannels by viewModel.activePttChannels.collectAsState()
+            val pendingMessageCount by viewModel.pendingMessageCount.collectAsState()
             val vehicleAlertsForStrip = remember(activeDtcs, maintenanceAlerts) {
                 val dtcAlerts = activeDtcs.take(3).map { code ->
                     com.elysium369.meet.ui.home.activity.VehicleAlert(
@@ -271,7 +272,7 @@ fun HomeClassicScreen(
                 }
                 dtcAlerts + maintAlerts
             }
-            val activityStrip = remember(activeRide, vehicleAlertsForStrip, activeJourneys, activePttChannels) {
+            val activityStrip = remember(activeRide, vehicleAlertsForStrip, activeJourneys, activePttChannels, pendingMessageCount) {
                 com.elysium369.meet.ui.home.activity.HomeActivityStripPolicy.buildFromState(
                     activeRides = listOfNotNull(
                         activeRide?.let { ride ->
@@ -285,7 +286,7 @@ fun HomeClassicScreen(
                     fuelAlerts = emptyList(),
                     activeJourneys = activeJourneys,
                     activePttChannels = activePttChannels,
-                    pendingMessages = 0,
+                    pendingMessages = pendingMessageCount,
                     activeListings = 0,
                     vehicleAlerts = vehicleAlertsForStrip
                 )

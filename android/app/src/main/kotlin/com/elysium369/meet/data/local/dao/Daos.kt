@@ -323,6 +323,9 @@ interface ChatDao {
 
     @Query("SELECT COUNT(*) FROM chat_blocklist WHERE businessId = :businessId AND ((blockerUserId = :userA AND blockedUserId = :userB) OR (blockerUserId = :userB AND blockedUserId = :userA))")
     suspend fun hasBlockBetween(businessId: String, userA: String, userB: String): Int
+
+    @Query("SELECT COUNT(*) FROM chat_messages WHERE receiverId = :userId AND status != 'READ'")
+    fun observeUnreadCount(userId: String): Flow<Int>
 }
 
 @Dao
