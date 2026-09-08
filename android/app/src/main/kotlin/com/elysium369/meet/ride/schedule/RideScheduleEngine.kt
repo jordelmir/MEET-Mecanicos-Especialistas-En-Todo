@@ -1,7 +1,15 @@
 package com.elysium369.meet.ride.schedule
 
+import android.util.Log
+import com.elysium369.meet.data.local.dao.ScheduledRideDao
+import com.elysium369.meet.data.local.entities.FavoriteRouteEntity
+import com.elysium369.meet.data.local.entities.ScheduledRideEntity
 import com.elysium369.meet.ride.domain.RideFareMode
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * ══════════════════════════════════════════════════════════════════════
@@ -9,49 +17,43 @@ import kotlinx.serialization.Serializable
  *  ──────────────────────────────────────────
  *  "Necesito un viaje mañana a las 6am al aeropuerto."
  *
- *  Schedule rides in advance:
- *  - Pick future date/time
- *  - Lock estimated fare
- *  - Auto-dispatch 15min before pickup
- *  - Reminders at 1h, 30min, 15min
- *  - Recurring schedules (daily commute)
- *  - Multi-stop support
- *  - Favorite routes for 1-tap rebooking
+ *  Backed by Room for persistence across process death.
+ *  Server-side Supabase infra already exists for sync.
  * ══════════════════════════════════════════════════════════════════════
  */
 
 // ─── Schedule Status ───
 
 enum class ScheduleStatus {
-    PENDING,        // Created, waiting for dispatch time
-    REMINDER_SENT,  // 1h/30min reminder sent
-    DISPATCHING,    // Auto-dispatch in progress (15min before)
-    DRIVER_MATCHED, // Driver confirmed
-    ACTIVE,         // Ride is live
-    COMPLETED,      // Ride finished
-    CANCELLED,      // User or system cancelled
-    EXPIRED,        // No driver found in time
+    PENDING,
+    REMINDER_SENT,
+    DISPATCHING,
+    DRIVER_MATCHED,
+    ACTIVE,
+    COMPLETED,
+    CANCELLED,
+    EXPIRED,
 }
 
 // ─── Recurrence ───
 
 enum class RecurrencePattern {
-    NONE,           // One-time
-    DAILY,          // Every day
-    WEEKDAYS,       // Mon-Fri
-    WEEKLY,         // Same day every week
-    CUSTOM,         // User-selected days
+    NONE,
+    DAILY,
+    WEEKDAYS,
+    WEEKLY,
+    CUSTOM,
 }
 
 @Serializable
 data class RecurrenceConfig(
     val pattern: RecurrencePattern = RecurrencePattern.NONE,
-    val customDays: Set<Int> = emptySet(), // 1=Mon..7=Sun
-    val endAfterTrips: Int? = null,        // Stop after N trips
-    val endAtEpochMs: Long? = null,        // Stop at date
+    val customDays: Set<Int> = emptySet(),
+    val endAfterTrips: Int? = null,
+    val endAtEpochMs: Long? = null,
 )
 
-// ─── Stop (for multi-stop) ───
+// ─── Stop ───
 
 @Serializable
 data class RideStop(
@@ -60,7 +62,7 @@ data class RideStop(
     val address: String,
     val latitude: Double,
     val longitude: Double,
-    val waitMinutes: Int = 0,   // How long to wait at this stop
+    val waitMinutes: Int = 0,
     val order: Int,
     val isPickup: Boolean = false,
     val isDropoff: Boolean = false,
@@ -71,7 +73,7 @@ data class RideStop(
 @Serializable
 data class FavoriteRoute(
     val routeId: String,
-    val label: String,          // "Al trabajo", "Al aeropuerto"
+    val label: String,
     val icon: String = "🏠",
     val stops: List<RideStop>,
     val fareMode: RideFareMode = RideFareMode.METERED_TIME_DISTANCE,
@@ -86,17 +88,17 @@ data class ScheduledRide(
     val scheduleId: String,
     val userId: String,
     val stops: List<RideStop>,
-    val scheduledAtEpochMs: Long,      // When the ride should happen
+    val scheduledAtEpochMs: Long,
     val createdAtEpochMs: Long = System.currentTimeMillis(),
     val fareMode: RideFareMode = RideFareMode.METERED_TIME_DISTANCE,
-    val estimatedFare: Long = 0,       // Locked fare estimate
+    val estimatedFare: Long = 0,
     val currency: String = "CRC",
     val status: ScheduleStatus = ScheduleStatus.PENDING,
     val recurrence: RecurrenceConfig = RecurrenceConfig(),
     val notes: String = "",
     val matchedDriverId: String? = null,
-    val rideId: String? = null,        // Linked ride when dispatched
-    val dispatchAtEpochMs: Long = scheduledAtEpochMs - 15 * 60 * 1000, // 15min before
+    val rideId: String? = null,
+    val dispatchAtEpochMs: Long = scheduledAtEpochMs - 15 * 60 * 1000,
 ) {
     val isPending: Boolean get() = status == ScheduleStatus.PENDING
     val isRecurring: Boolean get() = recurrence.pattern != RecurrencePattern.NONE
@@ -120,22 +122,24 @@ data class ScheduleReminder(
 )
 
 enum class ReminderType {
-    ONE_HOUR,       // 1 hour before
-    THIRTY_MIN,     // 30 minutes before
-    FIFTEEN_MIN,    // 15 minutes, auto-dispatch starts
-    DRIVER_MATCHED, // Driver confirmed
+    ONE_HOUR,
+    THIRTY_MIN,
+    FIFTEEN_MIN,
+    DRIVER_MATCHED,
 }
 
 // ─── Engine ───
 
-class RideScheduleEngine {
+@Singleton
+class RideScheduleEngine @Inject constructor(
+    private val scheduleDao: ScheduledRideDao,
+) {
 
-    private val schedules = mutableMapOf<String, ScheduledRide>()
-    private val favorites = mutableMapOf<String, FavoriteRoute>()
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     // ─── Schedule a Ride ───
 
-    fun scheduleRide(
+    suspend fun scheduleRide(
         userId: String,
         stops: List<RideStop>,
         scheduledAtEpochMs: Long,
@@ -147,44 +151,49 @@ class RideScheduleEngine {
         if (stops.size < 2) return null
         if (scheduledAtEpochMs <= System.currentTimeMillis()) return null
 
+        val now = System.currentTimeMillis()
         val ride = ScheduledRide(
-            scheduleId = "sched-${System.currentTimeMillis()}",
+            scheduleId = "sched-$now",
             userId = userId,
             stops = stops,
             scheduledAtEpochMs = scheduledAtEpochMs,
+            createdAtEpochMs = now,
             fareMode = fareMode,
             estimatedFare = estimatedFare,
             recurrence = recurrence,
             notes = notes,
         )
-        schedules[ride.scheduleId] = ride
+        scheduleDao.upsert(ride.toEntity())
+        Log.i("RideScheduleEngine", "Scheduled ride: ${ride.scheduleId} at $scheduledAtEpochMs")
         return ride
     }
 
     // ─── Multi-Stop ───
 
-    fun addStop(scheduleId: String, stop: RideStop): Boolean {
-        val ride = schedules[scheduleId] ?: return false
+    suspend fun addStop(scheduleId: String, stop: RideStop): Boolean {
+        val entity = scheduleDao.getById(scheduleId) ?: return false
+        val ride = entity.toDomain()
         if (!ride.isPending) return false
-        schedules[scheduleId] = ride.copy(
-            stops = (ride.stops + stop).sortedBy { it.order },
-        )
+        val updated = ride.copy(stops = (ride.stops + stop).sortedBy { it.order })
+        scheduleDao.upsert(updated.toEntity())
         return true
     }
 
-    fun removeStop(scheduleId: String, stopId: String): Boolean {
-        val ride = schedules[scheduleId] ?: return false
+    suspend fun removeStop(scheduleId: String, stopId: String): Boolean {
+        val entity = scheduleDao.getById(scheduleId) ?: return false
+        val ride = entity.toDomain()
         if (!ride.isPending) return false
         val updated = ride.stops.filter { it.stopId != stopId }
         if (updated.size < 2) return false
-        schedules[scheduleId] = ride.copy(stops = updated)
+        scheduleDao.upsert(ride.copy(stops = updated).toEntity())
         return true
     }
 
     // ─── Reminders ───
 
-    fun generateReminders(scheduleId: String): List<ScheduleReminder> {
-        val ride = schedules[scheduleId] ?: return emptyList()
+    suspend fun generateReminders(scheduleId: String): List<ScheduleReminder> {
+        val entity = scheduleDao.getById(scheduleId) ?: return emptyList()
+        val ride = entity.toDomain()
         val pickup = ride.pickup?.displayName ?: "origen"
 
         return listOf(
@@ -211,67 +220,131 @@ class RideScheduleEngine {
 
     // ─── Dispatch ───
 
-    fun dispatch(scheduleId: String): ScheduledRide? {
-        val ride = schedules[scheduleId] ?: return null
+    suspend fun dispatch(scheduleId: String): ScheduledRide? {
+        val entity = scheduleDao.getById(scheduleId) ?: return null
+        val ride = entity.toDomain()
         if (!ride.isPending) return null
         val updated = ride.copy(status = ScheduleStatus.DISPATCHING)
-        schedules[scheduleId] = updated
+        scheduleDao.upsert(updated.toEntity())
         return updated
     }
 
-    fun assignDriver(scheduleId: String, driverId: String, rideId: String): ScheduledRide? {
-        val ride = schedules[scheduleId] ?: return null
+    suspend fun assignDriver(scheduleId: String, driverId: String, rideId: String): ScheduledRide? {
+        val entity = scheduleDao.getById(scheduleId) ?: return null
+        val ride = entity.toDomain()
         if (ride.status != ScheduleStatus.DISPATCHING) return null
         val updated = ride.copy(
             status = ScheduleStatus.DRIVER_MATCHED,
             matchedDriverId = driverId,
             rideId = rideId,
         )
-        schedules[scheduleId] = updated
+        scheduleDao.upsert(updated.toEntity())
         return updated
     }
 
     // ─── Cancel ───
 
-    fun cancel(scheduleId: String): Boolean {
-        val ride = schedules[scheduleId] ?: return false
+    suspend fun cancel(scheduleId: String): Boolean {
+        val entity = scheduleDao.getById(scheduleId) ?: return false
+        val ride = entity.toDomain()
         if (ride.status in listOf(ScheduleStatus.COMPLETED, ScheduleStatus.CANCELLED)) return false
-        schedules[scheduleId] = ride.copy(status = ScheduleStatus.CANCELLED)
+        scheduleDao.upsert(ride.copy(status = ScheduleStatus.CANCELLED).toEntity())
         return true
     }
 
     // ─── Favorites ───
 
-    fun saveFavoriteRoute(label: String, icon: String, stops: List<RideStop>): FavoriteRoute {
+    suspend fun saveFavoriteRoute(label: String, icon: String, stops: List<RideStop>): FavoriteRoute {
         val route = FavoriteRoute(
             routeId = "fav-${System.currentTimeMillis()}",
             label = label,
             icon = icon,
             stops = stops,
         )
-        favorites[route.routeId] = route
+        scheduleDao.upsertFavorite(route.toEntity())
         return route
     }
 
-    fun bookFromFavorite(routeId: String, userId: String, scheduledAt: Long): ScheduledRide? {
-        val fav = favorites[routeId] ?: return null
-        favorites[routeId] = fav.copy(
-            usageCount = fav.usageCount + 1,
-            lastUsedEpochMs = System.currentTimeMillis(),
-        )
+    suspend fun bookFromFavorite(routeId: String, userId: String, scheduledAt: Long): ScheduledRide? {
+        val entity = scheduleDao.getFavoriteById(routeId) ?: return null
+        val fav = entity.toDomain()
+        scheduleDao.incrementFavoriteUsage(routeId, System.currentTimeMillis())
         return scheduleRide(userId, fav.stops, scheduledAt, fav.fareMode)
     }
 
-    fun getFavorites(): List<FavoriteRoute> = favorites.values
-        .sortedByDescending { it.usageCount }
+    suspend fun getFavorites(): List<FavoriteRoute> = scheduleDao.getFavorites().map { it.toDomain() }
 
     // ─── Queries ───
 
-    fun getUpcoming(userId: String): List<ScheduledRide> = schedules.values
-        .filter { it.userId == userId && it.isPending }
-        .sortedBy { it.scheduledAtEpochMs }
+    suspend fun getUpcoming(userId: String): List<ScheduledRide> =
+        scheduleDao.getUpcoming(userId).map { it.toDomain() }
 
-    fun getSchedule(id: String): ScheduledRide? = schedules[id]
+    suspend fun getSchedule(id: String): ScheduledRide? =
+        scheduleDao.getById(id)?.toDomain()
 
-    val totalScheduled: Int get() = schedules.size
+    // ─── Cleanup ───
+
+    suspend fun cleanup(maxAgeMs: Long = 30 * 24 * 60 * 60 * 1000L) {
+        val cutoff = System.currentTimeMillis() - maxAgeMs
+        scheduleDao.purgeTerminal(cutoff)
+    }
+
+    // ── Entity ↔ Domain mapping ──
+
+    private fun ScheduledRide.toEntity() = ScheduledRideEntity(
+        scheduleId = scheduleId,
+        userId = userId,
+        stopsJson = json.encodeToString(stops),
+        scheduledAtEpochMs = scheduledAtEpochMs,
+        createdAtEpochMs = createdAtEpochMs,
+        fareMode = fareMode.name,
+        estimatedFare = estimatedFare,
+        currency = currency,
+        status = status.name,
+        recurrencePattern = recurrence.pattern.name,
+        recurrenceConfigJson = json.encodeToString(recurrence),
+        notes = notes,
+        matchedDriverId = matchedDriverId,
+        rideId = rideId,
+        dispatchAtEpochMs = dispatchAtEpochMs,
+    )
+
+    private fun ScheduledRideEntity.toDomain() = ScheduledRide(
+        scheduleId = scheduleId,
+        userId = userId,
+        stops = try { json.decodeFromString(stopsJson) } catch (_: Exception) { emptyList() },
+        scheduledAtEpochMs = scheduledAtEpochMs,
+        createdAtEpochMs = createdAtEpochMs,
+        fareMode = try { RideFareMode.valueOf(fareMode) } catch (_: Exception) { RideFareMode.METERED_TIME_DISTANCE },
+        estimatedFare = estimatedFare,
+        currency = currency,
+        status = try { ScheduleStatus.valueOf(status) } catch (_: Exception) { ScheduleStatus.PENDING },
+        recurrence = try {
+            recurrenceConfigJson?.let { json.decodeFromString<RecurrenceConfig>(it) } ?: RecurrenceConfig()
+        } catch (_: Exception) { RecurrenceConfig() },
+        notes = notes,
+        matchedDriverId = matchedDriverId,
+        rideId = rideId,
+        dispatchAtEpochMs = dispatchAtEpochMs ?: (scheduledAtEpochMs - 15 * 60 * 1000),
+    )
+
+    private fun FavoriteRoute.toEntity() = FavoriteRouteEntity(
+        routeId = routeId,
+        label = label,
+        icon = icon,
+        stopsJson = json.encodeToString(stops),
+        fareMode = fareMode.name,
+        usageCount = usageCount,
+        lastUsedEpochMs = lastUsedEpochMs ?: 0L,
+    )
+
+    private fun FavoriteRouteEntity.toDomain() = FavoriteRoute(
+        routeId = routeId,
+        label = label,
+        icon = icon,
+        stops = try { json.decodeFromString(stopsJson) } catch (_: Exception) { emptyList() },
+        fareMode = try { RideFareMode.valueOf(fareMode) } catch (_: Exception) { RideFareMode.METERED_TIME_DISTANCE },
+        usageCount = usageCount,
+        lastUsedEpochMs = if (lastUsedEpochMs > 0) lastUsedEpochMs else null,
+    )
 }

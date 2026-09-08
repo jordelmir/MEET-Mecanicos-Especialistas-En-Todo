@@ -2,6 +2,7 @@ package com.elysium369.meet.ride.liveshare
 
 import kotlinx.serialization.Serializable
 import java.security.MessageDigest
+import java.security.SecureRandom
 
 /**
  * ══════════════════════════════════════════════════════════════════════════
@@ -456,8 +457,12 @@ class RideLiveSharingEngine {
 
     // ─── Internal ───
 
+    private val secureRandom = SecureRandom()
+
     private fun generateSecureToken(rideId: String, passengerId: String): String {
-        val seed = "$rideId|$passengerId|${System.currentTimeMillis()}|${Math.random()}"
+        val randomBytes = ByteArray(32)
+        secureRandom.nextBytes(randomBytes)
+        val seed = "$rideId|$passengerId|${System.currentTimeMillis()}|${randomBytes.joinToString("") { "%02x".format(it) }}"
         val digest = MessageDigest.getInstance("SHA-256")
         return digest.digest(seed.toByteArray(Charsets.UTF_8))
             .take(16)
