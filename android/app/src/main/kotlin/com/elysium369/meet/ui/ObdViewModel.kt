@@ -6746,46 +6746,15 @@ class ObdViewModel @Inject constructor(
      * Export the GPS forensic trail for a completed ride as a PDF.
      * The PDF includes QR verification code and SHA-256 integrity hash
      * for presentation to law enforcement or judicial authorities.
+     *
+     * Delegated to [RideCompletionHelper] via strangler migration.
      */
     fun exportGpsForensicTrail(rideId: String) {
-        viewModelScope.launch {
-            _rideVerificationNotice.emit("Generando reporte GPS forense…")
-            val trail = GpsTrailRecorder.loadTrail(context, rideId)
-            if (trail == null || trail.points.isEmpty()) {
-                _rideVerificationNotice.emit("No hay datos GPS registrados para este viaje.")
-                return@launch
-            }
-            val result = com.elysium369.meet.ride.location.GpsTrailPdfExporter.exportPdf(context, trail)
-            if (result != null) {
-                com.elysium369.meet.ride.location.GpsTrailPdfExporter.sharePdf(context, result)
-                _rideVerificationNotice.emit(
-                    "Reporte GPS forense generado: ${result.pointCount} puntos, " +
-                        "hash ${result.integrityHash.take(16)}…",
-                )
-            } else {
-                _rideVerificationNotice.emit("Error al generar el reporte GPS.")
-            }
-        }
+        rideCompletionHelper.exportGpsForensicTrail(rideId)
     }
 
     fun submitTip(rideId: String, tipMinor: Long, currency: String) {
-        viewModelScope.launch {
-            _rideVerificationNotice.emit("Enviando propina…")
-            runCatching {
-                com.elysium369.meet.data.remote.SupabaseModule.client.postgrest.rpc(
-                    function = "ride_submit_tip_v1",
-                    parameters = kotlinx.serialization.json.buildJsonObject {
-                        put("p_ride_id", rideId)
-                        put("p_tip_minor", tipMinor)
-                        put("p_currency", currency)
-                    },
-                )
-            }.onSuccess {
-                _rideVerificationNotice.emit("Propina de $tipMinor $currency enviada. ¡Gracias!")
-            }.onFailure {
-                _rideVerificationNotice.emit("Error al enviar propina: ${it.message?.take(80)}")
-            }
-        }
+        rideCompletionHelper.submitTip(rideId, tipMinor, currency)
     }
 
     fun getCurrentTrip(): TripEntity? {
@@ -7773,6 +7742,13 @@ class ObdViewModel @Inject constructor(
     // ═══════════════════════════════════════════════════════════════
     // Elysium Vanguard Viajes business logic
     // ═══════════════════════════════════════════════════════════════
+
+    // Strangler migration: ride completion logic delegated to RideCompletionHelper
+    private val rideCompletionHelper = com.elysium369.meet.ride.domain.RideCompletionHelper(
+        scope = viewModelScope,
+        context = context,
+        noticeEmitter = { msg -> _rideVerificationNotice.emit(msg) },
+    )
 
     val rideRequests = rideDao.getAllRequestsFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
