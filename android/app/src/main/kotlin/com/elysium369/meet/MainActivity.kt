@@ -72,6 +72,7 @@ import com.elysium369.meet.ui.components.LocalAnimatedIconStyle
 import com.elysium369.meet.ui.components.rememberAnimatedIconClock
 import com.elysium369.meet.ui.components.rememberAnimatedIconStyle
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.activity.viewModels
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
@@ -1128,6 +1129,9 @@ fun MeetApp(
                             } ?: "messages?serviceVertical=ride"
                         )
                     },
+                    onNavigateToSchedule = {
+                        navController.navigate(MeetDestinations.RIDE_SCHEDULE)
+                    },
                 )
             }
             composable("ai") {
@@ -1309,6 +1313,16 @@ fun MeetApp(
                         }
                     }
                 }
+            }
+
+            composable(MeetDestinations.RIDE_SCHEDULE) {
+                val scheduleViewModel: com.elysium369.meet.ui.screens.ride.RideScheduleViewModel = hiltViewModel()
+                val currentUserId = obdViewModel.currentUserId ?: ""
+                com.elysium369.meet.ui.screens.ride.RideScheduleScreen(
+                    navController = navController,
+                    userId = currentUserId,
+                    viewModel = scheduleViewModel,
+                )
             }
 
             composable("tow_active_tracking") {

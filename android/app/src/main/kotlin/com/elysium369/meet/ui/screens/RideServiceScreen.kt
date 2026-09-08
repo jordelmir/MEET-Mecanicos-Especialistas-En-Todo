@@ -109,6 +109,7 @@ fun RideServiceScreen(
     onNavigateBack: () -> Unit = {},
     onOpenDriverRegistration: () -> Unit = {},
     onOpenMessages: (String?) -> Unit = {},
+    onNavigateToSchedule: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -294,6 +295,15 @@ fun RideServiceScreen(
                                     },
                                 )
                             }
+                            HorizontalDivider(color = MeetColors.borderSubtle)
+                            DropdownMenuItem(
+                                text = { Text("Viajes Programados", color = Color.White) },
+                                leadingIcon = { Icon(Icons.Default.Schedule, null, tint = MeetColors.cyberCyan) },
+                                onClick = {
+                                    showRideMenu = false
+                                    onNavigateToSchedule()
+                                },
+                            )
                             HorizontalDivider(color = MeetColors.borderSubtle)
                             DropdownMenuItem(
                                 text = { Text("Volver a PRO", color = MeetColors.textMuted) },
