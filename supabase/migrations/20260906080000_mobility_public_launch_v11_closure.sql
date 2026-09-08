@@ -22,20 +22,25 @@
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
--- Geospatial shim compatibility helpers
+-- Geospatial shim compatibility helpers.
+-- On clean bootstrap, PostGIS already owns these functions via CREATE EXTENSION.
+-- DROP IF EXISTS removes them so we can recreate as thin wrappers.
+DROP FUNCTION IF EXISTS extensions.ST_AsText(extensions.geography) CASCADE;
 CREATE OR REPLACE FUNCTION extensions.ST_AsText(geom extensions.geography)
 RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
-    SELECT 'POINT(' || geom.lng::text || ' ' || geom.lat::text || ')'
+    SELECT public.ST_AsText(geom::public.geometry)
 $$;
 
+DROP FUNCTION IF EXISTS extensions.ST_X(extensions.geography) CASCADE;
 CREATE OR REPLACE FUNCTION extensions.ST_X(geom extensions.geography)
 RETURNS DOUBLE PRECISION LANGUAGE sql IMMUTABLE AS $$
-    SELECT geom.lng
+    SELECT public.ST_X(geom::public.geometry)
 $$;
 
+DROP FUNCTION IF EXISTS extensions.ST_Y(extensions.geography) CASCADE;
 CREATE OR REPLACE FUNCTION extensions.ST_Y(geom extensions.geography)
 RETURNS DOUBLE PRECISION LANGUAGE sql IMMUTABLE AS $$
-    SELECT geom.lat
+    SELECT public.ST_Y(geom::public.geometry)
 $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
