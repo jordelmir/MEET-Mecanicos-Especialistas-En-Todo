@@ -69,12 +69,12 @@ fun RideWalletStatusCard(
                 fontSize = 13.sp,
             )
             Text(
-                text = "Regalía inicial configurada: ₡100.000",
+                text = "Regalía inicial configurada: ₡15.000",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = "Saldo disponible: pendiente de sincronización segura",
+                text = "Saldo disponible: se sincroniza desde el ledger seguro",
                 color = MeetColors.warning,
                 fontSize = 12.sp,
             )
@@ -91,22 +91,16 @@ fun RideWalletStatusCard(
                 colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
             ) {
                 Text(
-                    if (BuildConfig.RIDE_PLAY_BILLING_POLICY_APPROVED) {
-                        "RECARGAR SALDO"
-                    } else {
-                        "RECARGA EN REVISIÓN DE POLÍTICA"
-                    },
+                    "RECARGAR POR SINPE · 63194029",
                     fontWeight = FontWeight.ExtraBold,
                 )
             }
-            if (!BuildConfig.RIDE_PLAY_BILLING_POLICY_APPROVED) {
-                Text(
-                    text = "Google Play Billing no está activado para pagar transporte físico. La arquitectura admite un proveedor de recarga autorizado sin alterar el ledger.",
-                    color = MeetColors.textMuted,
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
-                )
-            }
+            Text(
+                text = "La recarga requiere comprobante y aprobación manual en Trust Center.",
+                color = MeetColors.textMuted,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+            )
         }
     }
 }

@@ -56,6 +56,40 @@ data class TrustEvidenceItem(
 data class TrustEvidenceFile(val kind: String, val localPath: String)
 
 @Serializable
+data class RideWalletPolicy(
+    val currency: String = "CRC",
+    @SerialName("starter_credit_minor") val starterCreditMinor: Long = 0,
+    @SerialName("commission_basis_points") val commissionBasisPoints: Int = 500,
+    @SerialName("sinpe_phone") val sinpePhone: String = "",
+    @SerialName("sinpe_recipient_name") val sinpeRecipientName: String = "",
+)
+
+@Serializable
+data class RideWalletBalance(
+    val currency: String = "CRC",
+    @SerialName("posted_minor") val postedMinor: Long = 0,
+    @SerialName("reserved_minor") val reservedMinor: Long = 0,
+    @SerialName("available_minor") val availableMinor: Long = 0,
+)
+
+@Serializable
+data class RideWalletTopup(
+    val id: String,
+    @SerialName("driver_id") val driverId: String,
+    @SerialName("amount_minor") val amountMinor: Long,
+    val currency: String = "CRC",
+    @SerialName("sender_phone") val senderPhone: String? = null,
+    @SerialName("transfer_reference") val transferReference: String? = null,
+    @SerialName("proof_storage_path") val proofStoragePath: String,
+    val status: String,
+    @SerialName("submitted_at") val submittedAt: String,
+    @SerialName("decision_reason") val decisionReason: String? = null,
+)
+
+@Serializable
+data class RideWalletTopupQueue(val items: List<RideWalletTopup> = emptyList())
+
+@Serializable
 data class TrustQueueCounts(
     @SerialName("PENDING") val pending: Int = 0,
     @SerialName("APPROVED") val approved: Int = 0,
@@ -104,7 +138,76 @@ enum class TrustRealtimeSignal { SUBSCRIBED, CHANGE }
 
 object PlatformTrustCenterGateway {
     private const val TRUST_EVIDENCE_BUCKET = "trust-verification-evidence"
+    private const val WALLET_PROOF_BUCKET = "ride-wallet-proofs"
     private const val MAX_EVIDENCE_BYTES = 12L * 1024L * 1024L
+
+    suspend fun walletPolicy(): RideWalletPolicy =
+        SupabaseModule.client.postgrest.rpc("ride_wallet_policy_v1").decodeAs()
+
+    suspend fun ensureStarterCredit(): Long {
+        val result = SupabaseModule.client.postgrest.rpc("ride_wallet_ensure_starter_credit_v1")
+            .decodeAs<kotlinx.serialization.json.JsonObject>()
+        return result["credited_minor"]?.toString()?.trim('"')?.toLongOrNull() ?: 0L
+    }
+
+    suspend fun walletBalance(): RideWalletBalance =
+        SupabaseModule.client.postgrest.rpc("ride_wallet_balance_v1").decodeAs()
+
+    suspend fun submitWalletTopup(
+        localProof: String,
+        amountMinor: Long,
+        senderPhone: String?,
+        transferReference: String?,
+    ): String {
+        val userId = requireNotNull(SupabaseModule.client.auth.currentUserOrNull()?.id)
+        val file = File(localProof)
+        require(file.isFile && file.length() in 1..(12L * 1024L * 1024L)) { "Comprobante inválido" }
+        val bytes = file.readBytes()
+        val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+        val mime = when (file.extension.lowercase()) {
+            "png" -> "image/png"
+            "webp" -> "image/webp"
+            "pdf" -> "application/pdf"
+            else -> "image/jpeg"
+        }
+        val path = "$userId/${System.currentTimeMillis()}-$hash.${file.extension.ifBlank { "jpg" }}"
+        SupabaseModule.client.storage.from(WALLET_PROOF_BUCKET).upload(path, bytes, upsert = false)
+        val result = SupabaseModule.client.postgrest.rpc(
+            "ride_submit_wallet_topup_v1",
+            buildJsonObject {
+                put("p_amount_minor", amountMinor)
+                put("p_proof_storage_path", path)
+                put("p_proof_sha256", hash)
+                put("p_proof_byte_count", bytes.size)
+                put("p_proof_mime_type", mime)
+                put("p_idempotency_key", "topup-${userId}-${hash.take(32)}")
+                senderPhone?.takeIf(String::isNotBlank)?.let { put("p_sender_phone", it) }
+                transferReference?.takeIf(String::isNotBlank)?.let { put("p_transfer_reference", it) }
+            },
+        ).decodeAs<kotlinx.serialization.json.JsonObject>()
+        return result["id"]?.toString()?.trim('"') ?: error("Top-up receipt missing")
+    }
+
+    suspend fun loadWalletTopupQueue(status: String = "PENDING_REVIEW"): RideWalletTopupQueue =
+        SupabaseModule.client.postgrest.rpc(
+            "ride_owner_wallet_topup_queue_v1",
+            buildJsonObject { put("p_status", status); put("p_limit", 100) },
+        ).decodeAs()
+
+    suspend fun decideWalletTopup(id: String, decision: String, reason: String) {
+        SupabaseModule.client.postgrest.rpc(
+            "ride_owner_decide_wallet_topup_v1",
+            buildJsonObject {
+                put("p_topup_id", id); put("p_decision", decision); put("p_reason", reason)
+            },
+        )
+    }
+
+    suspend fun downloadWalletProof(path: String): ByteArray {
+        check(hasOwnerAccess()) { "Platform owner required" }
+        return SupabaseModule.client.storage.from(WALLET_PROOF_BUCKET).downloadAuthenticated(path)
+    }
 
     suspend fun hasOwnerAccess(): Boolean {
         val client = SupabaseModule.client

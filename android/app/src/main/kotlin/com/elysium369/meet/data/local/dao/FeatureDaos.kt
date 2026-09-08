@@ -744,6 +744,10 @@ interface RideDao {
     @Query("DELETE FROM active_ride_selections WHERE ownerPrincipalId = :ownerPrincipalId")
     suspend fun clearActiveRideSelection(ownerPrincipalId: String)
 
+    /** A terminal trip must never be restored as the user's active selection. */
+    @Query("DELETE FROM active_ride_selections WHERE rideRequestId = :requestId")
+    suspend fun clearActiveRideSelectionsForRide(requestId: String)
+
     @Query("SELECT * FROM ride_requests ORDER BY createdAt DESC")
     fun getAllRequestsFlow(): Flow<List<RideRequestEntity>>
 

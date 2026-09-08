@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -273,6 +274,7 @@ data class VehicleAlert(
 fun HomeActivityStripWidget(
     strip: HomeActivityStrip,
     onItemClick: (ActivityItem) -> Unit,
+    onDismissRide: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     if (!strip.hasActiveOperations) return
@@ -384,18 +386,36 @@ fun HomeActivityStripWidget(
                             }
                         }
 
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = domainColor.copy(alpha = 0.15f)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
-                            Text(
-                                text = item.state,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = domainColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
-                            )
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = domainColor.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = item.state,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = domainColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            if (item.domain == ActivityDomain.RIDE && onDismissRide != null) {
+                                IconButton(
+                                    onClick = onDismissRide,
+                                    modifier = Modifier.size(28.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Ocultar viaje del inicio",
+                                        tint = MeetColors.textSecondary,
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }

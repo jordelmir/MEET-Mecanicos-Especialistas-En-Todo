@@ -155,6 +155,12 @@ class RideCommandSyncWorker @AssistedInject constructor(
                             correlationId = result.correlationId,
                         )
                     }
+                    if (result.status.equals("CANCELLED", ignoreCase = true)) {
+                        // Cancellation is terminal. Remove every local owner
+                        // pointer for this trip so process death, role changes,
+                        // or a later projection refresh cannot resurrect it.
+                        rideDao.clearActiveRideSelectionsForRide(entity.rideId)
+                    }
                 }
                 is RideCommandGatewayResult.Rejected -> {
                     RideObservability.record(

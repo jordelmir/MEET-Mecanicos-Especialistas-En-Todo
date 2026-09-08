@@ -294,6 +294,7 @@ fun HomeClassicScreen(
             if (activityStrip.hasActiveOperations) {
                 com.elysium369.meet.ui.home.activity.HomeActivityStripWidget(
                     strip = activityStrip,
+                    onDismissRide = { viewModel.selectActiveRide(null) },
                     onItemClick = { item ->
                         item.actionRoute?.let { navController.safeNavigate(it) }
                     }

@@ -44,6 +44,9 @@ class RideCommandRepository @Inject constructor(
 
     fun pendingCount(): Flow<Int> = outboxDao.pendingCount()
 
+    /** UI-facing stream for authoritative rejections (for example, balance). */
+    fun recentFailures(): Flow<List<RideCommandOutboxEntity>> = outboxDao.recentFailures()
+
     suspend fun enqueue(
         envelope: RideCommandEnvelope,
         payload: RideCommandPayload = RideCommandPayload(),

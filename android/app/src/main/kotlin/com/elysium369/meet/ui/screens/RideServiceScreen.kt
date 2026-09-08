@@ -34,6 +34,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -80,6 +83,9 @@ import com.elysium369.meet.ride.traffic.RideCollaborativeEtaEstimator
 import com.elysium369.meet.ride.traffic.RideEtaEvidenceLevel
 import com.elysium369.meet.ride.traffic.RideEtaSegment
 import com.elysium369.meet.ride.notification.RideNotificationCoordinator
+import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
+import com.elysium369.meet.ride.data.remote.RideWalletPolicy
+import com.elysium369.meet.ride.data.remote.RideWalletBalance
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.serialization.encodeToString
@@ -88,6 +94,7 @@ import kotlinx.serialization.json.Json
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.io.File
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -354,6 +361,14 @@ fun RideServiceScreen(
                         Switch(
                             checked = driverMode,
                             onCheckedChange = { viewModel.toggleRideDriverMode() },
+                            modifier = Modifier.semantics {
+                                contentDescription = if (driverMode) {
+                                    "Cambiar a modo pasajero"
+                                } else {
+                                    "Cambiar a modo chofer"
+                                }
+                                stateDescription = if (driverMode) "Chofer activo" else "Pasajero activo"
+                            },
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = MeetColors.cyberCyan,
                                 checkedTrackColor = MeetColors.cyberCyan.copy(alpha = 0.5f),
@@ -414,6 +429,37 @@ fun RideServiceScreen(
                     )
                 }
             }
+        }
+    }
+
+}
+
+@Composable
+private fun DriverWalletCard(
+    policy: RideWalletPolicy?,
+    balance: RideWalletBalance?,
+    message: String?,
+    onRecharge: () -> Unit,
+) {
+    val starter = policy?.starterCreditMinor ?: 15_000L
+    val commission = (policy?.commissionBasisPoints ?: 500) / 100
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF07131E)),
+        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.65f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("BILLETERA DEL CHOFER", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
+            Text("Saldo promocional inicial: ₡$starter", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("Saldo disponible: ₡${balance?.availableMinor ?: 0}", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
+            Text("Reservado para comisiones: ₡${balance?.reservedMinor ?: 0}", color = MeetColors.textSecondary, fontSize = 12.sp)
+            Text("Comisión por viaje: $commission%", color = MeetColors.textSecondary)
+            HorizontalDivider(color = MeetColors.borderSubtle)
+            Text("Recarga por SINPE Móvil", color = MeetColors.textSecondary, fontSize = 12.sp)
+            Text("${policy?.sinpePhone ?: "63194029"} · ${policy?.sinpeRecipientName ?: "Jorge David Del Valle Miranda"}", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("El propietario valida el ingreso real en su cuenta antes de liberar el saldo.", color = MeetColors.warning, fontSize = 11.sp)
+            Button(onClick = onRecharge, modifier = Modifier.fillMaxWidth()) { Text("ENVIAR COMPROBANTE DE RECARGA") }
+            message?.let { Text(it, color = MeetColors.neonGreen, fontSize = 11.sp) }
         }
     }
 }
@@ -1486,8 +1532,11 @@ fun PassengerDashboard(
                                 return@Button
                             }
                             if (!RideTripPlanPolicy.canDispatch(
-                                    destinationResolved = destinationPlaceId != null ||
-                                        (destLatitude != 0.0 || destLongitude != 0.0),
+                                    destinationResolved = destinationPlaceId != null &&
+                                        destLatitude.isFinite() && destLongitude.isFinite() &&
+                                        destLatitude in -90.0..90.0 &&
+                                        destLongitude in -180.0..180.0 &&
+                                        !(destLatitude == 0.0 && destLongitude == 0.0),
                                     stops = stops,
                                 )
                             ) {
@@ -1986,6 +2035,39 @@ fun DriverDashboard(
     var homeLongitude by remember {
         mutableStateOf(driverPrefs.getString("home_longitude", null)?.toDoubleOrNull())
     }
+    var walletPolicy by remember { mutableStateOf<RideWalletPolicy?>(null) }
+    var walletBalance by remember { mutableStateOf<RideWalletBalance?>(null) }
+    var walletMessage by remember { mutableStateOf<String?>(null) }
+    var showTopupDialog by remember { mutableStateOf(false) }
+    var topupAmount by rememberSaveable { mutableStateOf(15000) }
+    var pendingTopupAmount by remember { mutableStateOf<Long?>(null) }
+    val walletScope = rememberCoroutineScope()
+    val proofPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent(),
+    ) { uri ->
+        val amount = pendingTopupAmount ?: return@rememberLauncherForActivityResult
+        pendingTopupAmount = null
+        if (uri == null) return@rememberLauncherForActivityResult
+        walletScope.launch {
+            runCatching {
+                val file = File(context.cacheDir, "ride-topup-${System.currentTimeMillis()}.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use(input::copyTo) }
+                    ?: error("No se pudo leer el comprobante")
+                PlatformTrustCenterGateway.submitWalletTopup(file.absolutePath, amount, null, null)
+            }.onSuccess { walletMessage = "Comprobante enviado. El saldo se acredita sólo después de verificar el SINPE." }
+                .onFailure { walletMessage = "No se pudo enviar el comprobante: ${it.message?.take(120)}" }
+        }
+    }
+    LaunchedEffect(driverVer?.status) {
+        if (!RideVerificationPolicy.grantsAccess(driverVer?.status)) return@LaunchedEffect
+        runCatching { PlatformTrustCenterGateway.walletPolicy() }
+            .onSuccess { walletPolicy = it }
+        runCatching { PlatformTrustCenterGateway.ensureStarterCredit() }
+            .onFailure { walletMessage = "No se pudo preparar el saldo inicial: ${it.message?.take(100)}" }
+        runCatching { PlatformTrustCenterGateway.walletBalance() }
+            .onSuccess { walletBalance = it }
+            .onFailure { walletMessage = "No se pudo consultar el saldo persistente: ${it.message?.take(100)}" }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.rideClaimFeedback.collect { feedback ->
@@ -2040,6 +2122,14 @@ fun DriverDashboard(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
+        item {
+            DriverWalletCard(
+                policy = walletPolicy,
+                balance = walletBalance,
+                message = walletMessage,
+                onRecharge = { showTopupDialog = true },
+            )
+        }
         if (!RideVerificationPolicy.grantsAccess(driverVer?.status)) {
             item {
                 BoxWithConstraints {
@@ -2098,10 +2188,6 @@ fun DriverDashboard(
                 }
             }
         } else {
-            item {
-                RideWalletStatusCard()
-            }
-
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF07131E)),
@@ -2249,6 +2335,10 @@ fun DriverDashboard(
                             Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = MeetColors.textMuted, modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(8.dp))
                             Text("Buscando solicitudes de viaje en tu zona...", color = MeetColors.textMuted, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedButton(onClick = { viewModel.refreshRideProjectionNow() }) {
+                                Text("ACTUALIZAR SOLICITUDES")
+                            }
                         }
                     }
                 }
@@ -2259,26 +2349,50 @@ fun DriverDashboard(
                         currentGps = currentGps,
                         onClick = { viewModel.selectActiveRide(request) },
                         onOffer = {
-                            val driver = driverVer
-                            if (driver != null) {
-                                viewModel.claimRideFirstCome(
-                                    requestId = request.requestId,
-                                    driverId = driver.driverId,
-                                    driverName = driver.fullName,
-                                    driverPhone = driver.phone,
-                                    vehicleDescription = listOf(
-                                        driver.vehicleMake,
-                                        driver.vehicleModel,
-                                        driver.vehicleYear.toString(),
-                                        driver.vehicleColor,
-                                    ).filter(String::isNotBlank).joinToString(" "),
-                                )
-                            }
+                            // Open the authoritative auction panel first. The old
+                            // shortcut claimed the ride immediately, so drivers
+                            // never reached the contra-offer form.
+                            viewModel.selectActiveRide(request)
                         }
                     )
                 }
             }
         }
+    }
+
+    if (showTopupDialog) {
+        AlertDialog(
+            onDismissRequest = { showTopupDialog = false },
+            title = { Text("Recargar saldo del chofer") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Envía el SINPE y adjunta el comprobante. El saldo queda pendiente hasta la revisión en Trust Center.", color = MeetColors.textSecondary)
+                    Text("SINPE Móvil: ${walletPolicy?.sinpePhone ?: "63194029"}", fontWeight = FontWeight.Bold)
+                    Text(walletPolicy?.sinpeRecipientName ?: "Jorge David Del Valle Miranda", fontWeight = FontWeight.Bold)
+                    OutlinedTextField(
+                        value = topupAmount.toString(),
+                        onValueChange = { value ->
+                            value.filter(Char::isDigit).toLongOrNull()?.coerceAtMost(10_000_000L)?.let { topupAmount = it.toInt() }
+                        },
+                        label = { Text("Monto enviado (CRC)") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                    Text("Se aceptan imágenes o PDF. La foto por sí sola no acredita fondos.", color = MeetColors.warning, fontSize = 11.sp)
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showTopupDialog = false
+                        pendingTopupAmount = topupAmount.toLong()
+                        proofPicker.launch("image/*")
+                    },
+                    enabled = topupAmount > 0,
+                ) { Text("ELEGIR COMPROBANTE") }
+            },
+            dismissButton = { TextButton(onClick = { showTopupDialog = false }) { Text("CANCELAR") } },
+        )
     }
 }
 
@@ -2578,7 +2692,7 @@ fun DriverRideItem(
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text("ACEPTAR AHORA ⚡", color = MeetColors.backgroundDark, fontWeight = FontWeight.ExtraBold, fontSize = 13.sp)
+                    Text("ENVIAR CONTRAOFERTA ⚡", color = MeetColors.backgroundDark, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                 }
             }
         }
@@ -3571,6 +3685,50 @@ fun ActiveRidePanel(
             lineHeight = 14.sp,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 2.dp),
         )
+        activeRoadRoute?.let { route ->
+            val etaMinutes = kotlin.math.ceil(route.durationSeconds / 60.0)
+                .toInt()
+                .coerceAtLeast(1)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MeetColors.cyberCyan.copy(alpha = 0.12f),
+                ),
+                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.72f)),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("⏱", fontSize = 21.sp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "ETA CALCULADO AUTOMÁTICAMENTE",
+                            color = MeetColors.cyberCyan,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                        Text(
+                            "Aproximadamente $etaMinutes min por la ruta recomendada",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "Se actualiza al cambiar origen, destino o estado del viaje.",
+                            color = MeetColors.textMuted,
+                            fontSize = 10.sp,
+                        )
+                    }
+                }
+            }
+        }
         if (roadReportAvailability.allowed) {
             OutlinedButton(
                 onClick = { showRoadReportDialog = true },
@@ -3735,7 +3893,8 @@ fun ActiveRidePanel(
                 PassengerLiveOffersPanel(
                     viewModel = viewModel,
                     ride = ride,
-                    offers = offers
+                    offers = offers,
+                    onCloseRide = onCloseRide,
                 )
             }
         }
@@ -4503,7 +4662,8 @@ fun BouncingRadarIndicator() {
 fun PassengerLiveOffersPanel(
     viewModel: ObdViewModel,
     ride: RideRequestEntity,
-    offers: List<RideOfferEntity>
+    offers: List<RideOfferEntity>,
+    onCloseRide: () -> Unit,
 ) {
     val currentLocale = rememberRideJavaLocale()
     var showCancellationDialog by remember { mutableStateOf(false) }
@@ -4634,6 +4794,10 @@ fun PassengerLiveOffersPanel(
                         actorRole = RideActorRole.PASSENGER.name,
                     )
                     showCancellationDialog = false
+                    // Clear the owner-scoped pointer immediately. The server
+                    // command remains authoritative and the projection worker
+                    // will confirm/reconcile the terminal state afterwards.
+                    onCloseRide()
                 },
             )
         }
@@ -4692,13 +4856,13 @@ fun PassengerLiveOffersPanel(
                     .fillMaxWidth()
                     .height(280.dp)
             ) {
-                LazyColumn(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    items(pendingOffers) { offer ->
+                    pendingOffers.forEach { offer ->
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
                             border = BorderStroke(1.dp, MeetColors.borderSubtle),
@@ -4800,6 +4964,61 @@ fun DriverNegotiationPanel(
     val myOffer = offers.firstOrNull { it.driverId == myDriverId && it.status == "PENDING" }
     // Detect if this driver's offer was recently rejected
     val wasRejected = remember(offers) { offers.any { it.driverId == myDriverId && it.status == "REJECTED" } }
+    var showOfferConfirmation by remember { mutableStateOf(false) }
+    LaunchedEffect(myOffer?.offerId) {
+        if (myOffer != null) {
+            showOfferConfirmation = true
+            delay(2800)
+            showOfferConfirmation = false
+        }
+    }
+
+    AnimatedVisibility(
+        visible = showOfferConfirmation,
+        enter = fadeIn() + scaleIn(),
+        exit = fadeOut() + scaleOut(),
+    ) {
+        val confirmationMotion = rememberInfiniteTransition(label = "offer-confirmation-3d")
+        val confirmationPulse by confirmationMotion.animateFloat(
+            initialValue = 0.98f,
+            targetValue = 1.02f,
+            animationSpec = infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "offer-confirmation-pulse",
+        )
+        val confirmationTilt by confirmationMotion.animateFloat(
+            initialValue = -1.2f,
+            targetValue = 1.2f,
+            animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+            label = "offer-confirmation-tilt",
+        )
+        Card(
+            colors = CardDefaults.cardColors(containerColor = MeetColors.neonGreen.copy(alpha = 0.16f)),
+            border = BorderStroke(1.5.dp, MeetColors.neonGreen),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .graphicsLayer {
+                    scaleX = confirmationPulse
+                    scaleY = confirmationPulse
+                    rotationY = confirmationTilt
+                    shadowElevation = 22.dp.toPx()
+                    cameraDistance = 18f * density
+                },
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(32.dp))
+                Column {
+                    Text("OFERTA ENVIADA", color = MeetColors.neonGreen, fontWeight = FontWeight.Black)
+                    Text("La red la está confirmando; el pasajero la verá sólo si la reserva de comisión es válida.", color = MeetColors.textSecondary, fontSize = 11.sp)
+                }
+            }
+        }
+    }
 
     if (myOffer != null) {
         // Driver has submitted an offer and is waiting for response
@@ -4892,7 +5111,6 @@ fun DriverNegotiationPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

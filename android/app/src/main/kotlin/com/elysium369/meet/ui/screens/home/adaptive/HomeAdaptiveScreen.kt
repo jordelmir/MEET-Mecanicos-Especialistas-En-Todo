@@ -280,6 +280,7 @@ fun HomeAdaptiveScreen(
             if (activityStrip.hasActiveOperations) {
                 HomeActivityStripWidget(
                     strip = activityStrip,
+                    onDismissRide = { viewModel.selectActiveRide(null) },
                     onItemClick = { item ->
                         item.actionRoute?.let { navController.safeNavigate(it) }
                     }

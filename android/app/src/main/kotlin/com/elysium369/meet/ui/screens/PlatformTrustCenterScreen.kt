@@ -60,6 +60,7 @@ import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
 import com.elysium369.meet.ride.data.remote.TrustQueueSnapshot
 import com.elysium369.meet.ride.data.remote.TrustRealtimeSignal
 import com.elysium369.meet.ride.data.remote.TrustVerificationApplication
+import com.elysium369.meet.ride.data.remote.RideWalletTopup
 import com.elysium369.meet.ride.domain.PlatformOwnerAccess
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.EliteCard
@@ -116,6 +117,8 @@ fun PlatformTrustCenterScreen(
         mutableStateOf<Pair<TrustVerificationApplication, String>?>(null)
     }
     var evidenceApplication by remember { mutableStateOf<TrustVerificationApplication?>(null) }
+    var walletTopups by remember { mutableStateOf(emptyList<RideWalletTopup>()) }
+    var walletProofTopup by remember { mutableStateOf<RideWalletTopup?>(null) }
     val scope = rememberCoroutineScope()
     val reloadMutex = remember { Mutex() }
 
@@ -146,6 +149,8 @@ fun PlatformTrustCenterScreen(
                 .onFailure { error ->
                     message = "Sincronización temporalmente interrumpida; se conserva la última cola y el reintento es automático. Código: ${TrustCenterObservability.failureCode(error)}."
                 }
+            runCatching { PlatformTrustCenterGateway.loadWalletTopupQueue("PENDING_REVIEW") }
+                .onSuccess { walletTopups = it.items }
             loading = false
         }
     }
@@ -337,6 +342,38 @@ fun PlatformTrustCenterScreen(
                         }
                     }
                     message?.let { item { Text(it, color = MeetColors.warning) } }
+                    item {
+                        EliteCard(
+                            glowColor = MeetColors.warning,
+                            borderColor = MeetColors.warning.copy(alpha = .45f),
+                            backgroundColor = MeetColors.cardBackground,
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                                Text("RECARGAS SINPE PENDIENTES · ${walletTopups.size}", color = MeetColors.warning, fontWeight = FontWeight.Black)
+                                Text("Verifica el ingreso en la cuenta real y aprueba sólo cuando el dinero haya llegado.", color = MeetColors.textSecondary, fontSize = 12.sp, modifier = Modifier.padding(top = 5.dp))
+                            }
+                        }
+                    }
+                    items(walletTopups, key = { it.id }) { topup ->
+                        WalletTopupReviewCard(
+                            topup = topup,
+                            enabled = mfaState.isAal2 && !loading,
+                            onOpenProof = { walletProofTopup = topup },
+                            onDecision = { decision ->
+                                if (!mfaState.isAal2) {
+                                    message = "Valida MFA antes de acreditar saldo."
+                                } else {
+                                    scope.launch {
+                                        loading = true
+                                        runCatching { PlatformTrustCenterGateway.decideWalletTopup(topup.id, decision, if (decision == "APPROVED") "Ingreso SINPE verificado por el propietario" else "Comprobante no verificado") }
+                                            .onSuccess { message = "Recarga ${if (decision == "APPROVED") "aprobada" else "rechazada"}; el saldo se actualizó de forma idempotente." }
+                                            .onFailure { message = "No se pudo decidir la recarga: ${it.message?.take(120)}" }
+                                        reloadNow()
+                                    }
+                                }
+                            },
+                        )
+                    }
                     if (loading) {
                         item { CircularProgressIndicator(color = MeetColors.cyberCyan) }
                     } else if (snapshot.items.isEmpty()) {
@@ -428,6 +465,13 @@ fun PlatformTrustCenterScreen(
         )
     }
 
+    walletProofTopup?.let { topup ->
+        WalletProofDialog(
+            topup = topup,
+            onDismiss = { walletProofTopup = null },
+        )
+    }
+
     if (mfaDialogVisible) {
         TrustMfaDialog(
             enrollment = mfaEnrollment,
@@ -468,6 +512,65 @@ fun PlatformTrustCenterScreen(
             },
         )
     }
+}
+
+@Composable
+private fun WalletTopupReviewCard(
+    topup: RideWalletTopup,
+    enabled: Boolean,
+    onOpenProof: () -> Unit,
+    onDecision: (String) -> Unit,
+) {
+    EliteCard(
+        glowColor = MeetColors.cyberCyan,
+        borderColor = MeetColors.cyberCyan.copy(alpha = .35f),
+        backgroundColor = MeetColors.cardBackground,
+    ) {
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+            Text("RECARGA ₡${topup.amountMinor}", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
+            Text("Chofer: ${topup.driverId.take(12)}… · ${topup.submittedAt}", color = Color.White, fontSize = 12.sp)
+            Text("Comprobante privado: ${topup.proofStoragePath.substringAfterLast('/')}", color = MeetColors.textSecondary, fontSize = 11.sp)
+            OutlinedButton(onClick = onOpenProof, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Text("VER COMPROBANTE")
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { onDecision("REJECTED") }, enabled = enabled, modifier = Modifier.weight(1f)) { Text("RECHAZAR") }
+                Button(onClick = { onDecision("APPROVED") }, enabled = enabled, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen)) { Text("ACREDITAR", color = Color.Black, fontWeight = FontWeight.Black) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WalletProofDialog(
+    topup: RideWalletTopup,
+    onDismiss: () -> Unit,
+) {
+    var bitmap by remember(topup.id) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var error by remember(topup.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(topup.id) {
+        runCatching {
+            val bytes = PlatformTrustCenterGateway.downloadWalletProof(topup.proofStoragePath)
+            withContext(Dispatchers.IO) {
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                    ?: error("INVALID_IMAGE")
+            }
+        }.onSuccess { bitmap = it }
+            .onFailure { error = "No se pudo abrir el comprobante privado. Código: ${TrustCenterObservability.failureCode(it)}" }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Comprobante SINPE · ₡${topup.amountMinor}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Verifica el ingreso en la cuenta real antes de acreditar.", color = MeetColors.warning, fontSize = 12.sp)
+                if (bitmap == null && error == null) CircularProgressIndicator(color = MeetColors.cyberCyan)
+                error?.let { Text(it, color = MeetColors.error) }
+                bitmap?.let { Image(bitmap = it, contentDescription = "Comprobante SINPE", modifier = Modifier.fillMaxWidth().height(320.dp)) }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("CERRAR") } },
+    )
 }
 
 @Composable

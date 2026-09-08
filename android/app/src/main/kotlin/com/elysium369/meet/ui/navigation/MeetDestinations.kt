@@ -87,10 +87,19 @@ fun NavController.backOrHome(): Boolean = when (
 
 /** Save and restore each top-level branch instead of recreating it on every tap. */
 fun NavController.navigateTopLevel(route: String) {
-    navigate(route) {
-        popUpTo(graph.findStartDestination().id) { saveState = true }
-        launchSingleTop = true
-        restoreState = true
+    if (currentDestination?.route == route) return
+    // Prefer returning to an existing top-level entry. This is reliable even
+    // when the current screen was opened from a nested ride/profile flow.
+    if (popBackStack(route, false)) return
+    runCatching {
+        navigate(route) {
+            popUpTo(graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }.onFailure { error ->
+        android.util.Log.w("Navigation", "Top-level navigation fallback for $route", error)
+        navigate(route) { launchSingleTop = true }
     }
 }
 

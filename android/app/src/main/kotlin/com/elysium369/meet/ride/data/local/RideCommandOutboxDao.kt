@@ -133,4 +133,14 @@ interface RideCommandOutboxDao {
         """,
     )
     fun pendingCount(): Flow<Int>
+
+    @Query(
+        """
+        SELECT * FROM ride_command_outbox
+        WHERE status IN ('FAILED', 'CONFLICT', 'DEAD_LETTER')
+        ORDER BY updatedAt DESC
+        LIMIT 20
+        """,
+    )
+    fun recentFailures(): Flow<List<RideCommandOutboxEntity>>
 }
