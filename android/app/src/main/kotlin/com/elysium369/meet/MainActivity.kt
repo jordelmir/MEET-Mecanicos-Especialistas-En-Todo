@@ -1114,12 +1114,12 @@ fun MeetApp(
                     onOpenMessages = { navController.navigate("messages?serviceVertical=parts") },
                 )
             }
-            composable("ride_service") {
+            composable(MeetDestinations.RIDE_HOME) {
                 com.elysium369.meet.ui.screens.RideServiceScreen(
                     viewModel = obdViewModel,
                     onNavigateBack = { navController.backOrHome() },
                     onOpenDriverRegistration = {
-                        navController.navigate("ride_driver_registration")
+                        navController.navigate(MeetDestinations.RIDE_DRIVER_REGISTRATION)
                     },
                     onOpenMessages = { referenceId ->
                         navController.navigate(
@@ -1174,7 +1174,7 @@ fun MeetApp(
             composable("trust_center") {
                 PlatformTrustCenterScreen(viewModel = obdViewModel, onBack = { navController.backOrHome() })
             }
-            composable("ride_driver_registration") {
+            composable(MeetDestinations.RIDE_DRIVER_REGISTRATION) {
                 com.elysium369.meet.ui.screens.ProviderRegistrationScreen(
                     viewModel = obdViewModel,
                     onNavigateBack = { navController.backOrHome() },
@@ -1193,33 +1193,17 @@ fun MeetApp(
             composable("adapter_diagnostics") {
                 CloneTestScreen(onRunTest = { obdViewModel.runAdapterCloneTest() })
             }
-            composable("ride_home") {
-                com.elysium369.meet.ui.screens.RideServiceScreen(
-                    viewModel = obdViewModel,
-                    onNavigateBack = { navController.backOrHome() },
-                    onOpenDriverRegistration = {
-                        navController.navigate("ride_driver_registration")
-                    },
-                    onOpenMessages = { referenceId ->
-                        navController.navigate(
-                            referenceId?.let {
-                                "messages?serviceVertical=ride&serviceReferenceId=$it&serviceTitle=Viaje%20Elysium"
-                            } ?: "messages?serviceVertical=ride"
-                        )
-                    },
-                )
-            }
-            composable("ride_passenger_request") {
+            composable(MeetDestinations.RIDE_PASSENGER_EXPERIMENT) {
                 com.elysium369.meet.ui.screens.ride.PassengerRideRequestScreen(
                     navController = navController,
                     viewModel = obdViewModel,
                     onBack = { navController.backOrHome() },
                     onStartActiveRide = {
-                        navController.navigate("ride_service")
+                        navController.navigate(MeetDestinations.RIDE_ACTIVE_TRACKING)
                     }
                 )
             }
-            composable("ride_driver_cockpit") {
+            composable(MeetDestinations.RIDE_DRIVER_EXPERIMENT) {
                 com.elysium369.meet.ui.screens.ride.DriverAppScreen(
                     navController = navController,
                     viewModel = obdViewModel,
@@ -1227,7 +1211,7 @@ fun MeetApp(
                 )
             }
 
-            composable("ride_active_tracking") {
+            composable(MeetDestinations.RIDE_ACTIVE_TRACKING) {
                 val activeRideReq by obdViewModel.activeRideRequest.collectAsState()
                 val activeRide = activeRideReq?.let { req ->
                     val parsedState = runCatching {
@@ -1317,7 +1301,7 @@ fun MeetApp(
                             )
                             Spacer(Modifier.height(24.dp))
                             Button(
-                                onClick = { navController.navigate("ride_passenger_request") },
+                                onClick = { navController.navigate(MeetDestinations.RIDE_PASSENGER_REQUEST) },
                                 colors = ButtonDefaults.buttonColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.neonGreen, contentColor = Color.Black)
                             ) {
                                 Text("SOLICITAR VIAJE", fontWeight = FontWeight.Bold)
@@ -1339,7 +1323,7 @@ fun MeetApp(
                 com.elysium369.meet.fulfillment.ui.UnifiedActivityScreen(
                     viewModel = obdViewModel,
                     towRepository = towRepository,
-                    onNavigateToRide = { navController.navigate("ride_active_tracking") },
+                    onNavigateToRide = { navController.navigate(MeetDestinations.RIDE_ACTIVE_TRACKING) },
                     onNavigateToTow = { navController.navigate("tow_active_tracking") },
                     onBack = { navController.backOrHome() }
                 )

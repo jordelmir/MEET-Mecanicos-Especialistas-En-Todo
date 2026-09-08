@@ -169,7 +169,7 @@ fun MarketplaceScreen(
                             )
                             EliteButton(
                                 text = "🚗 PEDIR UN VIAJE / RIDE (SUBASTA)",
-                                onClick = { navController.navigate("ride_service") },
+                                onClick = { navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.RIDE_HOME) },
                                 color = MeetColors.electricBlue,
                                 modifier = Modifier.fillMaxWidth()
                             )

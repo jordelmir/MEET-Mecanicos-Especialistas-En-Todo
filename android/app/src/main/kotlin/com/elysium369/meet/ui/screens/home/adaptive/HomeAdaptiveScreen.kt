@@ -40,6 +40,7 @@ import com.elysium369.meet.ui.screens.home.components.HomeExperienceSelectionDia
 import com.elysium369.meet.ui.screens.home.components.HomeExperienceSwitcherHeaderButton
 import com.elysium369.meet.ui.home.activity.HomeActivityStripPolicy
 import com.elysium369.meet.ui.home.activity.HomeActivityStripWidget
+import com.elysium369.meet.ui.home.activity.VehicleAlert
 import com.elysium369.meet.ui.theme.MeetColors
 import java.util.Calendar
 
@@ -68,6 +69,10 @@ fun HomeAdaptiveScreen(
     val adapterVer by viewModel.adapterVersion.collectAsState()
     val isClone by viewModel.isCloneAdapter.collectAsState()
     val platformOwnerAccess by viewModel.platformOwnerAccess.collectAsState()
+    val activeRide by viewModel.activeRideRequest.collectAsState()
+    val maintenanceAlerts by viewModel.maintenanceAlerts.collectAsState()
+    val activeJourneys by viewModel.activeJourneys.collectAsState()
+    val activePttChannels by viewModel.activePttChannels.collectAsState()
 
     val totalDtcs = activeDtcs.size
     val readyCount = readiness?.monitors?.count { it.complete } ?: 0
@@ -230,15 +235,44 @@ fun HomeAdaptiveScreen(
                 }
             }
 
-            val activityStrip = remember {
+            val vehicleAlerts = remember(activeDtcs, maintenanceAlerts) {
+                val dtcAlerts = activeDtcs.take(3).map { code ->
+                    VehicleAlert(
+                        title = "DTC Activo",
+                        message = code,
+                        severity = "WARNING",
+                        isCritical = true,
+                    )
+                }
+                val maintenanceAlertItems = maintenanceAlerts.take(2).map { alert ->
+                    val remainingKm = alert.nextDueKm - alert.lastDoneKm
+                    VehicleAlert(
+                        title = "${alert.type} — ${alert.intervalKm} km",
+                        message = if (remainingKm > 0) "Vence en ${remainingKm} km" else (alert.notes ?: "Requiere atención"),
+                        severity = if (remainingKm <= 0) "CRITICAL" else "WARNING",
+                        isCritical = remainingKm <= 0,
+                    )
+                }
+                dtcAlerts + maintenanceAlertItems
+            }
+
+            val activityStrip = remember(activeRide, vehicleAlerts, activeJourneys, activePttChannels) {
                 HomeActivityStripPolicy.buildFromState(
-                    activeRides = emptyList(),
+                    activeRides = listOfNotNull(
+                        activeRide?.let { ride ->
+                            HomeActivityStripPolicy.activeRide(
+                                rideId = ride.requestId,
+                                vehicleName = ride.assignedDriverVehicle,
+                                stateName = ride.serverState ?: ride.status,
+                            )
+                        },
+                    ),
                     fuelAlerts = emptyList(),
-                    activeJourneys = emptyList(),
-                    activePttChannels = emptyList(),
+                    activeJourneys = activeJourneys,
+                    activePttChannels = activePttChannels,
                     pendingMessages = 0,
                     activeListings = 0,
-                    vehicleAlerts = emptyList()
+                    vehicleAlerts = vehicleAlerts
                 )
             }
 
@@ -258,7 +292,7 @@ fun HomeAdaptiveScreen(
                     borderColor = MeetColors.neonGreen.copy(alpha = 0.5f),
                     backgroundColor = Color(0xFF0C1524),
                     shape = RoundedCornerShape(16.dp),
-                    onClick = { navController.safeNavigate("ride_passenger_request") },
+                    onClick = { navController.safeNavigate(MeetDestinations.RIDE_PASSENGER_REQUEST) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -308,7 +342,7 @@ fun HomeAdaptiveScreen(
                             border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.borderSubtle),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { navController.safeNavigate("ride_passenger_request") }
+                                .clickable { navController.safeNavigate(MeetDestinations.RIDE_PASSENGER_REQUEST) }
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -326,7 +360,7 @@ fun HomeAdaptiveScreen(
                         }
 
                         Button(
-                            onClick = { navController.safeNavigate("ride_passenger_request") },
+                            onClick = { navController.safeNavigate(MeetDestinations.RIDE_PASSENGER_REQUEST) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(46.dp),
@@ -344,7 +378,7 @@ fun HomeAdaptiveScreen(
                     borderColor = MeetColors.electricBlue.copy(alpha = 0.5f),
                     backgroundColor = Color(0xFF0C1524),
                     shape = RoundedCornerShape(16.dp),
-                    onClick = { navController.safeNavigate("ride_driver_cockpit") },
+                    onClick = { navController.safeNavigate(MeetDestinations.RIDE_DRIVER_MODE) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(
@@ -389,7 +423,7 @@ fun HomeAdaptiveScreen(
                         }
 
                         Button(
-                            onClick = { navController.safeNavigate("ride_driver_cockpit") },
+                            onClick = { navController.safeNavigate(MeetDestinations.RIDE_DRIVER_MODE) },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(46.dp),

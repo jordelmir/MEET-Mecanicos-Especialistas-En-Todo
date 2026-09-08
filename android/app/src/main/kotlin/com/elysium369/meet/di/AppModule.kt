@@ -4446,6 +4446,109 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_71_72 = object : Migration(71, 72) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // SafeJourneys
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safe_journeys` (
+                    `journeyId` TEXT NOT NULL PRIMARY KEY,
+                    `principalId` TEXT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `originName` TEXT NOT NULL,
+                    `destinationName` TEXT,
+                    `destinationLat` REAL NOT NULL,
+                    `destinationLon` REAL NOT NULL,
+                    `destinationRadiusMeters` REAL NOT NULL,
+                    `estimatedArrivalEpochMs` INTEGER NOT NULL,
+                    `state` TEXT NOT NULL,
+                    `journeyState` TEXT NOT NULL,
+                    `mode` TEXT NOT NULL,
+                    `createdAtEpochMs` INTEGER NOT NULL,
+                    `startedAtEpochMs` INTEGER,
+                    `lastCheckInAtEpochMs` INTEGER,
+                    `completedAtEpochMs` INTEGER,
+                    `sharedWithPrincipalIdsJson` TEXT NOT NULL,
+                    `checkInIntervalMs` INTEGER NOT NULL,
+                    `publisherDeviceId` TEXT NOT NULL
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safe_journeys_principalId` ON `safe_journeys` (`principalId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safe_journeys_state` ON `safe_journeys` (`state`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safe_journeys_principalId_state` ON `safe_journeys` (`principalId`, `state`)")
+
+            // PttChannels
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `ptt_channels` (
+                    `channelId` TEXT NOT NULL PRIMARY KEY,
+                    `name` TEXT NOT NULL,
+                    `type` TEXT NOT NULL,
+                    `state` TEXT NOT NULL,
+                    `ownerPrincipalId` TEXT NOT NULL,
+                    `createdAtEpochMs` INTEGER NOT NULL,
+                    `memberCount` INTEGER NOT NULL,
+                    `maxMembers` INTEGER NOT NULL,
+                    `isEncrypted` INTEGER NOT NULL
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ptt_channels_ownerPrincipalId` ON `ptt_channels` (`ownerPrincipalId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ptt_channels_state` ON `ptt_channels` (`state`)")
+
+            // PttChannelMembers
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `ptt_channel_members` (
+                    `channelId` TEXT NOT NULL,
+                    `principalId` TEXT NOT NULL,
+                    `role` TEXT NOT NULL,
+                    `state` TEXT NOT NULL,
+                    `joinedAtEpochMs` INTEGER NOT NULL,
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ptt_channel_members_channelId` ON `ptt_channel_members` (`channelId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_ptt_channel_members_principalId` ON `ptt_channel_members` (`principalId`)")
+            db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_ptt_channel_members_channelId_principalId` ON `ptt_channel_members` (`channelId`, `principalId`)")
+
+            // ScheduledRides
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `scheduled_rides` (
+                    `scheduleId` TEXT NOT NULL PRIMARY KEY,
+                    `userId` TEXT NOT NULL,
+                    `stopsJson` TEXT NOT NULL,
+                    `scheduledAtEpochMs` INTEGER NOT NULL,
+                    `createdAtEpochMs` INTEGER NOT NULL,
+                    `fareMode` TEXT NOT NULL,
+                    `estimatedFare` INTEGER NOT NULL,
+                    `currency` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `recurrencePattern` TEXT NOT NULL,
+                    `recurrenceConfigJson` TEXT,
+                    `notes` TEXT NOT NULL,
+                    `matchedDriverId` TEXT,
+                    `rideId` TEXT,
+                    `dispatchAtEpochMs` INTEGER
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_scheduled_rides_userId` ON `scheduled_rides` (`userId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_scheduled_rides_status` ON `scheduled_rides` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_scheduled_rides_scheduledAtEpochMs` ON `scheduled_rides` (`scheduledAtEpochMs`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_scheduled_rides_userId_status` ON `scheduled_rides` (`userId`, `status`)")
+
+            // FavoriteRoutes
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `favorite_routes` (
+                    `routeId` TEXT NOT NULL PRIMARY KEY,
+                    `label` TEXT NOT NULL,
+                    `icon` TEXT NOT NULL,
+                    `stopsJson` TEXT NOT NULL,
+                    `fareMode` TEXT NOT NULL,
+                    `usageCount` INTEGER NOT NULL,
+                    `lastUsedEpochMs` INTEGER NOT NULL
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_favorite_routes_usageCount` ON `favorite_routes` (`usageCount`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4504,6 +4607,7 @@ object AppModule {
             MIGRATION_68_69,
             MIGRATION_69_70,
             MIGRATION_70_71,
+            MIGRATION_71_72,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -4813,6 +4917,15 @@ object AppModule {
 
     @Provides
     fun provideActiveOperationDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.ActiveOperationDao = db.activeOperationDao()
+
+    @Provides
+    fun provideSafeJourneyDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.SafeJourneyDao = db.safeJourneyDao()
+
+    @Provides
+    fun providePttChannelDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.PttChannelDao = db.pttChannelDao()
+
+    @Provides
+    fun provideScheduledRideDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.ScheduledRideDao = db.scheduledRideDao()
 
     @Provides
     @Singleton

@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens.home.classic
 
+import com.elysium369.meet.ui.navigation.MeetDestinations
+import com.elysium369.meet.ui.navigation.safeNavigate
 import android.content.Context
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -244,6 +246,59 @@ fun HomeClassicScreen(
                 }
             }
 
+            // ── Activity Strip ──
+            val activeRide by viewModel.activeRideRequest.collectAsState()
+            val maintenanceAlerts by viewModel.maintenanceAlerts.collectAsState()
+            val activeJourneys by viewModel.activeJourneys.collectAsState()
+            val activePttChannels by viewModel.activePttChannels.collectAsState()
+            val vehicleAlertsForStrip = remember(activeDtcs, maintenanceAlerts) {
+                val dtcAlerts = activeDtcs.take(3).map { code ->
+                    com.elysium369.meet.ui.home.activity.VehicleAlert(
+                        title = "DTC Activo",
+                        message = code,
+                        severity = "WARNING",
+                        isCritical = true,
+                    )
+                }
+                val maintAlerts = maintenanceAlerts.take(2).map { alert ->
+                    val remainingKm = alert.nextDueKm - alert.lastDoneKm
+                    com.elysium369.meet.ui.home.activity.VehicleAlert(
+                        title = "${alert.type} — ${alert.intervalKm} km",
+                        message = if (remainingKm > 0) "Vence en ${remainingKm} km" else (alert.notes ?: "Requiere atención"),
+                        severity = if (remainingKm <= 0) "CRITICAL" else "WARNING",
+                        isCritical = remainingKm <= 0,
+                    )
+                }
+                dtcAlerts + maintAlerts
+            }
+            val activityStrip = remember(activeRide, vehicleAlertsForStrip, activeJourneys, activePttChannels) {
+                com.elysium369.meet.ui.home.activity.HomeActivityStripPolicy.buildFromState(
+                    activeRides = listOfNotNull(
+                        activeRide?.let { ride ->
+                            com.elysium369.meet.ui.home.activity.HomeActivityStripPolicy.activeRide(
+                                rideId = ride.requestId,
+                                vehicleName = ride.assignedDriverVehicle,
+                                stateName = ride.serverState ?: ride.status,
+                            )
+                        },
+                    ),
+                    fuelAlerts = emptyList(),
+                    activeJourneys = activeJourneys,
+                    activePttChannels = activePttChannels,
+                    pendingMessages = 0,
+                    activeListings = 0,
+                    vehicleAlerts = vehicleAlertsForStrip
+                )
+            }
+            if (activityStrip.hasActiveOperations) {
+                com.elysium369.meet.ui.home.activity.HomeActivityStripWidget(
+                    strip = activityStrip,
+                    onItemClick = { item ->
+                        item.actionRoute?.let { navController.safeNavigate(it) }
+                    }
+                )
+            }
+
             AnimatedEntrance(1) {
                 CommandCenterCard(
                     profile = userProfile,
@@ -462,7 +517,7 @@ fun HomeClassicScreen(
                 add(Triple("⚖️", "Legal Vanguard", MeetColors.warning) to "legal_vanguard")
                 add(Triple("🏠", "Properties", MeetColors.neonGreen) to "elysium_properties")
                 add(Triple("⛽", "Fuel Rewards", MeetColors.cyberCyan) to "fuel_rewards")
-                add(Triple("🚕", "MEET Rides", MeetColors.neonGreen) to "ride_service")
+                add(Triple("🚕", "MEET Rides", MeetColors.neonGreen) to MeetDestinations.RIDE_HOME)
                 add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
                 add(Triple("⚠️", "DTCs", MeetColors.hotMagenta) to "dtc")
                 add(Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito")
@@ -717,7 +772,7 @@ private fun buildRoleFirstHomeState(profile: String): HomeCommandState? =
             title = "Tu movilidad en Elysium Viajes",
             recommendation = "Completa tu registro de usuario de viajes para solicitar rutas, revisar costos y acceder a soporte.",
             primaryAction = "ABRIR VIAJES",
-            primaryRoute = "ride_service",
+            primaryRoute = MeetDestinations.RIDE_HOME,
             severityColor = MeetColors.cyberCyan,
             statusLine = "Perfil de usuario de viajes",
         )
@@ -725,7 +780,7 @@ private fun buildRoleFirstHomeState(profile: String): HomeCommandState? =
             title = "Activa tu operación como conductor",
             recommendation = "Completa identidad, documentación y vehículo. El despacho permanece bloqueado hasta que la verificación corresponda.",
             primaryAction = "ABRIR VIAJES",
-            primaryRoute = "ride_service",
+            primaryRoute = MeetDestinations.RIDE_HOME,
             severityColor = MeetColors.neonGreen,
             statusLine = "Verificación independiente requerida",
         )

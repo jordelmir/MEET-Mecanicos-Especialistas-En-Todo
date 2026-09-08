@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.navigation.MeetDestinations
 
 /**
  * HomeActivityStrip — Global cross-domain activity dashboard.
@@ -118,7 +119,7 @@ object HomeActivityStripPolicy {
                 subtitle = ride.vehicleName,
                 state = ride.stateName,
                 progress = ride.progress,
-                actionRoute = "/ride/${ride.rideId}",
+                actionRoute = MeetDestinations.RIDE_ACTIVE_TRACKING,
             ))
         }
 
@@ -199,10 +200,40 @@ object HomeActivityStripPolicy {
             activeDomains = activeDomains,
         )
     }
+
+    /**
+     * Projects only persisted, non-terminal ride states into Home. Unknown
+     * states fail closed instead of presenting an operation as active.
+     */
+    fun activeRide(
+        rideId: String,
+        vehicleName: String?,
+        stateName: String,
+    ): ActiveRideState? {
+        if (rideId.isBlank()) return null
+        val normalized = stateName.trim().uppercase()
+        val progress = when (normalized) {
+            "PENDING_PUBLICATION", "OPEN", "DRAFT", "SEARCHING" -> 0.15f
+            "OFFERED" -> 0.30f
+            "ASSIGNED", "ACCEPTED" -> 0.45f
+            "DRIVER_EN_ROUTE" -> 0.60f
+            "ARRIVED", "ARRIVED_PICKUP" -> 0.70f
+            "PASSENGER_ONBOARD" -> 0.80f
+            "IN_PROGRESS", "IN_TRIP" -> 0.90f
+            else -> return null
+        }
+        return ActiveRideState(
+            rideId = rideId,
+            vehicleName = vehicleName?.takeIf(String::isNotBlank) ?: "Conductor pendiente",
+            stateName = normalized,
+            isActive = true,
+            progress = progress,
+        )
+    }
 }
 
 data class ActiveRideState(
-    val rideId: UUID,
+    val rideId: String,
     val vehicleName: String,
     val stateName: String,
     val isActive: Boolean,
@@ -372,4 +403,3 @@ fun HomeActivityStripWidget(
         }
     }
 }
-

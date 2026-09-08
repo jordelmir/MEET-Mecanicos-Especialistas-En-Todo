@@ -47,6 +47,10 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import com.elysium369.meet.core.alerts.AlertManager
+import com.elysium369.meet.safejourney.SafeJourneyKernel
+import com.elysium369.meet.ptt.PttKernel
+import com.elysium369.meet.ui.home.activity.ActiveJourney
+import com.elysium369.meet.ui.home.activity.ActivePttChannel
 import javax.inject.Inject
 import android.content.Context
 import android.content.Intent
@@ -500,7 +504,9 @@ class ObdViewModel @Inject constructor(
     val entitlementManager: com.elysium369.meet.core.monetization.EntitlementManager,
     val adGateManager: com.elysium369.meet.core.monetization.AdGateManager,
     val usageMeter: com.elysium369.meet.core.monetization.UsageMeter,
-    private val aiRepository: com.elysium369.meet.ai.data.AiRepository
+    private val aiRepository: com.elysium369.meet.ai.data.AiRepository,
+    private val safeJourneyKernel: SafeJourneyKernel,
+    private val pttKernel: PttKernel
 ) : ViewModel() {
 
     // Device-level identity must be initialized before init{} calls provider role refresh.
@@ -512,6 +518,44 @@ class ObdViewModel @Inject constructor(
     val statusMessage: StateFlow<String> = obdSession.statusMessage
     val telemetrySamples: StateFlow<Map<String, TelemetrySample>> = obdSession.telemetrySamples
     val detectedDtcs: StateFlow<Set<String>> = obdSession.allDetectedDtcs
+
+    // --- Active Journeys (SafeJourneyKernel → HomeActivityStrip) ---
+    val activeJourneys: StateFlow<List<ActiveJourney>> = flow {
+        while (true) {
+            val journeys = safeJourneyKernel.getActiveJourneys().map { j ->
+                ActiveJourney(
+                    journeyId = j.journeyId,
+                    name = j.name.ifBlank { j.destinationName ?: "Viaje activo" },
+                    stateName = j.journeyState.name,
+                    isActive = j.state.isActive,
+                    progress = when {
+                        j.journeyState.isInProgress -> 0.6f
+                        j.journeyState == com.elysium369.meet.safejourney.SafeJourneyState.ARRIVED -> 1.0f
+                        else -> 0.3f
+                    }
+                )
+            }
+            emit(journeys)
+            kotlinx.coroutines.delay(5000L)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // --- Active PTT Channels (PttKernel → HomeActivityStrip) ---
+    val activePttChannels: StateFlow<List<ActivePttChannel>> = flow {
+        while (true) {
+            val principalId = activePrincipal.value?.id ?: ""
+            val channels = pttKernel.getChannelsForPrincipal(principalId).map { ch ->
+                ActivePttChannel(
+                    channelId = ch.channelId,
+                    name = ch.name,
+                    stateName = ch.state.name,
+                    isLive = ch.state.isActive
+                )
+            }
+            emit(channels)
+            kotlinx.coroutines.delay(5000L)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- UDS Protocol Manager (lazy, uses existing obdSession) ---
     private val udsProtocolManager by lazy {

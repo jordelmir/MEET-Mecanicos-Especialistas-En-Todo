@@ -30,7 +30,10 @@ class RideFirstAccessContractTest {
         assertTrue(screen.contains("COMPLETAR REGISTRO DE CHOFER"))
         assertTrue(screen.contains("BoxWithConstraints"))
         assertTrue(screen.contains("verticalScroll(rememberScrollState())"))
-        assertTrue(activity.contains("navController.navigate(\"ride_driver_registration\")"))
+        assertTrue(
+            activity.contains("navController.navigate(MeetDestinations.RIDE_DRIVER_REGISTRATION)") ||
+                activity.contains("navController.navigate(\"ride_driver_registration\")")
+        )
         assertTrue(activity.contains("openDriverOnStart = true"))
     }
 
@@ -41,6 +44,9 @@ class RideFirstAccessContractTest {
         ).readText()
 
         assertTrue(classicHome.contains("\"MEET Rides\""))
-        assertTrue(classicHome.contains("to \"ride_service\""))
+        assertTrue(
+            classicHome.contains("MeetDestinations.RIDE_HOME") ||
+                classicHome.contains("\"ride_service\"")
+        )
     }
 }

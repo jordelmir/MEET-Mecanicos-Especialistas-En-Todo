@@ -178,8 +178,15 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
 
         // ACTIVE OPERATIONS REGISTRY
         com.elysium369.meet.core.operations.ActiveOperationEntity::class,
+
+        // MOBILITY PERSISTENCE (SafeJourney, PttChannel, ScheduledRide)
+        SafeJourneyEntity::class,
+        PttChannelEntity::class,
+        PttChannelMemberEntity::class,
+        ScheduledRideEntity::class,
+        FavoriteRouteEntity::class,
     ],
-    version = 71,
+    version = 72,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -262,4 +269,9 @@ abstract class MeetDatabase : RoomDatabase() {
 
         // ACTIVE OPERATIONS REGISTRY
         abstract fun activeOperationDao(): ActiveOperationDao
+
+        // MOBILITY DAOs
+        abstract fun safeJourneyDao(): SafeJourneyDao
+        abstract fun pttChannelDao(): PttChannelDao
+        abstract fun scheduledRideDao(): ScheduledRideDao
 }

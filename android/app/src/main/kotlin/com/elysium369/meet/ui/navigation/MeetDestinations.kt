@@ -36,8 +36,15 @@ object MeetDestinations {
     const val PRO_HUB = "pro_hub"
     const val TRUST_CENTER = "platform_trust_center"
     const val RIDE_HOME = "ride_service"
-    const val RIDE_DRIVER_MODE = "ride_driver_registration"
-    const val RIDE_PASSENGER_REQUEST = "ride_service"
+    /** Passenger and driver entry points converge on the wired Ride product. */
+    const val RIDE_PASSENGER_REQUEST = RIDE_HOME
+    const val RIDE_DRIVER_MODE = RIDE_HOME
+    const val RIDE_DRIVER_REGISTRATION = "ride_driver_registration"
+    const val RIDE_ACTIVE_TRACKING = "ride_active_tracking"
+
+    /** Unwired prototypes retained for strangler migration, never as Home entry points. */
+    const val RIDE_PASSENGER_EXPERIMENT = "ride_passenger_request"
+    const val RIDE_DRIVER_EXPERIMENT = "ride_driver_cockpit"
     const val CAMPAIGNS = "reports"
     const val BATTERY_HEALTH = "health_score"
     const val CONNECT = "connect"

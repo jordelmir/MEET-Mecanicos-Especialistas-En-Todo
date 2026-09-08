@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.navigation.MeetDestinations
 import com.elysium369.meet.ui.navigation.backOrHome
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
@@ -287,7 +288,7 @@ fun RepairNetworkScreen(
                     onOpenMechanic = { navController.navigate("mechanic_service") },
                     onOpenTowTruck = { navController.navigate("tow_truck_service") },
                     onOpenParts = { navController.navigate("part_request") },
-                    onOpenRide = { navController.navigate("ride_service") },
+                    onOpenRide = { navController.navigate(MeetDestinations.RIDE_HOME) },
                     onOpenDekra = { navController.navigate("dekra_concierge") },
                     onOpenTheoryExam = { navController.navigate("theory_exam_preparation") },
                     onOpenUniversalServices = { navController.navigate("universal_services") },
@@ -301,7 +302,7 @@ fun RepairNetworkScreen(
                         "${it.make} ${it.model} ${it.year}"
                     },
                     activeDtcCodes = activeDtcs,
-                    onOpenRide = { navController.navigate("ride_service") },
+                    onOpenRide = { navController.navigate(MeetDestinations.RIDE_HOME) },
                     onOpenGarage = { navController.navigate("garage") },
                 )
             }
