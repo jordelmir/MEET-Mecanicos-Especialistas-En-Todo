@@ -143,8 +143,8 @@ INSERT INTO public.ride_requests (
     '55555555-5555-5555-5555-555555555555'::uuid,
     '11111111-1111-1111-1111-111111111111'::uuid,
     'CR_SJO', 'cat_sjo_standard', 'AUTO_DISPATCH', 'MATCHED',
-    ROW(-84.0833, 9.9333, 4326)::extensions.geography,
-    ROW(-84.0700, 9.9200, 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0833, 9.9333), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0700, 9.9200), 4326)::extensions.geography,
     'CRC', extensions.gen_random_uuid()
 );
 
@@ -266,8 +266,8 @@ INSERT INTO public.ride_requests (
     '77777777-7777-7777-7777-777777777777'::uuid,
     '11111111-1111-1111-1111-111111111111'::uuid,
     'CR_SJO', 'cat_sjo_standard', 'MARKETPLACE_OFFERS', 'MATCHED',
-    ROW(-84.0833, 9.9333, 4326)::extensions.geography,
-    ROW(-84.0700, 9.9200, 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0833, 9.9333), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0700, 9.9200), 4326)::extensions.geography,
     'CRC', extensions.gen_random_uuid()
 );
 
@@ -318,8 +318,8 @@ INSERT INTO public.ride_requests (
     '99999999-9999-9999-9999-999999999999'::uuid,
     '11111111-1111-1111-1111-111111111111'::uuid,
     'CR_SJO', 'cat_sjo_standard', 'AUTO_DISPATCH', 'MATCHED',
-    ROW(-84.0833, 9.9333, 4326)::extensions.geography,
-    ROW(-84.0700, 9.9200, 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0833, 9.9333), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0700, 9.9200), 4326)::extensions.geography,
     'CRC', extensions.gen_random_uuid()
 );
 

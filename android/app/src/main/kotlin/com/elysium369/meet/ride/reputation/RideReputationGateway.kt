@@ -7,6 +7,9 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import javax.inject.Inject
 
 interface RideReputationGateway {
@@ -47,7 +50,7 @@ class SupabaseRideReputationGateway @Inject constructor() : RideReputationGatewa
                 compliments.forEach { add(kotlinx.serialization.json.JsonPrimitive(it.code)) }
             })
         }
-        SupabaseManager.client.postgrest.rpc("ride_record_trip_feedback_v1", params)
-        true
+        val response = SupabaseManager.client.postgrest.rpc("ride_record_trip_feedback_v1", params).data
+        json.parseToJsonElement(response).jsonObject["success"]?.jsonPrimitive?.booleanOrNull == true
     }
 }

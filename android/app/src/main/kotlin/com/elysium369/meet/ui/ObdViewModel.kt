@@ -7748,6 +7748,8 @@ class ObdViewModel @Inject constructor(
         scope = viewModelScope,
         context = context,
         noticeEmitter = { msg -> _rideVerificationNotice.emit(msg) },
+        rideDao = rideDao,
+        currentUserId = { currentCloudUserId() },
     )
 
     val rideRequests = rideDao.getAllRequestsFlow()
@@ -7803,6 +7805,8 @@ class ObdViewModel @Inject constructor(
     ))
     val driverPresetMessages: StateFlow<List<String>> = _driverPresetMessages.asStateFlow()
 
+    private var selectedRideRequestId: String? = null
+    private var jobActiveRideCollection: Job? = null
     private var jobOffersCollection: Job? = null
     private var jobChatCollection: Job? = null
     private var jobChatRemoteSync: Job? = null
@@ -8058,12 +8062,30 @@ class ObdViewModel @Inject constructor(
     }
 
     private fun applyActiveRide(request: RideRequestEntity?) {
+        selectedRideRequestId = request?.requestId
         _activeRideRequest.value = request
+        jobActiveRideCollection?.cancel()
         jobOffersCollection?.cancel()
         jobChatCollection?.cancel()
         jobChatRemoteSync?.cancel()
 
         if (request != null) {
+            val ownerId = activePrincipalKernel.current().id
+            jobActiveRideCollection = viewModelScope.launch {
+                rideDao.observeRequest(request.requestId).collect { latest ->
+                    if (activePrincipalKernel.current().id != ownerId ||
+                        selectedRideRequestId != request.requestId
+                    ) return@collect
+                    if (latest?.status == "CANCELLED" || latest?.serverState == "CANCELLED") {
+                        rideDao.clearActiveRideSelectionsForRide(request.requestId)
+                        applyActiveRide(null)
+                    } else {
+                        // Room contains command acknowledgements as well as realtime refreshes.
+                        // Keep completion visible for receipt and feedback; never freeze a version.
+                        _activeRideRequest.value = latest
+                    }
+                }
+            }
             _rideSharingSelections.update { current ->
                 if (request.requestId in current) {
                     current
@@ -9168,65 +9190,56 @@ class ObdViewModel @Inject constructor(
     }
 
     fun submitRideRating(requestId: String, isPassengerRating: Boolean, stars: Double, comment: String) {
-        RideObservability.event("rating_submit_started", requestId = requestId, detail = if (isPassengerRating) "passenger" else "driver")
         viewModelScope.launch(Dispatchers.IO) {
-            val req = rideDao.getRequestById(requestId) ?: return@launch
-            if (isPassengerRating) {
-                // Pasajero califica al conductor
-                rideDao.updatePassengerRating(requestId, stars)
-                // Insert en la tabla global de ratings
-                val targetId = req.assignedDriverId ?: ""
-                val rating = RatingEntity(
-                    ratingId = UUID.randomUUID().toString(),
-                    targetType = "DRIVER",
-                    targetId = targetId,
-                    sourceId = req.passengerId,
-                    sourceName = req.passengerName,
-                    stars = stars,
-                    comment = comment,
-                    createdAt = System.currentTimeMillis()
-                )
-                ratingDao.insertRating(rating)
-                rideReputationGateway.recordTripFeedback(
-                    tripId = requestId,
-                    rating = stars.toInt().coerceIn(1, 5),
-                ).onSuccess {
-                    RideObservability.event("rating_remote", outcome = "SUCCEEDED", requestId = requestId, detail = "passenger_to_driver")
-                }.onFailure { error ->
-                    RideObservability.event("rating_remote", outcome = "FAILED", requestId = requestId, detail = error.message ?: "remote_failure")
-                }
-
-                // Recalcular promedio si tiene perfil registrado
-                val avg = ratingDao.getAverageRatingForTarget("DRIVER", targetId)
-                if (avg != null) {
-                    val profile = providerProfileDao.getProfileByUserAndTypes(
-                        targetId,
-                        listOf("ride_driver", "driver", "ride"),
+            val request = rideDao.getRequestById(requestId) ?: return@launch
+            val actorId = currentCloudUserId()
+            val result = com.elysium369.meet.ride.domain.RideRatingSubmission.submit(
+                actorId = actorId,
+                passengerId = request.passengerId,
+                assignedDriverId = request.assignedDriverId,
+                serverState = request.serverState,
+                serverVersion = request.serverVersion,
+                passengerRating = isPassengerRating,
+                stars = stars,
+                confirm = {
+                    rideReputationGateway.recordTripFeedback(requestId, stars.toInt())
+                },
+                persistConfirmed = {
+                    // A retry after a lost response replaces this exact trip's projection.
+                    // It cannot inflate local rating counts with a fresh random ID.
+                    ratingDao.insertRating(
+                        RatingEntity(
+                            ratingId = "ride-feedback:$requestId:$actorId",
+                            targetType = "DRIVER",
+                            targetId = requireNotNull(request.assignedDriverId),
+                            sourceId = requireNotNull(actorId),
+                            sourceName = request.passengerName,
+                            stars = stars,
+                            comment = comment.trim(),
+                            createdAt = System.currentTimeMillis(),
+                        ),
                     )
-                    if (profile != null) {
-                        providerProfileDao.updateRatingAndJobs(profile.profileId, avg, System.currentTimeMillis())
-                    }
-                }
-            } else {
-                // Conductor califica al pasajero
-                rideDao.updateDriverRating(requestId, stars)
-                val rating = RatingEntity(
-                    ratingId = UUID.randomUUID().toString(),
-                    targetType = "CLIENT",
-                    targetId = req.passengerId,
-                    sourceId = req.assignedDriverId ?: "",
-                    sourceName = req.assignedDriverName ?: "",
-                    stars = stars,
-                    comment = comment,
-                    createdAt = System.currentTimeMillis()
+                    rideDao.updatePassengerRating(requestId, stars)
+                },
+            )
+            result.onSuccess {
+                _rideVerificationNotice.emit("Calificación confirmada por el servidor. Gracias.")
+            }.onFailure {
+                _rideVerificationNotice.emit(
+                    "No se confirmó la calificación. Puedes reintentar. " +
+                        (it.message ?: "Conexión no disponible.").take(180),
                 )
-                ratingDao.insertRating(rating)
-                RideObservability.event("rating_remote", outcome = "REJECTED", requestId = requestId, detail = "driver_rating_requires_authoritative_rpc")
             }
-
-            val updatedRequest = rideDao.getRequestById(requestId)
+            RideObservability.event(
+                "rating_remote",
+                outcome = if (result.isSuccess) "SUCCEEDED" else "FAILED",
+                requestId = requestId,
+            )
+            val updated = rideDao.getRequestById(requestId)
             withContext(Dispatchers.Main) {
-                _activeRideRequest.value = updatedRequest
+                if (_activeRideRequest.value?.requestId == requestId && currentCloudUserId() == actorId) {
+                    _activeRideRequest.value = updated
+                }
             }
         }
     }

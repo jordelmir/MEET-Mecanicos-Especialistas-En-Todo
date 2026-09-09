@@ -165,8 +165,8 @@ INSERT INTO public.ride_requests (
     'cat_sjo_standard',
     'AUTO_DISPATCH',
     'REQUESTED',
-    ROW(-84.0833, 9.9333, 4326)::extensions.geography,
-    ROW(-83.9167, 9.8667, 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0833, 9.9333), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-83.9167, 9.8667), 4326)::extensions.geography,
     'CRC',
     extensions.gen_random_uuid()
 );
@@ -287,8 +287,8 @@ INSERT INTO public.ride_requests (
     'cat_sjo_standard',
     'AUTO_DISPATCH',
     'REQUESTED',
-    ROW(-84.0833, 9.9333, 4326)::extensions.geography,
-    ROW(-84.0850, 9.9340, 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0833, 9.9333), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0850, 9.9340), 4326)::extensions.geography,
     'CRC',
     extensions.gen_random_uuid()
 );
@@ -518,8 +518,8 @@ INSERT INTO public.ride_requests (
     'cat_sjo_standard',
     'AUTO_DISPATCH',
     'REQUESTED',
-    ROW(-84.0833, 9.9333, 4326)::extensions.geography,
-    ROW(-84.0700, 9.9200, 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0833, 9.9333), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0700, 9.9200), 4326)::extensions.geography,
     'CRC',
     extensions.gen_random_uuid()
 );

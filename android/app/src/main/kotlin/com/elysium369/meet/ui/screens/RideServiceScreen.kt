@@ -164,7 +164,10 @@ fun RideServiceScreen(
     val presencePreferences = remember(context) {
         context.getSharedPreferences("elysium_ride_driver_presence", Context.MODE_PRIVATE)
     }
-    var showLiveness by rememberSaveable { mutableStateOf(false) }
+    val presencePrincipal by viewModel.activePrincipal.collectAsState()
+    val presenceOwnerId = presencePrincipal.takeIf { it.isAuthenticated }?.id
+    val presenceKey = RideDriverPresencePolicy.storageKey(presenceOwnerId)
+    var showLiveness by rememberSaveable(presenceOwnerId) { mutableStateOf(false) }
 
     val openPassengerRegistration: () -> Unit = {
         if (driverMode) viewModel.toggleRideDriverMode()
@@ -172,13 +175,13 @@ fun RideServiceScreen(
         firstAccessRole = "PASSENGER"
     }
 
-    LaunchedEffect(driverMode, driverVerification?.status) {
+    LaunchedEffect(driverMode, driverVerification?.status, presenceKey) {
         if (
-            driverMode &&
+            driverMode && presenceKey != null &&
             RideVerificationPolicy.grantsAccess(driverVerification?.status) &&
             RideDriverPresencePolicy.requiresChallenge(
                 lastVerifiedAtEpochMs = presencePreferences
-                    .getLong("last_verified_at", 0L)
+                    .getLong(presenceKey, 0L)
                     .takeIf { it > 0L },
                 nowEpochMs = System.currentTimeMillis(),
             )
@@ -187,11 +190,13 @@ fun RideServiceScreen(
         }
     }
 
-    if (showLiveness) {
+    if (showLiveness && presenceKey != null) {
+        key(presenceOwnerId) {
         RideLivenessDialog(
             onVerified = { evidenceHash ->
                 val now = System.currentTimeMillis()
-                presencePreferences.edit { putLong("last_verified_at", now) }
+                if (viewModel.activePrincipal.value.id != presenceOwnerId) return@RideLivenessDialog
+                presencePreferences.edit { putLong(presenceKey, now) }
                 viewModel.recordDriverLiveness(evidenceHash, now)
                 showLiveness = false
             },
@@ -200,6 +205,7 @@ fun RideServiceScreen(
                 if (driverMode) viewModel.toggleRideDriverMode()
             },
         )
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -3362,6 +3368,10 @@ fun ActiveRidePanel(
                     }
                 }
                 if (ride.status == "COMPLETED") {
+                    val finalFare = com.elysium369.meet.ride.domain.RideFinalFarePresentation.from(
+                        ride.priceOfferMinor, ride.finalPriceMinor, ride.currency,
+                        ride.serverState, ride.serverVersion,
+                    )
                     Surface(
                         color = MeetColors.neonGreen.copy(alpha = 0.10f),
                         border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.55f)),
@@ -3376,18 +3386,21 @@ fun ActiveRidePanel(
                                 fontWeight = FontWeight.Black,
                             )
                             Text(
-                                "Tarifa aceptada: ${ride.priceOffer} ${ride.currency}",
+                                "Tarifa ofrecida: ${finalFare.offered}",
                                 color = MeetColors.textSecondary,
                                 fontSize = 11.sp,
                             )
                             Text(
-                                "Ajustes registrados: ninguno",
+                                "Diferencia respecto a tarifa ofrecida: ${finalFare.difference}",
                                 color = MeetColors.textSecondary,
                                 fontSize = 11.sp,
                             )
                             Text(
-                                "TOTAL: ${ride.finalPrice ?: ride.priceOffer} ${ride.currency} · " +
-                                    if (ride.paymentMethod == "SINPE") "SINPE" else "Efectivo",
+                                "TOTAL: ${finalFare.total} · " + when (ride.paymentMethod) {
+                                    "SINPE" -> "SINPE"
+                                    "CASH" -> "Efectivo"
+                                    else -> "Método de pago pendiente de validación"
+                                },
                                 color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Black,
@@ -5693,7 +5706,7 @@ private fun TipDialog(
                                 selectedPreset = if (isSelected) null else amount
                                 customTip = ""
                             },
-                            label = { Text("$amount $currency") },
+                            label = { Text("${com.elysium369.meet.ride.domain.RideTipPolicy.display(amount, currency)} $currency") },
                         )
                     }
                 }
@@ -5709,10 +5722,10 @@ private fun TipDialog(
             }
         },
         confirmButton = {
-            val tipMinor = selectedPreset ?: customTip.toLongOrNull()
+            val tipMinor = selectedPreset ?: com.elysium369.meet.ride.domain.RideTipPolicy.parseMajor(customTip, currency)
             TextButton(
                 onClick = { tipMinor?.let { onConfirm(it) } },
-                enabled = tipMinor != null && tipMinor > 0,
+                enabled = tipMinor != null && com.elysium369.meet.ride.domain.RideTipPolicy.isValid(tipMinor, currency),
             ) {
                 Text("ENVIAR PROPINA", fontWeight = FontWeight.Bold)
             }

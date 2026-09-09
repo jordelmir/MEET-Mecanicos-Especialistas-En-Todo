@@ -33,9 +33,10 @@ import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import java.security.MessageDigest
 import java.util.concurrent.Executors
-import kotlin.math.abs
+import android.os.SystemClock
+import com.elysium369.meet.ride.domain.RidePresenceChallenge
+import java.util.concurrent.atomic.AtomicBoolean
 
-private enum class BlinkPhase { FIND_FACE, OPEN, CLOSED, VERIFIED }
 
 @Composable
 fun RideLivenessDialog(
@@ -54,13 +55,68 @@ fun RideLivenessDialog(
         ActivityResultContracts.RequestPermission(),
     ) { hasPermission = it }
     val cameraExecutor = remember { Executors.newSingleThreadExecutor() }
-    var phase by remember { mutableStateOf(BlinkPhase.FIND_FACE) }
+    val challenge = remember { RidePresenceChallenge() }
+    var challengeState by remember { mutableStateOf(challenge.reset()) }
+    var cameraError by remember { mutableStateOf<String?>(null) }
+    var retry by remember { mutableIntStateOf(0) }
+    val previewView = remember { PreviewView(context) }
     var evidenceHash by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
-    DisposableEffect(Unit) { onDispose { cameraExecutor.shutdownNow() } }
+    DisposableEffect(Unit) { onDispose { cameraExecutor.shutdown() } }
+    DisposableEffect(hasPermission, retry, lifecycleOwner) {
+        val disposed = AtomicBoolean(false)
+        var provider: ProcessCameraProvider? = null
+        var analysis: ImageAnalysis? = null
+        var preview: Preview? = null
+        val detector = FaceDetection.getClient(
+            FaceDetectorOptions.Builder()
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+                .enableTracking()
+                .build(),
+        )
+        if (hasPermission) {
+            cameraError = null
+            val future = ProcessCameraProvider.getInstance(context)
+            future.addListener({
+                if (!disposed.get()) {
+                    try {
+                        val cameraProvider = future.get()
+                        provider = cameraProvider
+                        val cameraPreview = Preview.Builder().build().also {
+                            it.setSurfaceProvider(previewView.surfaceProvider)
+                        }
+                        preview = cameraPreview
+                        val imageAnalysis = ImageAnalysis.Builder()
+                            .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                            .build()
+                        analysis = imageAnalysis
+                        imageAnalysis.setAnalyzer(cameraExecutor) { proxy ->
+                            analyzeBlinkFrame(proxy, detector, disposed, challenge) { next, hash, error ->
+                                challengeState = next
+                                if (hash != null) evidenceHash = hash
+                                cameraError = error
+                            }
+                        }
+                        cameraProvider.bindToLifecycle(lifecycleOwner,
+                            CameraSelector.DEFAULT_FRONT_CAMERA, cameraPreview, imageAnalysis)
+                    } catch (_: Exception) {
+                        cameraError = "No se pudo iniciar la cámara frontal. Cierra otras cámaras y reintenta."
+                    }
+                }
+            }, ContextCompat.getMainExecutor(context))
+        }
+        onDispose {
+            disposed.set(true)
+            analysis?.clearAnalyzer()
+            val ownedUseCases = listOfNotNull(preview, analysis).toTypedArray()
+            if (ownedUseCases.isNotEmpty()) provider?.unbind(*ownedUseCases)
+            detector.close()
+        }
+    }
 
     AlertDialog(
         onDismissRequest = {},
@@ -74,51 +130,13 @@ fun RideLivenessDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    when (phase) {
-                        BlinkPhase.FIND_FACE -> "Mira de frente a la cámara"
-                        BlinkPhase.OPEN -> "Ahora parpadea naturalmente"
-                        BlinkPhase.CLOSED -> "Abre los ojos para completar"
-                        BlinkPhase.VERIFIED -> "Presencia confirmada"
-                    },
-                    color = if (phase == BlinkPhase.VERIFIED) MeetColors.neonGreen else Color.White,
+                    cameraError ?: challengeState.instruction,
+                    color = if (challengeState.phase == RidePresenceChallenge.Phase.VERIFIED) MeetColors.neonGreen else Color.White,
                     fontWeight = FontWeight.Bold,
                 )
                 if (hasPermission) {
                     AndroidView(
-                        factory = { viewContext ->
-                            PreviewView(viewContext).also { previewView ->
-                                val providerFuture = ProcessCameraProvider.getInstance(viewContext)
-                                providerFuture.addListener({
-                                    val provider = providerFuture.get()
-                                    val preview = Preview.Builder().build().also {
-                                        it.setSurfaceProvider(previewView.surfaceProvider)
-                                    }
-                                    val detector = FaceDetection.getClient(
-                                        FaceDetectorOptions.Builder()
-                                            .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                                            .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-                                            .enableTracking()
-                                            .build(),
-                                    )
-                                    val analysis = ImageAnalysis.Builder()
-                                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                                        .build()
-                                    analysis.setAnalyzer(cameraExecutor) { proxy ->
-                                        analyzeBlinkFrame(proxy, detector, phase) { next, hash ->
-                                            phase = next
-                                            if (hash != null) evidenceHash = hash
-                                        }
-                                    }
-                                    provider.unbindAll()
-                                    provider.bindToLifecycle(
-                                        lifecycleOwner,
-                                        CameraSelector.DEFAULT_FRONT_CAMERA,
-                                        preview,
-                                        analysis,
-                                    )
-                                }, ContextCompat.getMainExecutor(viewContext))
-                            }
-                        },
+                        factory = { previewView },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(330.dp)
@@ -129,7 +147,7 @@ fun RideLivenessDialog(
                     Text("Se requiere permiso de cámara para validar presencia.", color = MeetColors.warning)
                 }
                 Text(
-                    "El análisis ocurre en el dispositivo. Se conserva un hash de evidencia, no una plantilla facial reutilizable.",
+                    "Esta prueba detecta presencia; no verifica tu identidad. El análisis ocurre en el dispositivo y se conserva un hash, no una plantilla facial.",
                     color = MeetColors.textMuted,
                     fontSize = 9.sp,
                 )
@@ -138,12 +156,21 @@ fun RideLivenessDialog(
         confirmButton = {
             Button(
                 onClick = { evidenceHash?.let(onVerified) },
-                enabled = phase == BlinkPhase.VERIFIED && evidenceHash != null,
+                enabled = challengeState.phase == RidePresenceChallenge.Phase.VERIFIED && evidenceHash != null,
                 colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
             ) { Text("EMPEZAR A CONDUCIR", fontWeight = FontWeight.Black) }
         },
         dismissButton = {
-            TextButton(onClick = onCancel) { Text("VOLVER A PASAJERO") }
+            Column {
+                TextButton(onClick = {
+                    evidenceHash = null
+                    challengeState = challenge.reset()
+                    cameraError = null
+                    if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+                    retry++
+                }) { Text("REINTENTAR PRUEBA") }
+                TextButton(onClick = onCancel) { Text("VOLVER A PASAJERO") }
+            }
         },
     )
 }
@@ -152,29 +179,41 @@ fun RideLivenessDialog(
 private fun analyzeBlinkFrame(
     proxy: ImageProxy,
     detector: com.google.mlkit.vision.face.FaceDetector,
-    phase: BlinkPhase,
-    onPhase: (BlinkPhase, String?) -> Unit,
+    disposed: AtomicBoolean,
+    challenge: RidePresenceChallenge,
+    onState: (RidePresenceChallenge.State, String?, String?) -> Unit,
 ) {
+    if (disposed.get()) { proxy.close(); return }
     val mediaImage = proxy.image ?: run { proxy.close(); return }
-    detector.process(InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees))
-        .addOnSuccessListener { faces ->
-            val face = faces.singleOrNull()
-            if (face == null || abs(face.headEulerAngleY) > 20f || abs(face.headEulerAngleX) > 20f) {
-                onPhase(BlinkPhase.FIND_FACE, null)
-                return@addOnSuccessListener
-            }
-            val left = face.leftEyeOpenProbability ?: return@addOnSuccessListener
-            val right = face.rightEyeOpenProbability ?: return@addOnSuccessListener
-            when (phase) {
-                BlinkPhase.FIND_FACE -> if (left > 0.72f && right > 0.72f) onPhase(BlinkPhase.OPEN, null)
-                BlinkPhase.OPEN -> if (left < 0.28f && right < 0.28f) onPhase(BlinkPhase.CLOSED, null)
-                BlinkPhase.CLOSED -> if (left > 0.65f && right > 0.65f) {
-                    onPhase(BlinkPhase.VERIFIED, proxy.frameEvidenceSha256())
+    try {
+        detector.process(InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees))
+            .addOnSuccessListener { faces ->
+                if (!disposed.get() && !challenge.isComplete) {
+                    val face = faces.singleOrNull()
+                    val state = challenge.accept(RidePresenceChallenge.Observation(
+                        faceCount = faces.size,
+                        trackingId = face?.trackingId,
+                        yaw = face?.headEulerAngleY ?: 0f,
+                        pitch = face?.headEulerAngleX ?: 0f,
+                        leftEye = face?.leftEyeOpenProbability,
+                        rightEye = face?.rightEyeOpenProbability,
+                    ), SystemClock.elapsedRealtime())
+                    val hash = if (state.phase == RidePresenceChallenge.Phase.VERIFIED) proxy.frameEvidenceSha256() else null
+                    onState(state, hash, null)
                 }
-                BlinkPhase.VERIFIED -> Unit
             }
+            .addOnFailureListener {
+                if (!disposed.get() && !challenge.isComplete) onState(challenge.reset(), null,
+                    "No se pudo analizar la cámara. Reintenta la prueba con buena iluminación.")
+            }
+            .addOnCompleteListener { proxy.close() }
+    } catch (_: Exception) {
+        proxy.close()
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            if (!disposed.get() && !challenge.isComplete) onState(challenge.reset(), null,
+                "No se pudo analizar la cámara. Reintenta la prueba.")
         }
-        .addOnCompleteListener { proxy.close() }
+    }
 }
 
 private fun ImageProxy.frameEvidenceSha256(): String {
