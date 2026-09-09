@@ -19,6 +19,8 @@ jobs:
           echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
       - name: Verify native PostGIS bootstrap and compatibility
         run: bash tests/mobility/verify-mobility-geospatial-bootstrap.sh
+      - name: Verify universal offer policy replay preserves authorization
+        run: bash tests/mobility/verify-universal-offer-policy-bootstrap.sh
       - name: Verify canonical passenger and driver ride lifecycle
         run: bash tests/ride/verify-ride-command-authority-postgres.sh
       - name: Execute Mobility Authority V6 Integration Test Suite

@@ -476,8 +476,20 @@ CREATE POLICY "universal_offers_read" ON public.universal_service_offers
         ) OR auth.role() = 'service_role'
     );
 
-CREATE POLICY "universal_offers_provider_write" ON public.universal_service_offers
-    FOR INSERT TO authenticated WITH CHECK (provider_id = auth.uid());
+-- The August universal-services migration already creates this policy. Preserve
+-- its existing authority (including any stricter deployed predicate) on replay.
+DO $universal_offer_policy$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policy
+        WHERE polrelid = 'public.universal_service_offers'::regclass
+          AND polname = 'universal_offers_provider_write'
+    ) THEN
+        CREATE POLICY "universal_offers_provider_write" ON public.universal_service_offers
+            FOR INSERT TO authenticated WITH CHECK (provider_id = auth.uid());
+    END IF;
+END
+$universal_offer_policy$;
 
 CREATE POLICY "universal_offers_service_role_all" ON public.universal_service_offers
     FOR ALL TO service_role USING (TRUE) WITH CHECK (TRUE);
