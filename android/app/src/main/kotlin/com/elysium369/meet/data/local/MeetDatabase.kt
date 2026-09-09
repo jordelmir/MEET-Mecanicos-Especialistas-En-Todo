@@ -40,6 +40,7 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         FleetMemberEntity::class,
         ChatMessageEntity::class,
         ChatBlocklistEntity::class,
+        ChatReportEntity::class,
         DvirReportEntity::class,
         VehicleDnaProfileEntity::class,
         RepairCaseEntity::class,
@@ -186,7 +187,7 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         ScheduledRideEntity::class,
         FavoriteRouteEntity::class,
     ],
-    version = 72,
+    version = 73,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -210,6 +211,7 @@ abstract class MeetDatabase : RoomDatabase() {
     abstract fun repairHistoryDao(): RepairHistoryDao
     abstract fun fleetDao(): FleetDao
     abstract fun chatDao(): ChatDao
+    abstract fun chatReportDao(): ChatReportDao
     abstract fun dvirReportDao(): DvirReportDao
     abstract fun vehicleDnaDao(): VehicleDnaDao
     abstract fun repairCaseDao(): RepairCaseDao

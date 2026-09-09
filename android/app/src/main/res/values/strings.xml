@@ -1,5 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">OBD2 Elysium Vanguard</string>
+    <string name="app_name">MEET — Mecánicos Especialistas En Todo</string>
     <string name="hce_service_desc">MEET Vehicle Access Digital Key</string>
+
+    <!-- Play Store: Location Permission Disclosure -->
+    <string name="location_disclosure_title">Permiso de Ubicación</string>
+    <string name="location_disclosure_message">MEET recopila tu ubicación en tiempo real para mostrar tu posición al pasajero/conductor durante viajes activos. La ubicación se usa exclusivamente para la prestación del servicio de transporte y no se comparte con terceros con fines publicitarios.</string>
+    <string name="location_disclosure_accept">Aceptar y Continuar</string>
+    <string name="location_disclosure_decline">Rechazar</string>
+
+    <!-- Play Store: Background Location Disclosure -->
+    <string name="background_location_disclosure_title">Ubicación en Segundo Plano</string>
+    <string name="background_location_disclosure_message">MEET necesita acceso a tu ubicación en segundo plano para continuar rastreando tu posición durante viajes activos cuando la app está en segundo plano o la pantalla está bloqueada. Esto es necesario para la seguridad del pasajero y el registro preciso de la ruta. La ubicación en segundo plano se desactiva automáticamente cuando el viaje termina.</string>
+
+    <!-- Play Store: UGC Moderation -->
+    <string name="ugc_terms_of_use_title">Términos de Uso — Contenido Generado por Usuarios</string>
+    <string name="ugc_terms_of_use_message">Al usar el chat, calificaciones o cualquier función de contenido dentro de MEET, aceptas nuestros Términos de Uso. No está permitido contenido ofensivo, spam, acoso, fraude o material ilegal. El contenido puede ser revisado y moderado por nuestro equipo.</string>
+
+    <!-- Play Store: Account Deletion -->
+    <string name="account_deletion_info">Puedes eliminar tu cuenta desde Configuración → Eliminar Cuenta, o visitando https://elysium-vanguard.app/delete-account desde cualquier navegador.</string>
 </resources>

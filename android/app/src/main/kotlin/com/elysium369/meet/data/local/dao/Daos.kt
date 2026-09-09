@@ -329,6 +329,21 @@ interface ChatDao {
 }
 
 @Dao
+interface ChatReportDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertReport(report: ChatReportEntity)
+
+    @Query("SELECT COUNT(*) FROM chat_reports WHERE reporterUserId = :reporterId AND reportedUserId = :reportedId AND status != 'DISMISSED'")
+    suspend fun hasActiveReportBetween(reporterId: String, reportedId: String): Int
+
+    @Query("SELECT * FROM chat_reports WHERE businessId = :businessId ORDER BY createdAt DESC")
+    fun getReportsForBusiness(businessId: String): Flow<List<ChatReportEntity>>
+
+    @Query("UPDATE chat_reports SET status = :status, reviewedAt = :reviewedAt WHERE id = :reportId")
+    suspend fun updateReportStatus(reportId: String, status: String, reviewedAt: Long)
+}
+
+@Dao
 interface DvirReportDao {
     @Query("SELECT * FROM dvir_reports WHERE vehicleId = :vehicleId ORDER BY timestamp DESC")
     fun getReportsForVehicle(vehicleId: String): Flow<List<DvirReportEntity>>
