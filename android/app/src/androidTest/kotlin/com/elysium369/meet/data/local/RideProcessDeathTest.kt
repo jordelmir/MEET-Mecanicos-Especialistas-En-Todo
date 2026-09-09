@@ -1,11 +1,19 @@
 package com.elysium369.meet.data.local
 
+import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.elysium369.meet.data.local.entities.ActiveRideSelectionEntity
 import com.elysium369.meet.data.local.entities.RideRequestEntity
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.withTimeout
+import java.util.UUID
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -15,29 +23,38 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Proves that an active ride request survives process death via Room persistence.
- *
- * Flow: create request → select as active → "kill process" (new DB instance)
- *       → restore selection → verify same data returned.
+ * Verifies disk-backed Room reopen persistence and continuous DAO projections.
+ * Reopening a database is not an Android process-kill or Activity restoration test.
  */
 @RunWith(AndroidJUnit4::class)
 class RideProcessDeathTest {
 
     private lateinit var db: MeetDatabase
+    private lateinit var context: Context
+    private lateinit var databaseName: String
+
+    private fun openDatabase(): MeetDatabase = Room.databaseBuilder(
+        context, MeetDatabase::class.java, databaseName,
+    ).allowMainThreadQueries().build()
 
     @Before
     fun setup() {
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            MeetDatabase::class.java,
-        ).allowMainThreadQueries().build()
+        context = ApplicationProvider.getApplicationContext()
+        databaseName = "ride-reopen-${UUID.randomUUID()}.db"
+        db = openDatabase()
     }
 
     @After
-    fun teardown() { db.close() }
+    fun teardown() {
+        try {
+            if (::db.isInitialized) db.close()
+        } finally {
+            if (::databaseName.isInitialized) context.deleteDatabase(databaseName)
+        }
+    }
 
     @Test
-    fun activeRideSelection_survivesProcessDeath() = runBlocking {
+    fun activeRideSelection_survivesDatabaseReopen() = runBlocking {
         val rideDao = db.rideDao()
         val ownerId = "user-process-death-1"
 
@@ -71,22 +88,19 @@ class RideProcessDeathTest {
         )
         rideDao.upsertActiveRideSelection(selection)
 
-        // 3. "Kill process" — create fresh database instance (same schema)
+        // 3. Close and reopen the same on-disk database with a fresh Room instance.
         db.close()
-        db = Room.inMemoryDatabaseBuilder(
-            ApplicationProvider.getApplicationContext(),
-            MeetDatabase::class.java,
-        ).allowMainThreadQueries().build()
+        db = openDatabase()
         val freshDao = db.rideDao()
 
         // 4. Restore active ride selection (simulates init{} in ObdViewModel)
         val restoredSelection = freshDao.getActiveRideSelection(ownerId)
-        assertNotNull("Active ride selection must survive process death", restoredSelection)
+        assertNotNull("Active ride selection must survive database reopen", restoredSelection)
         assertEquals(request.requestId, restoredSelection!!.rideRequestId)
 
         // 5. Load the ride request from the pointer
         val restoredRequest = freshDao.getRequestById(restoredSelection.rideRequestId)
-        assertNotNull("Ride request must be retrievable after process death", restoredRequest)
+        assertNotNull("Ride request must be retrievable after database reopen", restoredRequest)
         assertEquals("ride-pd-001", restoredRequest!!.requestId)
         assertEquals("Test Passenger", restoredRequest.passengerName)
         assertEquals("OPEN", restoredRequest.status)
@@ -168,4 +182,57 @@ class RideProcessDeathTest {
         rideDao.clearActiveRideSelection(ownerId)
         assertNull(rideDao.getActiveRideSelection(ownerId))
     }
+    @Test
+    fun observeRequest_deliversLifecyclePinCompletionAndMissingRowRecovery() = runBlocking {
+        val dao = db.rideDao()
+        val requestId = "ride-continuous-projection"
+        val updates = Channel<RideRequestEntity?>(Channel.UNLIMITED)
+        val collector = launch(start = CoroutineStart.UNDISPATCHED) {
+            dao.observeRequest(requestId).collect { updates.send(it) }
+        }
+        try {
+            assertNull(withTimeout(5_000) { updates.receive() })
+            var request = RideRequestEntity(
+                requestId = requestId, passengerId = "passenger-observer",
+                passengerName = "Passenger", passengerPhone = "",
+                pickupLatitude = 9.93, pickupLongitude = -84.08,
+                pickupAddress = "Pickup", pickupAccuracy = 10f,
+                destLatitude = 10.0, destLongitude = -84.21,
+                destAddress = "Destination", priceOffer = 5000.0,
+                priceOfferMinor = 5000, currency = "CRC", estimatedDistanceKm = 20.0,
+                estimatedDurationMin = 30, status = "OPEN", serverState = "SEARCHING",
+                serverVersion = 1, createdAt = 1_000,
+            )
+            val states = listOf(
+                "SEARCHING" to "OPEN", "ASSIGNED" to "ACCEPTED",
+                "DRIVER_EN_ROUTE" to "ACCEPTED", "ARRIVED" to "ARRIVED",
+                "PASSENGER_ONBOARD" to "PASSENGER_ONBOARD",
+                "IN_PROGRESS" to "IN_PROGRESS", "COMPLETED" to "COMPLETED",
+            )
+            for ((index, state) in states.withIndex()) {
+                request = request.copy(
+                    serverState = state.first, status = state.second,
+                    serverVersion = index + 1L,
+                    boardingPin = if (state.first == "ARRIVED") "4826" else null,
+                    finalPriceMinor = if (state.first == "COMPLETED") 5300 else null,
+                )
+                dao.insertRequest(request)
+                val observed = withTimeout(5_000) {
+                    var next = updates.receive()
+                    while (next?.serverVersion != request.serverVersion) next = updates.receive()
+                    next
+                }
+                assertEquals(request, observed)
+            }
+            // The same collector must recover after temporary local absence.
+            dao.deleteRequest(requestId)
+            assertNull(withTimeout(5_000) { updates.receive() })
+            dao.insertRequest(request)
+            assertEquals(request, withTimeout(5_000) { updates.receive() })
+        } finally {
+            collector.cancelAndJoin()
+            updates.close()
+        }
+    }
+
 }

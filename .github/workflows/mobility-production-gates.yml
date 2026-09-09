@@ -15,7 +15,14 @@ jobs:
       - name: Install PostgreSQL server and client
         run: |
           sudo apt-get update
-          sudo apt-get install -y postgresql postgresql-contrib
+          sudo apt-get install -y postgresql postgresql-contrib postgis
+          echo "$(pg_config --bindir)" >> "$GITHUB_PATH"
+      - name: Verify native PostGIS bootstrap and compatibility
+        run: bash tests/mobility/verify-mobility-geospatial-bootstrap.sh
+      - name: Verify universal offer policy replay preserves authorization
+        run: bash tests/mobility/verify-universal-offer-policy-bootstrap.sh
+      - name: Verify canonical passenger and driver ride lifecycle
+        run: bash tests/ride/verify-ride-command-authority-postgres.sh
       - name: Execute Mobility Authority V6 Integration Test Suite
         run: bash tests/mobility/verify-mobility-authority-postgres.sh
       - name: Execute 100-Way Concurrent Dispatch and Idempotency Suite
@@ -44,7 +51,7 @@ jobs:
       - name: Compile Kotlin Debug
         run: ./gradlew :app:compileDebugKotlin
       - name: Run Mobility OS Unit & Parity Tests
-        run: ./gradlew :app:testDebugUnitTest --tests "com.elysium369.meet.mobility.*"
+        run: ./gradlew :app:testDebugUnitTest --tests "com.elysium369.meet.mobility.*" --tests "com.elysium369.meet.ride.*"
 
   cross-runtime-parity-gate:
     name: Cross-Runtime Parity Verification

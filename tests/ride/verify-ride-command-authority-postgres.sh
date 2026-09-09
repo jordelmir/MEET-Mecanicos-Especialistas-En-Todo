@@ -271,3 +271,13 @@ done
 
 psql "${psql_args[@]}" \
   -f "$repo_root/tests/ride/ride-schema-drift-hardening-integration.sql"
+
+# Exercise post-trip tipping against the canonical id/state ride schema.
+for migration in \
+  20260903010000_ride_tip_system.sql \
+  20260908020000_ride_tip_authority_repair.sql; do
+  psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/$migration" >/dev/null
+done
+
+psql "${psql_args[@]}" \
+  -f "$repo_root/tests/ride/ride-tip-authority-integration.sql"

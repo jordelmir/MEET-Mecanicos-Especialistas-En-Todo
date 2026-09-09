@@ -6,6 +6,12 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.rpc
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import com.elysium369.meet.data.local.dao.RideDao
 import kotlinx.serialization.json.JsonPrimitive
 
 /**
@@ -19,6 +25,8 @@ class RideCompletionHelper(
     private val scope: CoroutineScope,
     private val context: Context,
     private val noticeEmitter: suspend (String) -> Unit,
+    private val rideDao: RideDao,
+    private val currentUserId: () -> String?,
 ) {
     fun exportGpsForensicTrail(rideId: String) {
         scope.launch {
@@ -42,10 +50,19 @@ class RideCompletionHelper(
     }
 
     fun submitTip(rideId: String, tipMinor: Long, currency: String) {
-        scope.launch {
-            noticeEmitter("Enviando propina…")
-            runCatching {
-                SupabaseModule.client.postgrest.rpc(
+        scope.launch(Dispatchers.IO) {
+            val actor = currentUserId()
+            val ride = rideDao.getRequestById(rideId)
+            if (actor == null || ride?.passengerId != actor ||
+                ride.serverState != "COMPLETED" || ride.currency != currency ||
+                !RideTipPolicy.isValid(tipMinor, currency)
+            ) {
+                noticeEmitter("La propina requiere un viaje completado de tu cuenta y un importe válido.")
+                return@launch
+            }
+            noticeEmitter("Registrando propina…")
+            try {
+                val response = SupabaseModule.client.postgrest.rpc(
                     function = "ride_submit_tip_v1",
                     parameters = kotlinx.serialization.json.buildJsonObject {
                         put("p_ride_id", JsonPrimitive(rideId))
@@ -53,10 +70,20 @@ class RideCompletionHelper(
                         put("p_currency", JsonPrimitive(currency))
                     },
                 )
-            }.onSuccess {
-                noticeEmitter("Propina de $tipMinor $currency enviada. ¡Gracias!")
-            }.onFailure {
-                noticeEmitter("Error al enviar propina: ${it.message?.take(80)}")
+                val receipt = kotlinx.serialization.json.Json.parseToJsonElement(response.data).jsonObject
+                check(receipt["ok"]?.jsonPrimitive?.booleanOrNull == true)
+                check(receipt["tip_minor"]?.jsonPrimitive?.content?.toLongOrNull() == tipMinor)
+                check(receipt["currency"]?.jsonPrimitive?.content == currency)
+                rideDao.recordConfirmedTip(rideId, actor, tipMinor)
+                if (currentUserId() == actor) {
+                    noticeEmitter("Propina registrada: ${RideTipPolicy.display(tipMinor, currency)} $currency. Pago pendiente de confirmación.")
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (currentUserId() == actor) {
+                    noticeEmitter("No se confirmó la propina. Puedes reintentar sin duplicarla.")
+                }
             }
         }
     }

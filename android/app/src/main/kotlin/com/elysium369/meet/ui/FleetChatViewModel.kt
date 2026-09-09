@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.core.audio.VoicePlayer
 import com.elysium369.meet.core.audio.VoiceRecorder
 import com.elysium369.meet.data.local.dao.ChatDao
+import com.elysium369.meet.data.local.dao.ChatReportDao
 import com.elysium369.meet.data.local.dao.FleetDao
 import com.elysium369.meet.data.local.dao.VehicleDao
 import com.elysium369.meet.data.local.entities.*
@@ -28,6 +29,7 @@ import javax.inject.Inject
 @HiltViewModel
 class FleetChatViewModel @Inject constructor(
     private val chatDao: ChatDao,
+    private val chatReportDao: ChatReportDao,
     private val fleetDao: FleetDao,
     private val vehicleDao: VehicleDao,
     @ApplicationContext private val context: Context
@@ -168,6 +170,36 @@ class FleetChatViewModel @Inject constructor(
                 )
                 chatDao.blockUser(blockEntry)
                 _isPartnerBlocked.value = true
+            }
+        }
+    }
+
+    /**
+     * Report a user for policy violation (UGC moderation).
+     * Google Play requires accessible reporting for UGC apps.
+     */
+    fun reportUser(reason: String, description: String, reportedMessageId: String? = null) {
+        val businessId = _selectedBusinessId.value ?: return
+        val partner = _selectedPartner.value ?: return
+
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val report = ChatReportEntity(
+                    id = "${businessId}_${currentUserId}_${partner.userId}_${System.currentTimeMillis()}",
+                    businessId = businessId,
+                    reporterUserId = currentUserId,
+                    reportedUserId = partner.userId,
+                    reportedMessageId = reportedMessageId,
+                    reason = reason,
+                    description = description,
+                    status = "PENDING",
+                    createdAt = System.currentTimeMillis(),
+                    reviewedAt = null
+                )
+                chatReportDao.insertReport(report)
+                Log.i("FleetChatVM", "User report submitted: ${report.id}")
+            } catch (e: Exception) {
+                Log.e("FleetChatVM", "Failed to submit user report", e)
             }
         }
     }

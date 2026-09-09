@@ -760,6 +760,12 @@ interface RideDao {
     @Query("SELECT * FROM ride_requests WHERE requestId = :requestId LIMIT 1")
     suspend fun getRequestById(requestId: String): RideRequestEntity?
 
+    @Query("SELECT * FROM ride_requests WHERE requestId = :requestId LIMIT 1")
+    fun observeRequest(requestId: String): Flow<RideRequestEntity?>
+
+    @Query("UPDATE ride_requests SET tipAmountMinor = :amount WHERE requestId = :requestId AND passengerId = :passengerId")
+    suspend fun recordConfirmedTip(requestId: String, passengerId: String, amount: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertRequest(request: RideRequestEntity)
 

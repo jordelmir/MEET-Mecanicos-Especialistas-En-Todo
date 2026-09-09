@@ -195,7 +195,7 @@ INSERT INTO public.driver_presence_snapshot (
     '22222222-2222-2222-2222-222222222222'::uuid,
     '66666666-6666-6666-6666-666666666666'::uuid,
     'CR_SJO', 'AVAILABLE',
-    ROW(-84.0833, 9.9333, 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0833, 9.9333), 4326)::extensions.geography,
     90.0, 0.0, 10
 ) ON CONFLICT (driver_id) DO UPDATE SET sequence_id = 10;
 SQL
@@ -347,8 +347,8 @@ INSERT INTO public.ride_requests (
     'cccccccc-3333-3333-3333-333333333333'::uuid,
     '11111111-1111-1111-1111-111111111111'::uuid,
     'CR_SJO', 'cat_sjo_standard', 'AUTO_DISPATCH', 'SEARCHING',
-    ROW(-84.0833, 9.9333, 4326)::extensions.geography,
-    ROW(-84.0700, 9.9200, 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0833, 9.9333), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0700, 9.9200), 4326)::extensions.geography,
     'CRC', extensions.gen_random_uuid(), 1
 ) ON CONFLICT DO NOTHING;
 
@@ -479,8 +479,8 @@ INSERT INTO public.ride_requests (
     'dddddddd-3333-3333-3333-333333333333'::uuid,
     '11111111-1111-1111-1111-111111111111'::uuid,
     'CR_SJO', 'cat_sjo_standard', 'AUTO_DISPATCH', 'MATCHED',
-    ROW(-84.0833, 9.9333, 4326)::extensions.geography,
-    ROW(-84.0700, 9.9200, 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0833, 9.9333), 4326)::extensions.geography,
+    extensions.ST_SetSRID(extensions.ST_MakePoint(-84.0700, 9.9200), 4326)::extensions.geography,
     'CRC', extensions.gen_random_uuid(), 1
 ) ON CONFLICT DO NOTHING;
 

@@ -59,6 +59,7 @@ fun FleetChatDetailScreen(
     val audioPositionText by viewModel.audioPositionText.collectAsState()
 
     var textInput by remember { mutableStateOf("") }
+    var showReportDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
 
     LaunchedEffect(messages.size) {
@@ -100,6 +101,13 @@ fun FleetChatDetailScreen(
                 title = partner?.userId ?: "Chat",
                 onBackClick = onBack,
                 actions = {
+                    IconButton(onClick = { showReportDialog = true }) {
+                        AnimatedNeonIcon(
+                            imageVector = Icons.Default.Flag,
+                            contentDescription = "Reportar usuario",
+                            tint = MeetColors.warning
+                        )
+                    }
                     IconButton(onClick = { viewModel.toggleBlockActivePartner() }) {
                         AnimatedNeonIcon(
                             imageVector = if (isBlocked) Icons.Default.LockOpen else Icons.Default.Block,
@@ -264,11 +272,88 @@ fun FleetChatDetailScreen(
                                     }
                             ) {
                                 AnimatedNeonIcon(Icons.Default.Mic, contentDescription = "Grabar", tint = MeetColors.electricBlue)
-                            }
-                        }
-                    }
                 }
             }
+        }
+    }
+
+    if (showReportDialog) {
+        val reportReasons = listOf(
+            "SPAM" to "Spam o contenido no solicitado",
+            "HARASSMENT" to "Acoso o intimidación",
+            "INAPPROPRIATE_CONTENT" to "Contenido inapropiado",
+            "FRAUD" to "Fraude o actividad sospechosa",
+            "OTHER" to "Otro motivo"
+        )
+        var selectedReason by remember { mutableStateOf("SPAM") }
+        var reportDescription by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            title = {
+                Text("Reportar usuario", color = MeetColors.textPrimary)
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Selecciona el motivo del reporte. Tu reporte será revisado por nuestro equipo de moderación.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 12.sp
+                    )
+                    reportReasons.forEach { (key, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (selectedReason == key) MeetColors.electricBlue.copy(alpha = 0.15f)
+                                    else MeetColors.backgroundDeep
+                                )
+                                .clickable { selectedReason = key }
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = selectedReason == key,
+                                onClick = { selectedReason = key },
+                                colors = RadioButtonDefaults.colors(selectedColor = MeetColors.electricBlue)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(label, color = MeetColors.textPrimary, fontSize = 13.sp)
+                        }
+                    }
+                    OutlinedTextField(
+                        value = reportDescription,
+                        onValueChange = { reportDescription = it },
+                        label = { Text("Descripción (opcional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MeetColors.electricBlue,
+                            unfocusedBorderColor = MeetColors.textSecondary
+                        )
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.reportUser(selectedReason, reportDescription)
+                        showReportDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.error)
+                ) {
+                    Text("REPORTAR", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showReportDialog = false }) {
+                    Text("CANCELAR", color = MeetColors.textSecondary)
+                }
+            },
+            containerColor = MeetColors.cardBackground,
+        )
+    }
+}
         }
     }
 }

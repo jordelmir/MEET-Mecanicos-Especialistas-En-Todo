@@ -22,26 +22,49 @@
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
--- Geospatial shim compatibility helpers.
--- On clean bootstrap, PostGIS already owns these functions via CREATE EXTENSION.
--- DROP IF EXISTS removes them so we can recreate as thin wrappers.
-DROP FUNCTION IF EXISTS extensions.ST_AsText(extensions.geography) CASCADE;
-CREATE OR REPLACE FUNCTION extensions.ST_AsText(geom extensions.geography)
-RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
-    SELECT public.ST_AsText(geom::public.geometry)
-$$;
+-- Geospatial shim compatibility helpers. Preserve native PostGIS functions and
+-- their dependants. The V6 fallback uses a composite geography without geometry.
+DO $geospatial_helpers$
+DECLARE
+    v_geometry_schema TEXT;
+    v_composite BOOLEAN;
+    v_function TEXT;
+    v_expression TEXT;
+    v_result TEXT;
+BEGIN
+    SELECT t.typtype = 'c' INTO v_composite
+    FROM pg_type t WHERE t.oid = 'extensions.geography'::regtype;
 
-DROP FUNCTION IF EXISTS extensions.ST_X(extensions.geography) CASCADE;
-CREATE OR REPLACE FUNCTION extensions.ST_X(geom extensions.geography)
-RETURNS DOUBLE PRECISION LANGUAGE sql IMMUTABLE AS $$
-    SELECT public.ST_X(geom::public.geometry)
-$$;
+    SELECT n.nspname INTO v_geometry_schema
+    FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace
+    WHERE e.extname = 'postgis';
 
-DROP FUNCTION IF EXISTS extensions.ST_Y(extensions.geography) CASCADE;
-CREATE OR REPLACE FUNCTION extensions.ST_Y(geom extensions.geography)
-RETURNS DOUBLE PRECISION LANGUAGE sql IMMUTABLE AS $$
-    SELECT public.ST_Y(geom::public.geometry)
-$$;
+    FOREACH v_function IN ARRAY ARRAY['st_astext', 'st_x', 'st_y'] LOOP
+        IF to_regprocedure(format('extensions.%I(extensions.geography)', v_function)) IS NOT NULL THEN
+            CONTINUE;
+        END IF;
+
+        v_result := CASE WHEN v_function = 'st_astext' THEN 'text' ELSE 'double precision' END;
+        IF v_composite THEN
+            v_expression := CASE v_function
+                WHEN 'st_astext' THEN $expr$'POINT(' || ($1).lng::text || ' ' || ($1).lat::text || ')'$expr$
+                WHEN 'st_x' THEN '($1).lng'
+                WHEN 'st_y' THEN '($1).lat'
+            END;
+        ELSIF v_geometry_schema IS NOT NULL THEN
+            v_expression := format('%I.%I($1::%I.geometry)',
+                v_geometry_schema, v_function, v_geometry_schema);
+        ELSE
+            RAISE EXCEPTION 'Unsupported geography type: PostGIS or V6 composite shim required';
+        END IF;
+
+        EXECUTE format(
+            'CREATE FUNCTION extensions.%I(extensions.geography) RETURNS %s LANGUAGE sql IMMUTABLE STRICT SET search_path = pg_catalog AS %L',
+            v_function, v_result, 'SELECT ' || v_expression
+        );
+    END LOOP;
+END
+$geospatial_helpers$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. GATE P0: PRIVATE SCHEMA & 6-DIGIT CSPRNG PIN CHALLENGE AUTHORITY

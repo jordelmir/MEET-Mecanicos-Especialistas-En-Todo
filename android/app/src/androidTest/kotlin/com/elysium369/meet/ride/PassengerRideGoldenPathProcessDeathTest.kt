@@ -10,6 +10,8 @@ import com.elysium369.meet.data.local.entities.RideRequestEntity
 import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
 import com.elysium369.meet.ride.data.local.RideOutboxStatus
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -100,6 +102,36 @@ class PassengerRideGoldenPathProcessDeathTest {
         assertEquals("SERVER_CONFIRMED", restoredRide?.syncState)
         assertEquals(commandKey, restoredCommand?.idempotencyKey)
         assertEquals(RideOutboxStatus.PENDING, restoredCommand?.status)
+    }
+
+    @Test
+    fun selectedRideObservesEveryConfirmedStageAndPendingCommand() = runBlocking {
+        database = openDatabase()
+        val dao = requireNotNull(database).rideDao()
+        val rideId = "11111111-1111-1111-1111-111111111111"
+        val ownerId = "22222222-2222-2222-2222-222222222222"
+        val base = serverConfirmedActiveRide(rideId, ownerId, 1_788_805_000_000L)
+        val stages = listOf(
+            "SEARCHING", "ASSIGNED", "DRIVER_EN_ROUTE", "ARRIVED",
+            "PASSENGER_ONBOARD", "IN_PROGRESS", "COMPLETED",
+        )
+        for ((index, state) in stages.withIndex()) {
+            dao.insertRequest(base.copy(serverState = state, status = state, serverVersion = index + 1L))
+            val observed = withTimeout(5_000) {
+                dao.observeRequest(rideId).first { it?.serverState == state }
+            }
+            assertEquals(index + 1L, observed?.serverVersion)
+        }
+        dao.markCommandPending(rideId)
+        assertEquals("PENDING", withTimeout(5_000) {
+            dao.observeRequest(rideId).first { it?.syncState == "PENDING" }
+        }?.syncState)
+        dao.recordConfirmedTip(rideId, ownerId, 500)
+        assertEquals(500L, withTimeout(5_000) {
+            dao.observeRequest(rideId).first { it?.tipAmountMinor == 500L }
+        }?.tipAmountMinor)
+        assertEquals(0, dao.recordConfirmedTip(rideId, "other-account", 900))
+        assertEquals(500L, dao.getRequestById(rideId)?.tipAmountMinor)
     }
 
     private fun openDatabase(): MeetDatabase =

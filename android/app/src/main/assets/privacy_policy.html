@@ -1,19 +1,111 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-<title>Política de Privacidad - OBD2 Elysium Vanguard</title>
-<style>body { font-family: sans-serif; padding: 20px; line-height: 1.6; }</style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Política de Privacidad — MEET Mecánicos Especialistas En Todo</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 24px; line-height: 1.7; color: #1a1a2e; background: #fafafa; }
+h1 { font-size: 1.6em; border-bottom: 2px solid #0f3460; padding-bottom: 8px; }
+h2 { font-size: 1.2em; color: #0f3460; margin-top: 24px; }
+p, li { font-size: 0.95em; }
+ul { padding-left: 20px; }
+strong { color: #0f3460; }
+.footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; font-size: 0.85em; color: #666; }
+</style>
 </head>
 <body>
-<h1>Política de Privacidad</h1>
-<p>Última actualización: Abril 2026</p>
+
+<h1>Política de Privacidad — MEET</h1>
+<p><strong>Última actualización:</strong> 8 de septiembre de 2026</p>
+<p><strong>Entidad responsable:</strong> Elysium Vanguard ( MEET — Mecánicos Especialistas En Todo )</p>
+<p><strong>Contacto:</strong> privacidad@elysium-vanguard.app</p>
+
 <h2>1. Información que Recolectamos</h2>
-<p>Recolectamos datos de diagnóstico de tu vehículo (DTCs, métricas) para mostrártelos en la aplicación. Si inicias sesión, guardamos esta información en Supabase bajo tu cuenta.</p>
+<p>MEET recopila únicamente la información necesaria para prestar el servicio de conexión entre pasajeros y conductores, diagnóstico vehicular y gestión de flotas:</p>
+<ul>
+  <li><strong>Cuenta:</strong> nombre completo, número de teléfono, correo electrónico, foto de perfil (opcional).</li>
+  <li><strong>Ubicación GPS:</strong> ubicación en tiempo real del conductor durante viajes activos, y ubicación del pasajero al solicitar un servicio. La ubicación en segundo plano se utiliza exclusivamente para la prestación del servicio de transporte y rastreo de ruta.</li>
+  <li><strong>Datos del vehículo:</strong> VIN, placa, marca, modelo, año, motor, lecturas OBD-II (DTCs, PID, métricas) cuando el usuario conecta un adaptador.</li>
+  <li><strong>Datos de uso:</strong> registros de viajes, calificaciones, mensajes de chat dentro de la plataforma, comprobantes de pago SINPE (fotografías).</li>
+  <li><strong>Datos de facturación:</strong> historial de comisiones, saldo de billetera, transacciones de recarga.</li>
+</ul>
+
 <h2>2. Uso de la Información</h2>
-<p>La información recolectada se usa estrictamente para generar reportes y diagnósticos mecánicos de IA.</p>
+<p>La información se utiliza para:</p>
+<ul>
+  <li>Conectar pasajeros con conductores disponibles en su zona.</li>
+  <li>Mostrar la ubicación en tiempo real durante el viaje.</li>
+  <li>Generar diagnósticos vehiculares asistidos por IA.</li>
+  <li>Procesar comisiones y gestionar la billetera del conductor.</li>
+  <li>Prevenir fraude y proteger la seguridad de los usuarios.</li>
+  <li>Cumplir obligaciones legales y tributarias.</li>
+</ul>
+
 <h2>3. Compartir con Terceros</h2>
-<p>No vendemos ni compartimos tu información con terceros con fines publicitarios.</p>
-<h2>4. Eliminación de Datos</h2>
-<p>Puedes eliminar tu cuenta y todos tus datos guardados directamente desde la configuración de la app.</p>
+<p><strong>No vendemos ni compartimos</strong> tu información personal con terceros con fines publicitarios.</p>
+<p>Compartimos datos únicamente con:</p>
+<ul>
+  <li><strong>Supabase:</strong> proveedor de backend que almacena datos de forma encriptada (TLS 1.3).</li>
+  <li><strong>Google Play Services:</strong> para autenticación, mapas y servicios de ubicación.</li>
+  <li><strong>LiveKit:</strong> para llamadas de voz dentro de la plataforma (cuando aplica).</li>
+  <li><strong>Autoridades competentes:</strong> cuando exista obligación legal, orden judicial o investigación de fraude.</li>
+</ul>
+
+<h2>4. Seguridad de los Datos</h2>
+<ul>
+  <li>Todas las comunicaciones se realizan mediante TLS 1.3.</li>
+  <li>Las contraseñas y tokens de sesión se almacenan de forma segura en el dispositivo (Android Keystore).</li>
+  <li>Los datos sensibles (claves de API, credenciales) nunca se incluyen en el APK de producción.</li>
+  <li>Se aplica principio de mínimo privilegio en todas las funciones del sistema.</li>
+</ul>
+
+<h2>5. Retención de Datos</h2>
+<ul>
+  <li><strong>Datos de cuenta:</strong> se eliminan dentro de los 30 días posteriores a la solicitud de eliminación.</li>
+  <li><strong>Registros de viajes:</strong> se retienen por 5 años para cumplimiento tributario y resolución de disputas.</li>
+  <li><strong>Datos de diagnóstico vehicular:</strong> se eliminan cuando el usuario elimina su cuenta.</li>
+  <li><strong>Comprobantes de pago SINPE:</strong> se retienen por 3 años para auditoría financiera.</li>
+</ul>
+
+<h2>6. Eliminación de Cuenta</h2>
+<p>Puedes eliminar tu cuenta de las siguientes formas:</p>
+<ul>
+  <li><strong>Dentro de la app:</strong> Configuración → Eliminar Cuenta. Esto elimina tus datos locales y solicita la purga del servidor.</li>
+  <li><strong>Sin la app:</strong> Visita <a href="https://elysium-vanguard.app/delete-account">https://elysium-vanguard.app/delete-account</a> para solicitar eliminación desde cualquier navegador.</li>
+</ul>
+<p>La eliminación es permanente e irreversible. Dentro de los 30 días se eliminarán todos tus datos personales, excepto aquellos que debamos retener por obligación legal (registros de transacciones financieras por 3 años, registros de viajes por 5 años).</p>
+
+<h2>7. Derechos del Usuario (GDPR / CCPA)</h2>
+<ul>
+  <li><strong>Acceso:</strong> puedes solicitar una copia de todos tus datos personales.</li>
+  <li><strong>Rectificación:</strong> puedes corregir datos inexactos desde tu perfil.</li>
+  <li><strong>Portabilidad:</strong> puedes exportar tus datos en formato estándar.</li>
+  <li><strong>Oposición:</strong> puedes oponerte al procesamiento de tus datos para fines no esenciales.</li>
+  <li><strong>No discriminación:</strong> el ejercicio de tus derechos no afectará el servicio que recibes.</li>
+</ul>
+
+<h2>8. Privacidad de Menores</h2>
+<p>MEET no está dirigido a menores de 18 años. No recopilamos intencionadamente información de menores. Si descubrimos que hemos recopilado datos de un menor, los eliminaremos de inmediato.</p>
+
+<h2>9. Cookies y Tecnologías de Rastreo</h2>
+<p>MEET es una aplicación nativa. No utilizamos cookies en la aplicación. Los datos de uso se recopilan únicamente a través de Android Analytics (opcional, deshabilitable).</p>
+
+<h2>10. Cambios en esta Política</h2>
+<p> Nos reservamos el derecho de actualizar esta política. Los cambios importantes se notificarán a través de la aplicación y/o por correo electrónico. La fecha de "Última actualización" se actualizará al inicio del documento.</p>
+
+<h2>11. Contacto</h2>
+<p>Para preguntas sobre privacidad, solicitudes de datos o eliminación de cuenta:</p>
+<ul>
+  <li><strong>Email:</strong> privacidad@elysium-vanguard.app</li>
+  <li><strong>Web:</strong> <a href="https://elysium-vanguard.app/privacy">https://elysium-vanguard.app/privacy</a></li>
+  <li><strong>Eliminación:</strong> <a href="https://elysium-vanguard.app/delete-account">https://elysium-vanguard.app/delete-account</a></li>
+</ul>
+
+<div class="footer">
+  <p>© 2026 Elysium Vanguard — MEET Mecánicos Especialistas En Todo. Todos los derechos reservados.</p>
+  <p>Esta política es accesible dentro de la aplicación (Configuración → Privacidad) y en <a href="https://elysium-vanguard.app/privacy">https://elysium-vanguard.app/privacy</a>.</p>
+</div>
+
 </body>
 </html>

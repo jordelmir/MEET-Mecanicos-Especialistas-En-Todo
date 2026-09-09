@@ -4549,6 +4549,30 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_72_73 = object : Migration(72, 73) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // ChatReports (UGC moderation — Play Store requirement)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `chat_reports` (
+                    `id` TEXT NOT NULL PRIMARY KEY,
+                    `businessId` TEXT NOT NULL,
+                    `reporterUserId` TEXT NOT NULL,
+                    `reportedUserId` TEXT NOT NULL,
+                    `reportedMessageId` TEXT,
+                    `reason` TEXT NOT NULL,
+                    `description` TEXT,
+                    `status` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `reviewedAt` INTEGER
+                )
+            """)
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_chat_reports_businessId` ON `chat_reports` (`businessId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_chat_reports_reporterUserId` ON `chat_reports` (`reporterUserId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_chat_reports_reportedUserId` ON `chat_reports` (`reportedUserId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_chat_reports_status` ON `chat_reports` (`status`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4608,6 +4632,7 @@ object AppModule {
             MIGRATION_69_70,
             MIGRATION_70_71,
             MIGRATION_71_72,
+            MIGRATION_72_73,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -4703,6 +4728,9 @@ object AppModule {
 
     @Provides
     fun provideChatDao(db: MeetDatabase): ChatDao = db.chatDao()
+
+    @Provides
+    fun provideChatReportDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.ChatReportDao = db.chatReportDao()
 
     @Provides
     @Singleton

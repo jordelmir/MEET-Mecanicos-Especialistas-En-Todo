@@ -4,6 +4,9 @@ import java.time.Instant
 import java.time.ZoneId
 
 object RideDriverPresencePolicy {
+    fun storageKey(ownerId: String?): String? =
+        ownerId?.takeIf { it.isNotBlank() }?.let { "last_verified_at:$it" }
+
     const val MAX_SESSION_MS = 12 * 60 * 60 * 1000L
 
     fun requiresChallenge(

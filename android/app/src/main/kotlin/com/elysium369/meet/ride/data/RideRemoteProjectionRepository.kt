@@ -287,6 +287,7 @@ class RideRemoteProjectionRepository @Inject constructor(
             lastCorrelationId = existing?.lastCorrelationId,
             boardingPin = existing?.boardingPin,
             boardingPinExpiresAt = existing?.boardingPinExpiresAt,
+            tipAmountMinor = existing?.tipAmountMinor,
             passengerRating = existing?.passengerRating,
             driverRating = existing?.driverRating,
             createdAt = createdAt.toEpochMillisOr(existing?.createdAt ?: 0L),

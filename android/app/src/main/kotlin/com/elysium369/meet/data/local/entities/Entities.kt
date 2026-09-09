@@ -342,6 +342,20 @@ data class ChatBlocklistEntity(
     val blockedAt: Long
 )
 
+@Entity(tableName = "chat_reports")
+data class ChatReportEntity(
+    @PrimaryKey val id: String, // businessId_reporterId_reportedId_timestamp
+    val businessId: String,
+    val reporterUserId: String,
+    val reportedUserId: String,
+    val reportedMessageId: String?,
+    val reason: String, // "SPAM", "HARASSMENT", "INAPPROPRIATE_CONTENT", "FRAUD", "OTHER"
+    val description: String?,
+    val status: String, // "PENDING", "REVIEWED", "RESOLVED", "DISMISSED"
+    val createdAt: Long,
+    val reviewedAt: Long?
+)
+
 @Entity(tableName = "dvir_reports")
 data class DvirReportEntity(
     @PrimaryKey val id: String,
