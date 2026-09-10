@@ -1310,3 +1310,30 @@ DO $$ BEGIN
 END $$;
 SQL
 echo 'PASS: concurrent capture event ownership (one winner), required financial evidence, unambiguous RPC'
+
+# Isolated backup/restore drill. This proves fixture recovery, not production PITR/RPO/RTO.
+for restore_command in pg_dump pg_restore createdb; do
+  command -v "$restore_command" >/dev/null || { echo "FAIL: restore drill requires $restore_command"; exit 1; }
+done
+restore_started="$SECONDS"
+pg_dump -h "$socket_dir" -p "$port" -d postgres -Fc -f "$runtime_dir/mobility-backup.dump"
+createdb -h "$socket_dir" -p "$port" mobility_restore
+pg_restore -h "$socket_dir" -p "$port" -d mobility_restore --exit-on-error --no-owner --no-privileges "$runtime_dir/mobility-backup.dump"
+restore_invariants="SELECT json_build_array((SELECT count(*) FROM public.trips), (SELECT count(*) FROM public.payment_authorizations), (SELECT count(*) FROM public.payment_provider_events), (SELECT count(*) FROM public.ledger_transactions), (SELECT count(*) FROM public.ledger_entries));"
+original_counts="$(psql "${psql_args[@]}" -At -c "$restore_invariants")"
+restored_counts="$(psql -h "$socket_dir" -p "$port" -d mobility_restore -v ON_ERROR_STOP=1 -At -c "$restore_invariants")"
+[[ "$original_counts" == "$restored_counts" ]] || { echo 'FAIL: restored mobility counts differ'; exit 1; }
+psql -h "$socket_dir" -p "$port" -d mobility_restore -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $$ BEGIN
+    IF EXISTS (SELECT transaction_id FROM public.ledger_entries GROUP BY transaction_id HAVING sum(amount_minor) <> 0) THEN
+        RAISE EXCEPTION 'Restored ledger is unbalanced';
+    END IF;
+    IF EXISTS (SELECT 1 FROM public.ledger_entries e LEFT JOIN public.ledger_transactions t ON t.transaction_id=e.transaction_id WHERE t.transaction_id IS NULL) THEN
+        RAISE EXCEPTION 'Restored ledger has missing references';
+    END IF;
+    IF (SELECT count(*) FROM public.payment_provider_events WHERE provider_event_id='evt_concurrent_shared') <> 1 THEN
+        RAISE EXCEPTION 'Restored capture event ownership invalid';
+    END IF;
+END $$;
+SQL
+echo "PASS: isolated mobility backup/restore, count parity and ledger invariants ($((SECONDS - restore_started)) seconds; local fixture only)"
