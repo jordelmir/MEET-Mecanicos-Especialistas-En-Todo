@@ -26,7 +26,7 @@ interface RideRoutingProvider {
     suspend fun route(waypoints: List<RideGeoPoint>): RideRoadRoute
 }
 
-class RideRoutingException(message: String) : Exception(message)
+class RideRoutingException(message: String, val infrastructureFailure: Boolean = true) : Exception(message)
 
 class OsrmRideRoutingProvider(
     private val endpoint: String,
@@ -61,6 +61,7 @@ class OsrmRideRoutingProvider(
             if (connection.responseCode !in 200..299) {
                 throw RideRoutingException(
                     "Routing HTTP ${connection.responseCode}",
+                    infrastructureFailure = connection.responseCode == 429 || connection.responseCode >= 500,
                 )
             }
             parseOsrmRoute(
@@ -110,6 +111,7 @@ internal fun parseOsrmRoute(
         throw RideRoutingException(
             response.message?.takeIf(String::isNotBlank)
                 ?: "No se encontró una ruta vial",
+            infrastructureFailure = response.code !in setOf("NoRoute", "NoSegment", "InvalidQuery", "InvalidOptions", "InvalidValue", "TooBig"),
         )
     }
     val route = response.routes.firstOrNull()
