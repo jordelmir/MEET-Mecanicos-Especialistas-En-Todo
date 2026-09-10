@@ -120,6 +120,7 @@ psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906060000_mobilit
 psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906070000_mobility_hardening_and_stops_authority.sql"
 psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906080000_mobility_public_launch_v11_closure.sql"
 psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906090000_mobility_provider_operations_v12_closure.sql"
+psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260910020000_mobility_dispute_resolution_authority.sql"
 
 echo "=== 4. Seeding Test Entities (Rider, Driver, Stranger, Market, Vehicle) ==="
 psql "${psql_args[@]}" <<'SQL'
@@ -359,6 +360,47 @@ INSERT INTO public.mobility_trip_disputes (
 COMMIT;
 SQL
 echo "  [PASS] Rider successfully filed dedicated TripDispute aggregate."
+
+psql "${psql_args[@]}" <<'SQL'
+BEGIN;
+SET LOCAL ROLE authenticated;
+SET LOCAL "request.jwt.claim.sub" = '11111111-1111-4111-8111-111111111111';
+DO $$
+DECLARE forged_state text;
+BEGIN
+    FOREACH forged_state IN ARRAY ARRAY['RESOLVED_RIDER', 'RESOLVED_PROVIDER', 'CLOSED', 'INVESTIGATING'] LOOP
+        BEGIN
+            INSERT INTO public.mobility_trip_disputes(trip_id,opened_by,reason,state)
+            VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',auth.uid(),'Forged resolution',forged_state);
+            RAISE EXCEPTION 'Participant forged dispute state %', forged_state;
+        EXCEPTION WHEN insufficient_privilege THEN NULL;
+        END;
+    END LOOP;
+    BEGIN
+        INSERT INTO public.mobility_trip_disputes(trip_id,opened_by,reason,resolution_notes,resolved_at)
+        VALUES ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',auth.uid(),'Forged notes','Refund approved',clock_timestamp());
+        RAISE EXCEPTION 'Participant forged resolution metadata';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+    BEGIN
+        UPDATE public.mobility_trip_disputes SET state='RESOLVED_RIDER' WHERE opened_by=auth.uid();
+        RAISE EXCEPTION 'Participant updated resolution';
+    EXCEPTION WHEN insufficient_privilege THEN NULL;
+    END;
+END $$;
+COMMIT;
+-- Test a server operator can still resolve a legitimate case; no fake refund is created.
+DO $$
+DECLARE affected integer;
+BEGIN
+    UPDATE public.mobility_trip_disputes SET state='INVESTIGATING',updated_at=clock_timestamp()
+    WHERE trip_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' AND state='OPEN';
+    GET DIAGNOSTICS affected = ROW_COUNT;
+    IF affected <> 1 THEN RAISE EXCEPTION 'Expected one legitimate case, got %', affected; END IF;
+END $$;
+SQL
+echo "  [PASS] Participants cannot forge dispute state or resolution metadata; privileged review remains available."
+
 
 echo "=== 9. TEST 5: Zero-Trace Real Supabase Auth Deletion ==="
 # Setup deletion request
