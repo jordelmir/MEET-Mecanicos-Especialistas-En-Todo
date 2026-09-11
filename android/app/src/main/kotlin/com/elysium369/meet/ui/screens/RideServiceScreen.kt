@@ -1376,7 +1376,7 @@ fun PassengerDashboard(
                         OutlinedTextField(
                             value = guestPhoneE164,
                             onValueChange = { guestPhoneE164 = it.filter { char -> char == '+' || char.isDigit() }.take(16) },
-                            label = { Text("Teléfono internacional, ej. +50688888888") },
+                            label = { Text("Teléfono internacional (+ Código + Número)") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             modifier = Modifier.fillMaxWidth(),
