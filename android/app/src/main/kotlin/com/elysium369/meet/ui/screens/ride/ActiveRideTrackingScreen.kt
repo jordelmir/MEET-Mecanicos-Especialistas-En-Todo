@@ -49,25 +49,35 @@ import com.elysium369.meet.ride.payment.RidePaymentMethod
 import com.elysium369.meet.ui.theme.MeetColors
 
 /**
- * ActiveRideTrackingScreen — Real-time live ride tracking with driver location streaming,
- * PTT voice session, and safety guardian (Items 3, 5, 6, 8, 9).
+ * Tracking projection. Live markers require recent source evidence; commands stay externally owned.
  */
 @Composable
 fun ActiveRideTrackingScreen(
     ride: ActiveRideViewState,
-    onCancelRide: () -> Unit = {},
-    onBack: () -> Unit = {},
-    onCallDriver: () -> Unit = {},
-    onMessageDriver: () -> Unit = {},
+    onCancelRide: () -> Unit,
+    notice: String? = null,
+    onBack: () -> Unit,
+    onCallDriver: (() -> Unit)?,
+    onMessageDriver: (() -> Unit)?,
+    onPay: (() -> Unit)?,
+    onRate: (() -> Unit)?,
 ) {
-    val scrollState = rememberScrollState()
+    val context = LocalContext.current
     var showSafetyCenter by remember { mutableStateOf(false) }
-    var showPaymentConfirmation by remember { mutableStateOf(false) }
-    var showRatingSheet by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
-    var pttVoiceState by remember { mutableStateOf(PttVoiceState.IDLE) }
+    var now by remember(ride.rideId) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(ride.rideId) {
+        while (true) {
+            now = System.currentTimeMillis()
+            kotlinx.coroutines.delay(5_000L)
+        }
+    }
+    val trackingTruth = ride.driverLocation.trackingFreshness(now)
+    val actions = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.actions(
+        ride.state, ride.paymentSettled, onPay != null, onRate != null
+    )
 
-    val mapState = remember(ride) {
+    val mapState = remember(ride, trackingTruth) {
         val markers = mutableListOf<GeoMarker>()
         markers.add(
             GeoMarker(
@@ -86,7 +96,7 @@ fun ActiveRideTrackingScreen(
                 label = ride.dropoff.displayName
             )
         )
-        ride.driverLocation?.let { loc ->
+        ride.driverLocation?.takeIf { trackingTruth == com.elysium369.meet.ride.domain.TrackingFreshness.LIVE }?.let { loc ->
             markers.add(
                 GeoMarker(
                     id = "drv_loc",
@@ -117,7 +127,7 @@ fun ActiveRideTrackingScreen(
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "Seguimiento en Vivo",
+                        trackingTruth.label,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MeetColors.textPrimary
@@ -159,16 +169,6 @@ fun ActiveRideTrackingScreen(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // PTT Audio Session Bar (Push-To-Talk Voice Item 5)
-                val driverName = ride.driver?.name
-                if (driverName != null) {
-                    PttAudioSessionBar(
-                        channelName = "Canal Seguro de Voz con $driverName",
-                        state = pttVoiceState,
-                        speakerName = driverName
-                    )
-                }
-
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(24.dp),
@@ -227,13 +227,15 @@ fun ActiveRideTrackingScreen(
                             if (ride.driver != null) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                     OutlinedIconButton(
-                                        onClick = onCallDriver,
+                                        onClick = { onCallDriver?.invoke() },
+                                        enabled = onCallDriver != null,
                                         border = BorderStroke(1.dp, MeetColors.neonGreen)
                                     ) {
                                         Icon(Icons.Default.Phone, contentDescription = "Llamar", tint = MeetColors.neonGreen)
                                     }
                                     OutlinedIconButton(
-                                        onClick = onMessageDriver,
+                                        onClick = { onMessageDriver?.invoke() },
+                                        enabled = onMessageDriver != null,
                                         border = BorderStroke(1.dp, MeetColors.electricBlue)
                                     ) {
                                         Icon(Icons.Default.Chat, contentDescription = "Chat", tint = MeetColors.electricBlue)
@@ -247,32 +249,17 @@ fun ActiveRideTrackingScreen(
                             InfoPill(
                                 icon = { Icon(Icons.Default.DirectionsCar, null, tint = MeetColors.neonGreen) },
                                 label = "Llegada",
-                                value = ride.driver?.etaMinutes?.let { "~$it min" } ?: "Calculando...",
+                                value = ride.driver?.etaMinutes?.let { "~$it min" } ?: "No disponible",
                                 color = MeetColors.neonGreen,
                                 modifier = Modifier.weight(1f)
                             )
                             InfoPill(
                                 icon = { Icon(Icons.Default.AttachMoney, null, tint = MeetColors.electricBlue) },
-                                label = "Tarifa",
+                                label = "Tarifa estimada",
                                 value = ride.fareQuote.formattedTotal,
                                 color = MeetColors.electricBlue,
                                 modifier = Modifier.weight(1f)
                             )
-                        }
-
-                        // Interactive PTT Voice Button Row (only if driver assigned)
-                        if (driverName != null) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                PttFloatingButton(
-                                    state = pttVoiceState,
-                                    activeSpeakerName = driverName,
-                                    onPressStart = { pttVoiceState = PttVoiceState.TRANSMITTING },
-                                    onPressEnd = { pttVoiceState = PttVoiceState.IDLE }
-                                )
-                            }
                         }
 
                         // Expandable details button
@@ -306,28 +293,24 @@ fun ActiveRideTrackingScreen(
                             }
                         }
 
-                        // Action Buttons: Pay / Rate / Cancel
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Button(
-                                onClick = { showPaymentConfirmation = true },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black)
-                            ) {
-                                Text("PAGAR", fontWeight = FontWeight.Bold)
-                            }
-
-                            Button(
-                                onClick = { showRatingSheet = true },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue)
-                            ) {
-                                Text("CALIFICAR", fontWeight = FontWeight.Bold)
-                            }
+                        if (actions.canPay && onPay != null) {
+                            Button(onClick = onPay, modifier = Modifier.fillMaxWidth()) { Text("Pagar") }
+                        }
+                        if (actions.canRate && onRate != null) {
+                            Button(onClick = onRate, modifier = Modifier.fillMaxWidth()) { Text("Calificar") }
+                        }
+                        if (ride.state == RideState.COMPLETED && !actions.canPay && !actions.canRate) {
+                            Text("Pago y calificación: pendientes de integración y confirmación del servidor", color = MeetColors.textSecondary)
                         }
 
                         if (ride.state.isCancellable) {
+                            notice?.let {
+                                Text(
+                                    text = it,
+                                    color = MeetColors.warning,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
                             OutlinedButton(
                                 onClick = onCancelRide,
                                 modifier = Modifier.fillMaxWidth(),
@@ -341,37 +324,18 @@ fun ActiveRideTrackingScreen(
                 }
             }
 
-            // Overlays
             if (showSafetyCenter) {
-                SafetyCenterOverlay(
-                    ride = ride,
-                    onDismiss = { showSafetyCenter = false },
-                    onShareTrip = { /* Share */ },
-                    onSOS = { /* SOS */ },
-                    onGuardian = { /* Guardian */ }
-                )
-            }
-
-            if (showPaymentConfirmation) {
-                RidePaymentConfirmationDialog(
-                    fareQuote = ride.fareQuote,
-                    paymentMethod = RidePaymentMethod.SINPE_MOVIL,
-                    onConfirmPayment = {
-                        showPaymentConfirmation = false
-                        showRatingSheet = true
+                AlertDialog(
+                    onDismissRequest = { showSafetyCenter = false },
+                    title = { Text("Ayuda y seguridad") },
+                    text = { Text("El monitoreo Guardian, las alertas automáticas y compartir ubicación en vivo no están disponibles en este viaje. Si necesitas ayuda urgente, abre el teléfono y llama al servicio de emergencias de tu ubicación. Esta acción no transmite datos del viaje.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            val dial = android.content.Intent(android.content.Intent.ACTION_DIAL)
+                            if (dial.resolveActivity(context.packageManager) != null) context.startActivity(dial)
+                        }) { Text("Abrir teléfono") }
                     },
-                    onDismiss = { showPaymentConfirmation = false }
-                )
-            }
-
-            if (showRatingSheet) {
-                RideRatingAndReviewSheet(
-                    counterpartName = ride.driver?.name ?: "Conductor",
-                    onSubmitReview = { stars, tip, notes ->
-                        showRatingSheet = false
-                        onBack()
-                    },
-                    onDismiss = { showRatingSheet = false }
+                    dismissButton = { TextButton(onClick = { showSafetyCenter = false }) { Text("Cerrar") } }
                 )
             }
         }

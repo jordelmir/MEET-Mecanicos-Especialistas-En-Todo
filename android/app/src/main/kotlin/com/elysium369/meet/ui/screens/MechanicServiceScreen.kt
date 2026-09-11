@@ -517,7 +517,7 @@ private fun ClientWorkspaceView(
                         }
                     }
 
-                    val displayPrice = com.elysium369.meet.core.services.kernel.Money.ofCrc(priceOfferCrc.toLong()).formatted()
+                    val displayPrice = com.elysium369.meet.core.money.Money.ofCrc(priceOfferCrc.toLong()).formatted()
 
                     Text(
                         text = displayPrice,
@@ -1169,7 +1169,7 @@ private fun RequestCardItem(
                 }
 
                 Text(
-                    text = com.elysium369.meet.core.services.kernel.Money.ofCrc(request.priceOffer.toLong()).formatted(),
+                    text = com.elysium369.meet.core.money.Money.ofCrc(request.priceOffer.toLong()).formatted(),
                     fontWeight = FontWeight.Black,
                     color = MechanicColors.greenAccent,
                     fontSize = 16.sp

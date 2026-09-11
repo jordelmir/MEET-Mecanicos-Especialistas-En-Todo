@@ -39,7 +39,7 @@ data class TripEarning(
     val surchargeEarned: Long = 0,        // Night, holiday bonuses
     val platformFee: Long,                 // Elysium cut (max 5%)
     val netEarning: Long,                  // What driver actually gets
-    val currency: String = "CRC",
+    val currency: String,
     val distanceKm: Double,
     val durationMinutes: Int,
     val pickupName: String,
@@ -54,7 +54,7 @@ data class TripEarning(
         get() = if (grossFare > 0) (platformFee.toDouble() / grossFare * 100) else 0.0
 
     val formattedNet: String
-        get() = "₡${netEarning.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(netEarning, currency)
 
     val earningPerKm: Long get() = if (distanceKm > 0) (netEarning / distanceKm).toLong() else 0
     val earningPerMin: Long get() = if (durationMinutes > 0) netEarning / durationMinutes else 0
@@ -103,6 +103,7 @@ data class IncomeGoal(
     val driverId: String,
     val targetAmount: Long,
     val period: GoalPeriod,
+    val currency: String = "CRC",
     val currentProgress: Long = 0,
 ) {
     val progressPercent: Double
@@ -111,9 +112,9 @@ data class IncomeGoal(
     val remaining: Long get() = (targetAmount - currentProgress).coerceAtLeast(0)
 
     val formattedTarget: String
-        get() = "₡${targetAmount.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(targetAmount, currency)
     val formattedProgress: String
-        get() = "₡${currentProgress.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(currentProgress, currency)
 }
 
 enum class GoalPeriod {
@@ -140,14 +141,14 @@ data class EarningsSummary(
     val bestHour: Int?,            // Most profitable hour (0-23)
     val bestDay: Int?,             // Most profitable day (1=Mon..7=Sun)
     val topDestination: String?,
-    val currency: String = "CRC",
+    val currency: String,
 ) {
     val formattedGross: String
-        get() = "₡${totalGross.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(totalGross, currency)
     val formattedNet: String
-        get() = "₡${totalNet.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(totalNet, currency)
     val formattedTips: String
-        get() = "₡${totalTips.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(totalTips, currency)
     val platformFeePercent: Double
         get() = if (totalGross > 0) (totalPlatformFees.toDouble() / totalGross * 100) else 0.0
 }
@@ -204,6 +205,7 @@ class RideDriverEarningsEngine {
         grossFare: Long,
         tipAmount: Long = 0,
         surchargeEarned: Long = 0,
+        currency: String = "CRC",
         distanceKm: Double,
         durationMinutes: Int,
         pickupName: String,
@@ -226,6 +228,7 @@ class RideDriverEarningsEngine {
             surchargeEarned = surchargeEarned,
             platformFee = platformFee,
             netEarning = net,
+            currency = currency,
             distanceKm = distanceKm,
             durationMinutes = durationMinutes,
             pickupName = pickupName,
@@ -330,6 +333,7 @@ class RideDriverEarningsEngine {
             bestHour = byHour.maxByOrNull { it.value }?.key,
             bestDay = byDay.maxByOrNull { it.value }?.key,
             topDestination = topDest,
+            currency = trips.firstOrNull()?.currency ?: "CRC",
         )
     }
 
@@ -407,7 +411,7 @@ class RideDriverEarningsEngine {
 
     val totalRecordedTrips: Int get() = earnings.size
 
-    private fun emptySummary(driverId: String, label: String) = EarningsSummary(
-        driverId, label, 0, 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0.0, null, null, null,
+    private fun emptySummary(driverId: String, label: String, currency: String = "CRC") = EarningsSummary(
+        driverId, label, 0, 0, 0, 0, 0, 0.0, 0, 0, 0, 0, 0.0, null, null, null, currency,
     )
 }

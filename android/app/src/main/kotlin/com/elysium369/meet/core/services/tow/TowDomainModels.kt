@@ -1,7 +1,7 @@
 package com.elysium369.meet.core.services.tow
 
 import com.elysium369.meet.core.geo.GeoPoint
-import com.elysium369.meet.core.services.kernel.Money
+import com.elysium369.meet.core.money.Money
 import java.util.UUID
 
 /**

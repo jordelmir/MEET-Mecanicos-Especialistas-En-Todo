@@ -68,6 +68,8 @@ data class RepairPartEntity(
     val partNumber: String,
     val partName: String,
     val price: Double,
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val priceMinor: Long = 0L,       // Canonical minor units; Double is legacy display only
     val brand: String
 )
 
@@ -127,6 +129,8 @@ data class ServiceRequestEntity(
     val longitude: Double = 0.0,
     val phone: String = "",
     val priceOffer: Double = 0.0,           // Elysium Vanguard proposed price
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val priceOfferMinor: Long = 0L,  // Canonical minor units; Double is legacy display only
     val assignedMechanicId: String? = null,
     val assignedMechanicName: String? = null,
     val assignedMechanicPhone: String? = null,
@@ -143,6 +147,8 @@ data class ServiceBidEntity(
     val shopRating: Double,
     val providerPhone: String = "",
     val price: Double,
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val priceMinor: Long = 0L,       // Canonical minor units; Double is legacy display only
     val estimatedHours: Double,
     val warrantyDays: Int,
     val message: String,
@@ -212,7 +218,11 @@ data class PartOfferEntity(
     val partNumber: String,
     val condition: String,          // NEW, OEM, USED_TESTED, REMAN
     val price: Double,
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val priceMinor: Long = 0L,       // Canonical minor units; Double is legacy display only
     val deliveryFee: Double,
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val deliveryFeeMinor: Long = 0L, // Canonical minor units; Double is legacy display only
     val etaMinutes: Int,
     val warrantyDays: Int,
     val message: String,
@@ -290,6 +300,8 @@ data class TowTruckRequestEntity(
     val assignedDriverName: String? = null,
     val assignedDriverPhone: String? = null,
     val priceOffer: Double,        // Elysium Vanguard proposed fare
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val priceOfferMinor: Long = 0L, // Canonical minor units; Double is legacy display only
     val createdAt: Long,
     val completedAt: Long? = null
 )
@@ -371,7 +383,7 @@ data class RideRequestEntity(
     val estimatedDistanceKm: Double,     // Distancia calculada
     val estimatedDurationMin: Int,       // Duración aproximada
     val stopsJson: String = "[]",        // Ordered stop snapshots; never inferred
-    val paymentMethod: String = "CASH",  // CASH or SINPE (declared, not settlement proof)
+    val paymentMethod: String = "UNKNOWN",  // UNKNOWN until passenger/driver confirms; never silently default to CASH
     val fareMode: String = "OPEN_BID",
     val distanceRateMinorPerKm: Long = 0L,
     val timeRateMinorPerMinute: Long = 0L,
@@ -421,6 +433,8 @@ data class RideOfferEntity(
     val driverTotalTrips: Int,
     val vehicleDescription: String,      // Ej: "Toyota Corolla 2018 Gris"
     val counterPrice: Double,            // Contraoferta del conductor (o el mismo precio)
+    @androidx.room.ColumnInfo(defaultValue = "0")
+    val counterPriceMinor: Long = 0L,   // Canonical minor units; Double is legacy display only
     val currency: String,
     val estimatedArrivalMin: Int,        // Tiempo estimado de llegada
     val driverLatitude: Double,

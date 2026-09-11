@@ -1,8 +1,8 @@
 package com.elysium369.meet.mobility.domain.ledger
 
-import com.elysium369.meet.mobility.domain.models.CurrencyCode
-import com.elysium369.meet.mobility.domain.models.Money
-import com.elysium369.meet.mobility.domain.models.SignedMoney
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
+import com.elysium369.meet.core.money.SignedMoney
 import java.time.Instant
 import java.util.UUID
 
@@ -47,7 +47,7 @@ data class LedgerTransaction(
         val balance = entries.fold(0L) { accumulator, entry ->
             Math.addExact(
                 accumulator,
-                entry.amount.minorUnits,
+                entry.amount.amountMinor,
             )
         }
 
@@ -55,11 +55,11 @@ data class LedgerTransaction(
             "Unbalanced ledger transaction: balance=$balance"
         }
 
-        require(entries.any { it.amount.minorUnits > 0L }) {
+        require(entries.any { it.amount.amountMinor > 0L }) {
             "Ledger requires at least one debit"
         }
 
-        require(entries.any { it.amount.minorUnits < 0L }) {
+        require(entries.any { it.amount.amountMinor < 0L }) {
             "Ledger requires at least one credit"
         }
     }
@@ -92,16 +92,16 @@ data class TripSettlement(
         }
 
         val components = listOf(
-            platformFee.minorUnits,
-            driverEarnings.minorUnits,
-            tax.minorUnits,
-            toll.minorUnits,
+            platformFee.amountMinor,
+            driverEarnings.amountMinor,
+            tax.amountMinor,
+            toll.amountMinor,
         )
 
         val calculated = components.fold(0L, Math::addExact)
 
-        require(calculated == grossFare.minorUnits) {
-            "Settlement invariant violated: gross=${grossFare.minorUnits}, components=$calculated"
+        require(calculated == grossFare.amountMinor) {
+            "Settlement invariant violated: gross=${grossFare.amountMinor}, components=$calculated"
         }
     }
 }

@@ -6,9 +6,9 @@ import com.elysium369.meet.mobility.domain.ledger.LedgerEntry
 import com.elysium369.meet.mobility.domain.ledger.LedgerReferenceType
 import com.elysium369.meet.mobility.domain.ledger.LedgerTransaction
 import com.elysium369.meet.mobility.domain.ledger.TripSettlement
-import com.elysium369.meet.mobility.domain.models.CurrencyCode
-import com.elysium369.meet.mobility.domain.models.Money
-import com.elysium369.meet.mobility.domain.models.SignedMoney
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
+import com.elysium369.meet.core.money.SignedMoney
 import com.elysium369.meet.mobility.domain.pricing.FinancialRounding
 import com.elysium369.meet.mobility.domain.pricing.Rate
 import com.elysium369.meet.mobility.domain.pricing.multiply
@@ -40,8 +40,8 @@ import org.junit.Test
 
 class MobilityV7P0HardeningTest {
 
-    private val crc = CurrencyCode.of("CRC")
-    private val usd = CurrencyCode.of("USD")
+    private val crc = CurrencyCode.fromString("CRC")
+    private val usd = CurrencyCode.fromString("USD")
 
     @Test
     fun ledgerTransactionStrictlyRequiresAtLeastTwoEntries() {
@@ -141,7 +141,7 @@ class MobilityV7P0HardeningTest {
             ledgerTransactionId = UUID.randomUUID(),
             createdAt = Instant.now(),
         )
-        assertEquals(10_000L, settlement.grossFare.minorUnits)
+        assertEquals(10_000L, settlement.grossFare.amountMinor)
 
         // Invalid: components sum to 9,999L
         assertThrows(IllegalArgumentException::class.java) {
@@ -166,22 +166,22 @@ class MobilityV7P0HardeningTest {
         val twoThirds = Rate(2L, 3L)
 
         val down = money.multiply(twoThirds, FinancialRounding.DOWN)
-        assertEquals(666L, down.minorUnits)
+        assertEquals(666L, down.amountMinor)
 
         val halfUp = money.multiply(twoThirds, FinancialRounding.HALF_UP)
-        assertEquals(667L, halfUp.minorUnits)
+        assertEquals(667L, halfUp.amountMinor)
 
         // 1000 * 1/4 = 250 exact
         val quarter = money.multiply(Rate(1L, 4L), FinancialRounding.HALF_EVEN)
-        assertEquals(250L, quarter.minorUnits)
+        assertEquals(250L, quarter.amountMinor)
 
         // Half even rounding: 1.5 -> 2 (even), 2.5 -> 2 (even)
         val threeHalves = Rate(3L, 2L) // 1 * 3/2 = 1.5
         val oneUnit = Money(1L, crc)
-        assertEquals(2L, oneUnit.multiply(threeHalves, FinancialRounding.HALF_EVEN).minorUnits)
+        assertEquals(2L, oneUnit.multiply(threeHalves, FinancialRounding.HALF_EVEN).amountMinor)
 
         val fiveHalves = Rate(5L, 2L) // 1 * 5/2 = 2.5
-        assertEquals(2L, oneUnit.multiply(fiveHalves, FinancialRounding.HALF_EVEN).minorUnits)
+        assertEquals(2L, oneUnit.multiply(fiveHalves, FinancialRounding.HALF_EVEN).amountMinor)
     }
 
     @Test

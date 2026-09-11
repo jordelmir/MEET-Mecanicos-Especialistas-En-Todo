@@ -48,7 +48,8 @@ open class OpenAiCompatibleProvider(
 
             if (responseResult.isFailure) {
                 val exception = responseResult.exceptionOrNull()!!
-                if (currentAttempt >= maxAttempts || exception is java.util.concurrent.CancellationException) {
+                if (exception is kotlin.coroutines.cancellation.CancellationException) throw exception
+                if (currentAttempt >= maxAttempts) {
                     return@withContext Result.failure(
                         AiError.Unknown("Error de red o conexión: ${exception.message}", exception)
                     )
@@ -174,6 +175,8 @@ open class OpenAiCompatibleProvider(
             }
 
             if (responseResult.isFailure) {
+                val ex = responseResult.exceptionOrNull()!!
+                if (ex is kotlin.coroutines.cancellation.CancellationException) throw ex
                 return@withContext Result.failure(
                     AiError.NetworkUnavailable
                 )
@@ -206,6 +209,8 @@ open class OpenAiCompatibleProvider(
                         onToken(token)
                     }
                 }
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 return@withContext Result.failure(AiError.MalformedResponse(e.message))
             }

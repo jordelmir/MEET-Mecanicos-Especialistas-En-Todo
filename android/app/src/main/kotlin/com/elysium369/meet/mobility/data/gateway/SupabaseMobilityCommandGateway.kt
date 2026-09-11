@@ -6,12 +6,12 @@ import com.elysium369.meet.mobility.domain.commands.RequestRideCommand
 import com.elysium369.meet.mobility.domain.commands.SelectDriverOfferCommand
 import com.elysium369.meet.mobility.domain.commands.SubmitDriverOfferCommand
 import com.elysium369.meet.mobility.domain.commands.TransitionTripCommand
-import com.elysium369.meet.mobility.domain.models.CurrencyCode
+import com.elysium369.meet.core.money.CurrencyCode
 import com.elysium369.meet.mobility.domain.models.DispatchMode
 import com.elysium369.meet.mobility.domain.models.DriverOfferState
 import com.elysium369.meet.mobility.domain.models.DriverRideOffer
 import com.elysium369.meet.mobility.domain.models.MarketId
-import com.elysium369.meet.mobility.domain.models.Money
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.mobility.domain.models.RideEta
 import com.elysium369.meet.mobility.domain.models.RideRequest
 import com.elysium369.meet.mobility.domain.models.RideRequestState
@@ -104,7 +104,7 @@ class SupabaseMobilityCommandGateway @Inject constructor(
                         })
                     }
                 })
-                command.requestedPrice?.let { put("p_requested_price_minor", it.minorUnits) }
+                command.requestedPrice?.let { put("p_requested_price_minor", it.amountMinor) }
                 command.scheduledFor?.let { put("p_scheduled_for", it.toString()) }
                 put("p_idempotency_key", command.commandId.toString())
                 put("p_correlation_id", command.correlationId.toString())
@@ -187,8 +187,8 @@ class SupabaseMobilityCommandGateway @Inject constructor(
             val params = buildJsonObject {
                 put("p_ride_request_id", command.rideRequestId.toString())
                 put("p_vehicle_id", command.vehicleId.toString())
-                put("p_offered_price_minor", command.offeredPrice.minorUnits)
-                put("p_currency_code", command.offeredPrice.currency.value)
+                put("p_offered_price_minor", command.offeredPrice.amountMinor)
+                put("p_currency_code", command.offeredPrice.currency.name)
                 command.pickupEtaSeconds?.let { put("p_pickup_eta_seconds", it) }
                 put("p_expected_ride_version", command.expectedRideVersion)
                 put("p_idempotency_key", command.commandId.toString())
@@ -442,7 +442,7 @@ class SupabaseMobilityCommandGateway @Inject constructor(
             destination = destination,
             requestedPrice = json.optionalLong("requested_price_minor")?.let {
                 val currency = json.optionalString("currency_code") ?: json.requireString("currency")
-                Money(it, CurrencyCode.of(currency))
+                Money(it, CurrencyCode.fromString(currency))
             },
             state = RideRequestState.valueOf(json.requireString("state")),
             scheduledFor = json.optionalInstant("scheduled_for"),

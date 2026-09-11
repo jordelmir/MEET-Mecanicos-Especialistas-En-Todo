@@ -60,7 +60,8 @@ class RideCommandSyncWorker @AssistedInject constructor(
         var retryNeeded = false
         commands.forEach { entity ->
             val commandStartedAt = System.currentTimeMillis()
-            if (entity.actorSessionUserId != sessionUserId) {
+            if (entity.actorSessionUserId != sessionUserId ||
+                SupabaseModule.client.auth.currentUserOrNull()?.id != entity.actorSessionUserId) {
                 retryNeeded = true
                 finishRetry(
                     entity = entity,
@@ -70,8 +71,10 @@ class RideCommandSyncWorker @AssistedInject constructor(
                 return@forEach
             }
 
-            val command = try {
+            var command = try {
                 entity.decode(json)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (error: RuntimeException) {
                 outboxDao.finishFailure(
                     idempotencyKey = entity.idempotencyKey,
@@ -83,6 +86,27 @@ class RideCommandSyncWorker @AssistedInject constructor(
                     now = System.currentTimeMillis(),
                 )
                 return@forEach
+            }
+
+            // A version-zero cancellation is a durable intent. A missing snapshot
+            // is not proof of absence while publication may still be in flight.
+            if (command.type == RideCommandType.CANCEL && command.expectedVersion == 0L) {
+                when (val snapshot = gateway.fetchSnapshot(entity.rideId)) {
+                    is RideSnapshotResult.Found -> {
+                        if (snapshot.snapshot.version <= 0L ||
+                            outboxDao.resolveCancellationVersion(entity.idempotencyKey, snapshot.snapshot.version) != 1) {
+                            retryNeeded = true
+                            finishRetry(entity, "CANCEL_AWAITING_PUBLICATION", "Esperando una versión autoritativa para cancelar.")
+                            return@forEach
+                        }
+                        command = command.copy(expectedVersion = snapshot.snapshot.version)
+                    }
+                    else -> {
+                        retryNeeded = true
+                        finishRetry(entity, "CANCEL_AWAITING_PUBLICATION", "Cancelación guardada; esperando reconciliar la publicación.")
+                        return@forEach
+                    }
+                }
             }
 
             when (val result = gateway.execute(command)) {
@@ -190,7 +214,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
                     if (
                         result.retryable &&
                         !isConflict &&
-                        entity.attemptCount < MAX_ATTEMPTS
+                        (entity.commandType == RideCommandType.CANCEL.name || entity.attemptCount < MAX_ATTEMPTS)
                     ) {
                         retryNeeded = true
                         finishRetry(
@@ -227,7 +251,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
                             errorCode = result.code,
                         ),
                     )
-                    if (entity.attemptCount < MAX_ATTEMPTS) {
+                    if (entity.commandType == RideCommandType.CANCEL.name || entity.attemptCount < MAX_ATTEMPTS) {
                         retryNeeded = true
                         finishRetry(
                             entity = entity,
@@ -309,7 +333,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
             expectedVersion > 0 ||
                 (
                     expectedVersion == 0L &&
-                        commandType == RideCommandType.PUBLISH.name
+                        commandType in setOf(RideCommandType.PUBLISH.name, RideCommandType.CANCEL.name)
                 )
         ) { "Expected version is invalid for this command" }
         require(payloadVersion > 0) { "Payload version must be positive" }
@@ -332,7 +356,9 @@ class RideCommandSyncWorker @AssistedInject constructor(
         const val PERIODIC_WORK_NAME = "ride_command_outbox_periodic"
         private const val BATCH_SIZE = 20
         private const val MAX_ATTEMPTS = 8
-        private const val STALE_LEASE_MS = 15 * 60 * 1000L
+        // RPC calls are bounded by the network stack. A longer lease strands
+        // safety-critical cancellation after process death or connectivity loss.
+        private const val STALE_LEASE_MS = 2 * 60 * 1000L
         private val CONFLICT_CODES = setOf(
             "VERSION_CONFLICT",
             "ALREADY_ASSIGNED",

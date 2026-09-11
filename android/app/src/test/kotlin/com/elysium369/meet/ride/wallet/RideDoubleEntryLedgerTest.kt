@@ -3,7 +3,7 @@ package com.elysium369.meet.ride.wallet
 import com.elysium369.meet.ride.domain.BasisPoints
 import com.elysium369.meet.ride.domain.RideId
 import com.elysium369.meet.ride.domain.RideIdempotencyKey
-import com.elysium369.meet.ride.domain.RideMoney
+import com.elysium369.meet.core.money.Money
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -18,13 +18,13 @@ class RideDoubleEntryLedgerTest {
             idempotencyKey = key("trip-1:commission:reserve"),
             tripId = RideId.of("trip-1"),
             driverId = "driver-1",
-            amount = RideMoney.of(230, "CRC"),
+            amount = Money.of(230, "CRC"),
             createdAtEpochMs = 1_000,
         )
 
         assertTrue(journal.isBalanced)
-        assertEquals(230, journal.debitTotal.minorUnits)
-        assertEquals(230, journal.creditTotal.minorUnits)
+        assertEquals(230, journal.debitTotal.amountMinor)
+        assertEquals(230, journal.creditTotal.amountMinor)
         assertEquals(
             setOf(
                 RideLedgerAccountKind.DRIVER_AVAILABLE,
@@ -64,13 +64,13 @@ class RideDoubleEntryLedgerTest {
             idempotencyKey = key("trip-1:commission:capture"),
             tripId = RideId.of("trip-1"),
             driverId = "driver-1",
-            commission = RideMoney.of(230, "CRC"),
+            commission = Money.of(230, "CRC"),
             splitRules = rules,
             createdAtEpochMs = 2_000,
         )
 
         assertTrue(journal.isBalanced)
-        assertEquals(230, journal.creditTotal.minorUnits)
+        assertEquals(230, journal.creditTotal.amountMinor)
         assertEquals(
             mapOf(
                 RideLedgerAccountKind.PLATFORM_COMMISSION_REVENUE to 138L,
@@ -79,7 +79,7 @@ class RideDoubleEntryLedgerTest {
             ),
             journal.postings
                 .filter { it.direction == RidePostingDirection.CREDIT }
-                .associate { it.account.kind to it.amount.minorUnits },
+                .associate { it.account.kind to it.amount.amountMinor },
         )
     }
 
@@ -108,9 +108,9 @@ class RideDoubleEntryLedgerTest {
             ),
         )
 
-        val allocations = rules.allocate(RideMoney.of(7, "CRC"))
+        val allocations = rules.allocate(Money.of(7, "CRC"))
 
-        assertEquals(7, allocations.sumOf { it.amount.minorUnits })
+        assertEquals(7, allocations.sumOf { it.amount.amountMinor })
         assertEquals(500, allocations.sumOf { it.basisPoints.value })
     }
 
@@ -141,7 +141,7 @@ class RideDoubleEntryLedgerTest {
             idempotencyKey = key("trip-1:commission:reserve"),
             tripId = RideId.of("trip-1"),
             driverId = "driver-1",
-            amount = RideMoney.of(230, "CRC"),
+            amount = Money.of(230, "CRC"),
             createdAtEpochMs = 1_000,
         )
 
@@ -195,7 +195,7 @@ class RideDoubleEntryLedgerTest {
             idempotencyKey = key("trip-1:same:key:0001"),
             tripId = RideId.of("trip-1"),
             driverId = "driver-1",
-            amount = RideMoney.of(230, "CRC"),
+            amount = Money.of(230, "CRC"),
             createdAtEpochMs = 1_000,
         )
         val conflict = first.copy(transactionId = "tx-conflict")
@@ -219,6 +219,6 @@ class RideDoubleEntryLedgerTest {
             kind = RideLedgerAccountKind.PLATFORM_COMMISSION_REVENUE,
         ),
         direction = direction,
-        amount = RideMoney.of(amount, currency),
+        amount = Money.of(amount, currency),
     )
 }

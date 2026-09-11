@@ -1,5 +1,6 @@
 package com.elysium369.meet.core.services.kernel
 
+import com.elysium369.meet.core.money.Money
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.UUID

@@ -37,13 +37,13 @@ data class FareQuote(
     val distanceFare: Long,
     val timeFare: Long,
     val totalFare: Long,
-    val currency: String = "CRC",
+    val currency: String,
     val estimatedDistanceKm: Double,
     val estimatedDurationMin: Int,
     val fareMode: RideFareMode = RideFareMode.METERED_TIME_DISTANCE,
 ) {
     val formattedTotal: String
-        get() = "₡${totalFare.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(totalFare, currency)
 
     val formattedDistance: String
         get() = "%.1f km".format(estimatedDistanceKm)
@@ -84,7 +84,10 @@ data class RideLocationPoint(
     val latitude: Double,
     val longitude: Double,
     val accuracy: Float? = null,
-    val timestamp: Long = System.currentTimeMillis(),
+    val timestamp: Long = 0L,
+    val receivedAt: Long = 0L,
+    val sequenceId: Long? = null,
+    val source: String? = null,
     val speed: Float? = null,
     val heading: Float? = null,
 )
@@ -97,6 +100,7 @@ data class ActiveRideViewState(
     val fareQuote: FareQuote,
     val state: RideState,
     val driverLocation: RideLocationPoint? = null,
+    val paymentSettled: Boolean = false,
     val passengerLocation: RideLocationPoint? = null,
     val startedAt: Long = System.currentTimeMillis(),
 )
@@ -107,10 +111,11 @@ data class IncomingRideRequest(
     val pickup: RidePlaceInput,
     val dropoff: RidePlaceInput,
     val fare: Long,
+    val currency: String = "CRC",
     val distanceKm: Double,
     val durationMin: Int,
     val fareMode: RideFareMode = RideFareMode.METERED_TIME_DISTANCE,
-    val paymentMethod: RidePaymentMethod = RidePaymentMethod.CASH,
+    val paymentMethod: RidePaymentMethod = RidePaymentMethod.UNKNOWN,
     val requestTime: Long = System.currentTimeMillis(),
     val expiresAt: Long = System.currentTimeMillis() + 30_000,
 )
@@ -121,6 +126,7 @@ data class ActiveDriverRide(
     val pickup: RidePlaceInput,
     val dropoff: RidePlaceInput,
     val fare: Long,
+    val currency: String = "CRC",
     val state: RideState,
     val startedAt: Long = System.currentTimeMillis(),
     var passengerLocation: RideLocationPoint? = null,
@@ -166,3 +172,12 @@ fun getRideStatusLabel(state: RideState): String = when (state) {
     RideState.DISPUTED -> "En revisión"
     RideState.UNKNOWN -> "Estado desconocido"
 }
+
+/** Missing provenance cannot be promoted into a live location by UI construction time. */
+fun RideLocationPoint?.trackingFreshness(now: Long): com.elysium369.meet.ride.domain.TrackingFreshness =
+    com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.freshness(
+        latitude = this?.latitude, longitude = this?.longitude,
+        accuracy = this?.accuracy, capturedAt = this?.timestamp,
+        receivedAt = this?.receivedAt, sequenceId = this?.sequenceId,
+        source = this?.source, now = now
+    )

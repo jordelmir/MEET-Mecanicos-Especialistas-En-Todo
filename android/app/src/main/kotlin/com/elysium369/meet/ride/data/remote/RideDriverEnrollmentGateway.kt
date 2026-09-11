@@ -122,6 +122,8 @@ class SupabaseRideDriverEnrollmentGateway @Inject constructor() :
                     retryable = error.retryable,
                 )
             }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             RideDriverEnrollmentResult.TransportFailure(
                 (error.message ?: "No se pudo sincronizar el alta").take(300),

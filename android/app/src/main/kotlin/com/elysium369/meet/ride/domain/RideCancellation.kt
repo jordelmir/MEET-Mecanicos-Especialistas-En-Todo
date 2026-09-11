@@ -29,6 +29,33 @@ data class RideCancellationDecision(
     val automaticFeeAllowed: Boolean,
 )
 
+/**
+ * Deterministic FSM for the cancellation UI.
+ * Transitions: IDLE → SUBMITTING → CONFIRMED | REJECTED | FAILED → IDLE
+ */
+sealed interface RideCancellationUiState {
+    data object Idle : RideCancellationUiState
+    data class Submitting(
+        val requestId: String,
+        val reason: RideCancellationReason,
+        val detail: String?,
+    ) : RideCancellationUiState
+    data class Confirmed(
+        val requestId: String,
+        val reason: RideCancellationReason,
+    ) : RideCancellationUiState
+    data class Rejected(
+        val requestId: String,
+        val reason: RideCancellationReason,
+        val message: String,
+    ) : RideCancellationUiState
+    data class Failed(
+        val requestId: String,
+        val reason: RideCancellationReason,
+        val message: String,
+    ) : RideCancellationUiState
+}
+
 object RideCancellationPolicy {
     private const val MAX_DETAIL_LENGTH = 500
 

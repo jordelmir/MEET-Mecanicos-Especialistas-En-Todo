@@ -2,7 +2,7 @@ package com.elysium369.meet.mobility.domain.commands
 
 import com.elysium369.meet.mobility.domain.models.DispatchMode
 import com.elysium369.meet.mobility.domain.models.MarketId
-import com.elysium369.meet.mobility.domain.models.Money
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.mobility.domain.models.RideStopInput
 import com.elysium369.meet.mobility.domain.models.ServiceCategoryId
 import com.elysium369.meet.mobility.domain.models.TripState

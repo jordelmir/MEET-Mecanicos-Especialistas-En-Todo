@@ -1,8 +1,8 @@
 package com.elysium369.meet.ride.wallet
 
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.ride.domain.CostaRicaRidePolicy
-import com.elysium369.meet.ride.domain.CurrencyCode
-import com.elysium369.meet.ride.domain.RideMoney
 
 enum class RideLedgerEntryType {
     PROMOTIONAL_GRANT,
@@ -24,7 +24,7 @@ data class RideLedgerEntry(
     val id: String,
     val idempotencyKey: String,
     val type: RideLedgerEntryType,
-    val amount: RideMoney,
+    val amount: Money,
     val tripId: String?,
     val createdAtEpochMs: Long,
     val direction: RideLedgerDirection = RideLedgerDirection.CREDIT,
@@ -42,15 +42,15 @@ data class RideLedgerEntry(
             )
         ) {
             require(!tripId.isNullOrBlank()) { "Commission entries require a trip ID" }
-            require(amount.minorUnits > 0) { "Commission amount must be positive" }
+            require(amount.amountMinor > 0) { "Commission amount must be positive" }
         }
     }
 }
 
 data class RideWalletProjection(
-    val posted: RideMoney,
-    val reserved: RideMoney,
-    val available: RideMoney,
+    val posted: Money,
+    val reserved: Money,
+    val available: Money,
 )
 
 object RidePromotionalGrant {
@@ -106,27 +106,27 @@ object RideWalletLedger {
                             "Trip already has an active commission reservation"
                         }
                         val availableMinor = postedMinor - reservedMinor
-                        require(availableMinor >= entry.amount.minorUnits) {
+                        require(availableMinor >= entry.amount.amountMinor) {
                             "Insufficient available driver balance"
                         }
-                        reservedMinor = Math.addExact(reservedMinor, entry.amount.minorUnits)
-                        activeReservations[tripId] = entry.amount.minorUnits
+                        reservedMinor = Math.addExact(reservedMinor, entry.amount.amountMinor)
+                        activeReservations[tripId] = entry.amount.amountMinor
                     }
 
                     RideLedgerEntryType.COMMISSION_CAPTURED -> {
                         val tripId = requireNotNull(entry.tripId)
-                        consumeReservation(activeReservations, tripId, entry.amount.minorUnits)
-                        reservedMinor -= entry.amount.minorUnits
-                        require(postedMinor >= entry.amount.minorUnits) {
+                        consumeReservation(activeReservations, tripId, entry.amount.amountMinor)
+                        reservedMinor -= entry.amount.amountMinor
+                        require(postedMinor >= entry.amount.amountMinor) {
                             "Captured commission exceeds posted balance"
                         }
-                        postedMinor -= entry.amount.minorUnits
+                        postedMinor -= entry.amount.amountMinor
                     }
 
                     RideLedgerEntryType.COMMISSION_RELEASED -> {
                         val tripId = requireNotNull(entry.tripId)
-                        consumeReservation(activeReservations, tripId, entry.amount.minorUnits)
-                        reservedMinor -= entry.amount.minorUnits
+                        consumeReservation(activeReservations, tripId, entry.amount.amountMinor)
+                        reservedMinor -= entry.amount.amountMinor
                     }
 
                     RideLedgerEntryType.ADJUSTMENT -> {
@@ -166,12 +166,12 @@ object RideWalletLedger {
         entry: RideLedgerEntry,
     ): Long =
         when (entry.direction) {
-            RideLedgerDirection.CREDIT -> Math.addExact(balance, entry.amount.minorUnits)
+            RideLedgerDirection.CREDIT -> Math.addExact(balance, entry.amount.amountMinor)
             RideLedgerDirection.DEBIT -> {
-                require(balance >= entry.amount.minorUnits) {
+                require(balance >= entry.amount.amountMinor) {
                     "Ledger debit exceeds posted balance"
                 }
-                balance - entry.amount.minorUnits
+                balance - entry.amount.amountMinor
             }
         }
 
@@ -188,6 +188,6 @@ object RideWalletLedger {
         reservations.remove(tripId)
     }
 
-    private fun money(minorUnits: Long, currency: CurrencyCode): RideMoney =
-        RideMoney(minorUnits = minorUnits, currency = currency)
+    private fun money(amountMinor: Long, currency: CurrencyCode): Money =
+        Money(amountMinor = amountMinor, currency = currency)
 }

@@ -92,7 +92,7 @@ data class ScheduledRide(
     val createdAtEpochMs: Long = System.currentTimeMillis(),
     val fareMode: RideFareMode = RideFareMode.METERED_TIME_DISTANCE,
     val estimatedFare: Long = 0,
-    val currency: String = "CRC",
+    val currency: String,
     val status: ScheduleStatus = ScheduleStatus.PENDING,
     val recurrence: RecurrenceConfig = RecurrenceConfig(),
     val notes: String = "",
@@ -109,7 +109,7 @@ data class ScheduledRide(
     val dropoff: RideStop? get() = stops.lastOrNull { it.isDropoff }
 
     val formattedFare: String
-        get() = "₡${estimatedFare.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(estimatedFare, currency)
 }
 
 // ─── Reminder ───
@@ -145,6 +145,7 @@ class RideScheduleEngine @Inject constructor(
         scheduledAtEpochMs: Long,
         fareMode: RideFareMode = RideFareMode.METERED_TIME_DISTANCE,
         estimatedFare: Long = 0,
+        currency: String = "CRC",
         recurrence: RecurrenceConfig = RecurrenceConfig(),
         notes: String = "",
     ): ScheduledRide? {
@@ -160,6 +161,7 @@ class RideScheduleEngine @Inject constructor(
             createdAtEpochMs = now,
             fareMode = fareMode,
             estimatedFare = estimatedFare,
+            currency = currency,
             recurrence = recurrence,
             notes = notes,
         )

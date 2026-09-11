@@ -25,10 +25,7 @@ object RidePricingIntelligence {
             get() = "Mediana: ${formatColones(medianMinor)}"
 
         private fun formatColones(minor: Long): String {
-            val whole = minor / 100
-            val cents = minor % 100
-            return if (cents > 0) "₡$whole.${cents.toString().padStart(2, '0')}"
-            else "₡$whole"
+            return com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(minor, currency)
         }
     }
 

@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -129,12 +130,46 @@ fun RideLivenessDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    cameraError ?: challengeState.instruction,
-                    color = if (challengeState.phase == RidePresenceChallenge.Phase.VERIFIED) MeetColors.neonGreen else Color.White,
-                    fontWeight = FontWeight.Bold,
-                )
-                if (hasPermission) {
+                if (cameraError != null) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MeetColors.error.copy(alpha = 0.12f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text("⚠️", fontSize = 32.sp)
+                            Text(
+                                cameraError ?: "",
+                                color = MeetColors.error,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center,
+                            )
+                            Button(
+                                onClick = {
+                                    evidenceHash = null
+                                    challengeState = challenge.reset()
+                                    cameraError = null
+                                    if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+                                    retry++
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan),
+                                shape = RoundedCornerShape(12.dp),
+                            ) { Text("REINTENTAR", fontWeight = FontWeight.Black) }
+                        }
+                    }
+                } else {
+                    Text(
+                        challengeState.instruction,
+                        color = if (challengeState.phase == RidePresenceChallenge.Phase.VERIFIED) MeetColors.neonGreen else Color.White,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+                if (hasPermission && cameraError == null) {
                     AndroidView(
                         factory = { previewView },
                         modifier = Modifier
@@ -143,14 +178,16 @@ fun RideLivenessDialog(
                             .background(Color.Black, RoundedCornerShape(16.dp))
                             .border(2.dp, MeetColors.cyberCyan, RoundedCornerShape(16.dp)),
                     )
-                } else {
+                } else if (cameraError == null) {
                     Text("Se requiere permiso de cámara para validar presencia.", color = MeetColors.warning)
                 }
-                Text(
-                    "Esta prueba detecta presencia; no verifica tu identidad. El análisis ocurre en el dispositivo y se conserva un hash, no una plantilla facial.",
-                    color = MeetColors.textMuted,
-                    fontSize = 9.sp,
-                )
+                if (cameraError == null) {
+                    Text(
+                        "Esta prueba detecta presencia; no verifica tu identidad. El análisis ocurre en el dispositivo y se conserva un hash, no una plantilla facial.",
+                        color = MeetColors.textMuted,
+                        fontSize = 9.sp,
+                    )
+                }
             }
         },
         confirmButton = {
@@ -161,14 +198,18 @@ fun RideLivenessDialog(
             ) { Text("EMPEZAR A CONDUCIR", fontWeight = FontWeight.Black) }
         },
         dismissButton = {
-            Column {
-                TextButton(onClick = {
-                    evidenceHash = null
-                    challengeState = challenge.reset()
-                    cameraError = null
-                    if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
-                    retry++
-                }) { Text("REINTENTAR PRUEBA") }
+            if (cameraError == null) {
+                Column {
+                    TextButton(onClick = {
+                        evidenceHash = null
+                        challengeState = challenge.reset()
+                        cameraError = null
+                        if (!hasPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
+                        retry++
+                    }) { Text("REINTENTAR PRUEBA") }
+                    TextButton(onClick = onCancel) { Text("VOLVER A PASAJERO") }
+                }
+            } else {
                 TextButton(onClick = onCancel) { Text("VOLVER A PASAJERO") }
             }
         },

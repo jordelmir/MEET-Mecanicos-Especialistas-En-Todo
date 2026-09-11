@@ -44,8 +44,8 @@ object TowFulfillmentAdapter : FulfillmentPresentationAdapter<TowJob> {
         val pricing = when {
             source.finalSettlement != null -> FulfillmentPricing.FinalSettlement(
                 base = source.finalSettlement,
-                extras = com.elysium369.meet.core.services.kernel.Money.zero(source.finalSettlement.currency),
-                taxes = com.elysium369.meet.core.services.kernel.Money.zero(source.finalSettlement.currency),
+                extras = com.elysium369.meet.core.money.Money.zero(source.finalSettlement.currency),
+                taxes = com.elysium369.meet.core.money.Money.zero(source.finalSettlement.currency),
                 total = source.finalSettlement,
                 ledgerAttestationHash = null
             )

@@ -192,19 +192,35 @@ fun RideServiceScreen(
 
     if (showLiveness && presenceKey != null) {
         key(presenceOwnerId) {
-        RideLivenessDialog(
-            onVerified = { evidenceHash ->
-                val now = System.currentTimeMillis()
-                if (viewModel.activePrincipal.value.id != presenceOwnerId) return@RideLivenessDialog
-                presencePreferences.edit { putLong(presenceKey, now) }
-                viewModel.recordDriverLiveness(evidenceHash, now)
-                showLiveness = false
-            },
-            onCancel = {
-                showLiveness = false
-                if (driverMode) viewModel.toggleRideDriverMode()
-            },
-        )
+        if (BuildConfig.DEBUG && com.elysium369.meet.ride.domain.RidePresenceBypassWrapper.isBypassActive(context)) {
+            RideLivenessBypassDialog(
+                onVerified = { evidenceHash ->
+                    val now = System.currentTimeMillis()
+                    if (viewModel.activePrincipal.value.id != presenceOwnerId) return@RideLivenessBypassDialog
+                    presencePreferences.edit { putLong(presenceKey, now) }
+                    viewModel.recordDriverLiveness(evidenceHash, now)
+                    showLiveness = false
+                },
+                onCancel = {
+                    showLiveness = false
+                    if (driverMode) viewModel.toggleRideDriverMode()
+                },
+            )
+        } else {
+            RideLivenessDialog(
+                onVerified = { evidenceHash ->
+                    val now = System.currentTimeMillis()
+                    if (viewModel.activePrincipal.value.id != presenceOwnerId) return@RideLivenessDialog
+                    presencePreferences.edit { putLong(presenceKey, now) }
+                    viewModel.recordDriverLiveness(evidenceHash, now)
+                    showLiveness = false
+                },
+                onCancel = {
+                    showLiveness = false
+                    if (driverMode) viewModel.toggleRideDriverMode()
+                },
+            )
+        }
         }
     }
 
@@ -634,21 +650,23 @@ fun PassengerDashboard(
     val currentLocale = rememberRideJavaLocale()
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val allRides by viewModel.rideRequests.collectAsState()
-    val draftPreferences = remember(context, viewModel.currentUserId) {
-        val owner = viewModel.currentUserId?.replace(Regex("[^A-Za-z0-9_-]"), "_") ?: "signed_out"
+    val draftPrincipal by viewModel.activePrincipal.collectAsState()
+    val draftOwner = remember(draftPrincipal) { viewModel.currentUserId }
+    val draftPreferences = remember(context, draftOwner) {
+        val owner = draftOwner?.replace(Regex("[^A-Za-z0-9_-]"), "_") ?: "signed_out"
         context.getSharedPreferences("elysium_ride_draft_$owner", Context.MODE_PRIVATE)
     }
 
-    var destAddress by rememberSaveable {
+    var destAddress by rememberSaveable(draftOwner) {
         mutableStateOf(draftPreferences.getString("dest_address", "").orEmpty())
     }
-    var destLatitude by rememberSaveable {
+    var destLatitude by rememberSaveable(draftOwner) {
         mutableDoubleStateOf(draftPreferences.getString("dest_lat", null)?.toDoubleOrNull() ?: 0.0)
     }
-    var destLongitude by rememberSaveable {
+    var destLongitude by rememberSaveable(draftOwner) {
         mutableDoubleStateOf(draftPreferences.getString("dest_lng", null)?.toDoubleOrNull() ?: 0.0)
     }
-    var destinationPlaceId by rememberSaveable {
+    var destinationPlaceId by rememberSaveable(draftOwner) {
         mutableStateOf(draftPreferences.getString("dest_place_id", null))
     }
     var destinationSuggestions by remember { mutableStateOf(emptyList<RidePlaceSuggestion>()) }
@@ -658,14 +676,14 @@ fun PassengerDashboard(
     var pickupPin by remember { mutableStateOf<RideGeoPoint?>(null) }
     var pendingMapPin by remember { mutableStateOf<RideGeoPoint?>(null) }
     var stops by remember { mutableStateOf(emptyList<RideStopSnapshot>()) }
-    var paymentMethod by rememberSaveable {
+    var paymentMethod by rememberSaveable(draftOwner) {
         mutableStateOf(
             runCatching {
                 RidePaymentMethod.valueOf(
-                    draftPreferences.getString("payment_method", RidePaymentMethod.CASH.name)
-                        ?: RidePaymentMethod.CASH.name,
+                    draftPreferences.getString("payment_method", RidePaymentMethod.UNKNOWN.name)
+                        ?: RidePaymentMethod.UNKNOWN.name,
                 )
-            }.getOrDefault(RidePaymentMethod.CASH),
+            }.getOrDefault(RidePaymentMethod.UNKNOWN),
         )
     }
     val placeSearchProvider = remember {
@@ -683,14 +701,20 @@ fun PassengerDashboard(
     var previewRoadRoute by remember { mutableStateOf<RideRoadRoute?>(null) }
     var routeSearchLoading by remember { mutableStateOf(false) }
     var routeSearchFailed by remember { mutableStateOf(false) }
+    val savedPlacesPrincipal by viewModel.activePrincipal.collectAsState()
+    val savedPlacesOwner = remember(savedPlacesPrincipal) { viewModel.currentUserId }
+    var cancellationTarget by remember(savedPlacesOwner) { mutableStateOf<String?>(null) }
+    cancellationTarget?.let { requestId ->
+        AuthoritativeRideCancellationDialog(viewModel, requestId, RideActorRole.PASSENGER) { cancellationTarget = null }
+    }
     val savedPlacesStore = remember(context) { RideSavedPlacesStore(context) }
-    var savedPlaces by remember { mutableStateOf(savedPlacesStore.load()) }
+    var savedPlaces by remember(savedPlacesOwner) { mutableStateOf(savedPlacesStore.load(savedPlacesOwner)) }
 
-    var offerPrice by rememberSaveable {
+    var offerPrice by rememberSaveable(draftOwner) {
         mutableDoubleStateOf(draftPreferences.getString("offer_price", null)?.toDoubleOrNull() ?: 2_400.0)
     }
-    var isUsd by rememberSaveable { mutableStateOf(draftPreferences.getBoolean("is_usd", false)) }
-    var fareMode by rememberSaveable {
+    var isUsd by rememberSaveable(draftOwner) { mutableStateOf(draftPreferences.getBoolean("is_usd", false)) }
+    var fareMode by rememberSaveable(draftOwner) {
         mutableStateOf(
             runCatching {
                 RideFareMode.valueOf(
@@ -729,21 +753,25 @@ fun PassengerDashboard(
 
     val activeRideForPassenger = remember(allRides, passengerVer) {
         val myId = passengerVer?.passengerId ?: return@remember null
-        allRides.firstOrNull {
+        val active = allRides.filter {
             it.passengerId == myId &&
                 it.status in listOf(
                     "PENDING_PUBLICATION", "OPEN", "ACCEPTED", "ARRIVED",
                     "PASSENGER_ONBOARD", "IN_PROGRESS",
                 )
         }
+        if (active.size > 1) {
+            android.util.Log.e("MeetRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for passenger $myId — using most recent")
+        }
+        active.maxByOrNull { it.createdAt }
     }
 
-    var showPaxVerification by rememberSaveable { mutableStateOf(false) }
-    var paxName by rememberSaveable { mutableStateOf("") }
-    var paxPhone by rememberSaveable { mutableStateOf("") }
-    var paxProfilePhoto by rememberSaveable { mutableStateOf("") }
-    var paxCedulaFront by rememberSaveable { mutableStateOf("") }
-    var paxSelfieWithCedula by rememberSaveable { mutableStateOf("") }
+    var showPaxVerification by rememberSaveable(draftOwner) { mutableStateOf(false) }
+    var paxName by rememberSaveable(draftOwner) { mutableStateOf("") }
+    var paxPhone by rememberSaveable(draftOwner) { mutableStateOf("") }
+    var paxProfilePhoto by rememberSaveable(draftOwner) { mutableStateOf("") }
+    var paxCedulaFront by rememberSaveable(draftOwner) { mutableStateOf("") }
+    var paxSelfieWithCedula by rememberSaveable(draftOwner) { mutableStateOf("") }
 
     LaunchedEffect(forceRegistration, passengerVer) {
         if (forceRegistration && passengerVer == null) {
@@ -1209,6 +1237,7 @@ fun PassengerDashboard(
                                 TextButton(
                                     onClick = {
                                         savedPlaces = savedPlacesStore.save(
+                                            savedPlacesOwner,
                                             RideSavedPlace(
                                                 slot = slot,
                                                 label = label,
@@ -1317,7 +1346,7 @@ fun PassengerDashboard(
                         fontWeight = FontWeight.Black,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        RidePaymentMethod.entries.forEach { method ->
+                        listOf(RidePaymentMethod.CASH, RidePaymentMethod.SINPE).forEach { method ->
                             FilterChip(
                                 selected = paymentMethod == method,
                                 onClick = { paymentMethod = method },
@@ -1473,12 +1502,11 @@ fun PassengerDashboard(
                     if (fareMode == RideFareMode.OPEN_BID) Slider(
                         value = offerPrice.toFloat(),
                         onValueChange = {
-                            offerPrice = RideFareBidPolicy.normalize(
-                                it.toDouble(),
-                                "CRC",
-                            )
+                            val minor = it.toLong()
+                            val activeCurrency = if (isUsd) "USD" else "CRC"
+                            offerPrice = RideFareBidPolicy.normalizeMinor(minor, activeCurrency).toDouble()
                         },
-                        valueRange = 900f..30000f,
+                        valueRange = if (isUsd) 100f..6000f else 900f..30000f,
                         steps = 96,
                         colors = SliderDefaults.colors(
                             thumbColor = MeetColors.neonGreen,
@@ -1653,7 +1681,7 @@ fun PassengerDashboard(
                 PassengerRideItem(
                     ride = ride,
                     onSelect = { viewModel.selectActiveRide(ride) },
-                    onCancel = { viewModel.selectActiveRide(ride) }
+                    onCancel = { cancellationTarget = ride.requestId }
                 )
             }
         }
@@ -2028,46 +2056,67 @@ fun DriverDashboard(
 
     val driverVer by viewModel.driverVerification.collectAsState()
     val myDriverId = viewModel.currentUserId ?: driverVer?.driverId
-    val driverPrefs = remember(context) {
-        context.getSharedPreferences("elysium_ride_driver_ops", Context.MODE_PRIVATE)
+    val driverHomePrincipal by viewModel.activePrincipal.collectAsState()
+    val driverHomeOwner = remember(driverHomePrincipal) { viewModel.currentUserId }
+    val driverPrefs = remember(context, driverHomeOwner) {
+        context.getSharedPreferences("elysium_ride_driver_ops_${driverHomeOwner ?: "signed_out"}", Context.MODE_PRIVATE)
     }
-    val rideNotifications = remember(context) { RideNotificationCoordinator(context) }
-    var destinationHomeEnabled by remember {
+    val notificationPrincipal by viewModel.activePrincipal.collectAsState()
+    val notificationOwner = remember(notificationPrincipal) { viewModel.currentUserId }
+    val rideNotifications = remember(context, notificationOwner) { RideNotificationCoordinator(context, notificationOwner) }
+    var destinationHomeEnabled by remember(driverHomeOwner) {
         mutableStateOf(driverPrefs.getBoolean("destination_home_enabled", false))
     }
-    var homeLatitude by remember {
+    var homeLatitude by remember(driverHomeOwner) {
         mutableStateOf(driverPrefs.getString("home_latitude", null)?.toDoubleOrNull())
     }
-    var homeLongitude by remember {
+    var homeLongitude by remember(driverHomeOwner) {
         mutableStateOf(driverPrefs.getString("home_longitude", null)?.toDoubleOrNull())
     }
-    var walletPolicy by remember { mutableStateOf<RideWalletPolicy?>(null) }
-    var walletBalance by remember { mutableStateOf<RideWalletBalance?>(null) }
+    var walletPolicy by remember(driverHomeOwner) { mutableStateOf<RideWalletPolicy?>(null) }
+    var walletBalance by remember(driverHomeOwner) { mutableStateOf<RideWalletBalance?>(null) }
     var walletMessage by remember { mutableStateOf<String?>(null) }
     var showTopupDialog by remember { mutableStateOf(false) }
     var topupAmount by rememberSaveable { mutableStateOf(15000) }
     var pendingTopupAmount by remember { mutableStateOf<Long?>(null) }
     val walletScope = rememberCoroutineScope()
     val proofPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent(),
+        ActivityResultContracts.OpenDocument(),
     ) { uri ->
         val amount = pendingTopupAmount ?: return@rememberLauncherForActivityResult
         pendingTopupAmount = null
         if (uri == null) return@rememberLauncherForActivityResult
         walletScope.launch {
             runCatching {
-                val file = File(context.cacheDir, "ride-topup-${System.currentTimeMillis()}.jpg")
-                context.contentResolver.openInputStream(uri)?.use { input -> file.outputStream().use(input::copyTo) }
-                    ?: error("No se pudo leer el comprobante")
+                val bytes = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { input ->
+                        val output = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(8192)
+                        var total = 0
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            require(total <= com.elysium369.meet.ride.domain.RideProofFormat.MAX_BYTES) { "Comprobante mayor de 12 MB" }
+                            output.write(buffer, 0, count)
+                        }
+                        output.toByteArray()
+                    } ?: error("No se pudo leer el comprobante")
+                }
+                val extension = com.elysium369.meet.ride.domain.RideProofFormat.extension(bytes)
+                    ?: error("Usa JPEG, PNG o PDF de hasta 12 MB")
+                val file = File(context.cacheDir, "ride-topup-${System.currentTimeMillis()}.$extension")
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { file.writeBytes(bytes) }
                 PlatformTrustCenterGateway.submitWalletTopup(file.absolutePath, amount, null, null)
             }.onSuccess { walletMessage = "Comprobante enviado. El saldo se acredita sólo después de verificar el SINPE." }
                 .onFailure { walletMessage = "No se pudo enviar el comprobante: ${it.message?.take(120)}" }
         }
     }
-    LaunchedEffect(driverVer?.status) {
+    LaunchedEffect(driverHomeOwner, driverVer?.status) {
         if (!RideVerificationPolicy.grantsAccess(driverVer?.status)) return@LaunchedEffect
         runCatching { PlatformTrustCenterGateway.walletPolicy() }
             .onSuccess { walletPolicy = it }
+            .onFailure { walletPolicy = null; walletMessage = "Política financiera no disponible. Reintenta antes de transferir." }
         runCatching { PlatformTrustCenterGateway.ensureStarterCredit() }
             .onFailure { walletMessage = "No se pudo preparar el saldo inicial: ${it.message?.take(100)}" }
         runCatching { PlatformTrustCenterGateway.walletBalance() }
@@ -2091,10 +2140,14 @@ fun DriverDashboard(
 
     val activeRideForDriver = remember(allRides, myDriverId) {
         myDriverId?.let { driverId ->
-            allRides.firstOrNull {
+            val active = allRides.filter {
                 it.assignedDriverId == driverId &&
                     it.status in listOf("ACCEPTED", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")
             }
+            if (active.size > 1) {
+                android.util.Log.e("MeetRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for driver $driverId — using most recent")
+            }
+            active.maxByOrNull { it.createdAt }
         }
     }
     val rankedOpenRides = remember(openRides, destinationHomeEnabled, homeLatitude, homeLongitude) {
@@ -2220,7 +2273,7 @@ fun DriverDashboard(
                                         putBoolean("destination_home_enabled", destinationHomeEnabled)
                                     }
                                 },
-                                enabled = homeLatitude != null,
+                                enabled = driverHomeOwner != null && homeLatitude != null,
                             )
                         }
                         OutlinedButton(
@@ -2234,7 +2287,7 @@ fun DriverDashboard(
                                     }
                                 }
                             },
-                            enabled = currentGps != null,
+                            enabled = driverHomeOwner != null && currentGps != null,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(if (homeLatitude == null) "FIJAR CASA EN MI GPS" else "ACTUALIZAR UBICACIÓN DE CASA")
@@ -2373,8 +2426,8 @@ fun DriverDashboard(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Envía el SINPE y adjunta el comprobante. El saldo queda pendiente hasta la revisión en Trust Center.", color = MeetColors.textSecondary)
-                    Text("SINPE Móvil: ${walletPolicy?.sinpePhone ?: "63194029"}", fontWeight = FontWeight.Bold)
-                    Text(walletPolicy?.sinpeRecipientName ?: "Jorge David Del Valle Miranda", fontWeight = FontWeight.Bold)
+                    Text("SINPE Móvil: ${walletPolicy?.sinpePhone ?: "Política no disponible"}", fontWeight = FontWeight.Bold)
+                    Text(walletPolicy?.sinpeRecipientName ?: "Destinatario pendiente de consulta", fontWeight = FontWeight.Bold)
                     OutlinedTextField(
                         value = topupAmount.toString(),
                         onValueChange = { value ->
@@ -2392,9 +2445,9 @@ fun DriverDashboard(
                     onClick = {
                         showTopupDialog = false
                         pendingTopupAmount = topupAmount.toLong()
-                        proofPicker.launch("image/*")
+                        proofPicker.launch(arrayOf("image/jpeg", "image/png", "application/pdf"))
                     },
-                    enabled = topupAmount > 0,
+                    enabled = topupAmount > 0 && walletPolicy != null && driverHomeOwner != null,
                 ) { Text("ELEGIR COMPROBANTE") }
             },
             dismissButton = { TextButton(onClick = { showTopupDialog = false }) { Text("CANCELAR") } },
@@ -2490,7 +2543,7 @@ fun PassengerRideItem(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (ride.status == "OPEN") {
+                    if (ride.status in setOf("OPEN", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED")) {
                         TextButton(
                             onClick = { onCancel() },
                             colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFFEF5350)),
@@ -2670,8 +2723,11 @@ fun DriverRideItem(
                         fontSize = 20.sp
                     )
                     Text(
-                        "${if (ride.paymentMethod == "SINPE") "📲 SINPE" else "💵 EFECTIVO"} · " +
-                            "${orderedStops.size} parada(s)",
+                        "${when (ride.paymentMethod) {
+                            "SINPE" -> "📲 SINPE"
+                            "CASH" -> "💵 EFECTIVO"
+                            else -> "⏳ Método no confirmado"
+                        }} · ${orderedStops.size} parada(s)",
                         color = MeetColors.cyberCyan,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
@@ -2724,7 +2780,9 @@ fun ActiveRidePanel(
     val sharingSelections by viewModel.rideSharingSelections.collectAsState()
     val roadIncidents by viewModel.rideRoadIncidents.collectAsState()
     val speedSamplesByTrip by viewModel.rideSpeedSamples.collectAsState()
-    val rideNotifications = remember(context) { RideNotificationCoordinator(context) }
+    val notificationPrincipal by viewModel.activePrincipal.collectAsState()
+    val notificationOwner = remember(notificationPrincipal) { viewModel.currentUserId }
+    val rideNotifications = remember(context, notificationOwner) { RideNotificationCoordinator(context, notificationOwner) }
 
     var chatInputText by remember { mutableStateOf("") }
     var showRatingDialog by remember { mutableStateOf(false) }
@@ -3158,20 +3216,10 @@ fun ActiveRidePanel(
     }
 
     if (showCancellationDialog) {
-        RideCancellationDialog(
-            actorRole = if (isDriver) RideActorRole.DRIVER else RideActorRole.PASSENGER,
-            onDismiss = { showCancellationDialog = false },
-            onConfirm = { reason, detail ->
-                viewModel.cancelRide(
-                    requestId = ride.requestId,
-                    reason = reason,
-                    detail = detail,
-                    actorRole = myRole,
-                )
-                showCancellationDialog = false
-                onCloseRide()
-            },
-        )
+        AuthoritativeRideCancellationDialog(
+            viewModel, ride.requestId,
+            if (isDriver) RideActorRole.DRIVER else RideActorRole.PASSENGER,
+        ) { showCancellationDialog = false }
     }
     if (showGuardianDialog) {
         RideGuardianDialog(
@@ -3303,7 +3351,11 @@ fun ActiveRidePanel(
                     )
                 }
                 Text(
-                    text = "Pago: ${if (ride.paymentMethod == "SINPE") "SINPE" else "Efectivo"} · " +
+                    text = "Pago: ${when (ride.paymentMethod) {
+                        "SINPE" -> "SINPE"
+                        "CASH" -> "Efectivo"
+                        else -> "No confirmado"
+                    }} · " +
                         if (ride.fareMode == RideFareMode.METERED_TIME_DISTANCE.name) {
                             "Estimado actual: ${ride.estimatedFareMinor} CRC"
                         } else {
@@ -3399,7 +3451,8 @@ fun ActiveRidePanel(
                                 "TOTAL: ${finalFare.total} · " + when (ride.paymentMethod) {
                                     "SINPE" -> "SINPE"
                                     "CASH" -> "Efectivo"
-                                    else -> "Método de pago pendiente de validación"
+                                    "UNKNOWN" -> "Pendiente de confirmación"
+                                    else -> "Pendiente de confirmación"
                                 },
                                 color = Color.White,
                                 fontSize = 13.sp,
@@ -3615,7 +3668,7 @@ fun ActiveRidePanel(
                                 )
                             }
                         }
-                        if (ride.status in listOf("ACCEPTED", "ARRIVED")) {
+                        if (ride.status in listOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED")) {
                             Button(
                                 onClick = { showCancellationDialog = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
@@ -4717,9 +4770,11 @@ fun PassengerLiveOffersPanel(
                 ) {
                     IconButton(
                         onClick = {
+                            val priceMinor = ride.priceOffer.toLong()
+                            val adjusted = RideFareBidPolicy.adjustMinor(priceMinor, ride.currency, -1)
                             viewModel.updateRidePrice(
                                 ride.requestId,
-                                RideFareBidPolicy.adjust(ride.priceOffer, ride.currency, -1),
+                                adjusted.toDouble(),
                             )
                         },
                         modifier = Modifier.background(MeetColors.borderSubtle, CircleShape)
@@ -4740,9 +4795,11 @@ fun PassengerLiveOffersPanel(
 
                     IconButton(
                         onClick = {
+                            val priceMinor = ride.priceOffer.toLong()
+                            val adjusted = RideFareBidPolicy.adjustMinor(priceMinor, ride.currency, 1)
                             viewModel.updateRidePrice(
                                 ride.requestId,
-                                RideFareBidPolicy.adjust(ride.priceOffer, ride.currency, 1),
+                                adjusted.toDouble(),
                             )
                         },
                         modifier = Modifier.background(MeetColors.borderSubtle, CircleShape)
@@ -4796,23 +4853,9 @@ fun PassengerLiveOffersPanel(
         }
 
         if (showCancellationDialog) {
-            RideCancellationDialog(
-                actorRole = RideActorRole.PASSENGER,
-                onDismiss = { showCancellationDialog = false },
-                onConfirm = { reason, detail ->
-                    viewModel.cancelRide(
-                        requestId = ride.requestId,
-                        reason = reason,
-                        detail = detail,
-                        actorRole = RideActorRole.PASSENGER.name,
-                    )
-                    showCancellationDialog = false
-                    // Clear the owner-scoped pointer immediately. The server
-                    // command remains authoritative and the projection worker
-                    // will confirm/reconcile the terminal state afterwards.
-                    onCloseRide()
-                },
-            )
+            AuthoritativeRideCancellationDialog(viewModel, ride.requestId, RideActorRole.PASSENGER) {
+                showCancellationDialog = false
+            }
         }
 
         // Radar search indicator with elapsed time
@@ -5731,5 +5774,49 @@ private fun TipDialog(
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("SALTEAR") } },
+    )
+}
+
+/** The dialog observes durable commands and the canonical projection across recreation. */
+@Composable
+private fun AuthoritativeRideCancellationDialog(
+    viewModel: ObdViewModel,
+    requestId: String,
+    role: RideActorRole,
+    onDismiss: () -> Unit,
+) {
+    val commands by remember(requestId) { viewModel.cancellationCommands(requestId) }
+        .collectAsState(initial = emptyList())
+    val request by remember(requestId) { viewModel.observeRideForCancellation(requestId) }
+        .collectAsState(initial = null)
+    val command = commands.firstOrNull { it.actorSessionUserId == viewModel.currentUserId }
+    // A queued/retryable command is recoverable: allow the user to wake the
+    // worker again after auth/network recovery. Only an actively leased RPC
+    // must disable the confirm action to prevent concurrent submissions.
+    var observedAt by remember(requestId) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(command?.status, command?.leaseStartedAt) {
+        while (command?.status == "IN_FLIGHT") {
+            observedAt = System.currentTimeMillis()
+            delay(1_000L)
+        }
+    }
+    val leaseIsActive = command?.leaseStartedAt?.let { observedAt - it < 2 * 60 * 1000L } == true
+    val pending = command?.status == "IN_FLIGHT" && leaseIsActive && request?.serverState != "CANCELLED"
+    val failureMessage = when {
+        command?.status == "IN_FLIGHT" && !leaseIsActive ->
+            "La confirmación anterior se interrumpió. Puedes reintentar ahora."
+        command?.status in setOf("FAILED", "CONFLICT", "DEAD_LETTER") ->
+            "La cancelación no fue confirmada. Actualiza el viaje y revisa su estado antes de reintentar."
+        else -> null
+    }
+    LaunchedEffect(request?.serverState, request?.syncState) {
+        if (request?.serverState == "CANCELLED" || request?.syncState == "LOCAL_CANCELLED") onDismiss()
+    }
+    RideCancellationDialog(
+        actorRole = role,
+        onDismiss = onDismiss,
+        submitting = pending,
+        failureMessage = failureMessage,
+        onConfirm = { reason, detail -> viewModel.cancelRide(requestId, reason, detail, role.name) },
     )
 }

@@ -5,11 +5,11 @@ import com.elysium369.meet.mobility.domain.ledger.LedgerEntry
 import com.elysium369.meet.mobility.domain.ledger.LedgerReferenceType
 import com.elysium369.meet.mobility.domain.ledger.LedgerTransaction
 import com.elysium369.meet.mobility.domain.ledger.TripSettlement
-import com.elysium369.meet.mobility.domain.models.CurrencyCode
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
+import com.elysium369.meet.core.money.SignedMoney
 import com.elysium369.meet.mobility.domain.models.MarketId
-import com.elysium369.meet.mobility.domain.models.Money
 import com.elysium369.meet.mobility.domain.models.ServiceCategoryId
-import com.elysium369.meet.mobility.domain.models.SignedMoney
 import com.elysium369.meet.mobility.domain.payment.PaymentAuthorization
 import com.elysium369.meet.mobility.domain.payment.PaymentAuthorizationState
 import com.elysium369.meet.mobility.domain.payment.PaymentMethodType
@@ -33,8 +33,8 @@ import java.util.UUID
 
 class MobilityFinanceTest {
 
-    private val crc = CurrencyCode.of("CRC")
-    private val usd = CurrencyCode.of("USD")
+    private val crc = CurrencyCode.fromString("CRC")
+    private val usd = CurrencyCode.fromString("USD")
 
     @Test
     fun rateRationalMathAndMoneyMultiplication() {
@@ -42,15 +42,15 @@ class MobilityFinanceTest {
         val surge = Rate(3L, 2L) // 1.5x
 
         val surged = base.multiply(surge)
-        assertEquals(1500L, surged.minorUnits)
+        assertEquals(1500L, surged.amountMinor)
 
         // Integer arithmetic: 1000 * 1/3 = 333
         val third = base.multiply(Rate(1L, 3L))
-        assertEquals(333L, third.minorUnits)
+        assertEquals(333L, third.amountMinor)
 
         // 1000 * 2/3 = 666
         val twoThirds = base.multiply(Rate(2L, 3L))
-        assertEquals(666L, twoThirds.minorUnits)
+        assertEquals(666L, twoThirds.amountMinor)
 
         // Rate validation
         assertThrows(IllegalArgumentException::class.java) {
@@ -80,7 +80,7 @@ class MobilityFinanceTest {
             expiresAt = Instant.now().plusSeconds(600)
         )
 
-        assertEquals(5085L, quote.total.minorUnits)
+        assertEquals(5085L, quote.total.amountMinor)
         assertEquals("CR_SJO", quote.marketId.value)
         assertEquals("cat_sjo_standard", quote.serviceCategoryId.value)
 
@@ -200,7 +200,7 @@ class MobilityFinanceTest {
         )
 
         assertEquals(4, tx.entries.size)
-        assertEquals(0L, tx.entries.sumOf { it.amount.minorUnits })
+        assertEquals(0L, tx.entries.sumOf { it.amount.amountMinor })
     }
 
     @Test
@@ -243,7 +243,7 @@ class MobilityFinanceTest {
             createdAt = Instant.now()
         )
 
-        assertEquals(5000L, settlement.grossFare.minorUnits)
+        assertEquals(5000L, settlement.grossFare.amountMinor)
 
         // Mismatched gross fare throws
         assertThrows(IllegalArgumentException::class.java) {

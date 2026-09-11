@@ -1,11 +1,11 @@
 package com.elysium369.meet.ride.wallet
 
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.ride.domain.BasisPoints
-import com.elysium369.meet.ride.domain.CurrencyCode
 import com.elysium369.meet.ride.domain.RideCommissionPolicy
 import com.elysium369.meet.ride.domain.RideId
 import com.elysium369.meet.ride.domain.RideIdempotencyKey
-import com.elysium369.meet.ride.domain.RideMoney
 
 enum class RideLedgerAccountKind {
     DRIVER_AVAILABLE,
@@ -61,11 +61,11 @@ data class RideLedgerPosting(
     val entryId: String,
     val account: RideLedgerAccount,
     val direction: RidePostingDirection,
-    val amount: RideMoney,
+    val amount: Money,
 ) {
     init {
         require(entryId.isNotBlank()) { "Ledger entry ID is required" }
-        require(amount.minorUnits > 0) { "Ledger posting amount must be positive" }
+        require(amount.amountMinor > 0) { "Ledger posting amount must be positive" }
     }
 }
 
@@ -90,8 +90,8 @@ data class RideLedgerJournal(
 ) {
     val currency: CurrencyCode = postings.firstOrNull()?.amount?.currency
         ?: throw IllegalArgumentException("Journal requires postings")
-    val debitTotal: RideMoney = totalFor(RidePostingDirection.DEBIT)
-    val creditTotal: RideMoney = totalFor(RidePostingDirection.CREDIT)
+    val debitTotal: Money = totalFor(RidePostingDirection.DEBIT)
+    val creditTotal: Money = totalFor(RidePostingDirection.CREDIT)
     val isBalanced: Boolean = debitTotal == creditTotal
 
     init {
@@ -113,14 +113,14 @@ data class RideLedgerJournal(
         }
     }
 
-    private fun totalFor(direction: RidePostingDirection): RideMoney {
+    private fun totalFor(direction: RidePostingDirection): Money {
         val total = postings
             .asSequence()
             .filter { it.direction == direction }
             .fold(0L) { sum, posting ->
-                Math.addExact(sum, posting.amount.minorUnits)
+                Math.addExact(sum, posting.amount.amountMinor)
             }
-        return RideMoney(total, currency)
+        return Money(total, currency)
     }
 }
 
@@ -157,7 +157,7 @@ data class RevenueSplitAllocation(
     val beneficiary: RevenueBeneficiary,
     val ownerId: String?,
     val basisPoints: BasisPoints,
-    val amount: RideMoney,
+    val amount: Money,
 ) {
     fun ledgerAccount(): RideLedgerAccount =
         when (beneficiary) {
@@ -216,21 +216,21 @@ data class RevenueSplitRuleSet(
         }
     }
 
-    fun allocate(commission: RideMoney): List<RevenueSplitAllocation> {
-        if (commission.minorUnits == 0L) {
+    fun allocate(commission: Money): List<RevenueSplitAllocation> {
+        if (commission.amountMinor == 0L) {
             return rules.map { rule ->
                 RevenueSplitAllocation(
                     beneficiary = rule.beneficiary,
                     ownerId = rule.ownerId,
                     basisPoints = rule.basisPoints,
-                    amount = RideMoney.zero(commission.currency),
+                    amount = Money.zero(commission.currency),
                 )
             }
         }
 
         val denominator = RideCommissionPolicy.PLATFORM_RATE_BASIS_POINTS.toLong()
-        val whole = commission.minorUnits / denominator
-        val remainder = commission.minorUnits % denominator
+        val whole = commission.amountMinor / denominator
+        val remainder = commission.amountMinor % denominator
         val floors = rules.map { rule ->
             val wholeShare = Math.multiplyExact(
                 whole,
@@ -246,7 +246,7 @@ data class RevenueSplitRuleSet(
             )
         }.toMutableList()
 
-        var undistributed = commission.minorUnits -
+        var undistributed = commission.amountMinor -
             floors.sumOf(SplitFloor::amountMinor)
         val priority = rules.indices.sortedWith(
             compareByDescending<Int> { floors[it].remainder }
@@ -268,8 +268,8 @@ data class RevenueSplitRuleSet(
                 beneficiary = rule.beneficiary,
                 ownerId = rule.ownerId,
                 basisPoints = rule.basisPoints,
-                amount = RideMoney(
-                    minorUnits = floors[index].amountMinor,
+                amount = Money(
+                    amountMinor = floors[index].amountMinor,
                     currency = commission.currency,
                 ),
             )
@@ -288,10 +288,10 @@ object RideLedgerJournalFactory {
         idempotencyKey: RideIdempotencyKey,
         tripId: RideId,
         driverId: String,
-        amount: RideMoney,
+        amount: Money,
         createdAtEpochMs: Long,
     ): RideLedgerJournal {
-        require(amount.minorUnits > 0) { "Reserved commission must be positive" }
+        require(amount.amountMinor > 0) { "Reserved commission must be positive" }
         return journal(
             transactionId = transactionId,
             idempotencyKey = idempotencyKey,
@@ -328,10 +328,10 @@ object RideLedgerJournalFactory {
         idempotencyKey: RideIdempotencyKey,
         tripId: RideId,
         driverId: String,
-        amount: RideMoney,
+        amount: Money,
         createdAtEpochMs: Long,
     ): RideLedgerJournal {
-        require(amount.minorUnits > 0) { "Released commission must be positive" }
+        require(amount.amountMinor > 0) { "Released commission must be positive" }
         return journal(
             transactionId = transactionId,
             idempotencyKey = idempotencyKey,
@@ -368,13 +368,13 @@ object RideLedgerJournalFactory {
         idempotencyKey: RideIdempotencyKey,
         tripId: RideId,
         driverId: String,
-        commission: RideMoney,
+        commission: Money,
         splitRules: RevenueSplitRuleSet,
         createdAtEpochMs: Long,
     ): RideLedgerJournal {
-        require(commission.minorUnits > 0) { "Captured commission must be positive" }
+        require(commission.amountMinor > 0) { "Captured commission must be positive" }
         val allocations = splitRules.allocate(commission)
-            .filter { it.amount.minorUnits > 0 }
+            .filter { it.amount.amountMinor > 0 }
         return journal(
             transactionId = transactionId,
             idempotencyKey = idempotencyKey,
@@ -451,7 +451,7 @@ object RideLedgerJournalFactory {
         index: Int,
         account: RideLedgerAccount,
         direction: RidePostingDirection,
-        amount: RideMoney,
+        amount: Money,
     ) = RideLedgerPosting(
         entryId = "$transactionId:$index",
         account = account,

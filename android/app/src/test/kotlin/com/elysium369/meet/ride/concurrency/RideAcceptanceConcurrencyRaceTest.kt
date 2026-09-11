@@ -1,6 +1,6 @@
 package com.elysium369.meet.ride.concurrency
 
-import com.elysium369.meet.ride.domain.RideMoney
+import com.elysium369.meet.core.money.Money
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -50,7 +50,7 @@ class RideAcceptanceConcurrencyRaceTest {
             private set
 
         private val receipts = ConcurrentHashMap<String, AtomicAcceptResult>()
-        val commissionReservations = ConcurrentHashMap<String, RideMoney>()
+        val commissionReservations = ConcurrentHashMap<String, Money>()
 
         fun acceptOrClaim(
             tripId: String,
@@ -95,7 +95,7 @@ class RideAcceptanceConcurrencyRaceTest {
 
                 // 4. Reserve 5% commission in ledger
                 val commissionAmount = (fareMinor * 500L) / 10000L
-                commissionReservations[driverId] = RideMoney.of(commissionAmount, "CRC")
+                commissionReservations[driverId] = Money.of(commissionAmount, "CRC")
 
                 val winnerResult = AtomicAcceptResult.Won(tripId, driverId, currentVersion)
                 receipts[idempotencyKey] = winnerResult
@@ -167,7 +167,7 @@ class RideAcceptanceConcurrencyRaceTest {
             // Verify commission reservation exists ONLY for the winning driver
             assertEquals("Exactly 1 commission reservation must exist", 1, server.commissionReservations.size)
             assertTrue("Commission reservation must belong to winner", server.commissionReservations.containsKey(winnerDriverId))
-            assertEquals(250L, server.commissionReservations[winnerDriverId]!!.minorUnits) // 5% of 5000
+            assertEquals(250L, server.commissionReservations[winnerDriverId]!!.amountMinor) // 5% of 5000
 
             // Idempotent retry: winner retries with same key -> gets identical won result
             val retryResult = server.acceptOrClaim(

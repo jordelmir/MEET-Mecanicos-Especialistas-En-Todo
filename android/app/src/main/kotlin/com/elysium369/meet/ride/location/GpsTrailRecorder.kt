@@ -18,6 +18,7 @@ object GpsTrailRecorder {
     private const val TAG = "GpsTrailRecorder"
     private const val DIR_NAME = "gps_forensic_trails"
     private const val MAX_POINTS_PER_RIDE = 10_000
+    private val writeLock = Any()
 
     private fun trailDir(context: Context): File {
         val dir = File(context.filesDir, DIR_NAME)
@@ -46,7 +47,7 @@ object GpsTrailRecorder {
             put("completedAtEpochMs", 0L)
             put("points", JSONArray())
         }
-        file.writeText(meta.toString())
+        writeAtomically(file, meta.toString())
         activeRidePrefs(context).edit().putString("active_ride_id", rideId).apply()
         Log.i(TAG, "Started recording trail for ride $rideId")
     }
@@ -65,11 +66,12 @@ object GpsTrailRecorder {
         capturedAtEpochMs: Long,
     ) = withContext(Dispatchers.IO) {
         try {
-            val file = trailFile(context, rideId)
-            if (!file.exists()) return@withContext
-            val json = JSONObject(file.readText())
-            val points = json.getJSONArray("points")
-            if (points.length() >= MAX_POINTS_PER_RIDE) return@withContext
+            synchronized(writeLock) {
+                val file = trailFile(context, rideId)
+                if (!file.exists()) return@withContext
+                val json = JSONObject(file.readText())
+                val points = json.getJSONArray("points")
+                if (points.length() >= MAX_POINTS_PER_RIDE) return@withContext
 
             val point = JSONObject().apply {
                 put("lat", latitude)
@@ -80,8 +82,11 @@ object GpsTrailRecorder {
                 put("ts", capturedAtEpochMs)
                 put("seq", points.length().toLong())
             }
-            points.put(point)
-            file.writeText(json.toString())
+                points.put(point)
+                writeAtomically(file, json.toString())
+            }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.w(TAG, "Failed to record GPS point: ${e.message}")
         }
@@ -96,9 +101,11 @@ object GpsTrailRecorder {
             if (!file.exists()) return@withContext
             val json = JSONObject(file.readText())
             json.put("completedAtEpochMs", System.currentTimeMillis())
-            file.writeText(json.toString())
+            synchronized(writeLock) { writeAtomically(file, json.toString()) }
             activeRidePrefs(context).edit().remove("active_ride_id").apply()
             Log.i(TAG, "Stopped recording trail for ride $rideId")
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.w(TAG, "Failed to stop recording: ${e.message}")
         }
@@ -131,6 +138,8 @@ object GpsTrailRecorder {
                 passengerId = json.getString("passengerId"),
                 points = points,
             )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.w(TAG, "Failed to load trail: ${e.message}")
             null
@@ -154,6 +163,15 @@ object GpsTrailRecorder {
             ?.filter { it.extension == "json" && it.length() > 100 }
             ?.map { it.nameWithoutExtension }
             ?: emptyList()
+
+    private fun writeAtomically(file: File, contents: String) {
+        val temp = File(file.parentFile, "${file.name}.tmp")
+        temp.writeText(contents)
+        if (!temp.renameTo(file)) {
+            temp.delete()
+            error("Unable to atomically publish GPS trail")
+        }
+    }
 
     /**
      * Delete a trail file after successful export.

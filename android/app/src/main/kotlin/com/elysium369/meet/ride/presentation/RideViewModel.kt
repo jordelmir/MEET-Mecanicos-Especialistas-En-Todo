@@ -35,6 +35,7 @@ import com.elysium369.meet.ride.domain.RideActorRole
 import com.elysium369.meet.ride.domain.RideArrivalPolicy
 import com.elysium369.meet.ride.domain.RideCancellationPolicy
 import com.elysium369.meet.ride.domain.RideCancellationReason
+import com.elysium369.meet.ride.domain.RideCancellationUiState
 import com.elysium369.meet.ride.domain.RideCommandEnvelope
 
 import com.elysium369.meet.ride.domain.RideCommandType
@@ -250,6 +251,9 @@ class RideViewModel @Inject constructor(
 
     private val _activeRideRequest = MutableStateFlow<RideRequestEntity?>(null)
     val activeRideRequest: StateFlow<RideRequestEntity?> = _activeRideRequest.asStateFlow()
+
+    private val _cancellationUiState = MutableStateFlow<RideCancellationUiState>(RideCancellationUiState.Idle)
+    val cancellationUiState: StateFlow<RideCancellationUiState> = _cancellationUiState.asStateFlow()
 
     private val _rideOffers = MutableStateFlow<List<RideOfferEntity>>(emptyList())
     val rideOffers: StateFlow<List<RideOfferEntity>> = _rideOffers.asStateFlow()
@@ -966,7 +970,7 @@ class RideViewModel @Inject constructor(
         estimatedDistanceMeters: Long = (estDistance * 1_000.0).toLong(),
         estimatedDurationSeconds: Long = estDuration * 60L,
         stopsJson: String = "[]",
-        paymentMethod: String = "CASH",
+        paymentMethod: String = "UNKNOWN",
         fareMode: RideFareMode = RideFareMode.OPEN_BID,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -993,14 +997,11 @@ class RideViewModel @Inject constructor(
                 }
             } else null
 
-            val normalizedFare = meteredQuote?.estimatedTotalMinor?.toDouble()
-                ?: RideFareBidPolicy.normalize(priceOffer, currency)
-            val offeredFareMinor = runCatching {
-                rideFareToMinorUnits(normalizedFare, currency)
-            }.getOrElse {
-                _rideVerificationNotice.emit("La tarifa ingresada no es válida.")
-                return@launch
-            }
+            val offeredFareMinor = meteredQuote?.estimatedTotalMinor
+                ?: run {
+                    val priceOfferMinor = rideFareToMinorUnits(priceOffer, currency)
+                    RideFareBidPolicy.normalizeMinor(priceOfferMinor, currency)
+                }
             if (offeredFareMinor <= 0L) {
                 _rideVerificationNotice.emit("La tarifa debe ser mayor que cero.")
                 return@launch
@@ -1022,7 +1023,7 @@ class RideViewModel @Inject constructor(
                 destLatitude = destLat,
                 destLongitude = destLng,
                 destAddress = destAddr,
-                priceOffer = normalizedFare,
+                priceOffer = offeredFareMinor.toDouble(),
                 priceOfferMinor = offeredFareMinor,
                 currency = currency,
                 estimatedDistanceKm = estDistance,
@@ -1137,13 +1138,9 @@ class RideViewModel @Inject constructor(
                 _rideVerificationNotice.emit("No hay un vehículo remoto activo y verificado para ofertar.")
                 return@launch
             }
-            val normalizedPrice = RideFareBidPolicy.normalize(counterPrice, currency)
-            val fareMinor = runCatching {
-                rideFareToMinorUnits(normalizedPrice, currency)
-            }.getOrElse {
-                _rideVerificationNotice.emit("La contraoferta no es válida.")
-                return@launch
-            }
+            val counterPriceMinor = rideFareToMinorUnits(counterPrice, currency)
+            val fareMinor = RideFareBidPolicy.normalizeMinor(counterPriceMinor, currency)
+            val normalizedPrice = counterPrice
             val offerId = UUID.randomUUID().toString()
             val offer = RideOfferEntity(
                 offerId = offerId,
@@ -1415,24 +1412,43 @@ class RideViewModel @Inject constructor(
             else -> return
         }
         if (actorId.isBlank() || actorName.isBlank()) return
+        _cancellationUiState.value = RideCancellationUiState.Submitting(requestId, reason, detail)
         viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: return@launch
-            if (request.serverVersion <= 0L) {
-                _rideVerificationNotice.emit("La solicitud aún no fue confirmada; espera antes de cancelar.")
+            val request = rideDao.getRequestById(requestId)
+            if (request == null) {
+                _cancellationUiState.value = RideCancellationUiState.Failed(
+                    requestId, reason, "Solicitud no encontrada localmente.",
+                )
                 return@launch
             }
-            reportRideCommandEnqueue(
+            val payload = RideCommandPayload(
+                reasonCode = reason.name,
+                detail = detail?.trim()?.takeIf(String::isNotEmpty),
+            )
+            val success = reportRideCommandEnqueue(
                 result = enqueueAuthoritativeRideCommand(
                     request = request,
                     type = RideCommandType.CANCEL,
-                    payload = RideCommandPayload(
-                        reasonCode = reason.name,
-                        detail = detail?.trim()?.takeIf(String::isNotEmpty),
-                    ),
+                    payload = payload,
                 ),
-                acceptedMessage = "Cancelación enviada. El servidor aplicará estado, seguridad y liberación de saldo.",
+                acceptedMessage = if (request.serverVersion <= 0L) {
+                    "Cancelación registrada. Se procesará cuando la solicitud se sincronice."
+                } else {
+                    "Cancelación enviada. El servidor aplicará estado, seguridad y liberación de saldo."
+                },
             )
+            _cancellationUiState.value = if (success) {
+                RideCancellationUiState.Confirmed(requestId, reason)
+            } else {
+                RideCancellationUiState.Failed(
+                    requestId, reason, "No se pudo registrar la cancelación. Inténtalo de nuevo.",
+                )
+            }
         }
+    }
+
+    fun dismissCancellation() {
+        _cancellationUiState.value = RideCancellationUiState.Idle
     }
 
     fun activateRideGuardian(
@@ -1558,7 +1574,9 @@ class RideViewModel @Inject constructor(
     fun updateRidePrice(requestId: String, newPrice: Double) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = rideDao.getRequestById(requestId) ?: return@launch
-            val normalizedPrice = RideFareBidPolicy.normalize(newPrice, request.currency)
+            val newPriceMinor = rideFareToMinorUnits(newPrice, request.currency)
+            val normalizedMinor = RideFareBidPolicy.normalizeMinor(newPriceMinor, request.currency)
+            val normalizedPrice = normalizedMinor.toDouble()
             val updated = request.copy(priceOffer = normalizedPrice)
             rideDao.insertRequest(updated)
 
@@ -1662,6 +1680,8 @@ class RideViewModel @Inject constructor(
                         createdAt = System.currentTimeMillis(),
                     ),
                 )
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 destination.delete()
                 Log.e("RideViewModel", "Failed to persist ride chat image", error)
@@ -1711,6 +1731,8 @@ class RideViewModel @Inject constructor(
             }
             recordingStartTime = System.currentTimeMillis()
             _isRecordingAudio.value = true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.e("RideViewModel", "Failed to start audio recording", e)
             _isRecordingAudio.value = false
@@ -1759,6 +1781,8 @@ class RideViewModel @Inject constructor(
                     file.delete()
                 }
             }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.e("RideViewModel", "Failed to stop audio recording", e)
             _isRecordingAudio.value = false
@@ -1783,6 +1807,8 @@ class RideViewModel @Inject constructor(
                     }
                 }
                 _isPlayingAudio.value = filePath
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Log.e("RideViewModel", "MediaPlayer failed", e)
                 _isPlayingAudio.value = null

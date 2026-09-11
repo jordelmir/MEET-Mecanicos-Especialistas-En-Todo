@@ -207,6 +207,8 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                     correlationId = response.correlationId,
                 )
             }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             RideCommandGatewayResult.TransportFailure(
                 code = "REMOTE_TRANSPORT_FAILURE",
@@ -251,6 +253,8 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                     assignedVehicleId = wire.assignedVehicleId,
                 ),
             )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             RideSnapshotResult.Failure(
                 code = "REMOTE_READ_FAILURE",

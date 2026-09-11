@@ -53,7 +53,7 @@ object RideFareEngine {
 
         return RideFareQuote(
             mode = RideFareMode.METERED_TIME_DISTANCE,
-            currency = CurrencyCode.of(COSTA_RICA_CURRENCY),
+            currency = CurrencyCode.fromString(COSTA_RICA_CURRENCY),
             estimatedDistanceMeters = distanceMeters,
             estimatedDurationSeconds = durationSeconds,
             distanceRateMinorPerKm = CRC_DISTANCE_RATE_MINOR_PER_KM,

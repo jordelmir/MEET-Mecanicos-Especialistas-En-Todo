@@ -187,7 +187,7 @@ import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
         ScheduledRideEntity::class,
         FavoriteRouteEntity::class,
     ],
-    version = 73,
+    version = 74,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

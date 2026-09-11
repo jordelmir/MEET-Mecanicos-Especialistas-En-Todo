@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.core.geo.GeoPoint
-import com.elysium369.meet.core.services.kernel.Money
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.core.services.kernel.ServiceRole
 import com.elysium369.meet.core.services.tow.*
 import com.elysium369.meet.fulfillment.adapters.TowFulfillmentAdapter

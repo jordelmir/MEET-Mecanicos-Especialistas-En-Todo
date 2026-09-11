@@ -1,6 +1,6 @@
 package com.elysium369.meet.mobility.domain.payment
 
-import com.elysium369.meet.mobility.domain.models.Money
+import com.elysium369.meet.core.money.Money
 import java.time.Instant
 import java.util.UUID
 

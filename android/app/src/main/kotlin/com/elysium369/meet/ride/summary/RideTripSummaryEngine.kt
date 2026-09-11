@@ -65,10 +65,10 @@ data class TripReceipt(
     val issueReported: TripIssue? = null,
 ) {
     val formattedTotal: String
-        get() = "₡${totalFare.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(totalFare, currency)
 
     val formattedMyShare: String
-        get() = "₡${myShareAmount.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(myShareAmount, currency)
 
     val hasTip: Boolean get() = tipAmount > 0
     val isSplit: Boolean get() = splitWith.isNotEmpty()
@@ -149,10 +149,10 @@ data class TripStatistics(
     val averageDuration: Int,
     val favoriteDestination: String?,
     val mostUsedPayment: String?,
-    val currency: String = "CRC",
+    val currency: String,
 ) {
     val formattedTotalSpent: String
-        get() = "₡${totalSpent.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(totalSpent, currency)
 }
 
 // ─── Tip Presets ───
@@ -170,11 +170,11 @@ class RideTripSummaryEngine {
 
     private val receipts = mutableMapOf<String, TripReceipt>()
 
-    val defaultTipPresets = listOf(
+    fun defaultTipPresets(currency: String = "CRC") = listOf(
         TipPreset("Sin propina", 0),
-        TipPreset("₡500", 500),
-        TipPreset("₡1,000", 1000),
-        TipPreset("₡2,000", 2000),
+        TipPreset(com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(500, currency), 500),
+        TipPreset(com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(1000, currency), 1000),
+        TipPreset(com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(2000, currency), 2000),
         TipPreset("10%", 0, isPercentage = true, percentage = 10),
         TipPreset("15%", 0, isPercentage = true, percentage = 15),
         TipPreset("20%", 0, isPercentage = true, percentage = 20),
@@ -309,7 +309,7 @@ class RideTripSummaryEngine {
 
     fun computeStatistics(passengerId: String): TripStatistics {
         val trips = getTripHistory(passengerId)
-        if (trips.isEmpty()) return TripStatistics(0, 0.0, 0, 0, 0, 0.0, 0, null, null)
+        if (trips.isEmpty()) return TripStatistics(0, 0.0, 0, 0, 0, 0.0, 0, null, null, "CRC")
 
         val totalDist = trips.sumOf { it.distanceKm }
         val totalSpent = trips.sumOf { it.totalFare }
@@ -331,6 +331,7 @@ class RideTripSummaryEngine {
             averageDuration = trips.sumOf { it.durationMinutes } / trips.size,
             favoriteDestination = destinations,
             mostUsedPayment = payments,
+            currency = trips.firstOrNull()?.currency ?: "CRC",
         )
     }
 

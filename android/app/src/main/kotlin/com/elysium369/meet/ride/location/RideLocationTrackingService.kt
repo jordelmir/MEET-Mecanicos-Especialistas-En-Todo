@@ -68,8 +68,9 @@ class RideLocationTrackingService : Service() {
             stopTracking()
             return START_NOT_STICKY
         }
+        // A restarted service must receive a fresh explicit lease. Reusing a
+        // global preference could resume exact GPS for a stale trip/account.
         val tripId = intent?.getStringExtra(EXTRA_TRIP_ID)?.takeIf { it.isNotBlank() }
-            ?: getSharedPreferences(PREFERENCES, MODE_PRIVATE).getString(KEY_ACTIVE_TRIP, null)
             ?: run {
                 stopSelf()
                 return START_NOT_STICKY
@@ -87,7 +88,7 @@ class RideLocationTrackingService : Service() {
         )
         operationId = op.operationId
 
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

@@ -74,6 +74,8 @@ object GpsTrailPdfExporter {
                 integrityHash = trail.integrityHash,
                 pointCount = trail.points.size,
             )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             android.util.Log.e("GpsTrailPdfExporter", "Failed to export PDF: ${e.message}", e)
             null

@@ -115,11 +115,11 @@ fun FareModeSelector(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         if (fareQuote != null) {
-                            FareBreakdownRow("Tarifa base", fareQuote.baseFare, MeetColors.neonGreen)
-                            FareBreakdownRow("Distancia (${fareQuote.formattedDistance})", fareQuote.distanceFare, MeetColors.electricBlue)
-                            FareBreakdownRow("Tiempo (${fareQuote.formattedDuration})", fareQuote.timeFare, MeetColors.hotMagenta)
+                            FareBreakdownRow("Tarifa base", fareQuote.baseFare, MeetColors.neonGreen, currency = fareQuote.currency)
+                            FareBreakdownRow("Distancia (${fareQuote.formattedDistance})", fareQuote.distanceFare, MeetColors.electricBlue, currency = fareQuote.currency)
+                            FareBreakdownRow("Tiempo (${fareQuote.formattedDuration})", fareQuote.timeFare, MeetColors.hotMagenta, currency = fareQuote.currency)
                             HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
-                            FareBreakdownRow("Total estimado", fareQuote.totalFare, MeetColors.neonGreen, isTotal = true)
+                            FareBreakdownRow("Total estimado", fareQuote.totalFare, MeetColors.neonGreen, currency = fareQuote.currency, isTotal = true)
                         }
                     }
                 }
@@ -165,8 +165,8 @@ fun RowScope.FareModeChip(
 }
 
 @Composable
-fun FareBreakdownRow(label: String, amount: Long, color: Color, isTotal: Boolean = false) {
-    val formatted = "₡${amount.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+fun FareBreakdownRow(label: String, amount: Long, color: Color, currency: String, isTotal: Boolean = false) {
+    val formatted = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(amount, currency)
     Row(
         modifier = Modifier
             .fillMaxWidth()

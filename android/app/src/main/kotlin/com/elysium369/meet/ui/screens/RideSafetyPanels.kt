@@ -91,7 +91,7 @@ fun RideWalletStatusCard(
                 colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
             ) {
                 Text(
-                    "RECARGAR POR SINPE · 63194029",
+                    "RECARGAR POR SINPE",
                     fontWeight = FontWeight.ExtraBold,
                 )
             }
@@ -247,8 +247,17 @@ fun RideCancellationDialog(
     actorRole: RideActorRole,
     onDismiss: () -> Unit,
     onConfirm: (RideCancellationReason, String?) -> Unit,
+    submitting: Boolean = false,
+    failureMessage: String? = null,
 ) {
-    var selected by remember { mutableStateOf<RideCancellationReason?>(null) }
+    // Passenger cancellation is a normal, non-safety operation. Preselect a
+    // truthful neutral reason so the primary action is usable immediately;
+    // safety-sensitive reasons still require an explicit user selection.
+    var selected by remember(actorRole) {
+        mutableStateOf<RideCancellationReason?>(
+            RideCancellationReason.CHANGE_OF_PLANS.takeIf { actorRole == RideActorRole.PASSENGER },
+        )
+    }
     var detail by remember { mutableStateOf("") }
     val isValid = selected?.let { RideCancellationPolicy.isDetailValid(it, detail) } == true
 
@@ -263,9 +272,11 @@ fun RideCancellationDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = "${if (actorRole == RideActorRole.DRIVER) "Conductor" else "Pasajero"}: selecciona el motivo real. Los casos de seguridad se señalan para revisión; el piloto no aplica cargos automáticos.",
+                    text = "${if (actorRole == RideActorRole.DRIVER) "Conductor" else "Pasajero"}: selecciona el motivo real. Los casos de seguridad se señalan para revisión; la política y los cargos dependen de la confirmación del servidor.",
                     fontSize = 12.sp,
                 )
+                if (submitting) Text("Cancelación pendiente de confirmación. Puedes volver; la solicitud permanece guardada.")
+                failureMessage?.let { Text(it, color = MeetColors.error) }
                 RideCancellationPolicy.reasonsFor(actorRole).forEach { reason ->
                     OutlinedButton(
                         onClick = { selected = reason },
@@ -323,7 +334,7 @@ fun RideCancellationDialog(
                         onConfirm(it, detail.trim().takeIf(String::isNotEmpty))
                     }
                 },
-                enabled = isValid,
+                enabled = isValid && !submitting,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
             ) {
                 Text("CONFIRMAR CANCELACIÓN", fontWeight = FontWeight.Bold)

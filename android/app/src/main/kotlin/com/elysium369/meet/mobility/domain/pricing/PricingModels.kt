@@ -1,7 +1,7 @@
 package com.elysium369.meet.mobility.domain.pricing
 
 import com.elysium369.meet.mobility.domain.models.MarketId
-import com.elysium369.meet.mobility.domain.models.Money
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.mobility.domain.models.ServiceCategoryId
 import java.math.BigInteger
 import java.time.Instant
@@ -45,7 +45,7 @@ fun Money.multiply(
     rounding: FinancialRounding = FinancialRounding.DOWN,
 ): Money {
     val numerator =
-        BigInteger.valueOf(minorUnits)
+        BigInteger.valueOf(amountMinor)
             .multiply(
                 BigInteger.valueOf(rate.numerator)
             )
@@ -93,7 +93,7 @@ fun Money.multiply(
     }
 
     return Money(
-        minorUnits = quotient.toLongExactCompat(),
+        amountMinor = quotient.toLongExactCompat(),
         currency = currency,
     )
 }
@@ -125,7 +125,7 @@ data class RideQuote(
 ) {
     init {
         require(pricingPolicyVersion >= 1L) { "pricingPolicyVersion must be >= 1" }
-        require(total.minorUnits >= 0L) { "Quote total cannot be negative" }
+        require(total.amountMinor >= 0L) { "Quote total cannot be negative" }
     }
 }
 

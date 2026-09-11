@@ -3,6 +3,7 @@ package com.elysium369.meet.ride.domain
 import kotlinx.serialization.Serializable
 
 enum class RidePaymentMethod {
+    UNKNOWN,
     CASH,
     SINPE,
 }

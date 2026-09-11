@@ -14,6 +14,12 @@ import io.github.jan.supabase.realtime.postgresChangeFlow
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
@@ -32,7 +38,7 @@ sealed interface RideProjectionRefreshResult {
 }
 
 @Serializable
-private data class RemoteRideRequestProjection(
+internal data class RemoteRideRequestProjection(
     val id: String,
     @SerialName("passenger_id")
     val passengerId: String,
@@ -133,9 +139,8 @@ class RideRemoteProjectionRepository @Inject constructor(
 
     suspend fun refreshVisibleRides(): RideProjectionRefreshResult {
         val client = SupabaseModule.client
-        if (client.auth.currentUserOrNull() == null) {
-            return RideProjectionRefreshResult.AuthenticationRequired
-        }
+        val ownerAtStart = client.auth.currentUserOrNull()?.id
+            ?: return RideProjectionRefreshResult.AuthenticationRequired
         return try {
             val remoteRides = client.postgrest["ride_requests"]
                 .select {
@@ -165,9 +170,13 @@ class RideRemoteProjectionRepository @Inject constructor(
             val acceptedOfferByRequest = offers
                 .asSequence()
                 .filter { it.state == "ACCEPTED" }
-                .associateBy(RemoteRideOfferProjection::requestId)
+                .groupBy(RemoteRideOfferProjection::requestId)
 
             remoteRides.forEach { remote ->
+                currentCoroutineContext().ensureActive()
+                if (client.auth.currentUserOrNull()?.id != ownerAtStart) {
+                    return RideProjectionRefreshResult.AuthenticationRequired
+                }
                 val existing = rideDao.getRequestById(remote.id)
                 val orderedStops = stops[remote.id].orEmpty().map { stop ->
                     RideStopSnapshot(
@@ -178,20 +187,28 @@ class RideRemoteProjectionRepository @Inject constructor(
                         providerPlaceId = stop.providerPlaceId,
                     )
                 }
-                rideDao.insertRequest(
+                rideDao.insertRemoteProjection(
                     remote.toLocal(
                         existing = existing,
                         stops = orderedStops,
-                        acceptedOfferId = acceptedOfferByRequest[remote.id]?.id,
+                        acceptedOfferId = acceptedOfferByRequest[remote.id]?.firstOrNull {
+                            it.driverId == remote.assignedDriverId && it.vehicleId == remote.assignedVehicleId
+                        }?.id,
                     ),
                 )
             }
             offers.forEach { offer ->
+                currentCoroutineContext().ensureActive()
+                if (client.auth.currentUserOrNull()?.id != ownerAtStart) {
+                    return RideProjectionRefreshResult.AuthenticationRequired
+                }
                 rideDao.insertOffer(
                     offer.toLocal(vehicles[offer.vehicleId]?.displayName),
                 )
             }
             RideProjectionRefreshResult.Refreshed(remoteRides.size + offers.size)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (error: Exception) {
             RideProjectionRefreshResult.Failed(
                 (error.message ?: "No se pudo actualizar Viajes").take(300),
@@ -201,7 +218,8 @@ class RideRemoteProjectionRepository @Inject constructor(
 
     fun realtimeWakeUps(): Flow<Unit> = flow {
         val client = SupabaseModule.client
-        val channel = client.channel("elysium-rides-projection")
+        val ownerAtStart = client.auth.currentUserOrNull()?.id ?: return@flow
+        val channel = client.channel("elysium-rides-projection-$ownerAtStart")
         val changes = channel
             .postgresChangeFlow<PostgresAction>(schema = "public") {
                 table = "ride_requests"
@@ -229,72 +247,10 @@ class RideRemoteProjectionRepository @Inject constructor(
             emit(Unit)
             emitAll(merge(changes, offerChanges, stopChanges, vehicleChanges))
         } finally {
-            channel.unsubscribe()
+            withContext(NonCancellable) {
+                withTimeoutOrNull(5_000L) { channel.unsubscribe() }
+            }
         }
-    }
-
-    private fun RemoteRideRequestProjection.toLocal(
-        existing: RideRequestEntity?,
-        stops: List<RideStopSnapshot>,
-        acceptedOfferId: String?,
-    ): RideRequestEntity {
-        val offeredMajor = offeredFareMinor.toLegacyMajor(currency)
-        val finalMajor = finalFareMinor?.toLegacyMajor(currency)
-        return RideRequestEntity(
-            requestId = id,
-            passengerId = existing?.passengerId ?: passengerId,
-            passengerName = existing?.passengerName ?: "Pasajero verificado",
-            passengerPhone = existing?.passengerPhone.orEmpty(),
-            pickupLatitude = pickupLatitude,
-            pickupLongitude = pickupLongitude,
-            pickupAddress = pickupAddress,
-            pickupAccuracy = existing?.pickupAccuracy ?: 0f,
-            destLatitude = destinationLatitude,
-            destLongitude = destinationLongitude,
-            destAddress = destinationAddress,
-            priceOffer = offeredMajor,
-            priceOfferMinor = offeredFareMinor,
-            currency = currency,
-            estimatedDistanceKm = existing?.estimatedDistanceKm ?: 0.0,
-            estimatedDurationMin = existing?.estimatedDurationMin ?: 0,
-            stopsJson = if (stops.isEmpty()) {
-                existing?.stopsJson ?: "[]"
-            } else {
-                json.encodeToString(stops)
-            },
-            paymentMethod = paymentMethod ?: existing?.paymentMethod ?: "CASH",
-            fareMode = fareMode,
-            distanceRateMinorPerKm = distanceRateMinorPerKm,
-            timeRateMinorPerMinute = timeRateMinorPerMinute,
-            estimatedFareMinor = estimatedFareMinor,
-            fareRateCardVersion = fareRateCardVersion,
-            allowsInTripStops = allowsInTripStops,
-            quoteVersion = quoteVersion,
-            fareBreakdownJson = fareBreakdown.toString(),
-            status = state.toLegacyStatus(),
-            acceptedOfferId = acceptedOfferId ?: existing?.acceptedOfferId,
-            assignedDriverId = assignedDriverId,
-            assignedDriverName = existing?.assignedDriverName,
-            assignedDriverPhone = existing?.assignedDriverPhone,
-            assignedDriverVehicle = existing?.assignedDriverVehicle,
-            finalPrice = finalMajor,
-            finalPriceMinor = finalFareMinor,
-            serverState = state,
-            serverVersion = version,
-            serverAssignedVehicleId = assignedVehicleId,
-            syncState = "SYNCED",
-            lastSyncedAt = System.currentTimeMillis(),
-            lastCorrelationId = existing?.lastCorrelationId,
-            boardingPin = existing?.boardingPin,
-            boardingPinExpiresAt = existing?.boardingPinExpiresAt,
-            tipAmountMinor = existing?.tipAmountMinor,
-            passengerRating = existing?.passengerRating,
-            driverRating = existing?.driverRating,
-            createdAt = createdAt.toEpochMillisOr(existing?.createdAt ?: 0L),
-            completedAt = completedAt?.toEpochMillisOr(
-                existing?.completedAt ?: 0L,
-            )?.takeIf { it > 0L },
-        )
     }
 
     private fun RemoteRideOfferProjection.toLocal(
@@ -305,11 +261,11 @@ class RideRemoteProjectionRepository @Inject constructor(
         driverId = driverId,
         // Before assignment the passenger receives only an aggregate identity.
         // This avoids widening profile RLS just to render an offer card.
-        driverName = "Conductor verificado",
+        driverName = "Conductor",
         driverPhone = "",
         driverRating = 0.0,
         driverTotalTrips = 0,
-        vehicleDescription = vehicleDisplayName ?: "Vehículo verificado",
+        vehicleDescription = vehicleDisplayName ?: "Vehículo pendiente de confirmar",
         counterPrice = fareMinor.toLegacyMajor(currency),
         currency = currency,
         estimatedArrivalMin = ((etaSeconds ?: 0) / 60.0).toInt(),
@@ -338,4 +294,86 @@ class RideRemoteProjectionRepository @Inject constructor(
         const val MAX_VISIBLE_OFFERS = 300L
         const val MAX_VISIBLE_VEHICLES = 100L
     }
+}
+
+internal fun RemoteRideRequestProjection.toLocal(
+        existing: RideRequestEntity?,
+        stops: List<RideStopSnapshot>,
+        acceptedOfferId: String?,
+    ): RideRequestEntity {
+        val ownedExisting = existing?.takeIf { it.passengerId == passengerId }
+        val ownerUnchanged = ownedExisting != null
+        val driverUnchanged = ownerUnchanged && assignedDriverId != null && ownedExisting?.assignedDriverId == assignedDriverId
+        val assignmentUnchanged = driverUnchanged && ownedExisting?.assignedDriverId == assignedDriverId && ownedExisting?.serverAssignedVehicleId == assignedVehicleId
+        val keepPin = assignmentUnchanged && state in setOf("ASSIGNED", "DRIVER_EN_ROUTE", "ARRIVED")
+        val offeredMajor = offeredFareMinor.toLegacyMajor(currency)
+        val finalMajor = finalFareMinor?.toLegacyMajor(currency)
+        return RideRequestEntity(
+            requestId = id,
+            passengerId = passengerId,
+            passengerName = ownedExisting?.passengerName?.takeIf { ownerUnchanged } ?: "Pasajero",
+            passengerPhone = ownedExisting?.passengerPhone?.takeIf { ownerUnchanged }.orEmpty(),
+            pickupLatitude = pickupLatitude,
+            pickupLongitude = pickupLongitude,
+            pickupAddress = pickupAddress,
+            pickupAccuracy = ownedExisting?.pickupAccuracy ?: 0f,
+            destLatitude = destinationLatitude,
+            destLongitude = destinationLongitude,
+            destAddress = destinationAddress,
+            priceOffer = offeredMajor,
+            priceOfferMinor = offeredFareMinor,
+            currency = currency,
+            estimatedDistanceKm = ownedExisting?.estimatedDistanceKm ?: 0.0,
+            estimatedDurationMin = ownedExisting?.estimatedDurationMin ?: 0,
+            stopsJson = if (stops.isEmpty()) {
+                ownedExisting?.stopsJson ?: "[]"
+            } else {
+                projectionJson.encodeToString(stops)
+            },
+            paymentMethod = paymentMethod?.takeIf { it.isNotBlank() } ?: "UNKNOWN",
+            fareMode = fareMode,
+            distanceRateMinorPerKm = distanceRateMinorPerKm,
+            timeRateMinorPerMinute = timeRateMinorPerMinute,
+            estimatedFareMinor = estimatedFareMinor,
+            fareRateCardVersion = fareRateCardVersion,
+            allowsInTripStops = allowsInTripStops,
+            quoteVersion = quoteVersion,
+            fareBreakdownJson = fareBreakdown.toString(),
+            status = state.toLegacyStatus(),
+            acceptedOfferId = acceptedOfferId
+                ?: ownedExisting?.acceptedOfferId?.takeIf { assignmentUnchanged },
+            assignedDriverId = assignedDriverId,
+            assignedDriverName = ownedExisting?.assignedDriverName?.takeIf { assignmentUnchanged },
+            assignedDriverPhone = ownedExisting?.assignedDriverPhone?.takeIf { assignmentUnchanged },
+            assignedDriverVehicle = ownedExisting?.assignedDriverVehicle?.takeIf { assignmentUnchanged },
+            finalPrice = finalMajor,
+            finalPriceMinor = finalFareMinor,
+            serverState = state,
+            serverVersion = version,
+            serverAssignedVehicleId = assignedVehicleId,
+            syncState = "SYNCED",
+            lastSyncedAt = System.currentTimeMillis(),
+            lastCorrelationId = ownedExisting?.lastCorrelationId,
+            boardingPin = ownedExisting?.boardingPin?.takeIf { keepPin },
+            boardingPinExpiresAt = ownedExisting?.boardingPinExpiresAt?.takeIf { keepPin },
+            tipAmountMinor = ownedExisting?.tipAmountMinor?.takeIf { ownerUnchanged },
+            passengerRating = ownedExisting?.passengerRating?.takeIf { ownerUnchanged },
+            driverRating = ownedExisting?.driverRating?.takeIf { ownerUnchanged },
+            createdAt = createdAt.toEpochMillisOr(ownedExisting?.createdAt ?: 0L),
+            completedAt = completedAt?.toEpochMillisOr(
+                ownedExisting?.completedAt ?: 0L,
+            )?.takeIf { it > 0L },
+        )
+    }
+
+
+private val projectionJson = Json { encodeDefaults = true; explicitNulls = false }
+private fun Long.toLegacyMajor(currency: String): Double =
+    if (currency == "CRC") toDouble() else toDouble() / 100.0
+private fun String.toEpochMillisOr(fallback: Long): Long =
+    runCatching { Instant.parse(this).toEpochMilli() }.getOrDefault(fallback)
+private fun String.toLegacyStatus(): String = when (this) {
+    "SEARCHING", "OFFERED" -> "OPEN"
+    "ASSIGNED", "DRIVER_EN_ROUTE" -> "ACCEPTED"
+    else -> this
 }
