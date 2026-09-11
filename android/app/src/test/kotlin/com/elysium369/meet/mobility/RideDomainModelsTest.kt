@@ -1,11 +1,11 @@
 package com.elysium369.meet.mobility
 
-import com.elysium369.meet.mobility.domain.models.CurrencyCode
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.mobility.domain.models.DispatchMode
 import com.elysium369.meet.mobility.domain.models.DriverOfferState
 import com.elysium369.meet.mobility.domain.models.DriverRideOffer
 import com.elysium369.meet.mobility.domain.models.MarketId
-import com.elysium369.meet.mobility.domain.models.Money
 import com.elysium369.meet.mobility.domain.models.RideEta
 import com.elysium369.meet.mobility.domain.models.RideRequest
 import com.elysium369.meet.mobility.domain.models.RideRequestState
@@ -97,7 +97,7 @@ class RideDomainModelsTest {
             pickup = pickup,
             intermediateStops = emptyList(),
             destination = dest,
-            requestedPrice = Money(3000L, CurrencyCode.of("CRC")),
+            requestedPrice = Money(3000L, CurrencyCode.fromString("CRC")),
             state = RideRequestState.SEARCHING,
             scheduledFor = null,
             serverVersion = 1L,
@@ -120,7 +120,7 @@ class RideDomainModelsTest {
             rideRequestId = UUID.randomUUID(),
             driverId = UUID.randomUUID(),
             vehicleId = UUID.randomUUID(),
-            offeredPrice = Money(3200L, CurrencyCode.of("CRC")),
+            offeredPrice = Money(3200L, CurrencyCode.fromString("CRC")),
             pickupEta = RideEta.Routing(durationSeconds = 180, distanceMeters = 1200),
             state = DriverOfferState.OPEN,
             expiresAt = Instant.now().plusSeconds(180),

@@ -45,7 +45,7 @@ class RideDriverEnrollmentWorker @AssistedInject constructor(
                 // Even if evidence upload fails, we save the enrollment locally
                 // so the app knows the driver was registered (without evidence yet).
                 val enrollmentPrefs = applicationContext.getSharedPreferences(
-                    "ride_driver_enrollment", Context.MODE_PRIVATE
+                    "ride_driver_enrollment_${sessionUserId}", Context.MODE_PRIVATE
                 )
                 enrollmentPrefs.edit()
                     .putString("vehicle_id", result.vehicleId)

@@ -1,6 +1,6 @@
 package com.elysium369.meet.ride.wallet
 
-import com.elysium369.meet.ride.domain.RideMoney
+import com.elysium369.meet.core.money.Money
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -20,8 +20,8 @@ class RideWalletModelsTest {
 
         val projection = RideWalletLedger.project(listOf(grant, duplicate))
 
-        assertEquals(RideMoney.of(100_000, "CRC"), projection.posted)
-        assertEquals(RideMoney.of(100_000, "CRC"), projection.available)
+        assertEquals(Money.of(100_000, "CRC"), projection.posted)
+        assertEquals(Money.of(100_000, "CRC"), projection.available)
         assertEquals("promo:cr-pilot-2026:driver-1", grant.idempotencyKey)
         assertEquals(false, grant.withdrawable)
     }
@@ -41,9 +41,9 @@ class RideWalletModelsTest {
             ),
         )
 
-        assertEquals(RideMoney.of(100_000, "CRC"), projection.posted)
-        assertEquals(RideMoney.of(5_000, "CRC"), projection.reserved)
-        assertEquals(RideMoney.of(95_000, "CRC"), projection.available)
+        assertEquals(Money.of(100_000, "CRC"), projection.posted)
+        assertEquals(Money.of(5_000, "CRC"), projection.reserved)
+        assertEquals(Money.of(95_000, "CRC"), projection.available)
     }
 
     @Test
@@ -65,9 +65,9 @@ class RideWalletModelsTest {
             ),
         )
 
-        assertEquals(RideMoney.of(95_000, "CRC"), projection.posted)
-        assertEquals(RideMoney.of(0, "CRC"), projection.reserved)
-        assertEquals(RideMoney.of(95_000, "CRC"), projection.available)
+        assertEquals(Money.of(95_000, "CRC"), projection.posted)
+        assertEquals(Money.of(0, "CRC"), projection.reserved)
+        assertEquals(Money.of(95_000, "CRC"), projection.available)
     }
 
     @Test
@@ -86,9 +86,9 @@ class RideWalletModelsTest {
             ),
         )
 
-        assertEquals(RideMoney.of(100_000, "CRC"), projection.posted)
-        assertEquals(RideMoney.of(0, "CRC"), projection.reserved)
-        assertEquals(RideMoney.of(100_000, "CRC"), projection.available)
+        assertEquals(Money.of(100_000, "CRC"), projection.posted)
+        assertEquals(Money.of(0, "CRC"), projection.reserved)
+        assertEquals(Money.of(100_000, "CRC"), projection.available)
     }
 
     @Test
@@ -96,7 +96,7 @@ class RideWalletModelsTest {
         val first = reserve()
         val conflict = first.copy(
             id = "reserve-conflict",
-            amount = RideMoney.of(4_000, "CRC"),
+            amount = Money.of(4_000, "CRC"),
         )
 
         assertThrows(IllegalArgumentException::class.java) {
@@ -129,7 +129,7 @@ class RideWalletModelsTest {
                         id = "usd-topup",
                         idempotencyKey = "purchase-usd",
                         type = RideLedgerEntryType.TOP_UP_CONFIRMED,
-                        amount = RideMoney.of(10, "USD"),
+                        amount = Money.of(10, "USD"),
                         tripId = null,
                         createdAtEpochMs = 2_000,
                     ),
@@ -161,7 +161,7 @@ class RideWalletModelsTest {
             id = id,
             idempotencyKey = key,
             type = type,
-            amount = RideMoney.of(amount, "CRC"),
+            amount = Money.of(amount, "CRC"),
             tripId = tripId,
             createdAtEpochMs = 2_000,
         )

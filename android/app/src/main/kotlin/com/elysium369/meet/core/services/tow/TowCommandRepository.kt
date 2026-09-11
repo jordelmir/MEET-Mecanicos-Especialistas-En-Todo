@@ -1,7 +1,7 @@
 package com.elysium369.meet.core.services.tow
 
 import com.elysium369.meet.core.geo.GeoPoint
-import com.elysium369.meet.core.services.kernel.Money
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.core.services.kernel.ServiceRole
 import com.elysium369.meet.data.local.dao.TowJobDao
 import com.elysium369.meet.data.local.dao.TowTruckDao
@@ -118,6 +118,14 @@ class TowCommandRepository(
     }
 
     fun getJobById(jobId: UUID): TowJob? = _activeTowJob.value?.takeIf { it.jobId == jobId } ?: jobHistory[jobId]
+
+    /** Selects the exact job requested by Activity; never falls back to an arbitrary active tow. */
+    fun selectActiveJob(jobId: UUID): Boolean {
+        val job = getJobById(jobId) ?: return false
+        if (!job.state.isActive) return false
+        _activeTowJob.value = job
+        return true
+    }
 
     suspend fun fetchJob(jobId: UUID): TowJob? =
         _activeTowJob.value?.takeIf { it.jobId == jobId }

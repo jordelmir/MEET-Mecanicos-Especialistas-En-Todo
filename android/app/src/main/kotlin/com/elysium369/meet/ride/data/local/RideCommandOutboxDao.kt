@@ -9,6 +9,59 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RideCommandOutboxDao {
+    @Query("SELECT * FROM ride_command_outbox WHERE rideId = :requestId AND commandType = 'CANCEL' ORDER BY createdAt DESC")
+    fun cancellationCommands(requestId: String): Flow<List<RideCommandOutboxEntity>>
+
+    @Query("UPDATE ride_command_outbox SET expectedVersion = :version WHERE idempotencyKey = :key AND commandType = 'CANCEL' AND status = 'IN_FLIGHT' AND expectedVersion = 0")
+    suspend fun resolveCancellationVersion(key: String, version: Long): Int
+
+    /** Atomic with acquireBatch: a worker either leases publication or cancellation supersedes it. */
+    @Transaction
+    suspend fun insertCancellation(command: RideCommandOutboxEntity): Long {
+        require(command.commandType == "CANCEL")
+        val inserted = insert(command)
+        if (inserted == -1L) return inserted
+        val suppressed = if (command.expectedVersion == 0L) supersedeUnsentPublication(
+            command.rideId, command.actorSessionUserId, command.updatedAt,
+        ) else 0
+        if (suppressed > 0) {
+            finishLocalCancellation(command.idempotencyKey, command.updatedAt)
+            cancelUnpublishedRequest(command.rideId, command.actorSessionUserId)
+            clearLocalCancelledSelection(command.rideId, command.actorSessionUserId)
+        } else {
+            markCancellationPending(command.rideId, command.actorSessionUserId)
+        }
+        return inserted
+    }
+
+    @Query("""
+        UPDATE ride_command_outbox SET status = 'SUPERSEDED',
+            lastErrorCode = 'CANCELLED_BEFORE_PUBLICATION', updatedAt = :now
+        WHERE rideId = :rideId AND actorSessionUserId = :owner AND commandType = 'PUBLISH'
+          AND status = 'PENDING' AND attemptCount = 0
+          AND EXISTS (SELECT 1 FROM ride_requests WHERE requestId = :rideId AND passengerId = :owner AND serverVersion = 0)
+          AND NOT EXISTS (SELECT 1 FROM ride_command_outbox prior
+              WHERE prior.rideId = :rideId AND prior.commandType = 'PUBLISH'
+                AND (prior.attemptCount > 0 OR prior.actorSessionUserId != :owner OR prior.status != 'PENDING'))
+    """)
+    suspend fun supersedeUnsentPublication(rideId: String, owner: String, now: Long): Int
+
+    @Query("""
+        UPDATE ride_command_outbox SET status = 'LOCAL_CANCELLED',
+            lastErrorCode = 'CANCELLED_BEFORE_PUBLICATION', updatedAt = :now
+        WHERE idempotencyKey = :key AND commandType = 'CANCEL' AND status = 'PENDING' AND attemptCount = 0
+    """)
+    suspend fun finishLocalCancellation(key: String, now: Long): Int
+
+    @Query("UPDATE ride_requests SET status = 'CANCELLED', syncState = 'LOCAL_CANCELLED' WHERE requestId = :rideId AND passengerId = :owner AND serverVersion = 0")
+    suspend fun cancelUnpublishedRequest(rideId: String, owner: String): Int
+
+    @Query("DELETE FROM active_ride_selections WHERE rideRequestId = :rideId AND ownerPrincipalId = :owner")
+    suspend fun clearLocalCancelledSelection(rideId: String, owner: String): Int
+
+    @Query("UPDATE ride_requests SET syncState = 'PENDING' WHERE requestId = :rideId AND (passengerId = :owner OR assignedDriverId = :owner)")
+    suspend fun markCancellationPending(rideId: String, owner: String): Int
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(command: RideCommandOutboxEntity): Long
 
@@ -122,6 +175,30 @@ interface RideCommandOutboxDao {
         """,
     )
     suspend fun recoverStaleLeases(
+        staleBefore: Long,
+        now: Long,
+    ): Int
+
+    @Query(
+        """
+        UPDATE ride_command_outbox
+        SET status = 'RETRYABLE',
+            leaseStartedAt = NULL,
+            nextAttemptAt = :now,
+            lastErrorCode = 'STALE_CANCEL_LEASE_RECOVERED',
+            lastErrorMessage = 'Recovered when passenger retried cancellation',
+            updatedAt = :now
+        WHERE rideId = :rideId
+          AND actorSessionUserId = :actorId
+          AND commandType = 'CANCEL'
+          AND status = 'IN_FLIGHT'
+          AND leaseStartedAt IS NOT NULL
+          AND leaseStartedAt <= :staleBefore
+        """,
+    )
+    suspend fun recoverStaleCancellationLease(
+        rideId: String,
+        actorId: String,
         staleBefore: Long,
         now: Long,
     ): Int

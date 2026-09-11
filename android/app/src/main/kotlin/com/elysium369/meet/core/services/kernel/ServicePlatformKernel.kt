@@ -1,5 +1,8 @@
 package com.elysium369.meet.core.services.kernel
 
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
+import com.elysium369.meet.core.money.UnsupportedCurrencyException
 import java.util.UUID
 
 /**
@@ -10,70 +13,6 @@ enum class FeatureProofState {
     CLIENT_IMPLEMENTED,
     SERVER_AUTHORITATIVE,
     PHYSICALLY_VERIFIED,
-}
-
-/**
- * Exception thrown when a monetary operation encounters an unsupported or unmapped currency.
- * Fails closed to prevent financial contamination.
- */
-class UnsupportedCurrencyException(currencyRaw: String) :
-    IllegalArgumentException("Unsupported currency code: '$currencyRaw'. Financial operations must fail closed.")
-
-/**
- * Strict ISO 4217 Currency Code representation.
- */
-enum class CurrencyCode(val standardSymbol: String, val decimalPlaces: Int) {
-    CRC("₡", 0),
-    USD("$", 2);
-
-    companion object {
-        fun fromString(value: String): CurrencyCode = when (value.trim().uppercase()) {
-            "CRC", "COLONES", "COLÓN", "₡" -> CRC
-            "USD", "DOLLARS", "DÓLARES", "$" -> USD
-            else -> throw UnsupportedCurrencyException(value)
-        }
-
-        fun fromStringOrNull(value: String?): CurrencyCode? = when (value?.trim()?.uppercase()) {
-            "CRC", "COLONES", "COLÓN", "₡" -> CRC
-            "USD", "DOLLARS", "DÓLARES", "$" -> USD
-            else -> null
-        }
-    }
-}
-
-/**
- * Precise, overflow-safe integer money representation using minor units (e.g. cents/colones).
- */
-data class Money(
-    val amountMinor: Long,
-    val currency: CurrencyCode,
-) {
-    init {
-        require(amountMinor >= 0) { "Monetary amounts cannot be negative: $amountMinor" }
-    }
-
-    operator fun plus(other: Money): Money {
-        require(currency == other.currency) { "Cannot add distinct currencies: $currency vs ${other.currency}" }
-        return Money(Math.addExact(amountMinor, other.amountMinor), currency)
-    }
-
-    operator fun minus(other: Money): Money {
-        require(currency == other.currency) { "Cannot subtract distinct currencies: $currency vs ${other.currency}" }
-        val result = amountMinor - other.amountMinor
-        require(result >= 0) { "Monetary subtraction underflow: $amountMinor - ${other.amountMinor}" }
-        return Money(result, currency)
-    }
-
-    fun formatted(): String = when (currency) {
-        CurrencyCode.CRC -> String.format(java.util.Locale.US, "${currency.standardSymbol}%,d", amountMinor)
-        CurrencyCode.USD -> String.format(java.util.Locale.US, "${currency.standardSymbol}%,.2f", amountMinor / 100.0)
-    }
-
-    companion object {
-        fun zero(currency: CurrencyCode): Money = Money(0L, currency)
-        fun ofCrc(colones: Long): Money = Money(colones, CurrencyCode.CRC)
-        fun ofUsdCents(cents: Long): Money = Money(cents, CurrencyCode.USD)
-    }
 }
 
 /**

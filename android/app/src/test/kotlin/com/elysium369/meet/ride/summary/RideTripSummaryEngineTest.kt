@@ -107,7 +107,7 @@ class RideTripSummaryEngineTest {
     @Test
     fun `tip presets include percentage options`() {
         val e = RideTripSummaryEngine()
-        assertTrue(e.defaultTipPresets.any { it.isPercentage })
-        assertTrue(e.defaultTipPresets.any { it.amount == 0L && !it.isPercentage }) // "Sin propina"
+        assertTrue(e.defaultTipPresets().any { it.isPercentage })
+        assertTrue(e.defaultTipPresets().any { it.amount == 0L && !it.isPercentage }) // "Sin propina"
     }
 }

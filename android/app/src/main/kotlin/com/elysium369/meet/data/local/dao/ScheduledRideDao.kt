@@ -23,10 +23,10 @@ interface ScheduledRideDao {
     @Query("SELECT * FROM scheduled_rides WHERE scheduleId = :scheduleId")
     suspend fun getById(scheduleId: String): ScheduledRideEntity?
 
-    @Query("SELECT * FROM scheduled_rides WHERE userId = :userId AND status IN ('PENDING', 'REMINDER_SENT', 'DISPATCHING') ORDER BY scheduledAtEpochMs ASC")
+    @Query("SELECT * FROM scheduled_rides WHERE userId = :userId AND status IN ('PENDING', 'REMINDER_SENT', 'DISPATCHING', 'DRIVER_MATCHED', 'ACTIVE') ORDER BY scheduledAtEpochMs ASC")
     fun getUpcomingFlow(userId: String): Flow<List<ScheduledRideEntity>>
 
-    @Query("SELECT * FROM scheduled_rides WHERE userId = :userId AND status IN ('PENDING', 'REMINDER_SENT', 'DISPATCHING') ORDER BY scheduledAtEpochMs ASC")
+    @Query("SELECT * FROM scheduled_rides WHERE userId = :userId AND status IN ('PENDING', 'REMINDER_SENT', 'DISPATCHING', 'DRIVER_MATCHED', 'ACTIVE') ORDER BY scheduledAtEpochMs ASC")
     suspend fun getUpcoming(userId: String): List<ScheduledRideEntity>
 
     @Query("SELECT * FROM scheduled_rides WHERE status = 'DISPATCHING' AND dispatchAtEpochMs <= :nowEpochMs")

@@ -37,7 +37,7 @@ data class FareEstimate(
     val estimatedAmount: Long,
     val minAmount: Long? = null,        // For OPEN_BID range
     val maxAmount: Long? = null,        // For OPEN_BID range
-    val currency: String = "CRC",
+    val currency: String,
     val distanceKm: Double,
     val durationMinutes: Int,
     val surchargePercent: Double = 0.0, // Demand surge
@@ -45,12 +45,13 @@ data class FareEstimate(
     val breakdown: FareBreakdown? = null,
 ) {
     val formattedAmount: String
-        get() = "₡${estimatedAmount.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(estimatedAmount, currency)
 
     val formattedRange: String?
         get() = if (minAmount != null && maxAmount != null) {
-            "₡${minAmount.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")} — " +
-                "₡${maxAmount.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+            val low = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(minAmount, currency)
+            val high = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(maxAmount, currency)
+            "$low — $high"
         } else null
 
     val hasSurcharge: Boolean get() = surchargePercent > 0
@@ -77,9 +78,10 @@ data class RouteHistoryStats(
     val lastTripEpochMs: Long,
     val averageDurationMin: Int,
     val averageDistanceKm: Double,
+    val currency: String = "CRC",
 ) {
     val formattedAverage: String
-        get() = "₡${averageFare.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = com.elysium369.meet.ride.domain.RideTrackingTruthPolicy.formatFare(averageFare, currency)
 
     val isReliable: Boolean get() = sampleCount >= 5
 }
@@ -255,6 +257,7 @@ class RideFareComparatorEngine {
         baseFare: Long,
         distanceRate: Long,    // per km
         timeRate: Long,        // per minute
+        currency: String = "CRC",
         activeDrivers: Int = 10,
         activeRequests: Int = 8,
         pickupLat: Double = 0.0,
@@ -275,6 +278,7 @@ class RideFareComparatorEngine {
         val meteredEstimate = FareEstimate(
             fareMode = RideFareMode.METERED_TIME_DISTANCE,
             estimatedAmount = meteredTotal,
+            currency = currency,
             distanceKm = distanceKm,
             durationMinutes = durationMinutes,
             surchargePercent = demand.surchargePercent,
@@ -295,6 +299,7 @@ class RideFareComparatorEngine {
         val openBidEstimate = FareEstimate(
             fareMode = RideFareMode.OPEN_BID,
             estimatedAmount = bidBase,
+            currency = currency,
             minAmount = bidMin,
             maxAmount = bidMax,
             distanceKm = distanceKm,

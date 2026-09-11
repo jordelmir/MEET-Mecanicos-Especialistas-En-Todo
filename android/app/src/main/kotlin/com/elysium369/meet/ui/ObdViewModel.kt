@@ -1552,15 +1552,31 @@ class ObdViewModel @Inject constructor(
                     val latestByType = reconciledApplications
                         .groupBy { it.serviceType }
                         .mapValues { (_, values) -> values.maxBy { it.submittedAt } }
-                    latestByType["RIDE_DRIVER"]?.let { application ->
+                    val latestDriverApplication = latestByType["RIDE_DRIVER"]
+                    latestDriverApplication?.let { application ->
                         if (currentCloudUserId() == actorId) {
                             com.elysium369.meet.ride.domain.RideDriverSessionRestoration.restore(
                                 actorId, application, rideDao.getDriverVerification(actorId),
                             )?.let { rideDao.insertDriverVerification(it) }
+                            ensurePassengerRoleForDriver(actorId)?.let { passenger ->
+                                // An approved driver passed the stricter identity
+                                // review and receives passenger access immediately.
+                                // Pending drivers still submit the passenger record
+                                // so both decisions can progress independently.
+                                if (
+                                    application.status != "APPROVED" &&
+                                    latestByType["PASSENGER"] == null
+                                ) {
+                                    submitPassengerTrustApplication(passenger)
+                                }
+                            }
                         }
                     }
                     latestByType["PASSENGER"]?.let { application ->
-                        if (currentCloudUserId() == actorId) {
+                        if (
+                            currentCloudUserId() == actorId &&
+                            latestDriverApplication?.status != "APPROVED"
+                        ) {
                             com.elysium369.meet.ride.domain.RideDriverSessionRestoration.restorePassenger(
                                 actorId, application, rideDao.getPassengerVerification(actorId),
                             )?.let { rideDao.insertPassengerVerification(it) }
@@ -7496,7 +7512,7 @@ class ObdViewModel @Inject constructor(
                 destinationLocation = if (destLat != null && destLng != null) com.elysium369.meet.core.geo.GeoPoint(destLat, destLng) else null,
                 destinationAddress = destName,
                 requiredCapabilities = setOf(com.elysium369.meet.core.services.tow.TowCapabilities.FLATBED),
-                estimatedPrice = if (priceOffer > 0.0) com.elysium369.meet.core.services.kernel.Money.ofCrc(priceOffer.toLong()) else null
+                estimatedPrice = if (priceOffer > 0.0) com.elysium369.meet.core.money.Money.ofCrc(priceOffer.toLong()) else null
             )
         }
     }
@@ -7959,6 +7975,12 @@ class ObdViewModel @Inject constructor(
             context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
                 .edit().putBoolean(key, _rideDriverMode.value).apply()
         }
+        // Switching the visible role must not cancel the driver's active work.
+        // Each role restores its own durable navigation pointer.
+        applyActiveRide(null)
+        principal.id.takeIf { principal.isAuthenticated }?.let { ownerId ->
+            viewModelScope.launch { restoreActiveRideSelection(ownerId, _rideDriverMode.value) }
+        }
         if (_rideDriverMode.value) {
             startRideProjectionSync()
             refreshRideProjectionNow()
@@ -8045,13 +8067,27 @@ class ObdViewModel @Inject constructor(
 
     fun selectActiveRide(request: RideRequestEntity?) {
         val ownerId = activePrincipalKernel.current().id
+        val selectionOwnerKey = com.elysium369.meet.ride.domain.RideRoleContextPolicy
+            .selectionOwnerKey(ownerId, _rideDriverMode.value) ?: return
+        if (request != null && !canSelectRideForCurrentRole(request)) {
+            viewModelScope.launch {
+                _rideVerificationNotice.emit(
+                    "Este viaje no pertenece al rol y a la sesión activa.",
+                )
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                rideDao.clearActiveRideSelection(selectionOwnerKey)
+            }
+            applyActiveRide(null)
+            return
+        }
         viewModelScope.launch(Dispatchers.IO) {
             if (request == null) {
-                rideDao.clearActiveRideSelection(ownerId)
+                rideDao.clearActiveRideSelection(selectionOwnerKey)
             } else {
                 rideDao.upsertActiveRideSelection(
                     ActiveRideSelectionEntity(
-                        ownerPrincipalId = ownerId,
+                        ownerPrincipalId = selectionOwnerKey,
                         rideRequestId = request.requestId,
                         updatedAtEpochMs = System.currentTimeMillis(),
                     ),
@@ -8059,6 +8095,53 @@ class ObdViewModel @Inject constructor(
             }
         }
         applyActiveRide(request)
+    }
+
+    private fun canSelectRideForCurrentRole(request: RideRequestEntity): Boolean =
+        canSelectRide(request, _rideDriverMode.value)
+
+    private fun canSelectRide(request: RideRequestEntity, driverMode: Boolean): Boolean =
+        com.elysium369.meet.ride.domain.RideActiveSelectionPolicy.canSelect(
+            ownerId = currentCloudUserId(),
+            driverMode = driverMode,
+            passengerId = request.passengerId,
+            assignedDriverId = request.assignedDriverId,
+            serverState = request.serverState,
+            serverVersion = request.serverVersion,
+        )
+
+    private suspend fun restoreActiveRideSelection(ownerId: String, driverMode: Boolean) {
+        val roleKey = com.elysium369.meet.ride.domain.RideRoleContextPolicy
+            .selectionOwnerKey(ownerId, driverMode) ?: return
+        var selection = withContext(Dispatchers.IO) {
+            rideDao.getActiveRideSelection(roleKey)
+        }
+        // Adopt a pointer written by older builds only after actor/role validation.
+        if (selection == null) {
+            val legacy = withContext(Dispatchers.IO) { rideDao.getActiveRideSelection(ownerId) }
+            val legacyRide = legacy?.let {
+                withContext(Dispatchers.IO) { rideDao.getRequestById(it.rideRequestId) }
+            }
+            if (legacy != null && legacyRide != null && canSelectRide(legacyRide, driverMode)) {
+                selection = legacy.copy(ownerPrincipalId = roleKey)
+                withContext(Dispatchers.IO) {
+                    rideDao.upsertActiveRideSelection(requireNotNull(selection))
+                    rideDao.clearActiveRideSelection(ownerId)
+                }
+            }
+        }
+        val selected = selection ?: return
+        val request = withContext(Dispatchers.IO) {
+            rideDao.getRequestById(selected.rideRequestId)
+        }
+        if (request == null) {
+            Log.w("MeetRides", "Active ride unavailable locally; durable role pointer retained")
+        } else if (!canSelectRide(request, driverMode)) {
+            withContext(Dispatchers.IO) { rideDao.clearActiveRideSelection(roleKey) }
+            Log.w("MeetRides", "Rejected active ride pointer outside current actor/role scope")
+        } else if (_rideDriverMode.value == driverMode && currentCloudUserId() == ownerId) {
+            applyActiveRide(request)
+        }
     }
 
     private fun applyActiveRide(request: RideRequestEntity?) {
@@ -8119,35 +8202,25 @@ class ObdViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            activePrincipalKernel.activePrincipal
-                .map { it.id }
+            combine(activePrincipalKernel.activePrincipal, _rideDriverMode) { principal, driverMode ->
+                Triple(principal.id, principal.isAuthenticated, driverMode)
+            }
                 .distinctUntilChanged()
-                .collectLatest { ownerId ->
-                    // A principal boundary clears only the in-memory projection.
-                    // The owner-scoped pointer is retained and restored when that
-                    // principal returns; remote refresh cannot pick a replacement.
+                .collectLatest { (ownerId, authenticated, driverMode) ->
+                    // Account and visible-role boundaries restore independent UI
+                    // contexts; neither transition changes server trip state.
                     applyActiveRide(null)
-                    val selection = withContext(Dispatchers.IO) {
-                        rideDao.getActiveRideSelection(ownerId)
-                    } ?: return@collectLatest
-                    val request = withContext(Dispatchers.IO) {
-                        rideDao.getRequestById(selection.rideRequestId)
-                    }
-                    if (request == null) {
-                        Log.w("MeetRides", "Active ride unavailable locally; durable pointer retained")
-                    } else {
-                        applyActiveRide(request)
-                    }
+                    if (!authenticated) return@collectLatest
+                    restoreActiveRideSelection(ownerId, driverMode)
                 }
         }
         viewModelScope.launch {
-            combine(_rideDriverMode, _activeRideRequest) { isDriver, ride ->
-                ride?.takeIf {
-                    isDriver && it.status in setOf(
-                        "ASSIGNED", "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED",
-                        "PASSENGER_ONBOARD", "IN_PROGRESS",
-                    )
-                }
+            activePrincipalKernel.activePrincipal.flatMapLatest { principal ->
+                if (!principal.isAuthenticated) flowOf(null)
+                else rideDao.observeAuthoritativeActiveRidesForDriver(principal.id)
+                    // Tracking the wrong assignment is worse than pausing when
+                    // corrupted local data reports two active driver trips.
+                    .map { rides -> rides.singleOrNull() }
             }.distinctUntilChangedBy { it?.requestId to it?.status }
                 .collectLatest { ride ->
                     if (ride == null) {
@@ -8565,7 +8638,7 @@ class ObdViewModel @Inject constructor(
         estimatedDistanceMeters: Long = (estDistance * 1_000.0).toLong(),
         estimatedDurationSeconds: Long = estDuration * 60L,
         stopsJson: String = "[]",
-        paymentMethod: String = "CASH",
+        paymentMethod: String = "UNKNOWN",
         fareMode: RideFareMode = RideFareMode.OPEN_BID,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
@@ -8613,14 +8686,11 @@ class ObdViewModel @Inject constructor(
             } else {
                 null
             }
-            val normalizedFare = meteredQuote?.estimatedTotalMinor?.toDouble()
-                ?: RideFareBidPolicy.normalize(priceOffer, currency)
-            val offeredFareMinor = runCatching {
-                rideFareToMinorUnits(normalizedFare, currency)
-            }.getOrElse {
-                _rideVerificationNotice.emit("La tarifa ingresada no es válida.")
-                return@launch
-            }
+            val offeredFareMinor = meteredQuote?.estimatedTotalMinor
+                ?: run {
+                    val priceOfferMinor = rideFareToMinorUnits(priceOffer, currency)
+                    RideFareBidPolicy.normalizeMinor(priceOfferMinor, currency)
+                }
             if (offeredFareMinor <= 0L) {
                 _rideVerificationNotice.emit("La tarifa debe ser mayor que cero.")
                 return@launch
@@ -8637,7 +8707,7 @@ class ObdViewModel @Inject constructor(
                 destLatitude = destLat,
                 destLongitude = destLng,
                 destAddress = destAddr,
-                priceOffer = normalizedFare,
+                priceOffer = offeredFareMinor.toDouble(),
                 priceOfferMinor = offeredFareMinor,
                 currency = currency,
                 estimatedDistanceKm = estDistance,
@@ -8756,6 +8826,18 @@ class ObdViewModel @Inject constructor(
         RideObservability.event("offer_submit_started", requestId = requestId)
         viewModelScope.launch(Dispatchers.IO) {
             val request = rideDao.getRequestById(requestId) ?: return@launch
+            if (request.passengerId == driverId || request.passengerId == currentCloudUserId()) {
+                _rideVerificationNotice.emit(
+                    "No puedes ofertar en un viaje solicitado desde tu propia cuenta.",
+                )
+                RideObservability.event(
+                    "offer_submit",
+                    outcome = "REJECTED",
+                    requestId = requestId,
+                    detail = "self_ride",
+                )
+                return@launch
+            }
             if (request.serverVersion <= 0L) {
                 _rideVerificationNotice.emit(
                     "Espera la confirmación del servidor antes de ofertar.",
@@ -8769,13 +8851,9 @@ class ObdViewModel @Inject constructor(
                 )
                 return@launch
             }
-            val normalizedPrice = RideFareBidPolicy.normalize(counterPrice, currency)
-            val fareMinor = runCatching {
-                rideFareToMinorUnits(normalizedPrice, currency)
-            }.getOrElse {
-                _rideVerificationNotice.emit("La contraoferta no es válida.")
-                return@launch
-            }
+            val counterPriceMinor = rideFareToMinorUnits(counterPrice, currency)
+            val fareMinor = RideFareBidPolicy.normalizeMinor(counterPriceMinor, currency)
+            val normalizedPrice = counterPrice
             val offerId = UUID.randomUUID().toString()
             val offer = RideOfferEntity(
                 offerId = offerId,
@@ -9052,66 +9130,51 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    /** Pending is durable outbox state, never a claim that the server cancelled. */
+    fun observeRideForCancellation(requestId: String) = rideDao.observeRequest(requestId)
+
+    fun cancellationCommands(requestId: String) = rideCommandRepository.cancellationCommands(requestId)
+
     fun cancelRide(
         requestId: String,
         reason: RideCancellationReason,
         detail: String?,
         actorRole: String,
     ) {
-        if (!RideCancellationPolicy.isDetailValid(reason, detail)) {
-            Log.w("MeetRides", "cancel rejected: invalid detail request=$requestId reason=$reason")
-            return
-        }
-        val role = runCatching { RideActorRole.valueOf(actorRole.uppercase()) }.getOrNull()
-            ?: run {
-                Log.w("MeetRides", "cancel rejected: invalid actor role=$actorRole request=$requestId")
-                return
-            }
-        if (role !in setOf(RideActorRole.PASSENGER, RideActorRole.DRIVER)) {
-            Log.w("MeetRides", "cancel rejected: unsupported actor role=$role request=$requestId")
-            return
-        }
-        if (reason !in RideCancellationPolicy.reasonsFor(role)) {
-            Log.w("MeetRides", "cancel rejected: reason=$reason role=$role request=$requestId")
-            return
-        }
-        // The RPC is the authority for actor ownership. Local trust/profile
-        // projections may be incomplete during a restored test session, so
-        // cancellation must use the authenticated cloud identity directly.
-        val actorId = currentCloudUserId() ?: run {
-            Log.w("MeetRides", "cancel rejected: no authenticated actor request=$requestId")
-            return
-        }
-        if (actorId.isBlank()) return
         viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: run {
-                Log.w("MeetRides", "cancel rejected: local request missing request=$requestId")
+            val role = runCatching { RideActorRole.valueOf(actorRole.uppercase()) }.getOrNull()
+            val error = when {
+                !RideCancellationPolicy.isDetailValid(reason, detail) -> "Revisa el detalle de la cancelación."
+                role !in setOf(RideActorRole.PASSENGER, RideActorRole.DRIVER) -> "El rol no permite cancelar este viaje."
+                role != null && reason !in RideCancellationPolicy.reasonsFor(role) -> "Selecciona un motivo válido para tu rol."
+                currentCloudUserId().isNullOrBlank() -> "Inicia sesión para cancelar el viaje."
+                else -> null
+            }
+            if (error != null) {
+                _rideVerificationNotice.emit(error)
                 return@launch
             }
-            if (request.serverVersion <= 0L) {
-                Log.w("MeetRides", "cancel rejected: unconfirmed request=$requestId version=${request.serverVersion}")
-                _rideVerificationNotice.emit(
-                    "La solicitud aún no fue confirmada; espera antes de cancelar.",
-                )
+            val request = rideDao.getRequestById(requestId)
+            if (request == null) {
+                _rideVerificationNotice.emit("No se encontró el viaje. Actualiza las solicitudes.")
                 return@launch
             }
-            Log.i(
-                "MeetRides",
-                "cancel enqueue request=$requestId role=$role actor=$actorId state=${request.serverState} version=${request.serverVersion}",
-            )
-            val result = reportRideCommandEnqueue(
-                result = enqueueAuthoritativeRideCommand(
-                    request = request,
+            reportRideCommandEnqueue(
+                result = rideCommandRepository.enqueue(
+                envelope = rideCommandEnvelope(
+                    requestId = requestId,
+                    serverVersion = request.serverVersion,
                     type = RideCommandType.CANCEL,
+                ).copy(
+                        idempotencyKey = RideIdempotencyKey.of("cancel:$requestId:${request.serverVersion}"),
+                    ),
                     payload = RideCommandPayload(
                         reasonCode = reason.name,
                         detail = detail?.trim()?.takeIf(String::isNotEmpty),
                     ),
                 ),
-                acceptedMessage =
-                    "Cancelación enviada. El servidor aplicará estado, seguridad y liberación de saldo.",
+                acceptedMessage = "Cancelación pendiente de confirmación del servidor.",
             )
-            Log.i("MeetRides", "cancel enqueue outcome request=$requestId queued=$result")
         }
     }
 
@@ -9247,7 +9310,9 @@ class ObdViewModel @Inject constructor(
     fun updateRidePrice(requestId: String, newPrice: Double) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = rideDao.getRequestById(requestId) ?: return@launch
-            val normalizedPrice = RideFareBidPolicy.normalize(newPrice, request.currency)
+            val newPriceMinor = rideFareToMinorUnits(newPrice, request.currency)
+            val normalizedMinor = RideFareBidPolicy.normalizeMinor(newPriceMinor, request.currency)
+            val normalizedPrice = normalizedMinor.toDouble()
             val updated = request.copy(priceOffer = normalizedPrice)
             rideDao.insertRequest(updated)
             
@@ -9699,6 +9764,45 @@ class ObdViewModel @Inject constructor(
     )
 
     /**
+     * A driver account is also a passenger account under the same authenticated
+     * principal. Driver onboarding already captures every passenger identity
+     * artifact, so duplicating registration would create divergent identities.
+     */
+    private suspend fun ensurePassengerRoleForDriver(
+        actorId: String,
+    ): com.elysium369.meet.data.local.entities.PassengerVerificationEntity? {
+        val driver = rideDao.getDriverVerification(actorId) ?: return null
+        if (!evaluateDriverEvidence(driver).isReady) return null
+        rideDao.getPassengerVerification(actorId)?.let { existing ->
+            if (
+                driver.status == "APPROVED" &&
+                existing.status in setOf("PENDING", RideVerificationPolicy.PILOT_APPROVED)
+            ) {
+                return existing.copy(
+                    status = "APPROVED",
+                    rejectionReason = null,
+                    approvedAt = driver.approvedAt ?: driver.updatedAt,
+                ).also { rideDao.insertPassengerVerification(it) }
+            }
+            return existing
+        }
+        val passenger = com.elysium369.meet.data.local.entities.PassengerVerificationEntity(
+            passengerId = actorId,
+            fullName = driver.fullName,
+            phone = driver.phone,
+            pathProfilePhoto = driver.pathSelfieProfile,
+            pathCedulaFront = driver.pathCedulaFront,
+            pathSelfieWithCedula = driver.pathSelfieWithCedula,
+            status = driver.status,
+            rejectionReason = driver.rejectionReason,
+            createdAt = driver.createdAt,
+            approvedAt = driver.approvedAt,
+        )
+        rideDao.insertPassengerVerification(passenger)
+        return passenger
+    }
+
+    /**
      * Submit a complete driver verification application with all required
      * document file paths. This is the single entry point for the multi-step
      * onboarding wizard.
@@ -9815,6 +9919,14 @@ class ObdViewModel @Inject constructor(
                 approvedAt = verificationDecision.approvedAtEpochMs,
             )
             rideDao.insertDriverVerification(entity)
+            ensurePassengerRoleForDriver(actorId)?.let { passenger ->
+                submitPassengerTrustApplication(passenger).onFailure {
+                    Log.w("MeetTrustCenter", "Linked passenger role submission unavailable", it)
+                    _rideVerificationNotice.emit(
+                        "El acceso de pasajero quedó ligado localmente; la nube lo sincronizará al recuperar conexión.",
+                    )
+                }
+            }
             enqueueDriverPilotEnrollment(entity, evidenceFiles)
             _rideVerificationNotice.emit(
                 "Expediente guardado y enviado a revisión. El modo chofer seguirá bloqueado hasta la aprobación remota.",

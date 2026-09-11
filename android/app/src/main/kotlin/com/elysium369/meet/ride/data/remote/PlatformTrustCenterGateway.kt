@@ -163,6 +163,8 @@ object PlatformTrustCenterGateway {
         val file = File(localProof)
         require(file.isFile && file.length() in 1..(12L * 1024L * 1024L)) { "Comprobante inválido" }
         val bytes = file.readBytes()
+        val extension = com.elysium369.meet.ride.domain.RideProofFormat.extension(bytes)
+        require(extension != null && extension == file.extension.lowercase()) { "Formato del comprobante no válido" }
         val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
             .joinToString("") { "%02x".format(it) }
         val mime = when (file.extension.lowercase()) {
@@ -359,6 +361,8 @@ object PlatformTrustCenterGateway {
                     mimeType = obj.metadata?.get("mimetype")?.toString() ?: "image/jpeg",
                 )
             }
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             android.util.Log.w("PlatformTrustCenter", "Storage fallback list failed: ${e.message}")
             emptyList()

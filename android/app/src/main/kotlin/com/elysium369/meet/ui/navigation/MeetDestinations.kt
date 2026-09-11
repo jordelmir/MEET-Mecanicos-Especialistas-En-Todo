@@ -74,15 +74,21 @@ fun androidx.navigation.NavController.safeNavigate(route: String) {
  * usable parent (for example from a deep link) returns to Home instead of
  * becoming a dead end. Home itself is never duplicated.
  */
-fun NavController.backOrHome(): Boolean = when (
-    MeetBackStackPolicy.action(
-        currentRoute = currentDestination?.route,
-        hasPreviousEntry = previousBackStackEntry != null,
-    )
-) {
-    MeetBackStackPolicy.Action.POP_ONE -> if (popBackStack()) true else navigateHomeFallback()
-    MeetBackStackPolicy.Action.NAVIGATE_HOME -> navigateHomeFallback()
-    MeetBackStackPolicy.Action.STAY_HOME -> false
+fun NavController.backOrHome(): Boolean {
+    val currentRoute = currentDestination?.route
+    val hasPrevious = previousBackStackEntry != null
+    return when (
+        MeetBackStackPolicy.action(
+            currentRoute = currentRoute,
+            hasPreviousEntry = hasPrevious,
+        )
+    ) {
+        MeetBackStackPolicy.Action.POP_ONE -> {
+            if (popBackStack()) true else navigateHomeFallback()
+        }
+        MeetBackStackPolicy.Action.NAVIGATE_HOME -> navigateHomeFallback()
+        MeetBackStackPolicy.Action.STAY_HOME -> false
+    }
 }
 
 /** Save and restore each top-level branch instead of recreating it on every tap. */
@@ -117,6 +123,7 @@ object MeetBackStackPolicy {
 
     fun action(currentRoute: String?, hasPreviousEntry: Boolean): Action = when {
         currentRoute == MeetDestinations.HOME -> Action.STAY_HOME
+        currentRoute == null -> Action.NAVIGATE_HOME
         hasPreviousEntry -> Action.POP_ONE
         else -> Action.NAVIGATE_HOME
     }

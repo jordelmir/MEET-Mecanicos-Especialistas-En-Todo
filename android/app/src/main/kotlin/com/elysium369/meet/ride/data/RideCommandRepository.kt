@@ -42,6 +42,8 @@ class RideCommandRepository @Inject constructor(
         ignoreUnknownKeys = false
     }
 
+    fun cancellationCommands(requestId: String) = outboxDao.cancellationCommands(requestId)
+
     fun pendingCount(): Flow<Int> = outboxDao.pendingCount()
 
     /** UI-facing stream for authoritative rejections (for example, balance). */
@@ -54,7 +56,7 @@ class RideCommandRepository @Inject constructor(
     ): RideCommandEnqueueResult {
         if (
             envelope.expectedVersion.value <= 0 &&
-            envelope.type != RideCommandType.PUBLISH
+            envelope.type !in setOf(RideCommandType.PUBLISH, RideCommandType.CANCEL)
         ) {
             return RideCommandEnqueueResult.InvalidCommand(
                 "La versión remota debe ser positiva",
@@ -152,7 +154,20 @@ class RideCommandRepository @Inject constructor(
             createdAt = now,
             updatedAt = now,
         )
-        val inserted = outboxDao.insert(candidate)
+        if (envelope.type == RideCommandType.CANCEL) {
+            // A process/network interruption must not leave cancellation disabled
+            // behind an abandoned worker lease. The command remains idempotent and
+            // is returned to the durable retry queue before inserting/reusing it.
+            outboxDao.recoverStaleCancellationLease(
+                rideId = envelope.rideId.value,
+                actorId = sessionUserId,
+                staleBefore = now - CANCELLATION_LEASE_MS,
+                now = now,
+            )
+        }
+        val inserted = if (envelope.type == RideCommandType.CANCEL) {
+            outboxDao.insertCancellation(candidate)
+        } else outboxDao.insert(candidate)
         if (inserted == -1L) {
             val existing = outboxDao.byIdempotencyKey(
                 candidate.idempotencyKey,
@@ -167,7 +182,11 @@ class RideCommandRepository @Inject constructor(
             }
         }
 
-        rideDao.markCommandPending(envelope.rideId.value)
+        // Cancellation persists projection and outbox together, including terminal
+        // local suppression. Do not overwrite that terminal state with PENDING.
+        if (envelope.type != RideCommandType.CANCEL) {
+            rideDao.markCommandPending(envelope.rideId.value)
+        }
         RideCommandSyncWorker.enqueueNow(context)
         return RideCommandEnqueueResult.Enqueued
     }
@@ -178,11 +197,13 @@ class RideCommandRepository @Inject constructor(
         rideId == other.rideId &&
             actorSessionUserId == other.actorSessionUserId &&
             commandType == other.commandType &&
-            expectedVersion == other.expectedVersion &&
+            (expectedVersion == other.expectedVersion ||
+                (commandType == RideCommandType.CANCEL.name && other.expectedVersion == 0L && expectedVersion > 0L)) &&
             payloadVersion == other.payloadVersion &&
             payloadJson == other.payloadJson
 
     private companion object {
+        const val CANCELLATION_LEASE_MS = 2 * 60 * 1000L
         val SUPPORTED_COMMANDS = setOf(
             RideCommandType.PUBLISH,
             RideCommandType.SUBMIT_OFFER,

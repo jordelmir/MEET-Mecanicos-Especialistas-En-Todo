@@ -49,7 +49,11 @@ class RideLocationBreadcrumbWorker @AssistedInject constructor(
             ?: return Result.failure()
         val ciphertext = inputData.getString(KEY_CIPHERTEXT) ?: return Result.failure()
         val nonce = inputData.getString(KEY_NONCE) ?: return Result.failure()
-        if (SupabaseModule.client.auth.currentUserOrNull() == null) return Result.retry()
+        if (SupabaseModule.client.auth.currentUserOrNull() == null) {
+            // Exact GPS is principal-bound; retrying without a session can
+            // retain sensitive samples indefinitely and cannot become valid.
+            return Result.failure()
+        }
 
         val sample = runCatching {
             val plaintext = cipher.decrypt(

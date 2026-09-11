@@ -11,7 +11,7 @@ import com.elysium369.meet.ride.domain.RideFareEngine
 import com.elysium369.meet.ride.domain.RideFareMode
 import com.elysium369.meet.ride.domain.RideGuardianPolicy
 import com.elysium369.meet.ride.domain.RideLifecyclePolicy
-import com.elysium369.meet.ride.domain.RideMoney
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.ride.domain.RideSafetySignalType
 import com.elysium369.meet.ride.domain.RideState
 import com.elysium369.meet.ride.domain.RideTransitionRequest
@@ -178,7 +178,7 @@ class RideArchitectureAuditTest {
         val quote = RideFareEngine.quoteCostaRica(distanceMeters = 0, durationSeconds = 0)
         assertEquals(0L, quote.estimatedTotalMinor)
         assertEquals(RideFareMode.METERED_TIME_DISTANCE, quote.mode)
-        assertEquals("CRC", quote.currency.value)
+        assertEquals("CRC", quote.currency.name)
         assertEquals(1L, quote.rateCardVersion)
     }
 
@@ -226,17 +226,17 @@ class RideArchitectureAuditTest {
     // ──────────────────────────────────────────────
 
     @Test
-    fun `RideMoney addition prevents overflow`() {
-        val a = RideMoney.of(Long.MAX_VALUE / 2, "CRC")
-        val b = RideMoney.of(Long.MAX_VALUE / 2, "CRC")
+    fun `Money addition prevents overflow`() {
+        val a = Money.of(amountMinor = Long.MAX_VALUE / 2, currency = "CRC")
+        val b = Money.of(amountMinor = Long.MAX_VALUE / 2, currency = "CRC")
         val result = a + b
-        assertEquals(Long.MAX_VALUE / 2 + Long.MAX_VALUE / 2, result.minorUnits)
+        assertEquals(Long.MAX_VALUE / 2 + Long.MAX_VALUE / 2, result.amountMinor)
     }
 
     @Test
-    fun `RideMoney rejects negative minor units`() {
+    fun `Money rejects negative minor units`() {
         try {
-            RideMoney.of(-1, "CRC")
+            Money.of(amountMinor = -1, currency = "CRC")
             assertTrue("Should have thrown", false)
         } catch (e: IllegalArgumentException) {
             assertTrue(e.message?.contains("negative") == true)
@@ -244,21 +244,21 @@ class RideArchitectureAuditTest {
     }
 
     @Test
-    fun `RideMoney rejects currency mismatch in arithmetic`() {
-        val crc = RideMoney.of(100, "CRC")
-        val usd = RideMoney.of(100, "USD")
+    fun `Money rejects currency mismatch in arithmetic`() {
+        val crc = Money.of(amountMinor = 100, currency = "CRC")
+        val usd = Money.of(amountMinor = 100, currency = "USD")
         try {
             crc + usd
             assertTrue("Should have thrown", false)
         } catch (e: IllegalArgumentException) {
-            assertTrue(e.message?.contains("combine") == true)
+            assertTrue(e.message?.contains("distinct") == true)
         }
     }
 
     @Test
-    fun `RideMoney subtraction prevents negative result`() {
-        val a = RideMoney.of(50, "CRC")
-        val b = RideMoney.of(100, "CRC")
+    fun `Money subtraction prevents negative result`() {
+        val a = Money.of(amountMinor = 50, currency = "CRC")
+        val b = Money.of(amountMinor = 100, currency = "CRC")
         try {
             a - b
             assertTrue("Should have thrown", false)
@@ -274,46 +274,46 @@ class RideArchitectureAuditTest {
     @Test
     fun `5% commission on 10000 minor units is 500`() {
         val amounts = com.elysium369.meet.ride.domain.CommissionableRideAmounts(
-            currency = com.elysium369.meet.ride.domain.CurrencyCode.of("CRC"),
+            currency = com.elysium369.meet.ride.domain.CurrencyCode.fromString("CRC"),
             transportFare = com.elysium369.meet.ride.domain.AmountMinor.of(10_000),
         )
         val calc = RideCommissionPolicy.calculate(amounts)
-        assertEquals(10_000L, calc.commissionableBase.minorUnits)
-        assertEquals(500L, calc.platformCommission.minorUnits)
+        assertEquals(10_000L, calc.commissionableBase.amountMinor)
+        assertEquals(500L, calc.platformCommission.amountMinor)
         assertEquals("ride-commission-v1", calc.policyVersion)
     }
 
     @Test
     fun `5% commission on 1 cent rounds down to zero`() {
         val amounts = com.elysium369.meet.ride.domain.CommissionableRideAmounts(
-            currency = com.elysium369.meet.ride.domain.CurrencyCode.of("CRC"),
+            currency = com.elysium369.meet.ride.domain.CurrencyCode.fromString("CRC"),
             transportFare = com.elysium369.meet.ride.domain.AmountMinor.of(1),
         )
         val calc = RideCommissionPolicy.calculate(amounts)
         // 1 * 500 / 10000 = 0.05, half-up rounding: (1*500 + 5000) / 10000 = 0
-        assertEquals(0L, calc.platformCommission.minorUnits)
+        assertEquals(0L, calc.platformCommission.amountMinor)
     }
 
     @Test
     fun `zero base produces zero commission`() {
         val amounts = com.elysium369.meet.ride.domain.CommissionableRideAmounts(
-            currency = com.elysium369.meet.ride.domain.CurrencyCode.of("CRC"),
+            currency = com.elysium369.meet.ride.domain.CurrencyCode.fromString("CRC"),
         )
         val calc = RideCommissionPolicy.calculate(amounts)
-        assertEquals(0L, calc.commissionableBase.minorUnits)
-        assertEquals(0L, calc.platformCommission.minorUnits)
+        assertEquals(0L, calc.commissionableBase.amountMinor)
+        assertEquals(0L, calc.platformCommission.amountMinor)
     }
 
     @Test
     fun `discounts reduce commissionable base`() {
         val amounts = com.elysium369.meet.ride.domain.CommissionableRideAmounts(
-            currency = com.elysium369.meet.ride.domain.CurrencyCode.of("CRC"),
+            currency = com.elysium369.meet.ride.domain.CurrencyCode.fromString("CRC"),
             transportFare = com.elysium369.meet.ride.domain.AmountMinor.of(10_000),
             driverFundedDiscount = com.elysium369.meet.ride.domain.AmountMinor.of(2_000),
         )
         val calc = RideCommissionPolicy.calculate(amounts)
-        assertEquals(8_000L, calc.commissionableBase.minorUnits)
-        assertEquals(400L, calc.platformCommission.minorUnits)
+        assertEquals(8_000L, calc.commissionableBase.amountMinor)
+        assertEquals(400L, calc.platformCommission.amountMinor)
     }
 
     // ──────────────────────────────────────────────

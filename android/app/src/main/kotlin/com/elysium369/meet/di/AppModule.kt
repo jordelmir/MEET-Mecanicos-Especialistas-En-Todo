@@ -4573,6 +4573,19 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_73_74 = object : Migration(73, 74) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // P0-2: Add Long minor-unit columns for monetary Double fields (Doctrine #7 compliance)
+            db.execSQL("ALTER TABLE `repair_parts` ADD COLUMN `priceMinor` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `service_requests` ADD COLUMN `priceOfferMinor` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `service_bids` ADD COLUMN `priceMinor` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `part_offers` ADD COLUMN `priceMinor` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `part_offers` ADD COLUMN `deliveryFeeMinor` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `tow_truck_requests` ADD COLUMN `priceOfferMinor` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `ride_offers` ADD COLUMN `counterPriceMinor` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4633,6 +4646,7 @@ object AppModule {
             MIGRATION_70_71,
             MIGRATION_71_72,
             MIGRATION_72_73,
+            MIGRATION_73_74,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

@@ -35,7 +35,7 @@ interface RidePlaceSearchProvider {
     ): List<RidePlaceSuggestion>
 }
 
-class RidePlaceSearchException(message: String) : Exception(message)
+class RidePlaceSearchException(message: String, val infrastructureFailure: Boolean = true) : Exception(message)
 
 class PhotonRidePlaceSearchProvider(
     private val endpoint: String,
@@ -74,7 +74,8 @@ class PhotonRidePlaceSearchProvider(
             connection.setRequestProperty("Accept-Language", "es-CR,es;q=0.9,en;q=0.6")
             connection.setRequestProperty("User-Agent", "MEET-Rides-Android/1.0")
             if (connection.responseCode !in 200..299) {
-                throw RidePlaceSearchException("Photon HTTP ${connection.responseCode}")
+                throw RidePlaceSearchException("Photon HTTP ${connection.responseCode}",
+                    infrastructureFailure = connection.responseCode == 429 || connection.responseCode >= 500)
             }
             parsePhotonResponse(
                 raw = connection.inputStream.bufferedReader().use { it.readText() },

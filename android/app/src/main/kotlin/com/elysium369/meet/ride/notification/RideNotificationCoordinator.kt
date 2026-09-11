@@ -14,9 +14,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import com.elysium369.meet.MainActivity
 
-class RideNotificationCoordinator(private val context: Context) {
+class RideNotificationCoordinator(private val context: Context, private val ownerUserId: String?) {
     private val preferences = context.getSharedPreferences(
-        "elysium_ride_notifications",
+        "elysium_ride_notifications_${ownerUserId ?: "signed_out"}",
         Context.MODE_PRIVATE,
     )
 
@@ -34,6 +34,7 @@ class RideNotificationCoordinator(private val context: Context) {
     }
 
     fun notifyIdleDriver(nowEpochMs: Long = System.currentTimeMillis()) {
+        if (ownerUserId.isNullOrBlank()) return
         val last = preferences.getLong(KEY_IDLE_LAST, 0L)
         if (nowEpochMs - last < IDLE_COOLDOWN_MS) return
         if (notify(
@@ -47,11 +48,14 @@ class RideNotificationCoordinator(private val context: Context) {
     }
 
     fun notifyDestinationEtaSevenMinutes(tripId: String, etaSeconds: Long) {
+        if (ownerUserId.isNullOrBlank()) return
         if (etaSeconds !in 360L..480L) return
         val key = "eta7:$tripId"
         if (preferences.getBoolean(key, false)) return
         if (notify(
-                id = 7_100 + tripId.hashCode().and(0x0FFF),
+                // Keep the complete 31-bit hash space; a 12-bit mask caused
+                // unrelated trips to replace each other's notifications.
+                id = 7_100 + (tripId.hashCode() and 0x3FFF_FFFF),
                 title = "Destino a unos 7 minutos",
                 body = "Prepárate para finalizar. Este aviso corresponde al destino final, no a una parada.",
             )

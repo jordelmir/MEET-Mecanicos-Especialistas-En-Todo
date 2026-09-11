@@ -1,8 +1,8 @@
 package com.elysium369.meet.fulfillment
 
 import com.elysium369.meet.core.geo.GeoPoint
-import com.elysium369.meet.core.services.kernel.CurrencyCode
-import com.elysium369.meet.core.services.kernel.Money
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.core.services.kernel.ServiceRole
 import com.elysium369.meet.core.services.kernel.ServiceVertical
 import com.elysium369.meet.core.services.tow.*

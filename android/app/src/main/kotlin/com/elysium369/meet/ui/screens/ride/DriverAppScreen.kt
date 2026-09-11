@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.ride.domain.RideFareMode
 import com.elysium369.meet.ride.domain.RideState
 import com.elysium369.meet.ride.payment.RidePaymentMethod
@@ -70,6 +71,9 @@ fun DriverAppScreen(
     val todayEarnings = remember(completedRides) {
         completedRides.sumOf { it.priceOfferMinor }
     }
+    val dominantCurrency = remember(completedRides) {
+        completedRides.firstOrNull()?.currency ?: "CRC"
+    }
     val tripsToday = completedRides.size
 
     // Observe actual server-assigned ride for this driver
@@ -90,6 +94,7 @@ fun DriverAppScreen(
                 pickup = RidePlaceInput("p_${req.requestId}", req.pickupAddress, req.pickupAddress, req.pickupLatitude, req.pickupLongitude),
                 dropoff = RidePlaceInput("d_${req.requestId}", req.destAddress, req.destAddress, req.destLatitude, req.destLongitude),
                 fare = req.priceOfferMinor,
+                currency = req.currency,
                 state = runCatching { RideState.valueOf(req.status) }.getOrDefault(RideState.UNKNOWN),
                 startedAt = req.createdAt
             )
@@ -112,10 +117,11 @@ fun DriverAppScreen(
                 pickup = RidePlaceInput("p_${req.requestId}", req.pickupAddress, req.pickupAddress, req.pickupLatitude, req.pickupLongitude),
                 dropoff = RidePlaceInput("d_${req.requestId}", req.destAddress, req.destAddress, req.destLatitude, req.destLongitude),
                 fare = req.priceOfferMinor,
+                currency = req.currency,
                 distanceKm = req.estimatedDistanceKm,
                 durationMin = req.estimatedDurationMin,
                 fareMode = runCatching { RideFareMode.valueOf(req.fareMode) }.getOrDefault(RideFareMode.OPEN_BID),
-                paymentMethod = runCatching { RidePaymentMethod.valueOf(req.paymentMethod) }.getOrDefault(RidePaymentMethod.CASH)
+                paymentMethod = runCatching { RidePaymentMethod.valueOf(req.paymentMethod) }.getOrDefault(RidePaymentMethod.UNKNOWN)
             )
         }
     }
@@ -161,7 +167,7 @@ fun DriverAppScreen(
                 driverTotalTrips = totalTrips,
                 vehicleDesc = veh,
                 counterPrice = request.fare.toDouble(),
-                currency = "CRC",
+                currency = request.currency,
                 estArrivalMin = estArrival,
                 driverLat = gps.latitude,
                 driverLng = gps.longitude,
@@ -311,7 +317,7 @@ fun DriverAppScreen(
                                     }
                                 }
                                 Text(
-                                    "₡${req.fare.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}",
+                                    runCatching { Money.of(req.fare, req.currency).formatted() }.getOrDefault("—"),
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Black,
                                     color = MeetColors.neonGreen
@@ -417,7 +423,7 @@ fun DriverAppScreen(
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Ganancias de Hoy", style = MaterialTheme.typography.labelMedium, color = MeetColors.textSecondary)
                         Text(
-                            "₡${todayEarnings.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}",
+                            runCatching { Money.of(todayEarnings, dominantCurrency).formatted() }.getOrDefault("—"),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = MeetColors.neonGreen

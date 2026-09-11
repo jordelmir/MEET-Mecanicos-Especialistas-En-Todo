@@ -1,7 +1,8 @@
 package com.elysium369.meet.ride.map
 
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlin.math.round
 
 /**
@@ -50,15 +51,28 @@ internal class RideMapCircuitBreaker(
 
     private var consecutiveFailures = 0
     private var blockedUntilEpochMs = 0L
+    private var probeInFlight = false
 
-    fun canAttempt(): Boolean = nowEpochMs() >= blockedUntilEpochMs
+    fun canAttempt(): Boolean = nowEpochMs() >= blockedUntilEpochMs && !probeInFlight
+
+    fun tryAcquire(): Boolean {
+        if (!canAttempt()) return false
+        if (consecutiveFailures >= failureThreshold) probeInFlight = true
+        return true
+    }
+
+    fun releaseCancelledAttempt() {
+        probeInFlight = false
+    }
 
     fun recordSuccess() {
         consecutiveFailures = 0
+        probeInFlight = false
         blockedUntilEpochMs = 0L
     }
 
     fun recordFailure() {
+        probeInFlight = false
         consecutiveFailures += 1
         if (consecutiveFailures >= failureThreshold) {
             blockedUntilEpochMs = nowEpochMs() + coolDownMs
@@ -161,7 +175,7 @@ class ResilientRidePlaceSearchProvider(
         ttlMs = 10 * 60_000L,
         nowEpochMs = nowEpochMs,
     )
-    private val mutex = Mutex()
+    private val stateLock = Any()
     private val breakers = this.candidates.associate { candidate ->
         candidate.endpoint.id to RideMapCircuitBreaker(nowEpochMs = nowEpochMs)
     }
@@ -171,48 +185,60 @@ class ResilientRidePlaceSearchProvider(
         require(this.candidates.isNotEmpty()) { "At least one place search provider is required" }
     }
 
-    fun health(): List<RideMapProviderHealth> = candidates.map { candidate ->
+    fun health(): List<RideMapProviderHealth> = synchronized(stateLock) { candidates.map { candidate ->
         breakers.getValue(candidate.endpoint.id).health(
             id = candidate.endpoint.id,
             configured = candidate.endpoint.isConfigured,
             lastFailureMessage = failures[candidate.endpoint.id],
         )
-    }
+    } }
 
     override suspend fun search(
         query: String,
         biasLatitude: Double?,
         biasLongitude: Double?,
         limit: Int,
-    ): List<RidePlaceSuggestion> = mutex.withLock {
-        if (query.trim().length < 3) return@withLock emptyList()
+    ): List<RidePlaceSuggestion> {
+        currentCoroutineContext().ensureActive()
+        if (query.trim().length < 3) return emptyList()
         val key = buildRidePlaceSearchCacheKey(query, biasLatitude, biasLongitude, limit)
-        cache.get(key)?.let { cached ->
-            return@withLock cached.map {
-                it.copy(
-                    source = RideMapDataSource.CACHE,
-                    attribution = "${it.attribution} · caché local reciente",
-                )
+        synchronized(stateLock) { cache.get(key) }?.let { cached ->
+            return cached.map {
+                it.copy(source = RideMapDataSource.CACHE,
+                    attribution = "${it.attribution} · caché local reciente")
             }
         }
-
         var lastFailure: RidePlaceSearchException? = null
-        candidates.forEach { candidate ->
+        for (candidate in candidates) {
             val breaker = breakers.getValue(candidate.endpoint.id)
-            if (!candidate.endpoint.isConfigured || !breaker.canAttempt()) return@forEach
-            val result = runCatching {
-                candidate.provider.search(query, biasLatitude, biasLongitude, limit)
+            val acquired = synchronized(stateLock) {
+                candidate.endpoint.isConfigured && breaker.tryAcquire()
             }
-            result.onSuccess { suggestions ->
-                breaker.recordSuccess()
-                failures.remove(candidate.endpoint.id)
-                if (suggestions.isNotEmpty()) cache.put(key, suggestions)
-                return@withLock suggestions
-            }.onFailure { error ->
-                breaker.recordFailure()
-                val safeMessage = error.message?.take(160) ?: "Fallo de proveedor"
-                failures[candidate.endpoint.id] = safeMessage
-                lastFailure = RidePlaceSearchException(safeMessage)
+            if (!acquired) continue
+            try {
+                // Only metadata is locked. Slow searches must not block newer queries.
+                val suggestions = candidate.provider.search(query, biasLatitude, biasLongitude, limit)
+                currentCoroutineContext().ensureActive()
+                synchronized(stateLock) {
+                    breaker.recordSuccess()
+                    failures.remove(candidate.endpoint.id)
+                    if (suggestions.isNotEmpty()) cache.put(key, suggestions)
+                }
+                return suggestions
+            } catch (cancelled: CancellationException) {
+                synchronized(stateLock) { breaker.releaseCancelledAttempt() }
+                throw cancelled
+            } catch (error: Exception) {
+                val infrastructureFailure = error is java.io.IOException ||
+                    (error is RidePlaceSearchException && error.infrastructureFailure)
+                synchronized(stateLock) {
+                    if (infrastructureFailure) {
+                        breaker.recordFailure()
+                        failures[candidate.endpoint.id] = "Fallo de proveedor"
+                    } else breaker.releaseCancelledAttempt()
+                }
+                if (!infrastructureFailure) throw error
+                lastFailure = RidePlaceSearchException("Búsqueda temporalmente no disponible")
             }
         }
         throw lastFailure ?: RidePlaceSearchException(
@@ -240,7 +266,7 @@ class ResilientRideRoutingProvider(
         ttlMs = 3 * 60_000L,
         nowEpochMs = nowEpochMs,
     )
-    private val mutex = Mutex()
+    private val stateLock = Any()
     private val breakers = this.candidates.associate { candidate ->
         candidate.endpoint.id to RideMapCircuitBreaker(nowEpochMs = nowEpochMs)
     }
@@ -250,38 +276,52 @@ class ResilientRideRoutingProvider(
         require(this.candidates.isNotEmpty()) { "At least one routing provider is required" }
     }
 
-    fun health(): List<RideMapProviderHealth> = candidates.map { candidate ->
+    fun health(): List<RideMapProviderHealth> = synchronized(stateLock) { candidates.map { candidate ->
         breakers.getValue(candidate.endpoint.id).health(
             id = candidate.endpoint.id,
             configured = candidate.endpoint.isConfigured,
             lastFailureMessage = failures[candidate.endpoint.id],
         )
-    }
+    } }
 
-    override suspend fun route(waypoints: List<RideGeoPoint>): RideRoadRoute = mutex.withLock {
+    override suspend fun route(waypoints: List<RideGeoPoint>): RideRoadRoute {
+        currentCoroutineContext().ensureActive()
+        require(waypoints.size in 2..34) { "Road route requires between 2 and 34 waypoints" }
         val key = buildRideRouteCacheKey(waypoints)
-        cache.get(key)?.let { cached ->
-            return@withLock cached.copy(
-                source = RideMapDataSource.CACHE,
-                attribution = "${cached.attribution} · caché local reciente",
-            )
+        synchronized(stateLock) { cache.get(key) }?.let { cached ->
+            return cached.copy(source = RideMapDataSource.CACHE,
+                attribution = "${cached.attribution} · caché local reciente")
         }
-
         var lastFailure: RideRoutingException? = null
-        candidates.forEach { candidate ->
+        for (candidate in candidates) {
             val breaker = breakers.getValue(candidate.endpoint.id)
-            if (!candidate.endpoint.isConfigured || !breaker.canAttempt()) return@forEach
-            val result = runCatching { candidate.provider.route(waypoints) }
-            result.onSuccess { route ->
-                breaker.recordSuccess()
-                failures.remove(candidate.endpoint.id)
-                cache.put(key, route)
-                return@withLock route
-            }.onFailure { error ->
-                breaker.recordFailure()
-                val safeMessage = error.message?.take(160) ?: "Fallo de proveedor"
-                failures[candidate.endpoint.id] = safeMessage
-                lastFailure = RideRoutingException(safeMessage)
+            val acquired = synchronized(stateLock) {
+                candidate.endpoint.isConfigured && breaker.tryAcquire()
+            }
+            if (!acquired) continue
+            try {
+                val route = candidate.provider.route(waypoints)
+                currentCoroutineContext().ensureActive()
+                synchronized(stateLock) {
+                    breaker.recordSuccess()
+                    failures.remove(candidate.endpoint.id)
+                    cache.put(key, route)
+                }
+                return route
+            } catch (cancelled: CancellationException) {
+                synchronized(stateLock) { breaker.releaseCancelledAttempt() }
+                throw cancelled
+            } catch (error: Exception) {
+                val infrastructureFailure = error is java.io.IOException ||
+                    (error is RideRoutingException && error.infrastructureFailure)
+                synchronized(stateLock) {
+                    if (infrastructureFailure) {
+                        breaker.recordFailure()
+                        failures[candidate.endpoint.id] = "Fallo de proveedor"
+                    } else breaker.releaseCancelledAttempt()
+                }
+                if (!infrastructureFailure) throw error
+                lastFailure = RideRoutingException("Ruta vial temporalmente no disponible")
             }
         }
         throw lastFailure ?: RideRoutingException(

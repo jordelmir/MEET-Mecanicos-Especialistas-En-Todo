@@ -69,7 +69,7 @@ fun PassengerRideRequestScreen(
     var dropoff by remember { mutableStateOf<RidePlaceInput?>(null) }
 
     var fareMode by remember { mutableStateOf(RideFareMode.METERED_TIME_DISTANCE) }
-    var paymentMethod by remember { mutableStateOf(RidePaymentMethod.CASH) }
+    var paymentMethod by remember { mutableStateOf(RidePaymentMethod.UNKNOWN) }
     var showFareModeSheet by remember { mutableStateOf(false) }
     var showPaymentSheet by remember { mutableStateOf(false) }
     var showSafetyCenter by remember { mutableStateOf(false) }
@@ -87,7 +87,7 @@ fun PassengerRideRequestScreen(
                 rating = activeRideReq?.driverRating?.takeIf { it > 0.0 },
                 totalTrips = null,
                 vehicle = activeRideReq?.assignedDriverVehicle,
-                plate = activeRideReq?.serverAssignedVehicleId,
+                plate = null,
                 etaMinutes = activeRideReq?.estimatedDurationMin?.takeIf { it > 0 },
                 distanceMeters = activeRideReq?.estimatedDistanceKm?.takeIf { it > 0.0 }?.let { (it * 1000).toInt() }
             )

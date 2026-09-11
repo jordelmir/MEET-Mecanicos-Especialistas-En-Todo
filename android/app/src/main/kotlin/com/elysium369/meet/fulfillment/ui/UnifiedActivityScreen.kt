@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.core.services.kernel.ServiceVertical
 import com.elysium369.meet.core.services.tow.TowCommandRepository
+import com.elysium369.meet.core.money.Money
+import com.elysium369.meet.ride.domain.RideState
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import java.text.SimpleDateFormat
@@ -86,8 +88,10 @@ fun UnifiedActivityScreen(
                     title = "Viaje a ${ride.destAddress}",
                     subtitle = "Recogida: ${ride.pickupAddress}",
                     status = ride.status,
-                    isActive = ride.status in setOf("OPEN", "ACCEPTED", "IN_PROGRESS", "DRIVER_EN_ROUTE"),
-                    priceFormatted = if (ride.priceOfferMinor > 0) "${ride.currency} ${ride.priceOfferMinor}" else null,
+                    isActive = ride.status.toRideState().isActive,
+                    priceFormatted = ride.priceOfferMinor.takeIf { it > 0 }?.let {
+                        runCatching { Money.of(it, ride.currency).formatted() }.getOrNull()
+                    },
                     timestampEpochMs = ride.createdAt
                 )
             )
@@ -196,6 +200,14 @@ fun UnifiedActivityScreen(
             }
         }
     }
+}
+
+private fun String.toRideState(): RideState = when (this) {
+    "OPEN" -> RideState.SEARCHING
+    "ACCEPTED" -> RideState.ASSIGNED
+    "DRIVER_ARRIVED", "ARRIVED_PICKUP" -> RideState.ARRIVED
+    "IN_TRIP" -> RideState.PASSENGER_ONBOARD
+    else -> runCatching { RideState.valueOf(this) }.getOrDefault(RideState.UNKNOWN)
 }
 
 @Composable

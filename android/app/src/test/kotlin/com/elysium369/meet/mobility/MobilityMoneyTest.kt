@@ -1,8 +1,8 @@
 package com.elysium369.meet.mobility
 
-import com.elysium369.meet.mobility.domain.models.CurrencyCode
-import com.elysium369.meet.mobility.domain.models.Money
-import com.elysium369.meet.mobility.domain.models.SignedMoney
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
+import com.elysium369.meet.core.money.SignedMoney
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -11,45 +11,45 @@ class MobilityMoneyTest {
 
     @Test
     fun validCurrencyCodeNormalizesToUppercase() {
-        val crc = CurrencyCode.of("crc")
-        assertEquals("CRC", crc.value)
-        val usd = CurrencyCode.of("USD")
-        assertEquals("USD", usd.value)
+        val crc = CurrencyCode.fromString("crc")
+        assertEquals("CRC", crc.name)
+        val usd = CurrencyCode.fromString("USD")
+        assertEquals("USD", usd.name)
     }
 
     @Test
     fun invalidCurrencyCodeThrows() {
         assertThrows(IllegalArgumentException::class.java) {
-            CurrencyCode.of("CR")
+            CurrencyCode.fromString("CR")
         }
         assertThrows(IllegalArgumentException::class.java) {
-            CurrencyCode.of("123")
+            CurrencyCode.fromString("123")
         }
         assertThrows(IllegalArgumentException::class.java) {
-            CurrencyCode.of("CRCC")
+            CurrencyCode.fromString("CRCC")
         }
     }
 
     @Test
     fun negativeMoneyThrows() {
         assertThrows(IllegalArgumentException::class.java) {
-            Money(-1L, CurrencyCode.of("CRC"))
+            Money(-1L, CurrencyCode.fromString("CRC"))
         }
     }
 
     @Test
     fun moneyArithmeticWorksAndChecksCurrency() {
-        val crc = CurrencyCode.of("CRC")
-        val usd = CurrencyCode.of("USD")
+        val crc = CurrencyCode.fromString("CRC")
+        val usd = CurrencyCode.fromString("USD")
 
         val m1 = Money(2500L, crc)
         val m2 = Money(1500L, crc)
 
         val sum = m1 + m2
-        assertEquals(4000L, sum.minorUnits)
+        assertEquals(4000L, sum.amountMinor)
 
         val diff = m1 - m2
-        assertEquals(1000L, diff.minorUnits)
+        assertEquals(1000L, diff.amountMinor)
 
         val mUsd = Money(100L, usd)
         assertThrows(IllegalArgumentException::class.java) {
@@ -59,7 +59,7 @@ class MobilityMoneyTest {
 
     @Test
     fun signedMoneyAllowsNegativeForLedger() {
-        val sm = SignedMoney(-500L, CurrencyCode.of("CRC"))
-        assertEquals(-500L, sm.minorUnits)
+        val sm = SignedMoney(-500L, CurrencyCode.fromString("CRC"))
+        assertEquals(-500L, sm.amountMinor)
     }
 }

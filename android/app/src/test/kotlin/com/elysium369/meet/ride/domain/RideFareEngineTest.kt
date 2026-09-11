@@ -17,7 +17,7 @@ class RideFareEngineTest {
         assertEquals(3_000L, quote.distanceFareMinor)
         assertEquals(1_200L, quote.timeFareMinor)
         assertEquals(4_200L, quote.estimatedTotalMinor)
-        assertEquals(CurrencyCode.of("CRC"), quote.currency)
+        assertEquals(CurrencyCode.fromString("CRC"), quote.currency)
     }
 
     @Test

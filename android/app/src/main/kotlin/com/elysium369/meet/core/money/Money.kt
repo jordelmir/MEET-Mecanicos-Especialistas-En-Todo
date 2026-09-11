@@ -7,6 +7,9 @@ import java.util.Locale
  * MEET Vehicle Life OS — Immutable Financial Value Object.
  * Enforces Doctrine #7: Zero Double/Float representations for monetary amounts.
  * Stores values strictly as minor units (e.g., cents, centavos) in [Long].
+ *
+ * This is the canonical Money type for the entire MEET platform.
+ * All other Money implementations (mobility, ride, kernel) are deprecated in favor of this.
  */
 data class Money(
     val amountMinor: Long,
@@ -47,19 +50,25 @@ data class Money(
 
     fun formatted(): String {
         return when (currency.decimalPlaces) {
-            0 -> "${currency.symbol}${NumberFormat.getIntegerInstance(Locale.US).format(amountMinor)}"
+            0 -> "${currency.standardSymbol}${NumberFormat.getIntegerInstance(Locale.US).format(amountMinor)}"
             2 -> {
                 val major = amountMinor / 100
                 val minor = amountMinor % 100
                 val formattedMajor = NumberFormat.getIntegerInstance(Locale.US).format(major)
-                "${currency.symbol}$formattedMajor.%02d".format(minor)
+                "${currency.standardSymbol}$formattedMajor.%02d".format(minor)
             }
-            else -> "${currency.symbol}$amountMinor"
+            else -> "${currency.standardSymbol}$amountMinor"
         }
     }
 
     companion object {
         fun zero(currency: CurrencyCode): Money = Money(0L, currency)
+
+        fun of(amountMinor: Long, currency: String): Money = Money(amountMinor, CurrencyCode.fromString(currency))
+
+        fun ofCrc(colones: Long): Money = Money(colones, CurrencyCode.CRC)
+
+        fun ofUsdCents(cents: Long): Money = Money(cents, CurrencyCode.USD)
 
         fun fromMajor(amountMajor: Long, currency: CurrencyCode): Money {
             val factor = if (currency.decimalPlaces == 2) 100L else 1L
@@ -72,5 +81,19 @@ data class Money(
             val minor = Math.addExact(Math.multiplyExact(amountMajor, factor), amountMinorCents)
             return Money(minor, currency)
         }
+    }
+}
+
+/**
+ * Signed monetary value for double-entry bookkeeping (ledger entries).
+ * Allows negative amounts for credits. Use [Money] for all non-ledger contexts.
+ */
+data class SignedMoney(
+    val amountMinor: Long,
+    val currency: CurrencyCode,
+) {
+    companion object {
+        fun of(amountMinor: Long, currency: String): SignedMoney =
+            SignedMoney(amountMinor, CurrencyCode.fromString(currency))
     }
 }

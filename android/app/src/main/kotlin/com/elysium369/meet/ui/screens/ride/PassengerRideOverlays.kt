@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -169,7 +170,10 @@ fun PaymentMethodBottomSheet(
                         }
                     }
 
-                    RidePaymentMethod.entries.forEach { method ->
+                    // Card and wallet are not enabled by an authoritative
+                    // ride capability in this flow. Keep the selector honest
+                    // until the server exposes those capabilities.
+                    listOf(RidePaymentMethod.CASH, RidePaymentMethod.SINPE_MOVIL).forEach { method ->
                         val isSelected = method == selectedMethod
                         Card(
                             modifier = Modifier
@@ -203,6 +207,7 @@ fun PaymentMethodBottomSheet(
                                         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                             Icon(
                                                 imageVector = when (method) {
+                                                    RidePaymentMethod.UNKNOWN -> Icons.Default.HelpOutline
                                                     RidePaymentMethod.CASH -> Icons.Default.AttachMoney
                                                     RidePaymentMethod.SINPE_MOVIL -> Icons.Default.QrCode
                                                     RidePaymentMethod.CARD -> Icons.Default.CreditCard
@@ -218,6 +223,7 @@ fun PaymentMethodBottomSheet(
                                         Text(method.displayName, style = MaterialTheme.typography.titleSmall, color = MeetColors.textPrimary, fontWeight = FontWeight.SemiBold)
                                         Text(
                                             when (method) {
+                                                RidePaymentMethod.UNKNOWN -> "Método de pago aún no confirmado"
                                                 RidePaymentMethod.CASH -> "Pago en efectivo al finalizar el viaje"
                                                 RidePaymentMethod.SINPE_MOVIL -> "Transferencia instantánea SINPE Móvil"
                                                 RidePaymentMethod.CARD -> "Tarjeta de crédito / débito"
@@ -316,11 +322,11 @@ fun DriverProfileOverlay(
                         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Icon(Icons.Default.Security, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(16.dp))
-                                Text("Identidad Verificada biométricamente", style = MaterialTheme.typography.labelSmall, color = MeetColors.textPrimary)
+                                Text("Verificación de identidad: no disponible", style = MaterialTheme.typography.labelSmall, color = MeetColors.textPrimary)
                             }
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Icon(Icons.Default.DirectionsCar, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(16.dp))
-                                Text("Inspección Vehicular Certificada al día", style = MaterialTheme.typography.labelSmall, color = MeetColors.textPrimary)
+                                Text("Inspección del vehículo: pendiente de evidencia", style = MaterialTheme.typography.labelSmall, color = MeetColors.textPrimary)
                             }
                         }
                     }
@@ -405,11 +411,11 @@ fun RidePaymentConfirmationDialog(
                         shape = RoundedCornerShape(14.dp)
                     ) {
                         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FareBreakdownRow("Tarifa Base", fareQuote.baseFare, MeetColors.neonGreen)
-                            FareBreakdownRow("Distancia (${fareQuote.formattedDistance})", fareQuote.distanceFare, MeetColors.electricBlue)
-                            FareBreakdownRow("Tiempo (${fareQuote.formattedDuration})", fareQuote.timeFare, MeetColors.hotMagenta)
+                            FareBreakdownRow("Tarifa Base", fareQuote.baseFare, MeetColors.neonGreen, currency = fareQuote.currency)
+                            FareBreakdownRow("Distancia (${fareQuote.formattedDistance})", fareQuote.distanceFare, MeetColors.electricBlue, currency = fareQuote.currency)
+                            FareBreakdownRow("Tiempo (${fareQuote.formattedDuration})", fareQuote.timeFare, MeetColors.hotMagenta, currency = fareQuote.currency)
                             HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp, modifier = Modifier.padding(vertical = 4.dp))
-                            FareBreakdownRow("Total a liquidar", fareQuote.totalFare, MeetColors.neonGreen, isTotal = true)
+                            FareBreakdownRow("Total a liquidar", fareQuote.totalFare, MeetColors.neonGreen, currency = fareQuote.currency, isTotal = true)
                         }
                     }
 
@@ -511,7 +517,9 @@ fun RideRatingAndReviewSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        listOf(0L to "₡0", 500L to "₡500", 1000L to "₡1,000", 2000L to "₡2,000").forEach { (amount, label) ->
+                        listOf(
+                            0L to "₡0", 500L to "₡500", 1000L to "₡1,000", 2000L to "₡2,000"
+                        ).forEach { (amount, label) ->
                             val isSelected = tipAmount == amount
                             OutlinedButton(
                                 onClick = { tipAmount = amount },

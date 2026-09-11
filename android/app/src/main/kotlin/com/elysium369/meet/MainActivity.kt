@@ -381,7 +381,7 @@ fun MeetApp(
             // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect
             val currentRoute = navController.currentBackStackEntryAsState().value
                 ?.destination?.route
-            val hideNavRoutes = listOf("onboarding", "auth", "connect", "premium")
+            val hideNavRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
             if (currentRoute !in hideNavRoutes && currentRoute != null) {
                 MeetBottomNavigation(navController)
             }
@@ -389,7 +389,7 @@ fun MeetApp(
         topBar = {
             val currentRoute = navController.currentBackStackEntryAsState().value
                 ?.destination?.route
-            val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium")
+            val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
             if (currentRoute !in hideBarRoutes && currentRoute != null) {
                 Box(modifier = Modifier.statusBarsPadding()) {
                     ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
@@ -407,7 +407,7 @@ fun MeetApp(
         ) {
             val currentRoute = navController.currentBackStackEntryAsState().value
                 ?.destination?.route
-            val hideBgRoutes = listOf("onboarding", "auth", "connect", "premium")
+            val hideBgRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
             if (currentRoute !in hideBgRoutes && currentRoute != null) {
                 HolographicBackgroundShared()
             }
@@ -1217,9 +1217,18 @@ fun MeetApp(
 
             composable(MeetDestinations.RIDE_ACTIVE_TRACKING) {
                 val activeRideReq by obdViewModel.activeRideRequest.collectAsState()
+                var rideNotice by remember { mutableStateOf<String?>(null) }
+                LaunchedEffect(Unit) {
+                    obdViewModel.rideVerificationNotice.collect { rideNotice = it }
+                }
                 val activeRide = activeRideReq?.let { req ->
                     val parsedState = runCatching {
-                        com.elysium369.meet.ride.domain.RideState.valueOf(req.status)
+                        com.elysium369.meet.ride.domain.RideState.valueOf(
+                            when (req.serverState) {
+                                "DRIVER_ARRIVED" -> "ARRIVED"
+                                else -> req.serverState ?: "UNKNOWN"
+                            }
+                        )
                     }.getOrNull() ?: com.elysium369.meet.ride.domain.RideState.UNKNOWN
 
                     val matchedDriver = req.assignedDriverId?.let { driverId ->
@@ -1229,9 +1238,9 @@ fun MeetApp(
                             rating = req.driverRating,
                             totalTrips = null,
                             vehicle = req.assignedDriverVehicle,
-                            plate = req.serverAssignedVehicleId,
-                            etaMinutes = req.estimatedDurationMin.takeIf { it > 0 },
-                            distanceMeters = req.estimatedDistanceKm.takeIf { it > 0.0 }?.let { (it * 1000).toInt() }
+                            plate = null,
+                            etaMinutes = null,
+                            distanceMeters = null
                         )
                     }
 
@@ -1254,15 +1263,35 @@ fun MeetApp(
                             longitude = req.destLongitude,
                             placeType = com.elysium369.meet.ui.screens.ride.PlaceType.SEARCH
                         ),
-                        fareQuote = com.elysium369.meet.ui.screens.ride.FareQuote(
-                            baseFare = req.estimatedFareMinor,
-                            distanceFare = 0L,
-                            timeFare = 0L,
-                            totalFare = req.estimatedFareMinor,
-                            currency = req.currency,
-                            estimatedDistanceKm = req.estimatedDistanceKm,
-                            estimatedDurationMin = req.estimatedDurationMin
-                        ),
+                        fareQuote = run {
+                            val breakdown = try {
+                                org.json.JSONObject(req.fareBreakdownJson)
+                            } catch (_: Exception) {
+                                org.json.JSONObject()
+                            }
+                            val mode = breakdown.optString("mode", "OPEN_BID")
+                            val distanceFare = breakdown.optLong("distanceFareMinor", 0L)
+                            val timeFare = breakdown.optLong("timeFareMinor", 0L)
+                            val serverTotal = when {
+                                breakdown.has("estimatedTotalMinor") -> breakdown.optLong("estimatedTotalMinor", req.estimatedFareMinor)
+                                breakdown.has("acceptedFareMinor") -> breakdown.optLong("acceptedFareMinor", req.estimatedFareMinor)
+                                else -> req.estimatedFareMinor
+                            }
+                            com.elysium369.meet.ui.screens.ride.FareQuote(
+                                baseFare = serverTotal - distanceFare - timeFare,
+                                distanceFare = distanceFare,
+                                timeFare = timeFare,
+                                totalFare = serverTotal,
+                                currency = req.currency,
+                                estimatedDistanceKm = req.estimatedDistanceKm,
+                                estimatedDurationMin = req.estimatedDurationMin,
+                                fareMode = try {
+                                    com.elysium369.meet.ride.domain.RideFareMode.valueOf(mode)
+                                } catch (_: Exception) {
+                                    com.elysium369.meet.ride.domain.RideFareMode.METERED_TIME_DISTANCE
+                                }
+                            )
+                        },
                         state = parsedState
                     )
                 }
@@ -1270,6 +1299,7 @@ fun MeetApp(
                 if (activeRide != null) {
                     com.elysium369.meet.ui.screens.ride.ActiveRideTrackingScreen(
                         ride = activeRide,
+                        notice = rideNotice,
                         onCancelRide = {
                             obdViewModel.cancelRide(
                                 requestId = activeRide.rideId,
@@ -1277,8 +1307,11 @@ fun MeetApp(
                                 detail = "Cancelado desde seguimiento",
                                 actorRole = "PASSENGER"
                             )
-                            navController.backOrHome()
                         },
+                        onCallDriver = null,
+                        onMessageDriver = null,
+                        onPay = null,
+                        onRate = null,
                         onBack = { navController.backOrHome() }
                     )
                 } else {
@@ -1337,8 +1370,17 @@ fun MeetApp(
                 com.elysium369.meet.fulfillment.ui.UnifiedActivityScreen(
                     viewModel = obdViewModel,
                     towRepository = towRepository,
-                    onNavigateToRide = { navController.navigate(MeetDestinations.RIDE_ACTIVE_TRACKING) },
-                    onNavigateToTow = { navController.navigate("tow_active_tracking") },
+                    onNavigateToRide = { rideId ->
+                        obdViewModel.rideRequests.value.firstOrNull { it.requestId == rideId }
+                            ?.let(obdViewModel::selectActiveRide)
+                        navController.navigate(MeetDestinations.RIDE_ACTIVE_TRACKING)
+                    },
+                    onNavigateToTow = { towId ->
+                        runCatching { java.util.UUID.fromString(towId) }
+                            .getOrNull()
+                            ?.let(towRepository::selectActiveJob)
+                        navController.navigate("tow_active_tracking")
+                    },
                     onBack = { navController.backOrHome() }
                 )
             }

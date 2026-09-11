@@ -757,6 +757,20 @@ interface RideDao {
     @Query("SELECT * FROM ride_requests WHERE passengerId = :passengerId ORDER BY createdAt DESC")
     fun getRequestsByPassenger(passengerId: String): Flow<List<RideRequestEntity>>
 
+    @Query(
+        """
+        SELECT * FROM ride_requests
+        WHERE assignedDriverId = :driverId
+          AND serverVersion > 0
+          AND serverState IN (
+              'ASSIGNED', 'DRIVER_EN_ROUTE', 'ARRIVED',
+              'PASSENGER_ONBOARD', 'IN_PROGRESS'
+          )
+        ORDER BY createdAt DESC
+        """,
+    )
+    fun observeAuthoritativeActiveRidesForDriver(driverId: String): Flow<List<RideRequestEntity>>
+
     @Query("SELECT * FROM ride_requests WHERE requestId = :requestId LIMIT 1")
     suspend fun getRequestById(requestId: String): RideRequestEntity?
 
@@ -832,6 +846,9 @@ interface RideDao {
         syncedAt: Long,
         correlationId: String?,
     ): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRemoteProjection(remote: RideRequestEntity)
 
     @Query(
         """

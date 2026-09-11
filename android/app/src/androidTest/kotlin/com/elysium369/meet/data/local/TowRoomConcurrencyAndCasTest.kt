@@ -4,7 +4,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.elysium369.meet.core.geo.GeoPoint
-import com.elysium369.meet.core.services.kernel.Money
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.core.services.kernel.ServiceRole
 import com.elysium369.meet.core.services.tow.TowAction
 import com.elysium369.meet.core.services.tow.TowCapabilities

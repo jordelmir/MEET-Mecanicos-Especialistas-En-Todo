@@ -1,5 +1,8 @@
 package com.elysium369.meet.ride.domain
 
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
+
 @JvmInline
 value class AmountMinor private constructor(val value: Long) {
     companion object {
@@ -65,8 +68,8 @@ data class CommissionableRideAmounts(
     }
 }
 data class RideCommissionCalculation(
-    val commissionableBase: RideMoney,
-    val platformCommission: RideMoney,
+    val commissionableBase: Money,
+    val platformCommission: Money,
     val policyVersion: String,
 )
 
@@ -108,8 +111,8 @@ object RideCommissionPolicy {
             rate = platformRate,
         )
         return RideCommissionCalculation(
-            commissionableBase = RideMoney(base.value, amounts.currency),
-            platformCommission = RideMoney(commission.value, amounts.currency),
+            commissionableBase = Money(base.value, amounts.currency),
+            platformCommission = Money(commission.value, amounts.currency),
             policyVersion = version,
         )
     }

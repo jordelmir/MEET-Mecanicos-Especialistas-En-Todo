@@ -118,6 +118,7 @@ psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906050000_mobilit
 psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906060000_mobility_provider_capture_v9_closure.sql"
 psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906070000_mobility_hardening_and_stops_authority.sql"
 psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260906080000_mobility_public_launch_v11_closure.sql"
+psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/20260910010000_mobility_provider_capture_atomic_evidence.sql"
 
 echo "=== 4. Seeding Global Market, Actors & Vehicle ==="
 psql "${psql_args[@]}" <<'SQL'
@@ -968,6 +969,29 @@ DECLARE
 BEGIN
     SELECT auth_id INTO v_aid FROM tmp_auth_id;
 
+    -- SQL NULL must not bypass financial equality comparisons.
+    BEGIN
+        PERFORM public.mobility_confirm_provider_capture(
+            v_aid, 'dddddddd-4444-4444-4444-444444444444'::uuid,
+            'ch_missing_amount', 'evt_missing_amount', NULL::BIGINT, 'CRC'
+        );
+        RAISE EXCEPTION 'TEST_FAILED: NULL capture amount accepted';
+    EXCEPTION WHEN raise_exception THEN
+        IF SQLERRM <> 'PROVIDER_CAPTURE_AMOUNT_CURRENCY_TRIP_REQUIRED' THEN RAISE; END IF;
+    END;
+    BEGIN
+        PERFORM public.mobility_confirm_provider_capture(
+            v_aid, 'dddddddd-4444-4444-4444-444444444444'::uuid,
+            'ch_missing_currency', 'evt_missing_currency', 2655, NULL::TEXT
+        );
+        RAISE EXCEPTION 'TEST_FAILED: NULL currency accepted';
+    EXCEPTION WHEN raise_exception THEN
+        IF SQLERRM <> 'PROVIDER_CAPTURE_AMOUNT_CURRENCY_TRIP_REQUIRED' THEN RAISE; END IF;
+    END;
+    IF EXISTS (SELECT 1 FROM public.payment_provider_events WHERE provider_event_id IN ('evt_missing_amount', 'evt_missing_currency')) THEN
+        RAISE EXCEPTION 'TEST_FAILED: Invalid evidence persisted provider event';
+    END IF;
+
     v_res := public.mobility_confirm_provider_capture(
         v_aid,
         'dddddddd-4444-4444-4444-444444444444'::uuid,
@@ -1254,3 +1278,62 @@ echo ">>> PASSED: TEST 11 (Gate 7: Account deletion processor completed: status 
 echo "=========================================================================="
 echo "ALL V11 PUBLIC LAUNCH ADVERSARIAL TESTS PASSED (100% GREEN)"
 echo "=========================================================================="
+
+# Real concurrent connections: one provider event may capture only one payment.
+psql "${psql_args[@]}" -f "$repo_root/tests/mobility/provider-capture-race-setup.sql"
+psql "${psql_args[@]}" -At -c "SELECT auth_id || '|' || trip_id FROM public.capture_race_fixture ORDER BY auth_id" > "$runtime_dir/capture-race-input"
+race_pids=()
+while IFS='|' read -r race_auth race_trip; do
+  psql "${psql_args[@]}" -c "SET request.jwt.claim.role = 'service_role'; SELECT public.mobility_confirm_provider_capture('$race_auth'::uuid, '$race_trip'::uuid, 'cap_$race_auth', 'evt_concurrent_shared', 2655, 'CRC');" > "$runtime_dir/capture-$race_auth.log" 2>&1 &
+  race_pids+=("$!")
+done < "$runtime_dir/capture-race-input"
+race_successes=0
+for race_pid in "${race_pids[@]}"; do
+  if wait "$race_pid"; then race_successes=$((race_successes + 1)); fi
+done
+if [[ "$race_successes" != 1 ]]; then
+  cat "$runtime_dir"/capture-*.log
+  echo "FAIL: expected exactly one provider capture winner, got $race_successes"
+  exit 1
+fi
+psql "${psql_args[@]}" <<'SQL'
+DO $$ BEGIN
+    IF (SELECT count(*) FROM public.payment_authorizations a JOIN public.capture_race_fixture f ON a.payment_authorization_id=f.auth_id WHERE a.state='CAPTURED') <> 1 THEN
+        RAISE EXCEPTION 'More than one payment captured by one provider event';
+    END IF;
+    IF (SELECT count(*) FROM public.payment_provider_events WHERE provider_event_id='evt_concurrent_shared') <> 1 THEN
+        RAISE EXCEPTION 'Provider event was not unique';
+    END IF;
+    IF (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND proname='mobility_confirm_provider_capture') <> 1 THEN
+        RAISE EXCEPTION 'Ambiguous provider capture overload remains';
+    END IF;
+END $$;
+SQL
+echo 'PASS: concurrent capture event ownership (one winner), required financial evidence, unambiguous RPC'
+
+# Isolated backup/restore drill. This proves fixture recovery, not production PITR/RPO/RTO.
+for restore_command in pg_dump pg_restore createdb; do
+  command -v "$restore_command" >/dev/null || { echo "FAIL: restore drill requires $restore_command"; exit 1; }
+done
+restore_started="$SECONDS"
+pg_dump -h "$socket_dir" -p "$port" -d postgres -Fc -f "$runtime_dir/mobility-backup.dump"
+createdb -h "$socket_dir" -p "$port" mobility_restore
+pg_restore -h "$socket_dir" -p "$port" -d mobility_restore --exit-on-error --no-owner --no-privileges "$runtime_dir/mobility-backup.dump"
+restore_invariants="SELECT json_build_array((SELECT count(*) FROM public.trips), (SELECT count(*) FROM public.payment_authorizations), (SELECT count(*) FROM public.payment_provider_events), (SELECT count(*) FROM public.ledger_transactions), (SELECT count(*) FROM public.ledger_entries));"
+original_counts="$(psql "${psql_args[@]}" -At -c "$restore_invariants")"
+restored_counts="$(psql -h "$socket_dir" -p "$port" -d mobility_restore -v ON_ERROR_STOP=1 -At -c "$restore_invariants")"
+[[ "$original_counts" == "$restored_counts" ]] || { echo 'FAIL: restored mobility counts differ'; exit 1; }
+psql -h "$socket_dir" -p "$port" -d mobility_restore -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $$ BEGIN
+    IF EXISTS (SELECT transaction_id FROM public.ledger_entries GROUP BY transaction_id HAVING sum(amount_minor) <> 0) THEN
+        RAISE EXCEPTION 'Restored ledger is unbalanced';
+    END IF;
+    IF EXISTS (SELECT 1 FROM public.ledger_entries e LEFT JOIN public.ledger_transactions t ON t.transaction_id=e.transaction_id WHERE t.transaction_id IS NULL) THEN
+        RAISE EXCEPTION 'Restored ledger has missing references';
+    END IF;
+    IF (SELECT count(*) FROM public.payment_provider_events WHERE provider_event_id='evt_concurrent_shared') <> 1 THEN
+        RAISE EXCEPTION 'Restored capture event ownership invalid';
+    END IF;
+END $$;
+SQL
+echo "PASS: isolated mobility backup/restore, count parity and ledger invariants ($((SECONDS - restore_started)) seconds; local fixture only)"

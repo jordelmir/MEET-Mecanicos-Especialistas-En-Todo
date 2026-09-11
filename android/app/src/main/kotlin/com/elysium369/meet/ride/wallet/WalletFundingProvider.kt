@@ -1,11 +1,11 @@
 package com.elysium369.meet.ride.wallet
 
-import com.elysium369.meet.ride.domain.RideMoney
+import com.elysium369.meet.core.money.Money
 
 data class RideFundingProduct(
     val productId: String,
     val displayName: String,
-    val creditAmount: RideMoney,
+    val creditAmount: Money,
     val storePrice: String,
 )
 

@@ -1,12 +1,14 @@
 package com.elysium369.meet.ride.domain
 
+import com.elysium369.meet.core.money.CurrencyCode
+import com.elysium369.meet.core.money.Money
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class RideCommissionPolicyTest {
 
-    private val crc = CurrencyCode.of("CRC")
+    private val crc = CurrencyCode.fromString("CRC")
 
     @Test
     fun `public commission is exactly five hundred basis points`() {
@@ -61,8 +63,8 @@ class RideCommissionPolicyTest {
 
         val result = RideCommissionPolicy.calculate(amounts)
 
-        assertEquals(RideMoney.of(104_500, "CRC"), result.commissionableBase)
-        assertEquals(RideMoney.of(5_225, "CRC"), result.platformCommission)
+        assertEquals(Money.of(104_500, "CRC"), result.commissionableBase)
+        assertEquals(Money.of(5_225, "CRC"), result.platformCommission)
         assertEquals("ride-commission-v1", result.policyVersion)
     }
 
@@ -79,8 +81,8 @@ class RideCommissionPolicyTest {
 
         val result = RideCommissionPolicy.calculate(onlyExcluded)
 
-        assertEquals(RideMoney.zero(crc), result.commissionableBase)
-        assertEquals(RideMoney.zero(crc), result.platformCommission)
+        assertEquals(Money.zero(crc), result.commissionableBase)
+        assertEquals(Money.zero(crc), result.platformCommission)
     }
 
     @Test
@@ -94,8 +96,8 @@ class RideCommissionPolicyTest {
             ),
         )
 
-        assertEquals(RideMoney.zero(crc), result.commissionableBase)
-        assertEquals(RideMoney.zero(crc), result.platformCommission)
+        assertEquals(Money.zero(crc), result.commissionableBase)
+        assertEquals(Money.zero(crc), result.platformCommission)
     }
 
     @Test
@@ -136,7 +138,7 @@ class RideCommissionPolicyTest {
             ),
         )
 
-        assertEquals(RideMoney.of(4_600, "CRC"), result.commissionableBase)
-        assertEquals(RideMoney.of(230, "CRC"), result.platformCommission)
+        assertEquals(Money.of(4_600, "CRC"), result.commissionableBase)
+        assertEquals(Money.of(230, "CRC"), result.platformCommission)
     }
 }
