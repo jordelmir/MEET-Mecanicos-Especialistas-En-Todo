@@ -9154,6 +9154,15 @@ class ObdViewModel @Inject constructor(
 
     fun cancellationCommands(requestId: String) = rideCommandRepository.cancellationCommands(requestId)
 
+    fun localCancelStuckRide(requestId: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            rideCommandRepository.cancelStuckPendingPublication(requestId)
+            rideDao.clearActiveRideSelectionsForRide(requestId)
+            selectActiveRide(null)
+            _rideVerificationNotice.emit("Solicitud cancelada. Puedes crear una nueva.")
+        }
+    }
+
     fun cancelRide(
         requestId: String,
         reason: RideCancellationReason,

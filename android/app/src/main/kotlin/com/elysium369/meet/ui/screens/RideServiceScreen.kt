@@ -3399,6 +3399,23 @@ fun ActiveRidePanel(
                         fontSize = 15.sp
                     )
 
+                    if (ride.status == "PENDING_PUBLICATION" && ride.serverVersion <= 0L &&
+                        ride.syncState == "PENDING"
+                    ) {
+                        TextButton(
+                            onClick = {
+                                viewModel.localCancelStuckRide(ride.requestId)
+                                onCloseRide()
+                            },
+                        ) {
+                            Text(
+                                "Cancelar",
+                                color = MeetColors.error,
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+
                     IconButton(onClick = onCloseRide) {
                         Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar", tint = MeetColors.textMuted)
                     }

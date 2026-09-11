@@ -50,6 +50,14 @@ class RideCommandSyncWorker @AssistedInject constructor(
         val sessionUserId = SupabaseModule.client.auth.currentUserOrNull()?.id
             ?: return Result.retry()
         val startedAt = System.currentTimeMillis()
+
+        // Auto-cancel rides stuck in PENDING_PUBLICATION for > 10 minutes
+        val staleThreshold = startedAt - STALE_PUBLICATION_MS
+        outboxDao.findStalePendingPublications(staleThreshold).forEach { rideId ->
+            outboxDao.cancelStuckPendingPublication(rideId)
+            rideDao.clearActiveRideSelectionsForRide(rideId)
+        }
+
         outboxDao.recoverStaleLeases(
             staleBefore = startedAt - STALE_LEASE_MS,
             now = startedAt,
@@ -238,6 +246,10 @@ class RideCommandSyncWorker @AssistedInject constructor(
                             correlationId = result.correlationId,
                             now = System.currentTimeMillis(),
                         )
+                        if (isPublicationDeadLettered(entity)) {
+                            outboxDao.cancelStuckPendingPublication(entity.rideId)
+                            rideDao.clearActiveRideSelectionsForRide(entity.rideId)
+                        }
                     }
                 }
                 is RideCommandGatewayResult.TransportFailure -> {
@@ -268,6 +280,10 @@ class RideCommandSyncWorker @AssistedInject constructor(
                             correlationId = null,
                             now = System.currentTimeMillis(),
                         )
+                        if (isPublicationDeadLettered(entity)) {
+                            outboxDao.cancelStuckPendingPublication(entity.rideId)
+                            rideDao.clearActiveRideSelectionsForRide(entity.rideId)
+                        }
                     }
                 }
             }
@@ -325,6 +341,12 @@ class RideCommandSyncWorker @AssistedInject constructor(
         )
     }
 
+    private fun isPublicationDeadLettered(entity: RideCommandOutboxEntity): Boolean =
+        entity.commandType in setOf(
+            RideCommandType.PUBLISH.name,
+            RideCommandType.PUBLISH_GUEST.name,
+        ) && entity.attemptCount >= MAX_ATTEMPTS
+
     private fun RideCommandOutboxEntity.decode(
         json: Json,
     ): RideQueuedCommand {
@@ -360,6 +382,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
         const val PERIODIC_WORK_NAME = "ride_command_outbox_periodic"
         private const val BATCH_SIZE = 20
         private const val MAX_ATTEMPTS = 8
+        private const val STALE_PUBLICATION_MS = 10 * 60 * 1000L
         // RPC calls are bounded by the network stack. A longer lease strands
         // safety-critical cancellation after process death or connectivity loss.
         private const val STALE_LEASE_MS = 2 * 60 * 1000L

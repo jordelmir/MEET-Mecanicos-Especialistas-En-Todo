@@ -224,4 +224,21 @@ interface RideCommandOutboxDao {
         """,
     )
     fun recentFailures(): Flow<List<RideCommandOutboxEntity>>
+
+    @Query("""
+        UPDATE ride_requests
+        SET status = 'CANCELLED', syncState = 'LOCAL_CANCELLED', serverState = 'CANCELLED'
+        WHERE requestId = :rideId AND status = 'PENDING_PUBLICATION' AND serverVersion = 0
+    """)
+    suspend fun cancelStuckPendingPublication(rideId: String): Int
+
+    @Query("""
+        SELECT requestId FROM ride_requests
+        WHERE status = 'PENDING_PUBLICATION'
+          AND syncState = 'PENDING'
+          AND serverVersion = 0
+          AND createdAt < :staleBefore
+        LIMIT 50
+    """)
+    suspend fun findStalePendingPublications(staleBefore: Long): List<String>
 }
