@@ -8135,7 +8135,7 @@ class ObdViewModel @Inject constructor(
             rideDao.getRequestById(selected.rideRequestId)
         }
         if (request == null) {
-            Log.w("MeetRides", "Active ride unavailable locally; durable role pointer retained")
+            Log.w("MeetRides", "Active ride unavailable locally; durable pointer retained")
         } else if (!canSelectRide(request, driverMode)) {
             withContext(Dispatchers.IO) { rideDao.clearActiveRideSelection(roleKey) }
             Log.w("MeetRides", "Rejected active ride pointer outside current actor/role scope")

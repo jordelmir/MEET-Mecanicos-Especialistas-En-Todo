@@ -72,7 +72,7 @@ class RideDeliveryTruthContractTest {
         assertTrue(proguard.contains("extends androidx.work.InputMerger"))
         assertTrue(worker.contains("DeviceMessageCipher"))
         assertTrue(worker.contains("ExistingWorkPolicy.APPEND_OR_REPLACE"))
-        assertTrue(viewModel.contains("combine(_rideDriverMode, _activeRideRequest)"))
+        assertTrue(viewModel.contains("combine(activePrincipalKernel.activePrincipal, _rideDriverMode)"))
         assertTrue(viewModel.contains("RideLocationTrackingService.start"))
         assertTrue(viewModel.contains("RideLocationTrackingService.stop"))
         assertTrue(trackingService.contains("START_NOT_STICKY"))
