@@ -1346,7 +1346,7 @@ fun PassengerDashboard(
                         fontWeight = FontWeight.Black,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf(RidePaymentMethod.CASH, RidePaymentMethod.SINPE).forEach { method ->
+                        listOf(RidePaymentMethod.CASH, RidePaymentMethod.SINPE_MOVIL).forEach { method ->
                             FilterChip(
                                 selected = paymentMethod == method,
                                 onClick = { paymentMethod = method },
@@ -2724,6 +2724,7 @@ fun DriverRideItem(
                     )
                     Text(
                         "${when (ride.paymentMethod) {
+                            "SINPE_MOVIL" -> "📲 SINPE"
                             "SINPE" -> "📲 SINPE"
                             "CASH" -> "💵 EFECTIVO"
                             else -> "⏳ Método no confirmado"
@@ -3352,6 +3353,7 @@ fun ActiveRidePanel(
                 }
                 Text(
                     text = "Pago: ${when (ride.paymentMethod) {
+                        "SINPE_MOVIL" -> "SINPE"
                         "SINPE" -> "SINPE"
                         "CASH" -> "Efectivo"
                         else -> "No confirmado"
@@ -3449,6 +3451,7 @@ fun ActiveRidePanel(
                             )
                             Text(
                                 "TOTAL: ${finalFare.total} · " + when (ride.paymentMethod) {
+                                    "SINPE_MOVIL" -> "SINPE"
                                     "SINPE" -> "SINPE"
                                     "CASH" -> "Efectivo"
                                     "UNKNOWN" -> "Pendiente de confirmación"

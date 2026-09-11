@@ -2,10 +2,16 @@ package com.elysium369.meet.ride.domain
 
 import kotlinx.serialization.Serializable
 
+/**
+ * Canonical ride payment method. Mirrors ride.payment.RidePaymentMethod
+ * exactly so both domains share the same type set.
+ */
 enum class RidePaymentMethod {
     UNKNOWN,
     CASH,
-    SINPE,
+    SINPE_MOVIL,
+    CARD,
+    WALLET;
 }
 
 @Serializable
