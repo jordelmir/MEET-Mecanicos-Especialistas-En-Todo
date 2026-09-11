@@ -20,6 +20,8 @@ data class RideCommandPayload(
     val reasonCode: String? = null,
     val detail: String? = null,
     val displayName: String? = null,
+    val guestName: String? = null,
+    val guestPhoneE164: String? = null,
     val countryCode: String? = null,
     val pickupLatitude: String? = null,
     val pickupLongitude: String? = null,
@@ -269,7 +271,9 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
             put("p_idempotency_key", idempotencyKey)
         }
         return when (type) {
-            RideCommandType.PUBLISH -> {
+            RideCommandType.PUBLISH,
+            RideCommandType.PUBLISH_GUEST,
+            -> {
                 val displayName = payload.displayName.nonBlank() ?: return null
                 val countryCode = payload.countryCode.nonBlank() ?: return null
                 val pickupLatitude = payload.pickupLatitude.jsonNumber() ?: return null
@@ -300,8 +304,20 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                 val rateCardVersion = payload.fareRateCardVersion
                     ?.takeIf { it > 0L } ?: return null
                 val allowsInTripStops = payload.allowsInTripStops ?: return null
+                val guestName = if (type == RideCommandType.PUBLISH_GUEST) {
+                    payload.guestName.nonBlank() ?: return null
+                } else null
+                val guestPhone = if (type == RideCommandType.PUBLISH_GUEST) {
+                    payload.guestPhoneE164
+                        ?.takeIf { it.matches(Regex("^\\+[1-9][0-9]{7,14}$")) }
+                        ?: return null
+                } else null
                 RpcInvocation(
-                    functionName = "ride_create_request_v3",
+                    functionName = if (type == RideCommandType.PUBLISH_GUEST) {
+                        "ride_create_guest_request_v1"
+                    } else {
+                        "ride_create_request_v3"
+                    },
                     parameters = buildJsonObject {
                         put("p_request_id", rideId)
                         put("p_display_name", displayName)
@@ -324,6 +340,10 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                         put("p_fare_rate_card_version", rateCardVersion)
                         put("p_allows_in_trip_stops", allowsInTripStops)
                         put("p_idempotency_key", idempotencyKey)
+                        if (guestName != null && guestPhone != null) {
+                            put("p_guest_name", guestName)
+                            put("p_guest_phone_e164", guestPhone)
+                        }
                     },
                 )
             }

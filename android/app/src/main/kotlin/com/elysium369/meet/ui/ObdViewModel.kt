@@ -8640,6 +8640,8 @@ class ObdViewModel @Inject constructor(
         stopsJson: String = "[]",
         paymentMethod: String = "UNKNOWN",
         fareMode: RideFareMode = RideFareMode.OPEN_BID,
+        guestName: String? = null,
+        guestPhoneE164: String? = null,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             // A route cannot be calculated from a text label alone. Reject an
@@ -8695,6 +8697,17 @@ class ObdViewModel @Inject constructor(
                 _rideVerificationNotice.emit("La tarifa debe ser mayor que cero.")
                 return@launch
             }
+            val normalizedGuestName = guestName?.trim()?.takeIf { it.isNotEmpty() }
+            val normalizedGuestPhone = guestPhoneE164?.trim()?.takeIf {
+                it.matches(Regex("^\\+[1-9][0-9]{7,14}$"))
+            }
+            if ((normalizedGuestName == null) != (normalizedGuestPhone == null)) {
+                _rideVerificationNotice.emit(
+                    "Para pedir a otra persona, indica nombre y teléfono en formato internacional.",
+                )
+                return@launch
+            }
+            val isGuestRide = normalizedGuestName != null
             val request = RideRequestEntity(
                 requestId = UUID.randomUUID().toString(),
                 passengerId = passengerId,
@@ -8739,10 +8752,16 @@ class ObdViewModel @Inject constructor(
                 envelope = rideCommandEnvelope(
                     requestId = request.requestId,
                     serverVersion = 0L,
-                    type = RideCommandType.PUBLISH,
+                    type = if (isGuestRide) {
+                        RideCommandType.PUBLISH_GUEST
+                    } else {
+                        RideCommandType.PUBLISH
+                    },
                 ),
                 payload = RideCommandPayload(
                     displayName = passengerName,
+                    guestName = normalizedGuestName,
+                    guestPhoneE164 = normalizedGuestPhone,
                     countryCode = normalizedCountryCode,
                     pickupLatitude = pickupLat.toString(),
                     pickupLongitude = pickupLng.toString(),

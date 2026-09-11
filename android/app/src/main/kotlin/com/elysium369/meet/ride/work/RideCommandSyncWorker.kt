@@ -333,7 +333,11 @@ class RideCommandSyncWorker @AssistedInject constructor(
             expectedVersion > 0 ||
                 (
                     expectedVersion == 0L &&
-                        commandType in setOf(RideCommandType.PUBLISH.name, RideCommandType.CANCEL.name)
+                        commandType in setOf(
+                            RideCommandType.PUBLISH.name,
+                            RideCommandType.PUBLISH_GUEST.name,
+                            RideCommandType.CANCEL.name,
+                        )
                 )
         ) { "Expected version is invalid for this command" }
         require(payloadVersion > 0) { "Payload version must be positive" }
@@ -394,7 +398,9 @@ class RideCommandSyncWorker @AssistedInject constructor(
 }
 
 private fun String.successTelemetryType(): RideTelemetryEventType = when (this) {
-    RideCommandType.PUBLISH.name -> RideTelemetryEventType.RIDE_PUBLISHED
+    RideCommandType.PUBLISH.name,
+    RideCommandType.PUBLISH_GUEST.name,
+    -> RideTelemetryEventType.RIDE_PUBLISHED
     RideCommandType.SUBMIT_OFFER.name -> RideTelemetryEventType.OFFER_SUBMITTED
     RideCommandType.ACCEPT_OFFER.name -> RideTelemetryEventType.OFFER_ACCEPTED
     RideCommandType.CLAIM.name -> RideTelemetryEventType.ASSIGNMENT_WON

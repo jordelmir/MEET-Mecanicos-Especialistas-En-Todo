@@ -37,11 +37,11 @@ interface RideCommandOutboxDao {
     @Query("""
         UPDATE ride_command_outbox SET status = 'SUPERSEDED',
             lastErrorCode = 'CANCELLED_BEFORE_PUBLICATION', updatedAt = :now
-        WHERE rideId = :rideId AND actorSessionUserId = :owner AND commandType = 'PUBLISH'
+        WHERE rideId = :rideId AND actorSessionUserId = :owner AND commandType IN ('PUBLISH', 'PUBLISH_GUEST')
           AND status = 'PENDING' AND attemptCount = 0
           AND EXISTS (SELECT 1 FROM ride_requests WHERE requestId = :rideId AND passengerId = :owner AND serverVersion = 0)
           AND NOT EXISTS (SELECT 1 FROM ride_command_outbox prior
-              WHERE prior.rideId = :rideId AND prior.commandType = 'PUBLISH'
+            WHERE prior.rideId = :rideId AND prior.commandType IN ('PUBLISH', 'PUBLISH_GUEST')
                 AND (prior.attemptCount > 0 OR prior.actorSessionUserId != :owner OR prior.status != 'PENDING'))
     """)
     suspend fun supersedeUnsentPublication(rideId: String, owner: String, now: Long): Int
@@ -56,7 +56,11 @@ interface RideCommandOutboxDao {
     @Query("UPDATE ride_requests SET status = 'CANCELLED', syncState = 'LOCAL_CANCELLED' WHERE requestId = :rideId AND passengerId = :owner AND serverVersion = 0")
     suspend fun cancelUnpublishedRequest(rideId: String, owner: String): Int
 
-    @Query("DELETE FROM active_ride_selections WHERE rideRequestId = :rideId AND ownerPrincipalId = :owner")
+    @Query("""
+        DELETE FROM active_ride_selections
+        WHERE rideRequestId = :rideId
+          AND ownerPrincipalId IN (:owner, :owner || '#PASSENGER', :owner || '#RIDE_DRIVER')
+    """)
     suspend fun clearLocalCancelledSelection(rideId: String, owner: String): Int
 
     @Query("UPDATE ride_requests SET syncState = 'PENDING' WHERE requestId = :rideId AND (passengerId = :owner OR assignedDriverId = :owner)")

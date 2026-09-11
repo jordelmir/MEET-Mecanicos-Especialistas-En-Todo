@@ -51,6 +51,7 @@ enum class RideCommandType {
     CREATE_DRAFT,
     UPDATE_DRAFT,
     PUBLISH,
+    PUBLISH_GUEST,
     SUBMIT_OFFER,
     UPDATE_OFFER,
     WITHDRAW_OFFER,

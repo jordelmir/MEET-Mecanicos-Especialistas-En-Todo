@@ -724,6 +724,9 @@ fun PassengerDashboard(
             }.getOrDefault(RideFareMode.OPEN_BID),
         )
     }
+    var requestingForSomeoneElse by rememberSaveable(draftOwner) { mutableStateOf(false) }
+    var guestName by rememberSaveable(draftOwner) { mutableStateOf("") }
+    var guestPhoneE164 by rememberSaveable(draftOwner) { mutableStateOf("") }
 
     LaunchedEffect(
         destAddress, destLatitude, destLongitude, destinationPlaceId,
@@ -1339,6 +1342,62 @@ fun PassengerDashboard(
                 shape = RoundedCornerShape(16.dp),
             ) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "¿EL VIAJE ES PARA OTRA PERSONA?",
+                                color = MeetColors.cyberCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                            )
+                            Text(
+                                "Puedes pedirlo para tu mamá, familiar o invitado.",
+                                color = MeetColors.textMuted,
+                                fontSize = 10.sp,
+                            )
+                        }
+                        Switch(
+                            checked = requestingForSomeoneElse,
+                            onCheckedChange = { requestingForSomeoneElse = it },
+                        )
+                    }
+                    if (requestingForSomeoneElse) {
+                        OutlinedTextField(
+                            value = guestName,
+                            onValueChange = { guestName = it.take(120) },
+                            label = { Text("Nombre de quien viaja") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        OutlinedTextField(
+                            value = guestPhoneE164,
+                            onValueChange = { guestPhoneE164 = it.filter { char -> char == '+' || char.isDigit() }.take(16) },
+                            label = { Text("Teléfono internacional, ej. +50688888888") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                        Text(
+                            "La solicitud queda a tu nombre; MEET protege los datos y vincula a quien realmente viajará.",
+                            color = MeetColors.textMuted,
+                            fontSize = 9.sp,
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
                         "FORMA DE PAGO",
                         color = MeetColors.cyberCyan,
@@ -1565,6 +1624,18 @@ fun PassengerDashboard(
                                 Toast.makeText(context, "Por favor ingrese la dirección de destino", Toast.LENGTH_SHORT).show()
                                 return@Button
                             }
+                            if (
+                                requestingForSomeoneElse &&
+                                (guestName.trim().isEmpty() ||
+                                    !guestPhoneE164.trim().matches(Regex("^\\+[1-9][0-9]{7,14}$")))
+                            ) {
+                                Toast.makeText(
+                                    context,
+                                    "Indica el nombre y teléfono internacional de quien viajará",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                                return@Button
+                            }
                             if (!RideTripPlanPolicy.canDispatch(
                                     destinationResolved = destinationPlaceId != null &&
                                         destLatitude.isFinite() && destLongitude.isFinite() &&
@@ -1642,6 +1713,8 @@ fun PassengerDashboard(
                                 stopsJson = Json.encodeToString(stops),
                                 paymentMethod = paymentMethod.name,
                                 fareMode = fareMode,
+                                guestName = guestName.takeIf { requestingForSomeoneElse },
+                                guestPhoneE164 = guestPhoneE164.takeIf { requestingForSomeoneElse },
                             )
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
@@ -1652,7 +1725,11 @@ fun PassengerDashboard(
                     ) {
                         Text(
                             text = if (fareMode == RideFareMode.OPEN_BID) {
-                                "🚀 PUBLICAR MI OFERTA"
+                                if (requestingForSomeoneElse) {
+                                    "🚀 PEDIR VIAJE PARA ${guestName.trim().ifEmpty { "OTRA PERSONA" }.uppercase()}"
+                                } else {
+                                    "🚀 PUBLICAR MI OFERTA"
+                                }
                             } else {
                                 "⚡ SOLICITAR CON TARIFA MEDIDA"
                             },
@@ -2150,11 +2227,12 @@ fun DriverDashboard(
             active.maxByOrNull { it.createdAt }
         }
     }
-    val rankedOpenRides = remember(openRides, destinationHomeEnabled, homeLatitude, homeLongitude) {
+    val rankedOpenRides = remember(openRides, myDriverId, destinationHomeEnabled, homeLatitude, homeLongitude) {
+        val eligibleRides = openRides.filter { it.passengerId != myDriverId }
         if (!destinationHomeEnabled || homeLatitude == null || homeLongitude == null) {
-            openRides
+            eligibleRides
         } else {
-            openRides.sortedBy { ride ->
+            eligibleRides.sortedBy { ride ->
                 calculateDistance(
                     ride.destLatitude,
                     ride.destLongitude,

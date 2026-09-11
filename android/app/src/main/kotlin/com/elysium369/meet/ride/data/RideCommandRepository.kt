@@ -56,14 +56,18 @@ class RideCommandRepository @Inject constructor(
     ): RideCommandEnqueueResult {
         if (
             envelope.expectedVersion.value <= 0 &&
-            envelope.type !in setOf(RideCommandType.PUBLISH, RideCommandType.CANCEL)
+            envelope.type !in setOf(
+                RideCommandType.PUBLISH,
+                RideCommandType.PUBLISH_GUEST,
+                RideCommandType.CANCEL,
+            )
         ) {
             return RideCommandEnqueueResult.InvalidCommand(
                 "La versión remota debe ser positiva",
             )
         }
         if (
-            envelope.type == RideCommandType.PUBLISH &&
+            envelope.type in setOf(RideCommandType.PUBLISH, RideCommandType.PUBLISH_GUEST) &&
             envelope.expectedVersion.value != 0L
         ) {
             return RideCommandEnqueueResult.InvalidCommand(
@@ -206,6 +210,7 @@ class RideCommandRepository @Inject constructor(
         const val CANCELLATION_LEASE_MS = 2 * 60 * 1000L
         val SUPPORTED_COMMANDS = setOf(
             RideCommandType.PUBLISH,
+            RideCommandType.PUBLISH_GUEST,
             RideCommandType.SUBMIT_OFFER,
             RideCommandType.ACCEPT_OFFER,
             RideCommandType.CLAIM,
