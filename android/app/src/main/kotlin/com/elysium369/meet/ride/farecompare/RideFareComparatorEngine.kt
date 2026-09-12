@@ -1,5 +1,6 @@
 package com.elysium369.meet.ride.farecompare
 
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.ride.domain.RideFareMode
 import kotlinx.serialization.Serializable
 
@@ -149,7 +150,7 @@ data class FareComparison(
             appendLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             appendLine("💡 ${recommendation.message}")
             if (savingsIfRecommended > 0) {
-                appendLine("💰 Ahorro estimado: ₡$savingsIfRecommended")
+                appendLine("💰 Ahorro estimado: ${Money.ofCrc(savingsIfRecommended).formatted()}")
             }
         }
 }
@@ -352,7 +353,7 @@ class RideFareComparatorEngine {
             return FareRecommendation(
                 RideFareMode.OPEN_BID, 0.75,
                 RecommendationReason.LOW_DEMAND_NEGOTIATE,
-                "Demanda baja. Puedes negociar un mejor precio (~₡$bidMin).",
+                "Demanda baja. Puedes negociar un mejor precio (~${Money.ofCrc(bidMin).formatted()}).",
             )
         }
 
@@ -370,7 +371,7 @@ class RideFareComparatorEngine {
             return FareRecommendation(
                 RideFareMode.OPEN_BID, 0.70,
                 RecommendationReason.LONG_TRIP_NEGOTIATE,
-                "Viaje largo. Negociar puede ahorrarte ~₡${meteredTotal - bidBase}.",
+                "Viaje largo. Negociar puede ahorrarte ~${Money.ofCrc(meteredTotal - bidBase).formatted()}.",
             )
         }
 

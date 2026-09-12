@@ -66,6 +66,26 @@ interface RideCommandOutboxDao {
     @Query("UPDATE ride_requests SET syncState = 'PENDING' WHERE requestId = :rideId AND (passengerId = :owner OR assignedDriverId = :owner)")
     suspend fun markCancellationPending(rideId: String, owner: String): Int
 
+    @Query(
+        """
+        UPDATE ride_command_outbox
+        SET status = 'PENDING',
+            attemptCount = 0,
+            leaseStartedAt = NULL,
+            nextAttemptAt = :now,
+            lastErrorCode = 'FORCE_REQUEUED',
+            lastErrorMessage = 'Reset by passenger retry',
+            updatedAt = :now
+        WHERE rideId = :rideId
+          AND commandType = 'CANCEL'
+          AND (
+            status IN ('FAILED', 'DEAD_LETTER', 'RETRYABLE')
+            OR (status = 'PENDING' AND attemptCount = 0 AND createdAt < :staleBefore)
+          )
+        """,
+    )
+    suspend fun forceRequeueCancelledCommand(rideId: String, now: Long, staleBefore: Long): Int
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(command: RideCommandOutboxEntity): Long
 
@@ -241,4 +261,32 @@ interface RideCommandOutboxDao {
         LIMIT 50
     """)
     suspend fun findStalePendingPublications(staleBefore: Long): List<String>
+
+    /** Keep only the newest PENDING CANCEL per rideId; mark older duplicates SUPERSEDED. */
+    @Query("""
+        UPDATE ride_command_outbox
+        SET status = 'SUPERSEDED',
+            lastErrorCode = 'DUPLICATE_CANCEL',
+            lastErrorMessage = 'Superseded by newer cancel for same ride',
+            updatedAt = :now
+        WHERE commandType = 'CANCEL'
+          AND status = 'PENDING'
+          AND idempotencyKey NOT IN (
+            SELECT sub.idempotencyKey FROM (
+              SELECT idempotencyKey, rideId, createdAt,
+                ROW_NUMBER() OVER (PARTITION BY rideId ORDER BY createdAt DESC) AS rn
+              FROM ride_command_outbox
+              WHERE commandType = 'CANCEL' AND status = 'PENDING'
+            ) sub WHERE sub.rn = 1
+          )
+    """)
+    suspend fun supersedeDuplicatePendingCancels(now: Long): Int
+
+    /** Delete commands that have been SUPERSEDED or ACKNOWLEDGED for > 24h. */
+    @Query("""
+        DELETE FROM ride_command_outbox
+        WHERE status IN ('SUPERSEDED', 'ACKNOWLEDGED', 'LOCAL_CANCELLED')
+          AND updatedAt < :olderThan
+    """)
+    suspend fun pruneCompletedCommands(olderThan: Long): Int
 }

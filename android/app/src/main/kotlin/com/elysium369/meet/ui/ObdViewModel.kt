@@ -115,6 +115,7 @@ import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
 import com.elysium369.meet.ride.data.remote.ServiceVerificationSubmission
 import com.elysium369.meet.ride.data.remote.TrustEvidenceFile
 import com.elysium369.meet.ride.data.remote.ServiceVerificationTypePolicy
+import com.elysium369.meet.ride.work.RideCommandSyncWorker
 import com.elysium369.meet.ride.work.RideDriverEnrollmentWorker
 import com.elysium369.meet.ride.location.GpsTrailRecorder
 import com.elysium369.meet.ride.location.GpsTrailPdfExporter
@@ -510,7 +511,8 @@ class ObdViewModel @Inject constructor(
     val usageMeter: com.elysium369.meet.core.monetization.UsageMeter,
     private val aiRepository: com.elysium369.meet.ai.data.AiRepository,
     private val safeJourneyKernel: SafeJourneyKernel,
-    private val pttKernel: PttKernel
+    private val pttKernel: PttKernel,
+    private val ridePaymentGateway: com.elysium369.meet.ride.payment.RidePaymentGateway,
 ) : ViewModel() {
 
     // Device-level identity must be initialized before init{} calls provider role refresh.
@@ -8697,6 +8699,16 @@ class ObdViewModel @Inject constructor(
                 _rideVerificationNotice.emit("La tarifa debe ser mayor que cero.")
                 return@launch
             }
+            val authoritativePaymentMethod = when (paymentMethod.trim().uppercase()) {
+                "CASH" -> "CASH"
+                "SINPE", "SINPE_MOVIL" -> "SINPE"
+                else -> {
+                    _rideVerificationNotice.emit(
+                        "Selecciona Efectivo o SINPE antes de solicitar el viaje.",
+                    )
+                    return@launch
+                }
+            }
             val normalizedGuestName = guestName?.trim()?.takeIf { it.isNotEmpty() }
             val normalizedGuestPhone = guestPhoneE164?.trim()?.takeIf {
                 it.matches(Regex("^\\+[1-9][0-9]{7,14}$"))
@@ -8726,7 +8738,7 @@ class ObdViewModel @Inject constructor(
                 estimatedDistanceKm = estDistance,
                 estimatedDurationMin = estDuration,
                 stopsJson = stopsJson,
-                paymentMethod = paymentMethod,
+                paymentMethod = authoritativePaymentMethod,
                 fareMode = fareMode.name,
                 distanceRateMinorPerKm = meteredQuote?.distanceRateMinorPerKm ?: 0L,
                 timeRateMinorPerMinute = meteredQuote?.timeRateMinorPerMinute ?: 0L,
@@ -8771,7 +8783,7 @@ class ObdViewModel @Inject constructor(
                     destinationAddress = destAddr,
                     offeredFareMinor = offeredFareMinor,
                     currency = currency.uppercase(),
-                    paymentMethod = paymentMethod.uppercase(),
+                    paymentMethod = authoritativePaymentMethod,
                     stopsJson = stopsJson,
                     fareMode = fareMode.name,
                     distanceRateMinorPerKm = meteredQuote?.distanceRateMinorPerKm ?: 0L,
@@ -9187,15 +9199,23 @@ class ObdViewModel @Inject constructor(
                 _rideVerificationNotice.emit("No se encontró el viaje. Actualiza las solicitudes.")
                 return@launch
             }
+            val requeued = rideCommandRepository.forceRequeueStuckCancellation(
+                rideId = requestId,
+            )
+            if (requeued > 0) {
+                RideCommandSyncWorker.enqueueNow(context)
+                _rideVerificationNotice.emit(
+                    "Cancelación reintentada. El servidor procesará la solicitud.",
+                )
+                return@launch
+            }
             reportRideCommandEnqueue(
                 result = rideCommandRepository.enqueue(
                 envelope = rideCommandEnvelope(
                     requestId = requestId,
                     serverVersion = request.serverVersion,
                     type = RideCommandType.CANCEL,
-                ).copy(
-                        idempotencyKey = RideIdempotencyKey.of("cancel:$requestId:${request.serverVersion}"),
-                    ),
+                ),
                     payload = RideCommandPayload(
                         reasonCode = reason.name,
                         detail = detail?.trim()?.takeIf(String::isNotEmpty),
@@ -9203,6 +9223,23 @@ class ObdViewModel @Inject constructor(
                 ),
                 acceptedMessage = "Cancelación pendiente de confirmación del servidor.",
             )
+        }
+    }
+
+    fun confirmRidePayment(requestId: String, referenceNumber: String? = null) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val status = com.elysium369.meet.ride.payment.RidePaymentStatus.DRIVER_MARKED_RECEIVED
+            val result = ridePaymentGateway.attestPaymentEvent(
+                tripId = requestId,
+                newStatus = status,
+                referenceNumber = referenceNumber,
+            )
+            result.onSuccess { serverMessage ->
+                _rideVerificationNotice.emit("Pago confirmado. $serverMessage")
+            }.onFailure { error ->
+                if (error is kotlinx.coroutines.CancellationException) throw error
+                _rideVerificationNotice.emit("Error confirmando pago: ${error.message}")
+            }
         }
     }
 

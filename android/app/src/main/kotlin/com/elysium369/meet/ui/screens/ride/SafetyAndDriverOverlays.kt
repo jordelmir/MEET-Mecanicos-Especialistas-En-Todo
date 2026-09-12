@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.ui.theme.MeetColors
 
 @Composable
@@ -402,7 +403,7 @@ fun DriverEarningsBottomSheet(
                     ) {
                         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text("Hoy", style = MaterialTheme.typography.labelMedium, color = MeetColors.textSecondary)
-                            Text("₡${todayEarnings.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}", style = MaterialTheme.typography.headlineMedium, color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
+                            Text(Money.ofCrc(todayEarnings).formatted(), style = MaterialTheme.typography.headlineMedium, color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
                             Text("$tripsToday viajes completados", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
                         }
                     }
@@ -411,13 +412,13 @@ fun DriverEarningsBottomSheet(
                         Card(modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground)) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text("Esta semana", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
-                                Text("₡${weekEarnings.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}", style = MaterialTheme.typography.titleSmall, color = MeetColors.textPrimary, fontWeight = FontWeight.Bold)
+                                Text(Money.ofCrc(weekEarnings).formatted(), style = MaterialTheme.typography.titleSmall, color = MeetColors.textPrimary, fontWeight = FontWeight.Bold)
                             }
                         }
                         Card(modifier = Modifier.weight(1f), shape = RoundedCornerShape(12.dp), colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground)) {
                             Column(modifier = Modifier.padding(12.dp)) {
                                 Text("Este mes", style = MaterialTheme.typography.labelSmall, color = MeetColors.textSecondary)
-                                Text("₡${monthEarnings.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}", style = MaterialTheme.typography.titleSmall, color = MeetColors.textPrimary, fontWeight = FontWeight.Bold)
+                                Text(Money.ofCrc(monthEarnings).formatted(), style = MaterialTheme.typography.titleSmall, color = MeetColors.textPrimary, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

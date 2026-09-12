@@ -1,5 +1,6 @@
 package com.elysium369.meet.ride.summary
 
+import com.elysium369.meet.core.money.Money
 import com.elysium369.meet.ride.domain.RideFareMode
 import com.elysium369.meet.ride.domain.RideState
 import kotlinx.serialization.Serializable
@@ -346,7 +347,7 @@ class RideTripSummaryEngine {
             appendLine("📏 ${String.format("%.1f", r.distanceKm)} km · ${r.durationMinutes} min")
             appendLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             r.fareBreakdown.forEach { (label, amount) ->
-                appendLine("  $label: ₡$amount")
+                appendLine("  $label: ${Money.ofCrc(amount).formatted()}")
             }
             appendLine("━━━━━━━━━━━━━━━━━━━━━━━━━━━")
             appendLine("💰 Total: ${r.formattedTotal}")

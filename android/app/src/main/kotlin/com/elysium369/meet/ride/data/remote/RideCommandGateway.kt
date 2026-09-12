@@ -361,7 +361,9 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                             put("p_vehicle_id", vehicleId)
                             put("p_fare_minor", fareMinor)
                             put("p_currency", currency)
-                            payload.etaSeconds?.let { put("p_eta_seconds", it) }
+                            // The SQL RPC declares p_eta_seconds without a default; send the
+                            // key even when the driver has no trustworthy ETA yet.
+                            put("p_eta_seconds", payload.etaSeconds)
                         },
                     ),
                 )
@@ -400,9 +402,10 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                         common + buildJsonObject {
                             put("p_trip_id", rideId)
                             put("p_reason_code", reason)
-                            payload.detail?.takeIf(String::isNotBlank)?.let {
-                                put("p_detail", it)
-                            }
+                            // PostgREST resolves RPC overloads from the exact JSON key set.
+                            // The authoritative SQL function requires p_detail even when the
+                            // selected reason does not need an explanation.
+                            put("p_detail", payload.detail?.trim().orEmpty())
                         },
                     ),
                 )

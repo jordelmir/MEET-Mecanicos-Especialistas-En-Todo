@@ -39,6 +39,22 @@ class RideRemoteProjectionMapperTest {
         assertNull(result.acceptedOfferId)
     }
 
+    @Test fun `authoritative participant projection replaces stale assignment identity`() {
+        val result = remote(driver = "driver-B", vehicle = "vehicle-B").toLocal(
+            existing = existing(),
+            stops = emptyList(),
+            acceptedOfferId = "offer-B",
+            assignedDriverName = "Driver B",
+            assignedDriverVehicle = "Vehicle B",
+        )
+        assertEquals("driver-B", result.assignedDriverId)
+        assertEquals("Driver B", result.assignedDriverName)
+        assertEquals("Vehicle B", result.assignedDriverVehicle)
+        assertEquals("offer-B", result.acceptedOfferId)
+        assertNull(result.assignedDriverPhone)
+        assertNull(result.boardingPin)
+    }
+
     @Test fun `unassignment and terminal state remove boarding credentials`() {
         val unassigned = remote(driver = null, vehicle = null, state = "SEARCHING").toLocal(existing(), emptyList(), null)
         assertNull(unassigned.assignedDriverName)

@@ -1,5 +1,6 @@
 package com.elysium369.meet.core.antifraud
 
+import com.elysium369.meet.core.money.Money
 import kotlinx.serialization.Serializable
 import java.security.MessageDigest
 
@@ -70,7 +71,7 @@ data class RepairQuote(
     val lineCount: Int get() = lines.size
 
     val formattedTotal: String
-        get() = "₡${totalAmount.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = Money.ofCrc(totalAmount).formatted()
 }
 
 // ─── Fraud Alert ───
@@ -186,8 +187,8 @@ class AntifraudQuoteEngine {
                             type = FraudType.PARTS_OVERPRICED,
                             severity = if (deviation > 100) FraudSeverity.CRITICAL else FraudSeverity.WARNING,
                             message = "Precio ${deviation.toInt()}% sobre el promedio de mercado",
-                            details = "${line.description}: ₡${line.unitPrice} vs promedio ₡${ref.averagePrice}",
-                            expectedRange = "₡${ref.minPrice} — ₡${ref.maxPrice}",
+                            details = "${line.description}: ${Money.ofCrc(line.unitPrice).formatted()} vs promedio ${Money.ofCrc(ref.averagePrice).formatted()}",
+                            expectedRange = "${Money.ofCrc(ref.minPrice).formatted()} — ${Money.ofCrc(ref.maxPrice).formatted()}",
                             actualAmount = line.unitPrice,
                             deviationPercent = deviation,
                         ))

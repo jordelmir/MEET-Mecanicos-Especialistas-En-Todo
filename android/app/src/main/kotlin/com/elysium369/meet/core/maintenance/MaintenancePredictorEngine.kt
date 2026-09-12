@@ -1,5 +1,6 @@
 package com.elysium369.meet.core.maintenance
 
+import com.elysium369.meet.core.money.Money
 import kotlinx.serialization.Serializable
 
 /**
@@ -121,11 +122,11 @@ data class MaintenancePrediction(
     val currency: String = "CRC",
 ) {
     val formattedPreventive: String
-        get() = "₡${preventiveCost.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = Money.ofCrc(preventiveCost).formatted()
     val formattedEmergency: String
-        get() = "₡${emergencyCost.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = Money.ofCrc(emergencyCost).formatted()
     val formattedSavings: String
-        get() = "₡${savingsIfPreventive.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = Money.ofCrc(savingsIfPreventive).formatted()
 }
 
 // ─── Vehicle Service Record ───
@@ -288,7 +289,7 @@ class MaintenancePredictorEngine {
     ): String = when (urgency) {
         PredictionUrgency.OVERDUE -> {
             val savings = interval.emergencyCost - interval.preventiveCost
-            "⚫ ${component.displayLabel} VENCIDO. Reparar ya. Ahorro vs emergencia: ₡$savings"
+            "⚫ ${component.displayLabel} VENCIDO. Reparar ya. Ahorro vs emergencia: ${Money.ofCrc(savings).formatted()}"
         }
         PredictionUrgency.RED -> {
             "🔴 ${component.displayLabel} necesita servicio pronto (~$remainingKm km restantes)."

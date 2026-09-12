@@ -50,6 +50,7 @@ import com.elysium369.meet.data.local.entities.RideChatMessageEntity
 import com.elysium369.meet.data.local.entities.RideOfferEntity
 import com.elysium369.meet.data.local.entities.RideRequestEntity
 import com.elysium369.meet.BuildConfig
+import com.elysium369.meet.core.money.Money as CoreMoney
 import com.elysium369.meet.ride.domain.RidePaymentMethod
 import com.elysium369.meet.ride.domain.RideFareBidPolicy
 import com.elysium369.meet.ride.domain.RideFareEngine
@@ -474,9 +475,9 @@ private fun DriverWalletCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("BILLETERA DEL CHOFER", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
-            Text("Saldo promocional inicial: ₡$starter", color = Color.White, fontWeight = FontWeight.Bold)
-            Text("Saldo disponible: ₡${balance?.availableMinor ?: 0}", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
-            Text("Reservado para comisiones: ₡${balance?.reservedMinor ?: 0}", color = MeetColors.textSecondary, fontSize = 12.sp)
+            Text("Saldo promocional inicial: ${CoreMoney.ofCrc(starter).formatted()}", color = Color.White, fontWeight = FontWeight.Bold)
+            Text("Saldo disponible: ${CoreMoney.ofCrc(balance?.availableMinor ?: 0).formatted()}", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
+            Text("Reservado para comisiones: ${CoreMoney.ofCrc(balance?.reservedMinor ?: 0).formatted()}", color = MeetColors.textSecondary, fontSize = 12.sp)
             Text("Comisión por viaje: $commission%", color = MeetColors.textSecondary)
             HorizontalDivider(color = MeetColors.borderSubtle)
             Text("Recarga por SINPE Móvil", color = MeetColors.textSecondary, fontSize = 12.sp)
@@ -1544,12 +1545,12 @@ fun PassengerDashboard(
                         Text(
                             text = if (fareMode == RideFareMode.METERED_TIME_DISTANCE) {
                                 meteredQuote?.let {
-                                    "₡${String.format(currentLocale, "%,d", it.estimatedTotalMinor)} estimados"
+                                    "${CoreMoney.ofCrc(it.estimatedTotalMinor).formatted()} estimados"
                                 } ?: "Calculando estimado…"
                             } else if (isUsd) {
                                 "$${String.format(currentLocale, "%.2f", offerPrice / 500.0)} USD"
                             } else {
-                                "₡${String.format(currentLocale, "%,.0f", offerPrice)} CRC"
+                                "${CoreMoney.ofCrc(offerPrice.toLong()).formatted()} CRC"
                             },
                             fontSize = if (compact) 24.sp else 32.sp,
                             fontWeight = FontWeight.Black,
@@ -1578,8 +1579,8 @@ fun PassengerDashboard(
                     Text(
                         if (fareMode == RideFareMode.METERED_TIME_DISTANCE) {
                             meteredQuote?.let {
-                                "${String.format(currentLocale, "%.1f", it.estimatedDistanceMeters / 1_000.0)} km × ₡300 = ₡${it.distanceFareMinor}  ·  " +
-                                    "${String.format(currentLocale, "%.1f", it.estimatedDurationSeconds / 60.0)} min × ₡60 = ₡${it.timeFareMinor}\n" +
+                                "${String.format(currentLocale, "%.1f", it.estimatedDistanceMeters / 1_000.0)} km × ${CoreMoney.ofCrc(300L).formatted()} = ${CoreMoney.ofCrc(it.distanceFareMinor).formatted()}  ·  " +
+                                    "${String.format(currentLocale, "%.1f", it.estimatedDurationSeconds / 60.0)} min × ${CoreMoney.ofCrc(60L).formatted()} = ${CoreMoney.ofCrc(it.timeFareMinor).formatted()}\n" +
                                     "El total mostrado es estimado; el definitivo usa distancia y tiempo reales registrados. Puedes añadir paradas durante el viaje."
                             } ?: "Selecciona una ruta real para obtener el desglose."
                         } else if (isUsd) {
@@ -1613,6 +1614,18 @@ fun PassengerDashboard(
                                 Toast.makeText(
                                     context,
                                     "Falta un teléfono verificado",
+                                    Toast.LENGTH_LONG,
+                                ).show()
+                                return@Button
+                            }
+                            if (paymentMethod !in setOf(
+                                    RidePaymentMethod.CASH,
+                                    RidePaymentMethod.SINPE_MOVIL,
+                                )
+                            ) {
+                                Toast.makeText(
+                                    context,
+                                    "Selecciona Efectivo o SINPE antes de solicitar",
                                     Toast.LENGTH_LONG,
                                 ).show()
                                 return@Button
@@ -3411,6 +3424,7 @@ fun ActiveRidePanel(
             "PASSENGER_ONBOARD" -> MeetColors.neonGreen
             "IN_PROGRESS" -> MeetColors.neonGreen
             "COMPLETED" -> MeetColors.neonGreen
+            "EXPIRED" -> MeetColors.textMuted
             else -> MeetColors.error
         }
         val statusLabel = when (ride.status) {
@@ -3426,6 +3440,7 @@ fun ActiveRidePanel(
             "IN_PROGRESS" -> "Viaje en Curso 🏁"
             "COMPLETED" -> "Viaje Completado 🎉"
             "CANCELLED" -> "Viaje Cancelado ❌"
+            "EXPIRED" -> "Solicitud Expirada ⏰"
             else -> ride.status
         }
 
@@ -3986,8 +4001,22 @@ fun ActiveRidePanel(
             Text("ELYSIUM GUARDIAN · SEGURIDAD", fontWeight = FontWeight.Black, fontSize = 11.sp)
         }
 
-        // Partner Info Card (Visible if ride is ACCEPTED or later status)
-        if (ride.status != "OPEN") {
+        // Partner identity is only authoritative after the server has assigned a
+        // concrete driver. A local pending publication must never render a
+        // generic driver as if one had accepted the ride.
+        val hasAuthoritativeAssignment = ride.serverVersion > 0L &&
+            !ride.assignedDriverId.isNullOrBlank() &&
+            ride.serverState in setOf(
+                "ASSIGNED",
+                "DRIVER_EN_ROUTE",
+                "ARRIVED",
+                "PASSENGER_ONBOARD",
+                "IN_PROGRESS",
+            )
+        val acceptedOffer = remember(offers) {
+            offers.firstOrNull { it.status == "ACCEPTED" }
+        }
+        if (hasAuthoritativeAssignment) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -4025,7 +4054,6 @@ fun ActiveRidePanel(
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
-                        val acceptedOffer = remember(offers) { offers.firstOrNull { it.status == "ACCEPTED" } }
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -4033,13 +4061,17 @@ fun ActiveRidePanel(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = ride.assignedDriverName ?: "Chofer MEET",
+                                    text = ride.assignedDriverName
+                                        ?: acceptedOffer?.driverName?.takeUnless { it == "Conductor" }
+                                        ?: "Conductor verificado",
                                     color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
                                 Text(
-                                    text = ride.assignedDriverVehicle ?: "Vehículo: dato no capturado",
+                                    text = ride.assignedDriverVehicle
+                                        ?: acceptedOffer?.vehicleDescription
+                                        ?: "Vehículo: dato no capturado",
                                     color = MeetColors.textSecondary,
                                     fontSize = 12.sp
                                 )
@@ -4086,12 +4118,189 @@ fun ActiveRidePanel(
             }
         }
 
-        if (!isDriver && ride.status != "OPEN") {
+        if (!isDriver && hasAuthoritativeAssignment) {
             RidePassengerTrustCard(
-                vehicleDescription = ride.assignedDriverVehicle,
+                vehicleDescription = ride.assignedDriverVehicle
+                    ?: acceptedOffer?.vehicleDescription,
                 sharedCategories = sharingSelections[ride.requestId].orEmpty(),
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
+        }
+
+        // ═══ EXPIRED state feedback ═══
+        if (ride.status == "EXPIRED") {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                border = BorderStroke(1.dp, MeetColors.textMuted),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text("⏰", fontSize = 36.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Solicitud Expirada",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        "Tu solicitud no fue aceptada a tiempo. Puedes crear una nueva solicitud.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 13.sp,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = onCloseRide,
+                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan),
+                        shape = RoundedCornerShape(10.dp),
+                    ) {
+                        Text("CERRAR", color = MeetColors.backgroundDark, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // ═══ COMPLETED: Payment confirmation + Receipt + Support ═══
+        if (ride.status == "COMPLETED") {
+            val paymentConfirmed = ride.syncState == "PAYMENT_CONFIRMED" ||
+                ride.serverState == "PAYMENT_CONFIRMED"
+            if (isDriver && !paymentConfirmed) {
+                var sinpeRef by remember { mutableStateOf("") }
+                val isSinpe = ride.paymentMethod == "SINPE_MOVIL" || ride.paymentMethod == "SINPE"
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.warning.copy(alpha = 0.1f)),
+                    border = BorderStroke(1.dp, MeetColors.warning),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "CONFIRMAR PAGO",
+                            color = MeetColors.warning,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            when (ride.paymentMethod) {
+                                "CASH" -> "Confirmar que el pasajero pagó en efectivo"
+                                "SINPE_MOVIL", "SINPE" -> "Confirmar que recibiste el pago por SINPE Móvil"
+                                else -> "Confirmar que el pago fue procesado"
+                            },
+                            color = MeetColors.textSecondary,
+                            fontSize = 12.sp,
+                        )
+                        if (isSinpe) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = sinpeRef,
+                                onValueChange = { sinpeRef = it.filter { c -> c.isDigit() } },
+                                label = { Text("N.° de referencia SINPE (opcional)") },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MeetColors.warning,
+                                    unfocusedBorderColor = MeetColors.borderSubtle,
+                                ),
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = {
+                                coroutineScope.launch {
+                                    viewModel.confirmRidePayment(
+                                        ride.requestId,
+                                        sinpeRef.takeIf { it.isNotBlank() },
+                                    )
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.warning),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("PAGO RECIBIDO", color = Color.Black, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // Ride receipt / summary card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        "RESUMEN DEL VIAJE",
+                        color = MeetColors.cyberCyan,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                    )
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MeetColors.borderSubtle)
+                    ReceiptRow("Origen", ride.pickupAddress)
+                    ReceiptRow("Destino", ride.destAddress)
+                    if (orderedStops.isNotEmpty()) {
+                        ReceiptRow("Paradas", "${orderedStops.size} parada(s)")
+                    }
+                    ReceiptRow("Distancia", "${String.format(java.util.Locale.US, "%.1f", ride.estimatedDistanceKm)} km")
+                    ReceiptRow("Duración", "${ride.estimatedDurationMin} min")
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MeetColors.borderSubtle)
+                    ReceiptRow(
+                        "Pago",
+                        when (ride.paymentMethod) {
+                            "CASH" -> "Efectivo"
+                            "SINPE_MOVIL", "SINPE" -> "SINPE Móvil"
+                            else -> "No especificado"
+                        }
+                    )
+                    ReceiptRow(
+                        "Tarifa",
+                        if (ride.fareMode == RideFareMode.METERED_TIME_DISTANCE.name) "Tiempo + Distancia" else "Pon tu precio"
+                    )
+                    Text(
+                        "${ride.currency} ${ride.finalPrice ?: ride.priceOffer}",
+                        color = MeetColors.neonGreen,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 22.sp,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        textAlign = TextAlign.Center,
+                    )
+                    if (ride.tipAmountMinor != null && ride.tipAmountMinor > 0) {
+                        ReceiptRow("Propina", "+${ride.currency} ${ride.tipAmountMinor}")
+                    }
+                }
+            }
+        }
+
+        // ═══ Support case button (active rides) ═══
+        if (ride.status in listOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")) {
+            OutlinedButton(
+                onClick = { showCancellationDialog = true },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.5f)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.warning),
+            ) {
+                Icon(Icons.Default.HelpOutline, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("NECESITO AYUDA · SOPORTE", fontWeight = FontWeight.Black, fontSize = 11.sp)
+            }
         }
 
         // Bids / Negotiation Panel if status is OPEN
@@ -4934,7 +5143,7 @@ fun PassengerLiveOffersPanel(
                         text = if (ride.currency == "USD") {
                             "$${ride.priceOffer.toInt()}"
                         } else {
-                            "₡${String.format(currentLocale, "%,.0f", ride.priceOffer)} CRC"
+                            "${CoreMoney.ofCrc(ride.priceOffer.toLong()).formatted()} CRC"
                         },
                         color = MeetColors.neonGreen,
                         fontSize = 26.sp,
@@ -4970,7 +5179,7 @@ fun PassengerLiveOffersPanel(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     listOf(300.0, 900.0, 1500.0).forEach { amount ->
-                        val label = if (ride.currency == "USD") "+$${(amount / 500).toInt()}" else "+₡${amount.toInt()}"
+                        val label = if (ride.currency == "USD") "+$${(amount / 500).toInt()}" else "+${CoreMoney.ofCrc(amount.toLong()).formatted()}"
                         val valToAdd = if (ride.currency == "USD") amount / 500.0 else amount
                         Button(
                             onClick = { viewModel.updateRidePrice(ride.requestId, ride.priceOffer + valToAdd) },
@@ -5416,7 +5625,7 @@ fun DriverNegotiationPanel(
                 offsets.forEach { offset ->
                     val total = ride.priceOffer + offset
                     val label = if (offset == 0.0) "Aceptar" else {
-                        if (ride.currency == "USD") "+$${offset.toInt()}" else "+₡${offset.toInt()}"
+                        if (ride.currency == "USD") "+$${offset.toInt()}" else "+${CoreMoney.ofCrc(offset.toLong()).formatted()}"
                     }
                     Button(
                         onClick = { counterPrice = total },
@@ -5845,6 +6054,19 @@ private fun LiveRideMetrics(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ReceiptRow(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, color = MeetColors.textSecondary, fontSize = 12.sp)
+        Text(value, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

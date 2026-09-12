@@ -209,6 +209,22 @@ class RideCommandRepository @Inject constructor(
             payloadVersion == other.payloadVersion &&
             payloadJson == other.payloadJson
 
+    suspend fun forceRequeueStuckCancellation(rideId: String): Int {
+        val now = System.currentTimeMillis()
+        return outboxDao.forceRequeueCancelledCommand(
+            rideId = rideId,
+            now = now,
+            staleBefore = now - 2 * 60 * 1000L,
+        )
+    }
+
+    /** Called by worker on each run: deduplicate PENDING cancels + prune old completed. */
+    suspend fun deduplicateAndPrune() {
+        val now = System.currentTimeMillis()
+        outboxDao.supersedeDuplicatePendingCancels(now)
+        outboxDao.pruneCompletedCommands(now - 24 * 60 * 60 * 1000L)
+    }
+
     private companion object {
         const val CANCELLATION_LEASE_MS = 2 * 60 * 1000L
         val SUPPORTED_COMMANDS = setOf(

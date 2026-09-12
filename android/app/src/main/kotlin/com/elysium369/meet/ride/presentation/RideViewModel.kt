@@ -865,7 +865,11 @@ class RideViewModel @Inject constructor(
         rideId = RideId.of(requestId),
         expectedVersion = RideVersion.of(serverVersion),
         idempotencyKey = RideIdempotencyKey.of(
-            "${type.name.lowercase()}:$requestId:${UUID.randomUUID()}",
+            if (type == RideCommandType.CANCEL) {
+                "cancel:$requestId:$serverVersion"
+            } else {
+                "${type.name.lowercase()}:$requestId:${UUID.randomUUID()}"
+            },
         ),
         type = type,
         payloadVersion = RidePayloadVersion.of(1),
@@ -1425,6 +1429,14 @@ class RideViewModel @Inject constructor(
                 reasonCode = reason.name,
                 detail = detail?.trim()?.takeIf(String::isNotEmpty),
             )
+            val requeued = rideCommandRepository.forceRequeueStuckCancellation(
+                rideId = requestId,
+            )
+            if (requeued > 0) {
+                com.elysium369.meet.ride.work.RideCommandSyncWorker.enqueueNow(context)
+                _cancellationUiState.value = RideCancellationUiState.Confirmed(requestId, reason)
+                return@launch
+            }
             val success = reportRideCommandEnqueue(
                 result = enqueueAuthoritativeRideCommand(
                     request = request,

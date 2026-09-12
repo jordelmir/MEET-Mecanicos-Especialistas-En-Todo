@@ -527,7 +527,7 @@ private fun WalletTopupReviewCard(
         backgroundColor = MeetColors.cardBackground,
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
-            Text("RECARGA ₡${topup.amountMinor}", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
+            Text("RECARGA ${com.elysium369.meet.core.money.Money.ofCrc(topup.amountMinor).formatted()}", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
             Text("Chofer: ${topup.driverId.take(12)}… · ${topup.submittedAt}", color = Color.White, fontSize = 12.sp)
             Text("Comprobante privado: ${topup.proofStoragePath.substringAfterLast('/')}", color = MeetColors.textSecondary, fontSize = 11.sp)
             OutlinedButton(onClick = onOpenProof, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -560,7 +560,7 @@ private fun WalletProofDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Comprobante SINPE · ₡${topup.amountMinor}") },
+        title = { Text("Comprobante SINPE · ${com.elysium369.meet.core.money.Money.ofCrc(topup.amountMinor).formatted()}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Verifica el ingreso en la cuenta real antes de acreditar.", color = MeetColors.warning, fontSize = 12.sp)

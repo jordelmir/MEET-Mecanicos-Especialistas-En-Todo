@@ -1,5 +1,6 @@
 package com.elysium369.meet.core.insurance
 
+import com.elysium369.meet.core.money.Money
 import kotlinx.serialization.Serializable
 import java.security.MessageDigest
 
@@ -120,7 +121,7 @@ data class InsuranceReport(
             healthScoreAfter - healthScoreBefore else null
 
     val formattedDamage: String
-        get() = "₡${estimatedDamage.toString().replace(Regex("(\\d)(?=(\\d{3})+$)"), "$1,")}"
+        get() = Money.ofCrc(estimatedDamage).formatted()
 }
 
 // ─── Engine ───

@@ -58,6 +58,10 @@ class RideCommandSyncWorker @AssistedInject constructor(
             rideDao.clearActiveRideSelectionsForRide(rideId)
         }
 
+        // Deduplicate PENDING cancels and prune old completed commands
+        outboxDao.supersedeDuplicatePendingCancels(startedAt)
+        outboxDao.pruneCompletedCommands(startedAt - 24L * 60 * 60 * 1000)
+
         outboxDao.recoverStaleLeases(
             staleBefore = startedAt - STALE_LEASE_MS,
             now = startedAt,

@@ -48,6 +48,13 @@ class RideLifecyclePersistenceContractTest {
         assertTrue(viewModel.contains("expectedVersion: Long = request.serverVersion"))
         assertFalse(viewModel.contains("rideDao.cancelActiveRequest("))
         assertTrue(gateway.contains("\"ride_cancel_trip_v2\""))
+        assertTrue(
+            "Cancellation must always send p_detail so PostgREST resolves the required RPC signature",
+            gateway.contains("put(\"p_detail\", payload.detail?.trim().orEmpty())"),
+        )
+        assertTrue(viewModel.contains("\"SINPE\", \"SINPE_MOVIL\" -> \"SINPE\""))
+        assertTrue(viewModel.contains("Selecciona Efectivo o SINPE antes de solicitar el viaje."))
+        assertTrue(gateway.contains("put(\"p_eta_seconds\", payload.etaSeconds)"))
         assertFalse(gateway.contains("p_actor_id"))
         assertFalse(viewModel.contains("""?: "SYSTEM""""))
         assertFalse(viewModel.contains("""?: "Sistema""""))

@@ -128,6 +128,14 @@ private data class RemoteRideVehicleProjection(
     val displayName: String,
 )
 
+@Serializable
+private data class RemoteRideProfileProjection(
+    @SerialName("user_id")
+    val userId: String,
+    @SerialName("display_name")
+    val displayName: String,
+)
+
 @Singleton
 class RideRemoteProjectionRepository @Inject constructor(
     private val rideDao: RideDao,
@@ -167,6 +175,12 @@ class RideRemoteProjectionRepository @Inject constructor(
                 }
                 .decodeList<RemoteRideVehicleProjection>()
                 .associateBy(RemoteRideVehicleProjection::id)
+            val profiles = client.postgrest["ride_profiles"]
+                .select {
+                    limit(MAX_VISIBLE_PROFILES)
+                }
+                .decodeList<RemoteRideProfileProjection>()
+                .associateBy(RemoteRideProfileProjection::userId)
             val acceptedOfferByRequest = offers
                 .asSequence()
                 .filter { it.state == "ACCEPTED" }
@@ -187,13 +201,19 @@ class RideRemoteProjectionRepository @Inject constructor(
                         providerPlaceId = stop.providerPlaceId,
                     )
                 }
+                val acceptedOffer = acceptedOfferByRequest[remote.id]?.firstOrNull {
+                    it.driverId == remote.assignedDriverId &&
+                        it.vehicleId == remote.assignedVehicleId
+                }
                 rideDao.insertRemoteProjection(
                     remote.toLocal(
                         existing = existing,
                         stops = orderedStops,
-                        acceptedOfferId = acceptedOfferByRequest[remote.id]?.firstOrNull {
-                            it.driverId == remote.assignedDriverId && it.vehicleId == remote.assignedVehicleId
-                        }?.id,
+                        acceptedOfferId = acceptedOffer?.id,
+                        assignedDriverName = remote.assignedDriverId
+                            ?.let { profiles[it]?.displayName },
+                        assignedDriverVehicle = acceptedOffer
+                            ?.let { vehicles[it.vehicleId]?.displayName },
                     ),
                 )
             }
@@ -293,6 +313,7 @@ class RideRemoteProjectionRepository @Inject constructor(
         const val MAX_VISIBLE_STOPS = 512L
         const val MAX_VISIBLE_OFFERS = 300L
         const val MAX_VISIBLE_VEHICLES = 100L
+        const val MAX_VISIBLE_PROFILES = 100L
     }
 }
 
@@ -300,6 +321,8 @@ internal fun RemoteRideRequestProjection.toLocal(
         existing: RideRequestEntity?,
         stops: List<RideStopSnapshot>,
         acceptedOfferId: String?,
+        assignedDriverName: String? = null,
+        assignedDriverVehicle: String? = null,
     ): RideRequestEntity {
         val ownedExisting = existing?.takeIf { it.passengerId == passengerId }
         val ownerUnchanged = ownedExisting != null
@@ -343,9 +366,11 @@ internal fun RemoteRideRequestProjection.toLocal(
             acceptedOfferId = acceptedOfferId
                 ?: ownedExisting?.acceptedOfferId?.takeIf { assignmentUnchanged },
             assignedDriverId = assignedDriverId,
-            assignedDriverName = ownedExisting?.assignedDriverName?.takeIf { assignmentUnchanged },
+            assignedDriverName = assignedDriverName?.takeIf { it.isNotBlank() }
+                ?: ownedExisting?.assignedDriverName?.takeIf { assignmentUnchanged },
             assignedDriverPhone = ownedExisting?.assignedDriverPhone?.takeIf { assignmentUnchanged },
-            assignedDriverVehicle = ownedExisting?.assignedDriverVehicle?.takeIf { assignmentUnchanged },
+            assignedDriverVehicle = assignedDriverVehicle?.takeIf { it.isNotBlank() }
+                ?: ownedExisting?.assignedDriverVehicle?.takeIf { assignmentUnchanged },
             finalPrice = finalMajor,
             finalPriceMinor = finalFareMinor,
             serverState = state,
