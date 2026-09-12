@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.intl.Locale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -17,15 +19,20 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.elysium369.meet.education.domain.CertifiedCompetencyDiploma
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
 
 @Composable
 fun CertifiedDiplomaDialog(
     diploma: CertifiedCompetencyDiploma,
     onDismiss: () -> Unit
 ) {
-    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault())
-    val dateStr = dateFormat.format(Date(diploma.issuedAtEpochMs))
+    val languageTag = Locale.current.toLanguageTag()
+    val dateStr = remember(languageTag, diploma.issuedAtEpochMs) {
+        SimpleDateFormat(
+            "dd/MM/yyyy HH:mm:ss",
+            java.util.Locale.forLanguageTag(languageTag)
+        ).format(Date(diploma.issuedAtEpochMs))
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
