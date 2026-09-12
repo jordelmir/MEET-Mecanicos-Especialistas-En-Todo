@@ -116,6 +116,9 @@ fun PlatformTrustCenterScreen(
     var pendingDecisionAfterMfa by remember {
         mutableStateOf<Pair<TrustVerificationApplication, String>?>(null)
     }
+    var pendingWalletDecisionAfterMfa by remember {
+        mutableStateOf<Pair<RideWalletTopup, String>?>(null)
+    }
     var evidenceApplication by remember { mutableStateOf<TrustVerificationApplication?>(null) }
     var walletTopups by remember { mutableStateOf(emptyList<RideWalletTopup>()) }
     var walletProofTopup by remember { mutableStateOf<RideWalletTopup?>(null) }
@@ -151,6 +154,9 @@ fun PlatformTrustCenterScreen(
                 }
             runCatching { PlatformTrustCenterGateway.loadWalletTopupQueue("PENDING_REVIEW") }
                 .onSuccess { walletTopups = it.items }
+                .onFailure { error ->
+                    message = "No se pudo actualizar la cola de recargas; se conserva la última copia. Código: ${TrustCenterObservability.failureCode(error)}."
+                }
             loading = false
         }
     }
@@ -357,16 +363,25 @@ fun PlatformTrustCenterScreen(
                     items(walletTopups, key = { it.id }) { topup ->
                         WalletTopupReviewCard(
                             topup = topup,
-                            enabled = mfaState.isAal2 && !loading,
+                            enabled = !loading,
+                            requiresMfa = !mfaState.isAal2,
                             onOpenProof = { walletProofTopup = topup },
                             onDecision = { decision ->
                                 if (!mfaState.isAal2) {
-                                    message = "Valida MFA antes de acreditar saldo."
+                                    pendingWalletDecisionAfterMfa = topup to decision
+                                    message = "Valida MFA para continuar con esta recarga; la decisión se conservará."
+                                    prepareMfa()
                                 } else {
                                     scope.launch {
                                         loading = true
                                         runCatching { PlatformTrustCenterGateway.decideWalletTopup(topup.id, decision, if (decision == "APPROVED") "Ingreso SINPE verificado por el propietario" else "Comprobante no verificado") }
-                                            .onSuccess { message = "Recarga ${if (decision == "APPROVED") "aprobada" else "rechazada"}; el saldo se actualizó de forma idempotente." }
+                                            .onSuccess { receipt ->
+                                                message = if (receipt.status == "APPROVED") {
+                                                    "Recarga acreditada: ${com.elysium369.meet.core.money.Money.ofCrc(receipt.creditedMinor).formatted()}. Saldo disponible del chofer: ${receipt.availableMinor?.let { com.elysium369.meet.core.money.Money.ofCrc(it).formatted() } ?: "confirmado por servidor"}."
+                                                } else {
+                                                    "Recarga rechazada y retirada de la cola pendiente."
+                                                }
+                                            }
                                             .onFailure { message = "No se pudo decidir la recarga: ${it.message?.take(120)}" }
                                         reloadNow()
                                     }
@@ -503,6 +518,28 @@ fun PlatformTrustCenterScreen(
                             pendingDecisionAfterMfa = null
                             pendingDecision = app to decision
                         }
+                        pendingWalletDecisionAfterMfa?.let { (topup, decision) ->
+                            pendingWalletDecisionAfterMfa = null
+                            scope.launch {
+                                loading = true
+                                runCatching {
+                                    PlatformTrustCenterGateway.decideWalletTopup(
+                                        topup.id,
+                                        decision,
+                                        if (decision == "APPROVED") "Ingreso SINPE verificado por el propietario" else "Comprobante no verificado",
+                                    )
+                                }.onSuccess { receipt ->
+                                    message = if (receipt.status == "APPROVED") {
+                                        "Recarga acreditada: ${com.elysium369.meet.core.money.Money.ofCrc(receipt.creditedMinor).formatted()}."
+                                    } else {
+                                        "Recarga rechazada."
+                                    }
+                                }.onFailure { error ->
+                                    message = "No se pudo decidir la recarga: ${error.message?.take(120)}"
+                                }
+                                reloadNow()
+                            }
+                        }
                     }.onFailure { error ->
                             message = "El código MFA no se validó. Intenta con el código vigente. Código: ${TrustCenterObservability.failureCode(error)}."
                         }
@@ -518,6 +555,7 @@ fun PlatformTrustCenterScreen(
 private fun WalletTopupReviewCard(
     topup: RideWalletTopup,
     enabled: Boolean,
+    requiresMfa: Boolean,
     onOpenProof: () -> Unit,
     onDecision: (String) -> Unit,
 ) {
@@ -530,6 +568,9 @@ private fun WalletTopupReviewCard(
             Text("RECARGA ${com.elysium369.meet.core.money.Money.ofCrc(topup.amountMinor).formatted()}", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
             Text("Chofer: ${topup.driverId.take(12)}… · ${topup.submittedAt}", color = Color.White, fontSize = 12.sp)
             Text("Comprobante privado: ${topup.proofStoragePath.substringAfterLast('/')}", color = MeetColors.textSecondary, fontSize = 11.sp)
+            if (requiresMfa) {
+                Text("Al elegir una decisión se solicitará tu código MFA y continuará automáticamente.", color = MeetColors.warning, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+            }
             OutlinedButton(onClick = onOpenProof, modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
                 Text("VER COMPROBANTE")
             }

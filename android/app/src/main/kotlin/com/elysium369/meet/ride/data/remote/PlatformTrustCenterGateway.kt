@@ -4,6 +4,7 @@ import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.observability.TrustCenterObservability
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.postgrest.rpc
 import io.github.jan.supabase.realtime.PostgresAction
 import io.github.jan.supabase.realtime.channel
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
@@ -88,6 +90,18 @@ data class RideWalletTopup(
 
 @Serializable
 data class RideWalletTopupQueue(val items: List<RideWalletTopup> = emptyList())
+
+@Serializable
+data class RideWalletTopupDecisionReceipt(
+    val id: String,
+    val status: String,
+    @SerialName("amount_minor") val amountMinor: Long,
+    val currency: String = "CRC",
+    @SerialName("ledger_entry_id") val ledgerEntryId: String? = null,
+    @SerialName("credited_minor") val creditedMinor: Long = 0,
+    @SerialName("available_minor") val availableMinor: Long? = null,
+    val idempotent: Boolean = false,
+)
 
 @Serializable
 data class TrustQueueCounts(
@@ -197,14 +211,23 @@ object PlatformTrustCenterGateway {
             buildJsonObject { put("p_status", status); put("p_limit", 100) },
         ).decodeAs()
 
-    suspend fun decideWalletTopup(id: String, decision: String, reason: String) {
+    suspend fun loadOwnWalletTopups(): List<RideWalletTopup> {
+        if (SupabaseModule.client.auth.currentUserOrNull() == null) return emptyList()
+        return SupabaseModule.client.postgrest["ride_wallet_topups"]
+            .select {
+                order("submitted_at", Order.DESCENDING)
+                limit(10)
+            }
+            .decodeList()
+    }
+
+    suspend fun decideWalletTopup(id: String, decision: String, reason: String): RideWalletTopupDecisionReceipt =
         SupabaseModule.client.postgrest.rpc(
             "ride_owner_decide_wallet_topup_v1",
             buildJsonObject {
                 put("p_topup_id", id); put("p_decision", decision); put("p_reason", reason)
             },
-        )
-    }
+        ).decodeAs()
 
     suspend fun downloadWalletProof(path: String): ByteArray {
         check(hasOwnerAccess()) { "Platform owner required" }
@@ -447,11 +470,16 @@ object PlatformTrustCenterGateway {
                 table = "service_verification_applications"
             }
             .map { TrustRealtimeSignal.CHANGE }
+        val walletChanges = channel
+            .postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = "ride_wallet_topups"
+            }
+            .map { TrustRealtimeSignal.CHANGE }
         try {
             channel.subscribe()
             TrustCenterObservability.realtime("SUBSCRIBED")
             emit(TrustRealtimeSignal.SUBSCRIBED)
-            emitAll(changes)
+            emitAll(merge(changes, walletChanges))
         } catch (error: CancellationException) {
             throw error
         } catch (error: Exception) {
@@ -490,6 +518,26 @@ object PlatformTrustCenterGateway {
         } finally {
             channel.unsubscribe()
             TrustCenterObservability.realtime("OWN_VERIFICATION_DISCONNECTED")
+        }
+    }
+
+    fun ownWalletTopupChanges(): Flow<TrustRealtimeSignal> = flow {
+        val userId = SupabaseModule.client.auth.currentUserOrNull()?.id ?: return@flow
+        val channel = SupabaseModule.client.channel("elysium-own-wallet-topups-$userId")
+        val changes = channel
+            .postgresChangeFlow<PostgresAction>(schema = "public") {
+                table = "ride_wallet_topups"
+                filter = "driver_id=eq.$userId"
+            }
+            .map { TrustRealtimeSignal.CHANGE }
+        try {
+            channel.subscribe()
+            emit(TrustRealtimeSignal.SUBSCRIBED)
+            emitAll(changes)
+        } catch (error: CancellationException) {
+            throw error
+        } finally {
+            channel.unsubscribe()
         }
     }
 }

@@ -313,6 +313,7 @@ class RideViewModel @Inject constructor(
     private var jobChatCollection: Job? = null
     private var jobChatRemoteSync: Job? = null
     private var rideProjectionJob: Job? = null
+    private var rideProjectionOwnerId: String? = null
     private var seenCountPollingJob: Job? = null
 
     private val _rideProjectionConnectionState =
@@ -402,13 +403,20 @@ class RideViewModel @Inject constructor(
         SupabaseManager.client.auth.currentUserOrNull()?.id
 
     fun startRideProjectionSync() {
-        if (rideProjectionJob?.isActive == true) return
-        if (currentCloudUserId() == null) {
+        val ownerId = currentCloudUserId()
+        if (rideProjectionJob?.isActive == true && rideProjectionOwnerId == ownerId) return
+        if (rideProjectionJob?.isActive == true) {
+            rideProjectionJob?.cancel()
+            rideProjectionJob = null
+        }
+        if (ownerId == null) {
+            rideProjectionOwnerId = null
             _rideProjectionConnectionState.value =
                 RideProjectionConnectionState.AUTHENTICATION_REQUIRED
             Log.d("MeetRides", "Ride projection deferred until authentication")
             return
         }
+        rideProjectionOwnerId = ownerId
         rideProjectionJob = viewModelScope.launch(Dispatchers.IO) {
             _rideProjectionConnectionState.value =
                 RideProjectionConnectionState.CONNECTING
@@ -452,6 +460,7 @@ class RideViewModel @Inject constructor(
     fun stopRideProjectionSync() {
         rideProjectionJob?.cancel()
         rideProjectionJob = null
+        rideProjectionOwnerId = null
         _rideProjectionConnectionState.value = RideProjectionConnectionState.IDLE
     }
 

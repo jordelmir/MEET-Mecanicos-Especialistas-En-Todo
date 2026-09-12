@@ -89,6 +89,7 @@ import com.elysium369.meet.ride.data.remote.RideWalletPolicy
 import com.elysium369.meet.ride.data.remote.RideWalletBalance
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.retryWhen
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -168,6 +169,14 @@ fun RideServiceScreen(
     }
     val presencePrincipal by viewModel.activePrincipal.collectAsState()
     val presenceOwnerId = presencePrincipal.takeIf { it.isAuthenticated }?.id
+    LaunchedEffect(presenceOwnerId) {
+        if (presenceOwnerId != null) {
+            // Authentication can change while this screen stays composed.
+            // Restart the owner-scoped realtime channel and force an RLS catch-up.
+            viewModel.startRideProjectionSync()
+            viewModel.refreshRideProjectionNow()
+        }
+    }
     val presenceKey = RideDriverPresencePolicy.storageKey(presenceOwnerId)
     var showLiveness by rememberSaveable(presenceOwnerId) { mutableStateOf(false) }
 
@@ -463,6 +472,7 @@ fun RideServiceScreen(
 private fun DriverWalletCard(
     policy: RideWalletPolicy?,
     balance: RideWalletBalance?,
+    topups: List<com.elysium369.meet.ride.data.remote.RideWalletTopup>,
     message: String?,
     onRecharge: () -> Unit,
 ) {
@@ -484,6 +494,24 @@ private fun DriverWalletCard(
             Text("${policy?.sinpePhone ?: "63194029"} · ${policy?.sinpeRecipientName ?: "Jorge David Del Valle Miranda"}", color = Color.White, fontWeight = FontWeight.Bold)
             Text("El propietario valida el ingreso real en su cuenta antes de liberar el saldo.", color = MeetColors.warning, fontSize = 11.sp)
             Button(onClick = onRecharge, modifier = Modifier.fillMaxWidth()) { Text("ENVIAR COMPROBANTE DE RECARGA") }
+            topups.take(3).forEach { topup ->
+                val status = when (topup.status) {
+                    "PENDING_REVIEW" -> "PENDIENTE DE REVISIÓN"
+                    "APPROVED" -> "ACREDITADA"
+                    "REJECTED" -> "RECHAZADA"
+                    else -> topup.status
+                }
+                Text(
+                    "${CoreMoney.ofCrc(topup.amountMinor).formatted()} · $status",
+                    color = when (topup.status) {
+                        "APPROVED" -> MeetColors.neonGreen
+                        "REJECTED" -> MeetColors.error
+                        else -> MeetColors.warning
+                    },
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
             message?.let { Text(it, color = MeetColors.neonGreen, fontSize = 11.sp) }
         }
     }
@@ -2169,6 +2197,7 @@ fun DriverDashboard(
     var walletPolicy by remember(driverHomeOwner) { mutableStateOf<RideWalletPolicy?>(null) }
     var walletBalance by remember(driverHomeOwner) { mutableStateOf<RideWalletBalance?>(null) }
     var walletMessage by remember { mutableStateOf<String?>(null) }
+    var walletTopups by remember(driverHomeOwner) { mutableStateOf(emptyList<com.elysium369.meet.ride.data.remote.RideWalletTopup>()) }
     var showTopupDialog by remember { mutableStateOf(false) }
     var topupAmount by rememberSaveable { mutableStateOf(15000) }
     var pendingTopupAmount by remember { mutableStateOf<Long?>(null) }
@@ -2201,7 +2230,10 @@ fun DriverDashboard(
                 val file = File(context.cacheDir, "ride-topup-${System.currentTimeMillis()}.$extension")
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { file.writeBytes(bytes) }
                 PlatformTrustCenterGateway.submitWalletTopup(file.absolutePath, amount, null, null)
-            }.onSuccess { walletMessage = "Comprobante enviado. El saldo se acredita sólo después de verificar el SINPE." }
+            }.onSuccess {
+                walletMessage = "Comprobante enviado. Estado: pendiente de revisión en Trust Center."
+                walletTopups = runCatching { PlatformTrustCenterGateway.loadOwnWalletTopups() }.getOrDefault(walletTopups)
+            }
                 .onFailure { walletMessage = "No se pudo enviar el comprobante: ${it.message?.take(120)}" }
         }
     }
@@ -2215,6 +2247,21 @@ fun DriverDashboard(
         runCatching { PlatformTrustCenterGateway.walletBalance() }
             .onSuccess { walletBalance = it }
             .onFailure { walletMessage = "No se pudo consultar el saldo persistente: ${it.message?.take(100)}" }
+        runCatching { PlatformTrustCenterGateway.loadOwnWalletTopups() }
+            .onSuccess { walletTopups = it }
+    }
+    LaunchedEffect(driverHomeOwner, driverVer?.status) {
+        if (driverHomeOwner == null || !RideVerificationPolicy.grantsAccess(driverVer?.status)) {
+            return@LaunchedEffect
+        }
+        PlatformTrustCenterGateway.ownWalletTopupChanges()
+            .retryWhen { _, _ -> delay(5_000L); true }
+            .collect {
+                walletTopups = runCatching { PlatformTrustCenterGateway.loadOwnWalletTopups() }
+                    .getOrDefault(walletTopups)
+                walletBalance = runCatching { PlatformTrustCenterGateway.walletBalance() }
+                    .getOrDefault(walletBalance)
+            }
     }
 
     LaunchedEffect(viewModel) {
@@ -2279,6 +2326,7 @@ fun DriverDashboard(
             DriverWalletCard(
                 policy = walletPolicy,
                 balance = walletBalance,
+                topups = walletTopups,
                 message = walletMessage,
                 onRecharge = { showTopupDialog = true },
             )
