@@ -117,6 +117,7 @@ fun RideServiceScreen(
     onOpenDriverRegistration: () -> Unit = {},
     onOpenMessages: (String?) -> Unit = {},
     onNavigateToSchedule: () -> Unit = {},
+    onNavigateToRideCenter: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -443,6 +444,7 @@ fun RideServiceScreen(
                     DriverDashboard(
                         viewModel = viewModel,
                         onRegisterDriver = onOpenDriverRegistration,
+                        onOpenRideCenter = onNavigateToRideCenter,
                     )
                 } else {
                     PassengerDashboard(
@@ -2121,6 +2123,7 @@ private fun RideStopField(
 fun DriverDashboard(
     viewModel: ObdViewModel,
     onRegisterDriver: () -> Unit = {},
+    onOpenRideCenter: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val openRides by viewModel.openRideRequests.collectAsState()
@@ -2266,6 +2269,53 @@ fun DriverDashboard(
                 message = walletMessage,
                 onRecharge = { showTopupDialog = true },
             )
+        }
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenRideCenter() },
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
+                border = BorderStroke(1.5.dp, Color(0xFFFF8C00).copy(alpha = 0.7f)),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        color = Color(0xFFFF8C00).copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text("🚗", fontSize = 24.sp)
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "CENTRO DE VIAJES",
+                            color = Color(0xFFFF8C00),
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 15.sp,
+                        )
+                        Text(
+                            "${rankedOpenRides.size} solicitud(es) disponible(s)",
+                            color = MeetColors.textSecondary,
+                            fontSize = 12.sp,
+                        )
+                    }
+                    Icon(
+                        Icons.Default.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = Color(0xFFFF8C00),
+                        modifier = Modifier.size(28.dp),
+                    )
+                }
+            }
         }
         if (!RideVerificationPolicy.grantsAccess(driverVer?.status)) {
             item {
@@ -3708,14 +3758,14 @@ fun ActiveRidePanel(
                             }
                         }
                     } else {
-                        // Pasajero
-                        if (ride.status == "OPEN") {
+                        // Pasajero — SIEMPRE pasa por el backend (Supabase RPC)
+                        if (ride.status in listOf("PENDING_PUBLICATION", "OPEN")) {
                             Button(
                                 onClick = { showCancellationDialog = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
-                                modifier = Modifier.weight(1.2f),
+                                modifier = Modifier.fillMaxWidth(),
                             ) {
-                                Text("Cancelar solicitud", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                Text("Cancelar Viaje", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                         if (ride.status == "ARRIVED" && ride.boardingPin == null) {
@@ -4512,7 +4562,7 @@ private fun RideRoadReportDialog(
 }
 
 // Haversine formula to compute distance in km between two GPS coordinates
-private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+internal fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
     val r = 6371.0 // Earth radius in km
     val dLat = Math.toRadians(lat2 - lat1)
     val dLon = Math.toRadians(lon2 - lon1)

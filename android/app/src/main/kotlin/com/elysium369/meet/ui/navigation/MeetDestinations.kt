@@ -42,6 +42,7 @@ object MeetDestinations {
     const val RIDE_DRIVER_REGISTRATION = "ride_driver_registration"
     const val RIDE_ACTIVE_TRACKING = "ride_active_tracking"
     const val RIDE_SCHEDULE = "ride_schedule"
+    const val RIDE_CENTER = "ride_center"
 
     /** Unwired prototypes retained for strangler migration, never as Home entry points. */
     const val RIDE_PASSENGER_EXPERIMENT = "ride_passenger_request"

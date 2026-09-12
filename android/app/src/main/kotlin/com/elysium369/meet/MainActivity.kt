@@ -1132,6 +1132,19 @@ fun MeetApp(
                     onNavigateToSchedule = {
                         navController.navigate(MeetDestinations.RIDE_SCHEDULE)
                     },
+                    onNavigateToRideCenter = {
+                        navController.navigate(MeetDestinations.RIDE_CENTER)
+                    },
+                )
+            }
+            composable(MeetDestinations.RIDE_CENTER) {
+                com.elysium369.meet.ui.screens.ride.RideCenterScreen(
+                    viewModel = obdViewModel,
+                    onBack = { navController.popBackStack() },
+                    onSelectRide = { ride ->
+                        obdViewModel.selectActiveRide(ride)
+                        navController.popBackStack()
+                    },
                 )
             }
             composable("ai") {
