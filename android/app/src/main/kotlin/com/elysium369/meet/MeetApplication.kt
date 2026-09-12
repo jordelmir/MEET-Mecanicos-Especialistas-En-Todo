@@ -135,9 +135,11 @@ class MeetApplication : Application(), Configuration.Provider {
             ExistingPeriodicWorkPolicy.KEEP,
             request,
         )
+        // Also run immediately on cold start to clean stale PENDING_PUBLICATION rides
+        RideCommandSyncWorker.enqueueNow(this)
         android.util.Log.i(
             "ElysiumApplication",
-            "Ride command outbox sync scheduled (network-gated)",
+            "Ride command outbox sync scheduled (network-gated) + immediate run",
         )
     }
 

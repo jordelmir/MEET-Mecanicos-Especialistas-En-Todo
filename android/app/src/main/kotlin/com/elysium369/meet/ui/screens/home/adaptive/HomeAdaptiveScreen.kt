@@ -280,7 +280,17 @@ fun HomeAdaptiveScreen(
             if (activityStrip.hasActiveOperations) {
                 HomeActivityStripWidget(
                     strip = activityStrip,
-                    onDismissRide = { viewModel.selectActiveRide(null) },
+                    onDismissRide = {
+                        val stuckRide = activeRide
+                        if (stuckRide != null &&
+                            stuckRide.status == "PENDING_PUBLICATION" &&
+                            stuckRide.serverVersion <= 0L
+                        ) {
+                            viewModel.localCancelStuckRide(stuckRide.requestId)
+                        } else {
+                            viewModel.selectActiveRide(null)
+                        }
+                    },
                     onItemClick = { item ->
                         item.actionRoute?.let { navController.safeNavigate(it) }
                     }
