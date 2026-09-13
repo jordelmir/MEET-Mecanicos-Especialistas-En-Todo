@@ -13,10 +13,10 @@ COMMENT ON COLUMN public.ride_wallet_topups.amount_minor IS
 COMMENT ON COLUMN public.ride_commission_reservations.amount_minor IS
     'WHOLE CRC units (colones enteros). NOT minor currency units. 15000 = ₡15,000.';
 
-COMMENT ON COLUMN public.trips.estimated_fare_minor IS
+COMMENT ON COLUMN public.ride_requests.estimated_fare_minor IS
     'WHOLE CRC units (colones enteros). NOT minor currency units. 15000 = ₡15,000.';
 
-COMMENT ON COLUMN public.trips.final_price_minor IS
+COMMENT ON COLUMN public.ride_requests.final_fare_minor IS
     'WHOLE CRC units (colones enteros). NOT minor currency units. 15000 = ₡15,000.';
 
 COMMENT ON COLUMN public.ride_offers.fare_minor IS
