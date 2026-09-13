@@ -222,8 +222,18 @@ class RideRemoteProjectionRepository @Inject constructor(
                 if (client.auth.currentUserOrNull()?.id != ownerAtStart) {
                     return RideProjectionRefreshResult.AuthenticationRequired
                 }
+                val existingOffer = rideDao.getOfferById(offer.id)
+                val existingRequest = rideDao.getRequestById(offer.requestId)
+                val isLocallyAccepted = existingOffer?.status == "ACCEPTED" || existingRequest?.acceptedOfferId == offer.id
+                val isLocallyRejected = existingOffer?.status == "REJECTED" || (existingRequest?.acceptedOfferId != null && existingRequest.acceptedOfferId != offer.id)
+                val resolvedState = when {
+                    offer.state in setOf("ACCEPTED", "REJECTED", "EXPIRED", "CANCELLED") -> offer.state
+                    isLocallyAccepted -> "ACCEPTED"
+                    isLocallyRejected -> "REJECTED"
+                    else -> offer.state
+                }
                 rideDao.insertOffer(
-                    offer.toLocal(vehicles[offer.vehicleId]?.displayName),
+                    offer.toLocal(vehicles[offer.vehicleId]?.displayName, overrideState = resolvedState),
                 )
             }
             RideProjectionRefreshResult.Refreshed(remoteRides.size + offers.size)
@@ -275,6 +285,7 @@ class RideRemoteProjectionRepository @Inject constructor(
 
     private fun RemoteRideOfferProjection.toLocal(
         vehicleDisplayName: String?,
+        overrideState: String? = null,
     ): RideOfferEntity = RideOfferEntity(
         offerId = id,
         requestId = requestId,
@@ -292,7 +303,7 @@ class RideRemoteProjectionRepository @Inject constructor(
         driverLatitude = 0.0,
         driverLongitude = 0.0,
         message = null,
-        status = state,
+        status = overrideState ?: state,
         createdAt = createdAt.toEpochMillisOr(0L),
     )
 
@@ -324,13 +335,17 @@ internal fun RemoteRideRequestProjection.toLocal(
         assignedDriverName: String? = null,
         assignedDriverVehicle: String? = null,
     ): RideRequestEntity {
+        val activeStatuses = setOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")
+        val terminalStatuses = setOf("COMPLETED", "CANCELLED")
+
         val ownedExisting = existing?.takeIf { it.passengerId == passengerId }
         val ownerUnchanged = ownedExisting != null
         val driverUnchanged = ownerUnchanged && assignedDriverId != null && ownedExisting?.assignedDriverId == assignedDriverId
-        val assignmentUnchanged = driverUnchanged && ownedExisting?.assignedDriverId == assignedDriverId && ownedExisting?.serverAssignedVehicleId == assignedVehicleId
+        val assignmentUnchanged = driverUnchanged && ownedExisting?.serverAssignedVehicleId == assignedVehicleId
         val keepPin = assignmentUnchanged && state in setOf("ASSIGNED", "DRIVER_EN_ROUTE", "ARRIVED")
         val offeredMajor = offeredFareMinor.toLegacyMajor(currency)
         val finalMajor = finalFareMinor?.toLegacyMajor(currency)
+
         return RideRequestEntity(
             requestId = id,
             passengerId = passengerId,

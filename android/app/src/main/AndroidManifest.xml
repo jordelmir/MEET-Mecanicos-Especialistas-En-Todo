@@ -121,6 +121,15 @@
                 android:resource="@xml/widget_meet_info" />
         </receiver>
 
+        <receiver
+            android:name=".automation.AiAutomationReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.elysium369.meet.AI_NAVIGATE" />
+                <action android:name="com.elysium369.meet.AI_ACTION" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

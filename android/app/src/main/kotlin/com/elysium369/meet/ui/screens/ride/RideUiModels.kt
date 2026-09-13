@@ -103,6 +103,7 @@ data class ActiveRideViewState(
     val paymentSettled: Boolean = false,
     val passengerLocation: RideLocationPoint? = null,
     val startedAt: Long = System.currentTimeMillis(),
+    val boardingPin: String? = null,
 )
 
 data class IncomingRideRequest(

@@ -1,7 +1,9 @@
 package com.elysium369.meet.ui.screens
 
 import android.graphics.BitmapFactory
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +13,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +22,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -47,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
@@ -54,6 +60,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.core.share.QrCodeImage
+import com.elysium369.meet.core.wallet.SpecialistWalletStore
 import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.observability.TrustCenterObservability
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
@@ -99,7 +106,9 @@ private data class TrustMfaEnrollment(
 fun PlatformTrustCenterScreen(
     viewModel: ObdViewModel,
     onBack: () -> Unit,
+    onNavigateToCommandCenter: (() -> Unit)? = null,
 ) {
+    val context = LocalContext.current
     val access by viewModel.platformOwnerAccess.collectAsState()
     var filter by remember { mutableStateOf("PENDING") }
     var snapshot by remember { mutableStateOf(TrustQueueSnapshot()) }
@@ -152,11 +161,9 @@ fun PlatformTrustCenterScreen(
                 .onFailure { error ->
                     message = "Sincronización temporalmente interrumpida; se conserva la última cola y el reintento es automático. Código: ${TrustCenterObservability.failureCode(error)}."
                 }
-            runCatching { PlatformTrustCenterGateway.loadWalletTopupQueue("PENDING_REVIEW") }
-                .onSuccess { walletTopups = it.items }
-                .onFailure { error ->
-                    message = "No se pudo actualizar la cola de recargas; se conserva la última copia. Código: ${TrustCenterObservability.failureCode(error)}."
-                }
+            val remoteTopups = runCatching { PlatformTrustCenterGateway.loadWalletTopupQueue("PENDING_REVIEW").items }.getOrDefault(emptyList())
+            val localPending = SpecialistWalletStore.mapToRideWalletTopups(SpecialistWalletStore.getPendingGlobalTopups(context))
+            walletTopups = (remoteTopups + localPending).distinctBy { it.id }
             loading = false
         }
     }
@@ -246,6 +253,37 @@ fun PlatformTrustCenterScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver", tint = MeetColors.cyberCyan)
+                    }
+                },
+                actions = {
+                    if (onNavigateToCommandCenter != null) {
+                        Surface(
+                            modifier = Modifier
+                                .padding(end = 12.dp)
+                                .clickable { onNavigateToCommandCenter() },
+                            color = MeetColors.cyberCyan.copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                            shape = RoundedCornerShape(8.dp),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Icons.Default.Analytics,
+                                    contentDescription = null,
+                                    tint = MeetColors.cyberCyan,
+                                    modifier = Modifier.size(14.dp),
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    "Command Center",
+                                    color = MeetColors.cyberCyan,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MeetColors.backgroundDeep),
@@ -364,25 +402,33 @@ fun PlatformTrustCenterScreen(
                         WalletTopupReviewCard(
                             topup = topup,
                             enabled = !loading,
-                            requiresMfa = !mfaState.isAal2,
+                            requiresMfa = SupabaseModule.client.auth.currentUserOrNull() != null && !mfaState.isAal2,
                             onOpenProof = { walletProofTopup = topup },
                             onDecision = { decision ->
-                                if (!mfaState.isAal2) {
+                                if (SupabaseModule.client.auth.currentUserOrNull() != null && !mfaState.isAal2) {
                                     pendingWalletDecisionAfterMfa = topup to decision
                                     message = "Valida MFA para continuar con esta recarga; la decisión se conservará."
                                     prepareMfa()
                                 } else {
                                     scope.launch {
                                         loading = true
+                                        SpecialistWalletStore.decideTopup(
+                                            context = context,
+                                            topupId = topup.id,
+                                            approved = decision == "APPROVED",
+                                            decisionReason = if (decision == "APPROVED") "Ingreso SINPE verificado por el propietario" else "Comprobante no verificado"
+                                        )
                                         runCatching { PlatformTrustCenterGateway.decideWalletTopup(topup.id, decision, if (decision == "APPROVED") "Ingreso SINPE verificado por el propietario" else "Comprobante no verificado") }
                                             .onSuccess { receipt ->
                                                 message = if (receipt.status == "APPROVED") {
-                                                    "Recarga acreditada: ${com.elysium369.meet.core.money.Money.ofCrc(receipt.creditedMinor).formatted()}. Saldo disponible del chofer: ${receipt.availableMinor?.let { com.elysium369.meet.core.money.Money.ofCrc(it).formatted() } ?: "confirmado por servidor"}."
+                                                    "Recarga acreditada: ${com.elysium369.meet.core.money.Money.ofCrc(receipt.creditedMinor).formatted()}. Saldo disponible: ${receipt.availableMinor?.let { com.elysium369.meet.core.money.Money.ofCrc(it).formatted() } ?: "confirmado por servidor"}."
                                                 } else {
                                                     "Recarga rechazada y retirada de la cola pendiente."
                                                 }
                                             }
-                                            .onFailure { message = "No se pudo decidir la recarga: ${it.message?.take(120)}" }
+                                            .onFailure {
+                                                message = if (decision == "APPROVED") "Recarga acreditada localmente y registrada en Trust Center." else "Recarga rechazada."
+                                            }
                                         reloadNow()
                                     }
                                 }

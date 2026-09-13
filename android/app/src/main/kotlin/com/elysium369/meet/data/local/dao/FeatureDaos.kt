@@ -941,9 +941,7 @@ interface RideDao {
             assignedDriverVehicle = :vehicle,
             finalPrice = :price
         WHERE requestId = :requestId
-          AND status = 'OPEN'
-          AND assignedDriverId IS NULL
-          AND acceptedOfferId IS NULL
+          AND (status = 'OPEN' OR status = 'ACCEPTED' OR assignedDriverId = :driverId OR assignedDriverId IS NULL)
         """
     )
     suspend fun claimOpenRequestWithOffer(
@@ -966,8 +964,7 @@ interface RideDao {
             assignedDriverVehicle = :vehicle,
             finalPrice = priceOffer
         WHERE requestId = :requestId
-          AND status = 'OPEN'
-          AND assignedDriverId IS NULL
+          AND (status = 'OPEN' OR status = 'ACCEPTED' OR assignedDriverId = :driverId OR assignedDriverId IS NULL)
         """
     )
     suspend fun claimOpenRequest(
@@ -984,12 +981,21 @@ interface RideDao {
     @Query("UPDATE ride_requests SET driverRating = :rating WHERE requestId = :requestId")
     suspend fun updateDriverRating(requestId: String, rating: Double)
 
+    @Query("UPDATE ride_requests SET status = :status, serverState = :status WHERE requestId = :requestId")
+    suspend fun updateRideStatus(requestId: String, status: String)
+
+    @Query("UPDATE ride_requests SET status = 'COMPLETED', serverState = 'COMPLETED', completedAt = :completedAt WHERE requestId = :requestId")
+    suspend fun markRideCompleted(requestId: String, completedAt: Long)
+
     @Query("DELETE FROM ride_requests WHERE requestId = :requestId")
     suspend fun deleteRequest(requestId: String)
 
     // Offers
     @Query("SELECT * FROM ride_offers WHERE requestId = :requestId ORDER BY counterPrice ASC, createdAt DESC")
     fun getOffersForRequest(requestId: String): Flow<List<RideOfferEntity>>
+
+    @Query("SELECT * FROM ride_offers WHERE requestId = :requestId ORDER BY counterPrice ASC, createdAt DESC")
+    suspend fun getOffersForRequestSync(requestId: String): List<RideOfferEntity>
 
     @Query("SELECT * FROM ride_offers WHERE offerId = :offerId LIMIT 1")
     suspend fun getOfferById(offerId: String): RideOfferEntity?

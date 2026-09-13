@@ -530,6 +530,7 @@ fun HomeClassicScreen(
                 add(Triple("🏠", "Properties", MeetColors.neonGreen) to "elysium_properties")
                 add(Triple("⛽", "Fuel Rewards", MeetColors.cyberCyan) to "fuel_rewards")
                 add(Triple("🚕", "MEET Rides", MeetColors.neonGreen) to MeetDestinations.RIDE_HOME)
+                add(Triple("🛠️", "Servicios & Oficios", Color(0xFFC85CFF)) to "universal_services")
                 add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
                 add(Triple("⚠️", "DTCs", MeetColors.hotMagenta) to "dtc")
                 add(Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito")
@@ -556,7 +557,14 @@ fun HomeClassicScreen(
                 if (com.elysium369.meet.ride.domain.PlatformOwnerAccessPolicy
                         .canExposeTrustCenter(platformOwnerAccess)) {
                     add(Triple("🛡️", "Centro de Confianza", MeetColors.neonGreen) to "platform_trust_center")
+                    add(Triple("⚡", "Command Center", MeetColors.cyberCyan) to "meet_command_center")
                 }
+                add(Triple("🌱", "Mi Actividad", MeetColors.neonGreen) to "passenger_activity")
+                add(Triple("📊", "Driver Center", MeetColors.neonGreen) to "driver_command_center")
+                add(Triple("🔧", "Técnico BI", Color(0xFF00E5FF)) to "mechanic_business")
+                add(Triple("🏭", "Taller B2B", Color(0xFFFFB300)) to "workshop_command_center")
+                add(Triple("🏗️", "Grúas BI", Color(0xFFFF5252)) to "tow_command_center")
+                add(Triple("🏢", "Flota B2B", MeetColors.cyberCyan) to "fleet_command_center")
                 add(Triple("🔬", "Pro Hub", MeetColors.hotMagenta) to "pro_hub")
             }
 

@@ -21,7 +21,8 @@ class RideNotificationCoordinator(private val context: Context, private val owne
     )
 
     init {
-        context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        notificationManager?.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
                 "Elysium Viajes",
@@ -30,6 +31,53 @@ class RideNotificationCoordinator(private val context: Context, private val owne
                 description = "Asignaciones y avisos operativos de viajes"
                 enableVibration(true)
             },
+        )
+        notificationManager?.createNotificationChannel(
+            NotificationChannel(
+                DISPATCH_CHANNEL_ID,
+                "MEET Despacho y Alertas Prioritarias",
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply {
+                description = "Notificaciones urgentes de solicitudes, ofertas y viajes en curso"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 400, 200, 400, 200, 600)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+            },
+        )
+    }
+
+    fun notifyIncomingRideDispatch(tripId: String, pickupAddress: String, destAddress: String, priceCrc: Double) {
+        val title = "🚨 NUEVO VIAJE: ₡${priceCrc.toInt()} CRC"
+        val body = "Recogida: $pickupAddress\nDestino: $destAddress"
+        notify(
+            id = 7_200 + (tripId.hashCode() and 0x3FFF_FFFF),
+            title = title,
+            body = body,
+            channelId = DISPATCH_CHANNEL_ID,
+            category = NotificationCompat.CATEGORY_CALL,
+        )
+    }
+
+    fun notifyOfferAccepted(tripId: String, passengerName: String, priceCrc: Double) {
+        val title = "🎉 ¡OFERTA ACEPTADA! 🚕"
+        val body = "$passengerName aceptó tu tarifa de ₡${priceCrc.toInt()} CRC. Abre MEET para iniciar la ruta."
+        notify(
+            id = 7_300 + (tripId.hashCode() and 0x3FFF_FFFF),
+            title = title,
+            body = body,
+            channelId = DISPATCH_CHANNEL_ID,
+            category = NotificationCompat.CATEGORY_EVENT,
+        )
+    }
+
+    fun notifyNewChatMessage(tripId: String, senderName: String, messageText: String) {
+        val title = "💬 Mensaje de $senderName"
+        notify(
+            id = 7_400 + (tripId.hashCode() and 0x3FFF_FFFF),
+            title = title,
+            body = messageText,
+            channelId = DISPATCH_CHANNEL_ID,
+            category = NotificationCompat.CATEGORY_MESSAGE,
         )
     }
 
@@ -64,7 +112,13 @@ class RideNotificationCoordinator(private val context: Context, private val owne
         }
     }
 
-    private fun notify(id: Int, title: String, body: String): Boolean {
+    private fun notify(
+        id: Int,
+        title: String,
+        body: String,
+        channelId: String = CHANNEL_ID,
+        category: String? = null,
+    ): Boolean {
         if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -80,21 +134,27 @@ class RideNotificationCoordinator(private val context: Context, private val owne
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_map)
             .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
-            .build()
-        NotificationManagerCompat.from(context).notify(id, notification)
+
+        if (category != null) {
+            builder.setCategory(category)
+        }
+
+        NotificationManagerCompat.from(context).notify(id, builder.build())
         return true
     }
 
     private companion object {
         const val CHANNEL_ID = "elysium_rides_operations"
+        const val DISPATCH_CHANNEL_ID = "elysium_rides_dispatch_high_priority"
         const val KEY_IDLE_LAST = "idle_driver_last"
         const val IDLE_COOLDOWN_MS = 30 * 60 * 1000L
     }

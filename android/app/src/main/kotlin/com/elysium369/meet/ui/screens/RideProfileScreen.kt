@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocationOn
@@ -21,6 +22,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import com.elysium369.meet.ui.screens.ride.RideHistoryDetailDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -169,7 +171,7 @@ fun RideProfileScreen(
                     onAddVehicle = { showAddVehicle = true },
                     onActivateVehicle = viewModel::activateRideDriverVehicle,
                 )
-                1 -> RideHistoryPanel(roleRides)
+                1 -> RideHistoryPanel(roleRides, onOpenSupport = { supportRide = it })
                 2 -> RideSupportPanel(
                     summary = summary,
                     rides = roleRides,
@@ -637,11 +639,24 @@ private fun RatingDistribution(data: RideProfileSummary) {
 }
 
 @Composable
-private fun RideHistoryPanel(rides: List<RideRequestEntity>) {
+private fun RideHistoryPanel(
+    rides: List<RideRequestEntity>,
+    onOpenSupport: ((RideRequestEntity) -> Unit)? = null,
+) {
     val currentLocale = rememberRideJavaLocale()
     val dateTimeFormat = remember(currentLocale) {
         DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, currentLocale)
     }
+    var selectedRideDetail by remember { mutableStateOf<RideRequestEntity?>(null) }
+
+    selectedRideDetail?.let { ride ->
+        RideHistoryDetailDialog(
+            ride = ride,
+            onDismiss = { selectedRideDetail = null },
+            onOpenSupport = onOpenSupport,
+        )
+    }
+
     LazyColumn(
         contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 80.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -651,21 +666,46 @@ private fun RideHistoryPanel(rides: List<RideRequestEntity>) {
         }
         items(rides.sortedByDescending { it.createdAt }) { ride ->
             Card(
+                onClick = { selectedRideDetail = ride },
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF08141F)),
-                border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(14.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         Text(ride.status, color = statusColor(ride.status), fontWeight = FontWeight.Black, fontSize = 11.sp)
                         Text(dateTimeFormat.format(Date(ride.createdAt)), color = MeetColors.textMuted, fontSize = 10.sp)
                     }
+                    Spacer(Modifier.height(4.dp))
                     Text(ride.pickupAddress, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
                     Text("→ ${ride.destAddress}", color = MeetColors.cyberCyan, maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp)
-                    Text(
-                        "${ride.finalPrice ?: ride.priceOffer} ${ride.currency} · ${String.format(currentLocale, "%.1f km", ride.estimatedDistanceKm)}",
-                        color = MeetColors.textSecondary,
-                        fontSize = 10.sp,
-                    )
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "${ride.finalPrice ?: ride.priceOffer} ${ride.currency} · ${String.format(currentLocale, "%.1f km", ride.estimatedDistanceKm)}",
+                            color = MeetColors.textSecondary,
+                            fontSize = 10.sp,
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Ver detalles y ruta", color = MeetColors.neonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.width(4.dp))
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = null,
+                                tint = MeetColors.neonGreen,
+                                modifier = Modifier.size(12.dp),
+                            )
+                        }
+                    }
                 }
             }
         }

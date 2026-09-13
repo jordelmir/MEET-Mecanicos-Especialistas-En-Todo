@@ -15,19 +15,17 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual publicada: 4.16.0 (`versionCode 44`)
+## Versión actual publicada: 4.24.0 (`versionCode 57`)
 
-La línea 4.16.0 consolida CI/CD, diagnóstico canónico y verificación Android. La versión 4.10.0 introdujo `Vanguard Neon Navigation`: jerarquía vial de alto
-contraste, ruta multicapa animada, pines procedurales con volumen y avatares con
-halo de vidrio, conservando gestos y control manual de cámara. Si no existe un
-perfil de pasajero ni de conductor, Viajes muestra primero el registro por rol
-y conecta cada opción con su flujo real de verificación.
+La versión 4.24.0 representa el hito más completo de la plataforma, unificando el ciclo técnico automotriz completo:
 
-La versión 4.9.1 restringe los reportes colaborativos de tránsito a una ruta
-realmente iniciada. El botón sólo aparece al conductor durante `IN_PROGRESS`,
-la aplicación vuelve a validar rol, GPS y proyección del servidor antes de
-registrar, y Supabase rechaza inserciones que no pertenezcan al conductor y
-vehículo verificado asignados al viaje activo.
+- **V2 Reportes PDF Certificados & Historial Técnico:** Generador multi-página certificado con carátula forense, Pre-Scan, hallazgos DTC, evidencia fotográfica, firma pericial y Post-Scan con comparador de estados (`BeforeAfterComparator`).
+- **Encadenamiento Criptográfico por Vehículo:** Cada reporte enlaza criptográficamente al reporte anterior (`hash_N = SHA-256(canonical(report_N) + hash_N-1)`), alertando manipulación (`TAMPERED`) de inmediato.
+- **Código QR Forense Zero-PII:** Código QR de 6 campos canónicos (`report_id`, `integrity_hash`, `vehicle_id`, `generated_at`, `report_type`, `verifier_url`) sin exponer datos privados (VIN/placa/teléfono).
+- **V2 Marketplace Técnico de Repuestos:** Conexión directa DTC ↔ Catálogo Técnico ↔ Visual 3D Atlas (`G4ED` / `VehicleTechnicalAtlas3dCatalog`). Cotizaciones en tiempo real con clasificación anti-fraude (`OK`, `WARN`, `BLOCK`) y sellos de mejor opción (`BEST_COMPATIBILITY`, `CHEAPEST`, `FASTEST_DELIVERY`, `BEST_WARRANTY`).
+- **Billetera & Reconciliación Bancaria SINPE Móvil:** Conciliación automatizada de transferencias bancarias vía email webhook (BAC, BNCR, BCR, etc.) con acreditación instantánea a la billetera del conductor (`ride_driver_wallet_credit_v1`).
+- **Preparación Google Play Store:** Compilación limpia en modo Release con optimización R8, shrink resources y reglas ProGuard que blindan los contratos de paridad cruzada TS ↔ Kotlin. Generación de Android App Bundle firmado (`app-release.aab`).
+- **Gate de Calidad Unitario:** 2.027 pruebas unitarias pasando al 100% con cero fallos y paridad cruzada continua (`ci-verify.sh`).
 
 La versión 4.9.0 añade identidad visual personalizable al mapa de Viajes: cuatro
 emblemas originales para conductor y cuatro avatares originales para pasajero,

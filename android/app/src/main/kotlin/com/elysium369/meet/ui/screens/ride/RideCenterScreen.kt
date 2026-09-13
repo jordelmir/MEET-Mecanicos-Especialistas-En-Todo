@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.edit
+import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.data.local.entities.RideRequestEntity
 import com.elysium369.meet.ride.data.remote.RideDispatchGateway
 import com.elysium369.meet.ride.domain.RideDispatchExpiryPolicy
@@ -148,7 +149,9 @@ fun RideCenterScreen(
 
     val eligibleRides = remember(openRides, myDriverId, hiddenRideIds, clockMillis) {
         openRides.filter {
-            it.passengerId != myDriverId &&
+            it.status == "OPEN" &&
+                it.assignedDriverId == null &&
+                (it.passengerId != myDriverId || BuildConfig.DEBUG) &&
                 it.requestId !in hiddenRideIds &&
                 RideDispatchExpiryPolicy.remainsVisible(it.createdAt, clockMillis)
         }
@@ -346,6 +349,7 @@ fun RideCenterScreen(
                         RideCenterCard(
                             ride = ride,
                             currentGps = currentGps,
+                            isOwnRequest = ride.passengerId == myDriverId,
                             onSelect = { onSelectRide(ride) },
                             onDismiss = { queueDriverDecisions(listOf(ride), "DISMISS") },
                             onReject = { queueDriverDecisions(listOf(ride), "REJECT") },
@@ -361,6 +365,7 @@ fun RideCenterScreen(
 private fun RideCenterCard(
     ride: RideRequestEntity,
     currentGps: ObdViewModel.GpsLocationInfo?,
+    isOwnRequest: Boolean = false,
     onSelect: () -> Unit,
     onDismiss: () -> Unit,
     onReject: () -> Unit,
@@ -413,17 +418,35 @@ private fun RideCenterCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Fare mode badge
-                Surface(
-                    color = fareModeBadgeColor.copy(alpha = 0.15f),
-                    shape = RoundedCornerShape(6.dp),
-                ) {
-                    Text(
-                        text = fareModeLabel,
-                        color = fareModeBadgeColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isOwnRequest) {
+                        Surface(
+                            color = MeetColors.neonGreen.copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, MeetColors.neonGreen),
+                            shape = RoundedCornerShape(6.dp),
+                        ) {
+                            Text(
+                                text = "🧪 TU SOLICITUD (MODO PRUEBA)",
+                                color = MeetColors.neonGreen,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            )
+                        }
+                        Spacer(Modifier.width(6.dp))
+                    }
+                    Surface(
+                        color = fareModeBadgeColor.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(6.dp),
+                    ) {
+                        Text(
+                            text = fareModeLabel,
+                            color = fareModeBadgeColor,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {

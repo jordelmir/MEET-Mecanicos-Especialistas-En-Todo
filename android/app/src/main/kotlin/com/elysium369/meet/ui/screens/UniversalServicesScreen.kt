@@ -2,6 +2,7 @@ package com.elysium369.meet.ui.screens
 
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -9,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -17,8 +19,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -30,11 +34,14 @@ import com.elysium369.meet.core.services.UniversalServiceDefinition
 import com.elysium369.meet.core.services.UniversalServiceModality
 import com.elysium369.meet.data.local.entities.ServiceRequestEntity
 import com.elysium369.meet.ride.map.RideGeoPoint
+import com.elysium369.meet.ride.map.RideMapMarker
 import com.elysium369.meet.ride.map.RideMapStateFactory
+import com.elysium369.meet.ride.map.RideMarkerRole
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.components.AccessLevel
 import com.elysium369.meet.ui.components.AccessStatusCard
 import com.elysium369.meet.ui.components.AccessStep
+import com.elysium369.meet.ui.screens.RideMapPanel
 import com.elysium369.meet.ui.theme.MeetColors
 import java.util.UUID
 
@@ -81,6 +88,17 @@ fun UniversalServicesScreen(
 
     var selectedDomain by rememberSaveable { mutableStateOf("TODOS") }
     val domains = remember { listOf("TODOS", "Ferretería & Materiales", "Hogar", "Movilidad", "Automotriz", "Profesional", "Digital", "Logística") }
+
+    val activeSelection = selected
+    if (activeSelection != null) {
+        com.elysium369.meet.ui.screens.universal.UniversalActivityWorkflowScreen(
+            service = activeSelection,
+            viewModel = viewModel,
+            onNavigateBack = { selected = null },
+            onOpenMessages = onOpenMessages,
+        )
+        return
+    }
 
     Scaffold(
         containerColor = MeetColors.backgroundDark,
@@ -162,13 +180,27 @@ fun UniversalServicesScreen(
                         }
                     }
                 }
-            } else {
+                val infiniteTransition = rememberInfiniteTransition(label = "universal-radar-loop")
+                val universalRadarPulse by infiniteTransition.animateFloat(
+                    initialValue = 0.88f,
+                    targetValue = 1.15f,
+                    animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                    label = "univ-pulse",
+                )
+                val universalRadarGlowAlpha by infiniteTransition.animateFloat(
+                    initialValue = 0.35f,
+                    targetValue = 1.0f,
+                    animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Reverse),
+                    label = "univ-glow",
+                )
+
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
                     placeholder = { Text("¿Qué necesitas? Tubos PVC, plomero, cerradura, cables…") },
-                    leadingIcon = { Icon(Icons.Default.Search, null) },
+                    leadingIcon = { Icon(Icons.Default.Search, null, tint = MeetColors.cyberCyan) },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
@@ -177,7 +209,7 @@ fun UniversalServicesScreen(
                     ),
                 )
 
-                // Category Filter Chips
+                // Category Filter Chips with 3D styling
                 androidx.compose.foundation.lazy.LazyRow(
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -186,7 +218,7 @@ fun UniversalServicesScreen(
                         FilterChip(
                             selected = selectedDomain == domain,
                             onClick = { selectedDomain = domain },
-                            label = { Text(domain, fontSize = 11.sp, fontWeight = if (selectedDomain == domain) FontWeight.Bold else FontWeight.Normal) },
+                            label = { Text(domain, fontSize = 11.sp, fontWeight = if (selectedDomain == domain) FontWeight.Black else FontWeight.Normal) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MeetColors.cyberCyan.copy(alpha = 0.25f),
                                 selectedLabelColor = MeetColors.cyberCyan,
@@ -197,8 +229,96 @@ fun UniversalServicesScreen(
 
                 LazyColumn(
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
+                    // Live 3D Satellite Map (Visible immediately, matching MEET Rides standard)
+                    item {
+                        val previewState = remember(gps) {
+                            val pickup = gps?.let { RideGeoPoint(it.latitude, it.longitude, it.accuracy, it.timestamp) }
+                                ?: RideGeoPoint(9.9281, -84.0907, 10f, System.currentTimeMillis())
+                            val lat = pickup.latitude
+                            val lng = pickup.longitude
+                            val dest = RideGeoPoint(lat + 0.007, lng + 0.005, 10f, System.currentTimeMillis())
+                            RideMapStateFactory.create(
+                                pickup = pickup,
+                                destination = dest,
+                            )
+                        }
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(210.dp)
+                                .graphicsLayer {
+                                    shadowElevation = 16.dp.toPx()
+                                    cameraDistance = 16f * density
+                                },
+                            colors = CardDefaults.cardColors(containerColor = Color(0xCC06121F)),
+                            border = BorderStroke(
+                                1.5.dp,
+                                Brush.horizontalGradient(
+                                    listOf(MeetColors.cyberCyan, Color(0xFFC85CFF))
+                                )
+                            ),
+                            shape = RoundedCornerShape(20.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 14.dp),
+                        ) {
+                            Box(Modifier.fillMaxSize()) {
+                                RideMapPanel(
+                                    state = previewState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    userLocation = gps?.let { RideGeoPoint(it.latitude, it.longitude, it.accuracy, it.timestamp) },
+                                    onRecenterRequested = { viewModel.detectCurrentLocation(context) },
+                                )
+                                Row(
+                                    modifier = Modifier
+                                        .padding(10.dp)
+                                        .align(Alignment.TopStart)
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(Color(0xF0081326))
+                                        .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
+                                        .padding(horizontal = 10.dp, vertical = 5.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .graphicsLayer {
+                                                scaleX = universalRadarPulse
+                                                scaleY = universalRadarPulse
+                                                alpha = universalRadarGlowAlpha
+                                            }
+                                            .clip(CircleShape)
+                                            .background(MeetColors.neonGreen),
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = "RADAR ELYSIUM · SERVICIOS Y FERRETERÍAS EN VIVO",
+                                        color = Color.White,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Black,
+                                    )
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .padding(10.dp)
+                                        .align(Alignment.BottomStart)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color(0xF006121F))
+                                        .border(1.dp, Color(0xFFC85CFF).copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                ) {
+                                    Text(
+                                        text = "📍 COBERTURA: ${gps?.addressName?.take(22) ?: "Gran Área Metropolitana"}",
+                                        color = MeetColors.cyberCyan,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     item {
                         Text(
                             "SUBASTA DUAL: FERRETERÍAS VENDEN MATERIALES + PLOMEROS/ELECTRICISTAS OFRECEN COLOCARLOS",
@@ -228,48 +348,6 @@ fun UniversalServicesScreen(
         }
     }
 
-    selected?.let { service ->
-        CreateUniversalRequestDialog(
-            service = service,
-            initialPoint = gps?.let {
-                RideGeoPoint(
-                    latitude = it.latitude,
-                    longitude = it.longitude,
-                    accuracyMeters = it.accuracy,
-                    capturedAtEpochMs = it.timestamp,
-                )
-            },
-            onDismiss = { selected = null },
-            onCreate = { title, detail, location, latitude, longitude, price, modality ->
-                val metadata = buildString {
-                    appendLine("[ELYSIUM_UNIVERSAL_SERVICE]")
-                    appendLine("definition_id=${service.id}")
-                    appendLine("domain=${service.domain}")
-                    appendLine("modality=${modality.name}")
-                    appendLine("risk_tier=${service.riskTier}")
-                    appendLine("currency=CRC")
-                    appendLine("price_minor=${(price * 100).toLong()}")
-                    append("[/ELYSIUM_UNIVERSAL_SERVICE]")
-                }
-                viewModel.createServiceRequest(
-                    vehicleId = "$UNIVERSAL_PREFIX$clientId",
-                    problem = title,
-                    description = detail,
-                    location = location,
-                    priority = "MEDIUM",
-                    latitude = latitude,
-                    longitude = longitude,
-                    priceOffer = price,
-                    serviceCategory = service.domain,
-                    serviceMetadata = metadata,
-                    dtcCodes = emptyList(),
-                )
-                viewModel.voiceFeedbackManager.guideHardwareAndTradesStatus("REQUEST_PUBLISHED", materialName = title)
-                Toast.makeText(context, "Solicitud de subasta publicada. Ferreterías y profesionales han sido notificados.", Toast.LENGTH_LONG).show()
-                selected = null
-            },
-        )
-    }
 
     if (showProviderRegistration) {
         ProviderQuickRegistrationDialog(
@@ -295,21 +373,42 @@ fun UniversalServicesScreen(
 @Composable
 private fun UniversalServiceCard(service: UniversalServiceDefinition, onClick: () -> Unit) {
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = Color(0xCC0A1726)),
-        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = .45f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .graphicsLayer {
+                shadowElevation = 8.dp.toPx()
+            }
+            .clickable(onClick = onClick),
+        colors = CardDefaults.cardColors(containerColor = Color(0xEE0B1728)),
+        border = BorderStroke(
+            1.2.dp,
+            Brush.horizontalGradient(listOf(MeetColors.cyberCyan.copy(alpha = 0.6f), Color(0xFFC85CFF).copy(alpha = 0.5f)))
+        ),
         shape = RoundedCornerShape(18.dp),
     ) {
-        Row(Modifier.padding(14.dp)) {
-            Text(service.icon, fontSize = 28.sp)
+        Row(
+            Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF132238))
+                    .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(service.icon, fontSize = 24.sp)
+            }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(service.name, color = Color.White, fontWeight = FontWeight.Black)
+                Text(service.name, color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                Spacer(Modifier.height(2.dp))
                 Text(
                     "${service.domain} · ${service.modalities.joinToString { it.label }}",
                     color = MeetColors.cyberCyan,
-                    fontSize = 10.sp,
-                    maxLines = 2,
+                    fontSize = 11.sp,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
@@ -497,87 +596,7 @@ private fun ProviderServiceBoard(
     }
 }
 
-@Composable
-private fun CreateUniversalRequestDialog(
-    service: UniversalServiceDefinition,
-    initialPoint: RideGeoPoint?,
-    onDismiss: () -> Unit,
-    onCreate: (String, String, String, Double, Double, Double, UniversalServiceModality) -> Unit,
-) {
-    var title by remember(service.id) { mutableStateOf(service.name) }
-    var detail by remember(service.id) { mutableStateOf("") }
-    var selectedPoint by remember(service.id) { mutableStateOf(initialPoint) }
-    var location by remember(service.id) {
-        mutableStateOf(initialPoint?.let { "${it.latitude},${it.longitude}" }.orEmpty())
-    }
-    var price by remember(service.id) { mutableStateOf("") }
-    var modality by remember(service.id) { mutableStateOf(service.modalities.first()) }
-    var showPinPicker by remember(service.id) { mutableStateOf(false) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = Color(0xFF07131E),
-        title = { Text("${service.icon} ${service.name}", color = MeetColors.cyberCyan) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(title, { title = it }, label = { Text("Servicio") })
-                OutlinedTextField(detail, { detail = it }, label = { Text("Necesidad, alcance y entregables") }, minLines = 3)
-                if (modality != UniversalServiceModality.DIGITAL) {
-                    OutlinedTextField(location, { location = it }, label = { Text("Ubicación / referencia") })
-                    OutlinedButton(
-                        onClick = { showPinPicker = true },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Icon(Icons.Default.PinDrop, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(if (selectedPoint == null) "MARCAR EN EL MAPA" else "AJUSTAR PIN EN EL MAPA")
-                    }
-                }
-                OutlinedTextField(price, { price = it.filter(Char::isDigit) }, label = { Text("Oferta inicial CRC") })
-                service.modalities.forEach { option ->
-                    FilterChip(
-                        selected = modality == option,
-                        onClick = { modality = option },
-                        label = { Text(option.label) },
-                    )
-                }
-                if (service.riskTier != "STANDARD") {
-                    Text("Validación reforzada requerida: ${service.riskTier}", color = MeetColors.warning, fontSize = 10.sp)
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = title.isNotBlank() && detail.isNotBlank() && (price.toDoubleOrNull() ?: 0.0) > 0,
-                onClick = {
-                    onCreate(
-                        title,
-                        detail,
-                        location,
-                        selectedPoint?.latitude ?: 0.0,
-                        selectedPoint?.longitude ?: 0.0,
-                        price.toDouble(),
-                        modality,
-                    )
-                },
-            ) { Text("PUBLICAR") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-    )
-    if (showPinPicker) {
-        RidePinPickerDialog(
-            targetLabel = "Ubicación del servicio",
-            state = RideMapStateFactory.create(pickup = selectedPoint),
-            initialPoint = selectedPoint,
-            onPinChanged = { selectedPoint = it },
-            onDismiss = { showPinPicker = false },
-            onConfirm = {
-                selectedPoint = it
-                location = "${it.latitude},${it.longitude}"
-                showPinPicker = false
-            },
-        )
-    }
-}
+
 
 @Composable
 private fun ProviderQuickRegistrationDialog(

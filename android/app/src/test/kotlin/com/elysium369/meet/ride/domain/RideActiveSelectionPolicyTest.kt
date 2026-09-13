@@ -55,4 +55,14 @@ class RideActiveSelectionPolicyTest {
             ),
         )
     }
+
+    @Test
+    fun driverCanInspectOwnPassengerRequestWhenSelfRideAllowed() {
+        assertTrue(
+            RideActiveSelectionPolicy.canSelect(
+                "same-account", true, "same-account", null, "SEARCHING", 1,
+                allowSelfRide = true,
+            ),
+        )
+    }
 }

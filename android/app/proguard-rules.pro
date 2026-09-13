@@ -86,3 +86,21 @@
 
 # ── Play Billing Catalog product IDs ─────────────────────────────────────────
 -keep class com.elysium369.meet.core.billing.** { *; }
+
+# ── SLF4J ────────────────────────────────────────────────────────────────────
+-dontwarn org.slf4j.**
+-dontwarn org.slf4j.impl.**
+-dontwarn org.slf4j.impl.StaticLoggerBinder
+
+# ── Cross-Runtime Parity & TypeScript Shared Contracts ───────────────────────
+# Preserves canonical hashing, SHA-256 evidence structures, and wire models
+-keep class com.elysium369.meet.core.reports.** { *; }
+-keepclassmembers class com.elysium369.meet.core.reports.** { *; }
+-keep class com.elysium369.meet.core.parts.** { *; }
+-keepclassmembers class com.elysium369.meet.core.parts.** { *; }
+-keep class com.elysium369.meet.diagnostic.** { *; }
+-keepclassmembers class com.elysium369.meet.diagnostic.** { *; }
+-keep class com.elysium369.meet.data.supabase.** { *; }
+-keepclassmembers class com.elysium369.meet.data.supabase.** { *; }
+
+

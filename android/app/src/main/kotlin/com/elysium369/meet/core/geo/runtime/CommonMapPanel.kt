@@ -9,10 +9,17 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.Icon as ComposeIcon
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -25,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -34,6 +42,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.core.geo.CommonMapState
+import com.elysium369.meet.core.geo.GeoPoint
 import com.elysium369.meet.core.geo.GeoMarkerRole
 import com.elysium369.meet.core.geo.MapCameraIntent
 import org.maplibre.android.MapLibre
@@ -57,7 +66,11 @@ fun CommonMapPanel(
     state: CommonMapState,
     modifier: Modifier = Modifier,
     styleUrl: String = BuildConfig.RIDE_MAP_STYLE_URL,
+    recenterAlignment: Alignment = Alignment.CenterEnd,
+    recenterPadding: PaddingValues = PaddingValues(end = 12.dp),
+    userLocation: GeoPoint? = null,
     onMapReady: ((MapLibreMap) -> Unit)? = null,
+    onRecenterRequested: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -108,24 +121,85 @@ fun CommonMapPanel(
             }
         )
 
-        if (state.showRecenterButton && state.markers.isNotEmpty()) {
+        if (state.showRecenterButton) {
             FloatingActionButton(
                 onClick = {
+                    onRecenterRequested?.invoke()
                     mapInstance?.let { map ->
-                        fitCameraToBounds(map, state)
+                        val target = resolveCommonUserCoordinates(context, userLocation, state)
+                        map.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(target, 16.8),
+                            300,
+                        )
                     }
                 },
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp),
+                    .align(recenterAlignment)
+                    .padding(recenterPadding)
+                    .size(48.dp)
+                    .zIndex(20f)
+                    .border(
+                        BorderStroke(1.5.dp, ComposeColor(0xFF00E5FF)),
+                        CircleShape,
+                    ),
                 shape = CircleShape,
-                containerColor = ComposeColor(0xFF00E5FF),
-                contentColor = ComposeColor.Black
+                containerColor = ComposeColor(0xFF07131E).copy(alpha = 0.94f),
+                contentColor = ComposeColor(0xFF00E5FF)
             ) {
-                Text("🎯", style = MaterialTheme.typography.titleMedium)
+                ComposeIcon(
+                    imageVector = Icons.Default.MyLocation,
+                    contentDescription = "Centrar en mi ubicación GPS",
+                    tint = ComposeColor(0xFF00E5FF),
+                    modifier = Modifier.size(26.dp)
+                )
             }
         }
     }
+}
+
+private fun resolveCommonUserCoordinates(
+    context: Context,
+    explicitUserLocation: GeoPoint?,
+    state: CommonMapState,
+): LatLng {
+    if (explicitUserLocation != null && (kotlin.math.abs(explicitUserLocation.latitude) > 0.01 || kotlin.math.abs(explicitUserLocation.longitude) > 0.01)) {
+        return LatLng(explicitUserLocation.latitude, explicitUserLocation.longitude)
+    }
+
+    val userMarker = state.marker(GeoMarkerRole.USER_LOCATION)
+        ?: state.marker(GeoMarkerRole.PROVIDER_LIVE)
+        ?: state.marker(GeoMarkerRole.VEHICLE_ORIGIN)
+    if (userMarker != null && (kotlin.math.abs(userMarker.point.latitude) > 0.01 || kotlin.math.abs(userMarker.point.longitude) > 0.01)) {
+        return LatLng(userMarker.point.latitude, userMarker.point.longitude)
+    }
+
+    try {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            val lastGps = locationManager?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+            val lastNetwork = locationManager?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+            val bestLoc = listOfNotNull(lastGps, lastNetwork)
+                .filter { kotlin.math.abs(it.latitude) > 0.01 || kotlin.math.abs(it.longitude) > 0.01 }
+                .maxByOrNull { it.time }
+            if (bestLoc != null) {
+                return LatLng(bestLoc.latitude, bestLoc.longitude)
+            }
+        }
+    } catch (_: Exception) {
+    }
+
+    val fallbackPt = state.markers.firstOrNull()?.point
+        ?: state.routes.firstOrNull()?.points?.firstOrNull()
+        ?: GeoPoint(9.9281, -84.0907)
+    return LatLng(fallbackPt.latitude, fallbackPt.longitude)
 }
 
 private fun renderCommonMap(

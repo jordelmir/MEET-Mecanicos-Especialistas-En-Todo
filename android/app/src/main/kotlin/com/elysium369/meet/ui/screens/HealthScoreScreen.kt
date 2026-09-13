@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.core.health.*
+import com.elysium369.meet.core.maintenance.displayLabel
 import com.elysium369.meet.data.local.entities.HealthSnapshotEntity
 import com.elysium369.meet.data.local.entities.PredictionEventEntity
 import com.elysium369.meet.ui.ObdViewModel
@@ -68,16 +69,24 @@ fun HealthScoreScreen(
     val healthHistory by viewModel.healthHistory.collectAsState()
     val predictionEvents by viewModel.predictionEvents.collectAsState()
 
-    var selectedTab by remember { mutableStateOf(0) } // 0: Análisis, 1: Timeline, 2: Eléctrico
+    val civilizationalScore by viewModel.civilizationalHealthScore.collectAsState()
+    val civilizationalTimeline by viewModel.civilizationalTimeline.collectAsState()
+    val maintenancePlan = remember(viewModel.selectedVehicle.collectAsState().value) {
+        viewModel.getMaintenancePlan()
+    }
+
+    var selectedTab by remember { mutableStateOf(0) } // 0: Análisis, 1: Timeline, 2: Eléctrico, 3: Ahorro & Plan
     
     // Comparación state
     var selectedSnapshotToCompare1 by remember { mutableStateOf<HealthSnapshotEntity?>(null) }
     var selectedSnapshotToCompare2 by remember { mutableStateOf<HealthSnapshotEntity?>(null) }
     var showComparisonDialog by remember { mutableStateOf(false) }
 
+    val currentScore = civilizationalScore?.score ?: (healthReport?.overallScore ?: 85)
+
     // Animated score
     val animatedScore by animateIntAsState(
-        targetValue = healthReport?.overallScore ?: 0,
+        targetValue = currentScore,
         animationSpec = tween(1500, easing = FastOutSlowInEasing), label = "score"
     )
 
@@ -93,7 +102,8 @@ fun HealthScoreScreen(
     )
 
     LaunchedEffect(Unit) { 
-        viewModel.runPredictiveAnalysis() 
+        viewModel.runPredictiveAnalysis()
+        viewModel.computeCivilizationalScore()
     }
 
     Scaffold(
@@ -127,17 +137,22 @@ fun HealthScoreScreen(
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text("ANÁLISIS", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                    text = { Text("ANÁLISIS", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text("TIMELINE", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                    text = { Text("TIMELINE", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
                 )
                 Tab(
                     selected = selectedTab == 2,
                     onClick = { selectedTab = 2 },
-                    text = { Text("SISTEMA ELÉCTRICO", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+                    text = { Text("ELÉCTRICO", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
+                )
+                Tab(
+                    selected = selectedTab == 3,
+                    onClick = { selectedTab = 3 },
+                    text = { Text("AHORRO & PLAN", fontWeight = FontWeight.Bold, fontSize = 11.sp) }
                 )
             }
 
@@ -185,6 +200,13 @@ fun HealthScoreScreen(
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
                             }
+                        }
+                    }
+
+                    // Civilizational 0-1000 Factors Breakdown
+                    item {
+                        civilizationalScore?.let { scoreEntry ->
+                            CivilizationalFactorsCard(scoreEntry)
                         }
                     }
 
@@ -380,6 +402,80 @@ fun HealthScoreScreen(
                         }
                     }
 
+                    // Cryptographic Blockchain History
+                    if (civilizationalTimeline.isNotEmpty()) {
+                        item {
+                            PhantomSectionHeader(
+                                label = "Línea de Tiempo Criptográfica (${civilizationalTimeline.size} Eventos)",
+                                accentColor = MeetColors.neonGreen
+                            )
+                        }
+
+                        items(civilizationalTimeline) { event ->
+                            EliteCard(
+                                modifier = Modifier.fillMaxWidth(),
+                                glowColor = MeetColors.neonGreen.copy(alpha = 0.5f),
+                                backgroundColor = MeetColors.backgroundDeep,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = event.title,
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                        Surface(
+                                            color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = event.type.name,
+                                                color = MeetColors.neonGreen,
+                                                fontWeight = FontWeight.Black,
+                                                fontSize = 9.sp,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Text(
+                                        text = event.description,
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 12.sp
+                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(
+                                            text = "SHA-256: ${event.eventHash.take(12)}...",
+                                            color = MeetColors.cyberCyan,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp
+                                        )
+                                        event.mileageKm?.let { km ->
+                                            Text(
+                                                text = "$km km",
+                                                color = MeetColors.textMuted,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                 } else if (selectedTab == 2) {
                     // Electrical Subsystem Diagnosis details
                     val diagnosis = healthReport?.electricalDiagnosis
@@ -479,6 +575,97 @@ fun HealthScoreScreen(
                                         )
                                     }
                                 }
+                            }
+                        }
+                    }
+                } else if (selectedTab == 3) {
+                    item {
+                        EliteCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            glowColor = MeetColors.neonGreen,
+                            backgroundColor = MeetColors.backgroundDeep,
+                            shape = RoundedCornerShape(16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    "PREDICTOR DE MANTENIMIENTO & AHORRO",
+                                    color = MeetColors.neonGreen,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    "Anticipar el servicio preventivo ahorra hasta un 75% frente al costo de avería crítica en taller.",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 11.sp
+                                )
+                                Surface(
+                                    color = MeetColors.neonGreen.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column(Modifier.padding(12.dp)) {
+                                        Text("Ahorro Preventivo Proyectado", color = MeetColors.textMuted, fontSize = 10.sp)
+                                        Text(
+                                            "₡${maintenancePlan.totalSavings}",
+                                            color = MeetColors.neonGreen,
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 24.sp,
+                                            fontFamily = FontFamily.Monospace
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        PhantomSectionHeader(label = "Componentes Monitoreados (${maintenancePlan.predictions.size})", accentColor = MeetColors.cyberCyan)
+                    }
+
+                    items(maintenancePlan.predictions) { pred ->
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                            border = BorderStroke(
+                                1.dp,
+                                when (pred.urgency) {
+                                    com.elysium369.meet.core.maintenance.PredictionUrgency.OVERDUE,
+                                    com.elysium369.meet.core.maintenance.PredictionUrgency.RED -> MeetColors.error.copy(alpha = 0.6f)
+                                    com.elysium369.meet.core.maintenance.PredictionUrgency.ORANGE,
+                                    com.elysium369.meet.core.maintenance.PredictionUrgency.YELLOW -> MeetColors.warning.copy(alpha = 0.6f)
+                                    else -> MeetColors.borderSubtle
+                                }
+                            ),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(pred.component.displayLabel, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text(
+                                        pred.urgency.displayLabel,
+                                        color = when (pred.urgency) {
+                                            com.elysium369.meet.core.maintenance.PredictionUrgency.OVERDUE,
+                                            com.elysium369.meet.core.maintenance.PredictionUrgency.RED -> MeetColors.error
+                                            com.elysium369.meet.core.maintenance.PredictionUrgency.ORANGE,
+                                            com.elysium369.meet.core.maintenance.PredictionUrgency.YELLOW -> MeetColors.warning
+                                            else -> MeetColors.neonGreen
+                                        },
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                                Text(
+                                    "Vida restante: ${pred.remainingKm} km | Costo preventivo: ${pred.formattedPreventive} vs Falla: ${pred.formattedEmergency}",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 11.sp
+                                )
                             }
                         }
                     }
@@ -893,4 +1080,77 @@ private fun getScoreLabel(score: Int): String = when {
     score >= 40 -> "ATENCIÓN REQUERIDA"
     score >= 20 -> "ESTADO CRÍTICO"
     else -> "EMERGENCIA"
+}
+
+@Composable
+private fun CivilizationalFactorsCard(entry: com.elysium369.meet.core.vehicle.HealthScoreEntry) {
+    EliteCard(
+        modifier = Modifier.fillMaxWidth(),
+        glowColor = MeetColors.neonGreen,
+        backgroundColor = MeetColors.backgroundDeep,
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "DESGLOSE CIVILIZACIONAL (0-1000)",
+                    color = MeetColors.neonGreen,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 12.sp
+                )
+                Surface(
+                    color = when (entry.tier) {
+                        com.elysium369.meet.core.vehicle.HealthTier.EXCELLENT -> MeetColors.neonGreen.copy(alpha = 0.2f)
+                        com.elysium369.meet.core.vehicle.HealthTier.GOOD -> MeetColors.cyberCyan.copy(alpha = 0.2f)
+                        com.elysium369.meet.core.vehicle.HealthTier.FAIR -> MeetColors.warning.copy(alpha = 0.2f)
+                        else -> MeetColors.error.copy(alpha = 0.2f)
+                    },
+                    shape = RoundedCornerShape(6.dp)
+                ) {
+                    Text(
+                        entry.tier.name,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            FactorRow("DTCs Activos & Críticos (30%)", entry.breakdown.dtcScore, 300, MeetColors.neonGreen)
+            FactorRow("Mantenimiento Preventivo (25%)", entry.breakdown.maintenanceScore, 250, MeetColors.cyberCyan)
+            FactorRow("Antigüedad y Kilometraje (20%)", entry.breakdown.ageMileageScore, 200, Color(0xFF64B5F6))
+            FactorRow("Reparaciones Previas (15%)", entry.breakdown.repairScore, 150, Color(0xFFFFB74D))
+            FactorRow("Historial de Incidentes (10%)", entry.breakdown.incidentScore, 100, Color(0xFFE57373))
+        }
+    }
+}
+
+@Composable
+private fun FactorRow(name: String, current: Int, max: Int, color: Color) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(name, color = MeetColors.textSecondary, fontSize = 11.sp)
+            Text("$current / $max pts", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        }
+        LinearProgressIndicator(
+            progress = { (current.toFloat() / max.toFloat()).coerceIn(0f, 1f) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp)),
+            color = color,
+            trackColor = Color.White.copy(alpha = 0.08f)
+        )
+    }
 }

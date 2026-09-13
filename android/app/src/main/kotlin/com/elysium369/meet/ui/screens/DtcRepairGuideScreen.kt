@@ -66,7 +66,8 @@ private data class DtcSolutionCard(
     val partRequired: String? = null,
     val estimatedCostUsd: Float? = null,
     val difficultyLevel: String = "medio",
-    val verifiedFixId: Long? = null
+    val verifiedFixId: Long? = null,
+    val wisdomSolutionId: String? = null
 )
 
 private data class LivePidReading(
@@ -738,9 +739,36 @@ private fun buildDtcSolutionCards(
     steps: List<RepairStep>,
     repairCosts: List<DtcRepairCostEntity>,
     verifiedFixes: List<DtcVerifiedFixEntity>,
-    communityCases: List<RepairCase>
+    communityCases: List<RepairCase>,
+    wisdomSolutions: List<com.elysium369.meet.core.diagnostic.DtcSolution> = emptyList()
 ): List<DtcSolutionCard> {
     val cards = mutableListOf<DtcSolutionCard>()
+
+    wisdomSolutions.forEach { wisdom ->
+        val contributor = if (wisdom.contributorName.isNotBlank()) wisdom.contributorName.uppercase() else "MECÁNICO CERTIFICADO"
+        cards.add(
+            DtcSolutionCard(
+                source = "SABIDURÍA CROWD ($contributor)",
+                title = wisdom.title,
+                description = wisdom.description + if (wisdom.steps.isNotEmpty()) "\n\nPasos recomendados:\n" + wisdom.steps.mapIndexed { idx, s -> "${idx + 1}. $s" }.joinToString("\n") else "",
+                successMetric = if (wisdom.totalAttempts > 0) {
+                    EvidenceMetric(
+                        value = wisdom.successRate.toFloat().coerceIn(0f, 1f),
+                        source = "CROWD_DIAGNOSTIC_WISDOM",
+                        sampleCount = wisdom.totalAttempts,
+                        confidenceMethod = "CALIBRATED_HOLDOUT",
+                        generatedAt = System.currentTimeMillis()
+                    )
+                } else null,
+                voteCount = wisdom.upvotes - wisdom.downvotes,
+                partRequired = wisdom.partsNeeded.joinToString(", ").takeIf { it.isNotBlank() },
+                estimatedCostUsd = wisdom.estimatedCost?.let { (it / 500L).toFloat() },
+                difficultyLevel = wisdom.difficulty.name.lowercase(),
+                verifiedFixId = null,
+                wisdomSolutionId = wisdom.solutionId
+            )
+        )
+    }
 
     verifiedFixes.forEach { fix ->
         cards.add(
@@ -815,6 +843,7 @@ private fun buildDtcSolutionCards(
 private fun solutionRank(source: String): Int {
     val value = source.lowercase()
     return when {
+        value.contains("sabiduría") || value.contains("crowd") -> 5
         value.contains("tsb") || value.contains("oem") || value.contains("verificada") -> 4
         value.contains("comunidad") -> 3
         value.contains("taller") -> 2
@@ -1214,6 +1243,9 @@ fun DtcRepairGuideScreen(
     var repairCosts by remember { mutableStateOf<List<com.elysium369.meet.data.local.entities.DtcRepairCostEntity>>(emptyList()) }
     var verifiedFixes by remember { mutableStateOf<List<com.elysium369.meet.data.local.entities.DtcVerifiedFixEntity>>(emptyList()) }
     var communityCases by remember { mutableStateOf<List<RepairCase>>(emptyList()) }
+    var wisdomSolutions by remember { mutableStateOf<List<com.elysium369.meet.core.diagnostic.DtcSolution>>(emptyList()) }
+    val votedWisdomIds = remember { mutableStateListOf<String>() }
+    val outcomeRecordedWisdomIds = remember { mutableStateListOf<String>() }
     var isLoading by remember { mutableStateOf(true) }
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var activeStepIdx by remember { mutableIntStateOf(0) }
@@ -1239,6 +1271,7 @@ fun DtcRepairGuideScreen(
             repairCosts = viewModel.getDtcRepairCosts(dtcCode)
             verifiedFixes = viewModel.getDtcVerifiedFixes(dtcCode)
             communityCases = viewModel.getDtcCommunityRepairCases(dtcCode)
+            wisdomSolutions = viewModel.getWisdomSolutionsForDtc(dtcCode)
             isLoading = false
         }
     }
@@ -1315,7 +1348,7 @@ fun DtcRepairGuideScreen(
         buildDisplayRepairCauses(dtcCode, causes)
     }
 
-    val solutionCards = remember(dtcCode, definition, displayCauses, steps, repairCosts, verifiedFixes, communityCases) {
+    val solutionCards = remember(dtcCode, definition, displayCauses, steps, repairCosts, verifiedFixes, communityCases, wisdomSolutions) {
         buildDtcSolutionCards(
             dtcCode = dtcCode,
             definition = definition,
@@ -1323,7 +1356,8 @@ fun DtcRepairGuideScreen(
             steps = steps,
             repairCosts = repairCosts,
             verifiedFixes = verifiedFixes,
-            communityCases = communityCases
+            communityCases = communityCases,
+            wisdomSolutions = wisdomSolutions
         )
     }
 
@@ -2354,6 +2388,7 @@ fun DtcRepairGuideScreen(
                                                 }
 
                                                 val fixId = solution.verifiedFixId
+                                                val wId = solution.wisdomSolutionId
                                                 if (fixId != null) {
                                                     val isUpvoted = upvotedFixIds.contains(fixId)
                                                     Button(
@@ -2384,6 +2419,53 @@ fun DtcRepairGuideScreen(
                                                             fontWeight = FontWeight.Bold,
                                                             fontFamily = FontFamily.Monospace
                                                         )
+                                                    }
+                                                } else if (wId != null) {
+                                                    val isVoted = votedWisdomIds.contains(wId)
+                                                    val isOutcomeRecorded = outcomeRecordedWisdomIds.contains(wId)
+                                                    Row(
+                                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        OutlinedButton(
+                                                            onClick = {
+                                                                if (!isVoted) {
+                                                                    viewModel.voteWisdomSolution(wId, true)
+                                                                    votedWisdomIds.add(wId)
+                                                                    wisdomSolutions = viewModel.getWisdomSolutionsForDtc(dtcCode)
+                                                                }
+                                                            },
+                                                            enabled = !isVoted,
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            border = BorderStroke(1.dp, if (isVoted) Color.Transparent else accentColor.copy(alpha = 0.4f)),
+                                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                            modifier = Modifier.height(30.dp)
+                                                        ) {
+                                                            Text("👍 ${solution.voteCount}", fontSize = 10.sp, color = accentColor, fontWeight = FontWeight.Bold)
+                                                        }
+                                                        Button(
+                                                            onClick = {
+                                                                if (!isOutcomeRecorded) {
+                                                                    viewModel.recordWisdomOutcome(wId, dtcCode, success = true, dtcCleared = true)
+                                                                    outcomeRecordedWisdomIds.add(wId)
+                                                                    wisdomSolutions = viewModel.getWisdomSolutionsForDtc(dtcCode)
+                                                                }
+                                                            },
+                                                            enabled = !isOutcomeRecorded,
+                                                            colors = ButtonDefaults.buttonColors(
+                                                                containerColor = if (isOutcomeRecorded) MeetColors.neonGreen.copy(alpha = 0.2f) else MeetColors.neonGreen,
+                                                                contentColor = if (isOutcomeRecorded) MeetColors.neonGreen else Color.Black
+                                                            ),
+                                                            shape = RoundedCornerShape(6.dp),
+                                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                                            modifier = Modifier.height(30.dp)
+                                                        ) {
+                                                            Text(
+                                                                if (isOutcomeRecorded) "✓ RESUELTO" else "ME SIRVIÓ",
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold
+                                                            )
+                                                        }
                                                     }
                                                 } else {
                                                     Text(

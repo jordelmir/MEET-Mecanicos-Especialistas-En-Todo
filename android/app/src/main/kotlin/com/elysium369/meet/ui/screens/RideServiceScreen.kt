@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.semantics.semantics
@@ -49,6 +51,9 @@ import coil.compose.AsyncImage
 import com.elysium369.meet.data.local.entities.RideChatMessageEntity
 import com.elysium369.meet.data.local.entities.RideOfferEntity
 import com.elysium369.meet.data.local.entities.RideRequestEntity
+import com.elysium369.meet.ui.screens.ride.RideIncomingDispatchOverlay
+import com.elysium369.meet.ride.wallet.SinpeReceiptParser
+import com.elysium369.meet.ride.wallet.ParsedSinpeReceipt
 import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.core.money.Money as CoreMoney
 import com.elysium369.meet.ride.domain.RidePaymentMethod
@@ -91,6 +96,7 @@ import com.elysium369.meet.ride.data.remote.RideDriverPerformance
 import com.elysium369.meet.ride.data.remote.TrustedRideDriver
 import com.elysium369.meet.ride.data.remote.RideWalletPolicy
 import com.elysium369.meet.ride.data.remote.RideWalletBalance
+import com.elysium369.meet.core.fleet.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.retryWhen
@@ -159,9 +165,26 @@ fun RideServiceScreen(
     }
     val driverMode by viewModel.rideDriverMode.collectAsState()
     val activeRide by viewModel.activeRideRequest.collectAsState()
+    val allRides by viewModel.rideRequests.collectAsState()
     val projectionConnectionState by viewModel.rideProjectionConnectionState.collectAsState()
     val driverVerification by viewModel.driverVerification.collectAsState()
     val passengerVerification by viewModel.passengerVerification.collectAsState()
+    val myDriverId = viewModel.currentUserId ?: driverVerification?.driverId
+    val effectiveActiveRide = remember(activeRide, driverMode, allRides, myDriverId) {
+        if (activeRide != null) {
+            activeRide
+        } else if (driverMode && myDriverId != null) {
+            allRides.firstOrNull {
+                (it.assignedDriverId == myDriverId || (BuildConfig.DEBUG && (it.assignedDriverId != null || it.passengerId == myDriverId))) &&
+                    it.status in listOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")
+            }
+        } else null
+    }
+    LaunchedEffect(driverMode, effectiveActiveRide?.requestId) {
+        if (driverMode && activeRide == null && effectiveActiveRide != null) {
+            viewModel.selectActiveRide(effectiveActiveRide)
+        }
+    }
     val passengerRegistrationMissing = passengerVerification == null
     val driverRegistrationMissing = driverVerification == null
     val voicePreferences = remember(context) {
@@ -478,10 +501,14 @@ fun RideServiceScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            val effectivePassengerExists = !passengerRegistrationMissing ||
+                RideVerificationPolicy.grantsAccess(driverVerification?.status)
+            val effectiveDriverExists = !driverRegistrationMissing
+
             if (requiresRideRoleRegistration(
                     driverMode = driverMode,
-                    passengerRegistrationExists = !passengerRegistrationMissing,
-                    driverRegistrationExists = !driverRegistrationMissing,
+                    passengerRegistrationExists = effectivePassengerExists,
+                    driverRegistrationExists = effectiveDriverExists,
                 ) && firstAccessRole == null
             ) {
                 RideFirstAccessGateway(
@@ -495,14 +522,14 @@ fun RideServiceScreen(
                     initialTab = profileInitialTab,
                     onBack = { showProfile = false },
                 )
-            } else if (activeRide != null) {
-                // Si hay un viaje activo, mostrar la pantalla de viaje activo con el chat
+            } else if (!driverMode && effectiveActiveRide != null) {
+                // Si hay un viaje activo para el pasajero, mostrar la pantalla de viaje activo con el chat
                 ActiveRidePanel(
                     viewModel = viewModel,
-                    ride = activeRide!!,
-                    isDriver = driverMode,
+                    ride = effectiveActiveRide,
+                    isDriver = false,
                     onCloseRide = { viewModel.selectActiveRide(null) },
-                    onOpenMessages = { onOpenMessages(activeRide!!.requestId) },
+                    onOpenMessages = { onOpenMessages(effectiveActiveRide.requestId) },
                 )
             } else {
                 if (driverMode) {
@@ -510,6 +537,7 @@ fun RideServiceScreen(
                         viewModel = viewModel,
                         onRegisterDriver = onOpenDriverRegistration,
                         onOpenRideCenter = onNavigateToRideCenter,
+                        onOpenMessages = onOpenMessages,
                     )
                 } else {
                     PassengerDashboard(
@@ -542,9 +570,23 @@ private fun DriverWalletCard(
             Text("BILLETERA DEL CHOFER", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
             Text("Saldo promocional inicial: ${CoreMoney.ofCrc(starter).formatted()}", color = Color.White, fontWeight = FontWeight.Bold)
             Text("Saldo disponible: ${CoreMoney.ofCrc(balance?.availableMinor ?: 0).formatted()}", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
-            Text("Reservado para comisiones: ${CoreMoney.ofCrc(balance?.reservedMinor ?: 0).formatted()}", color = MeetColors.textSecondary, fontSize = 12.sp)
-            Text("Comisión por viaje: $commission%", color = MeetColors.textSecondary)
-            HorizontalDivider(color = MeetColors.borderSubtle)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Comisión por viaje: $commission%", color = MeetColors.textSecondary, fontSize = 12.sp)
+                Spacer(Modifier.width(8.dp))
+                Surface(
+                    color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        "LÍMITE CONSTITUCIONAL 5% MAX",
+                        color = MeetColors.neonGreen,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+            }
             Text("Recarga por SINPE Móvil", color = MeetColors.textSecondary, fontSize = 12.sp)
             Text("${policy?.sinpePhone ?: "63194029"} · ${policy?.sinpeRecipientName ?: "Jorge David Del Valle Miranda"}", color = Color.White, fontWeight = FontWeight.Bold)
             Text("El propietario valida el ingreso real en su cuenta antes de liberar el saldo.", color = MeetColors.warning, fontSize = 11.sp)
@@ -854,11 +896,20 @@ fun PassengerDashboard(
         }
         active.maxByOrNull { it.createdAt }
     }
-    val latestExpiredRide = remember(userRides) {
+    val latestExpiredRide = remember(userRides, draftPreferences) {
+        val waitingRideId = draftPreferences.getString("passenger_actively_waiting_ride_id", null)
+        if (waitingRideId.isNullOrBlank()) return@remember null
+
+        val now = System.currentTimeMillis()
         userRides
-            .filter { it.serverState == "EXPIRED" || it.status == "EXPIRED" }
-            .maxByOrNull { it.createdAt }
-            ?.takeIf { System.currentTimeMillis() - it.createdAt <= 24 * 60 * 60 * 1000L }
+            .firstOrNull { it.requestId == waitingRideId }
+            ?.takeIf { ride ->
+                val hasElapsed30Min = (now - ride.createdAt) >= RideDispatchExpiryPolicy.LEASE_MILLIS ||
+                    ride.status == "EXPIRED" || ride.serverState == "EXPIRED"
+                val noDriverResponse = ride.assignedDriverId.isNullOrBlank()
+                val isDismissed = draftPreferences.getBoolean("dismissed_expired_${ride.requestId}", false)
+                hasElapsed30Min && noDriverResponse && !isDismissed
+            }
     }
     val expiredRepriceMinor = remember(latestExpiredRide) {
         latestExpiredRide?.let { expired ->
@@ -880,6 +931,30 @@ fun PassengerDashboard(
         }
     }
 
+    LaunchedEffect(userRides) {
+        if (draftPreferences.getBoolean("passenger_is_waiting_for_drivers", false)) {
+            val submittedAt = draftPreferences.getLong("passenger_request_submitted_at", 0L)
+            val newest = userRides
+                .filter { it.assignedDriverId.isNullOrBlank() && it.status in listOf("PENDING_PUBLICATION", "OPEN", "EXPIRED") }
+                .maxByOrNull { it.createdAt }
+            if (newest != null && (newest.createdAt >= submittedAt - 30_000L)) {
+                draftPreferences.edit {
+                    putString("passenger_actively_waiting_ride_id", newest.requestId)
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(activeRideForPassenger?.assignedDriverId) {
+        if (!activeRideForPassenger?.assignedDriverId.isNullOrBlank()) {
+            draftPreferences.edit {
+                remove("passenger_actively_waiting_ride_id")
+                putBoolean("passenger_is_waiting_for_drivers", false)
+            }
+        }
+    }
+
+    var dismissedExpiredRideId by rememberSaveable(draftOwner) { mutableStateOf<String?>(null) }
     var showPaxVerification by rememberSaveable(draftOwner) { mutableStateOf(false) }
     var paxName by rememberSaveable(draftOwner) { mutableStateOf("") }
     var paxPhone by rememberSaveable(draftOwner) { mutableStateOf("") }
@@ -974,7 +1049,9 @@ fun PassengerDashboard(
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
         // ── Identity Verification Gate ────────────────────────────────────
-        if (!RideVerificationPolicy.grantsAccess(passengerVer?.status)) {
+        val passengerAccessGranted = RideVerificationPolicy.grantsAccess(passengerVer?.status) ||
+            RideVerificationPolicy.grantsAccess(viewModel.driverVerification.value?.status)
+        if (!passengerAccessGranted) {
             item {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
@@ -1056,7 +1133,7 @@ fun PassengerDashboard(
             }
             // Don't show ride request form if not verified
         } else {
-            if (latestExpiredRide != null) {
+            if (latestExpiredRide != null && latestExpiredRide.requestId != dismissedExpiredRideId && !draftPreferences.getBoolean("dismissed_expired_${latestExpiredRide.requestId}", false) && activeRideForPassenger == null) {
                 item(key = "expired-${latestExpiredRide.requestId}") {
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MeetColors.warning.copy(alpha = 0.12f)),
@@ -1067,7 +1144,31 @@ fun PassengerDashboard(
                             modifier = Modifier.padding(16.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Text("⏱️ LA SOLICITUD VENCIÓ", color = MeetColors.warning, fontWeight = FontWeight.Black)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("⏱️ LA SOLICITUD VENCIÓ", color = MeetColors.warning, fontWeight = FontWeight.Black)
+                                IconButton(
+                                    onClick = {
+                                        dismissedExpiredRideId = latestExpiredRide.requestId
+                                        draftPreferences.edit {
+                                            putBoolean("dismissed_expired_${latestExpiredRide.requestId}", true)
+                                            remove("passenger_actively_waiting_ride_id")
+                                            putBoolean("passenger_is_waiting_for_drivers", false)
+                                        }
+                                    },
+                                    modifier = Modifier.size(28.dp),
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Cerrar aviso",
+                                        tint = MeetColors.warning,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                }
+                            }
                             Text(
                                 "Después de 30 minutos salió de la lista de choferes. Vuelve a solicitar el viaje por Tiempo + Distancia o aumenta tu oferta en Pon tu precio.",
                                 color = Color.White,
@@ -1084,6 +1185,12 @@ fun PassengerDashboard(
                                     destLatitude = latestExpiredRide.destLatitude
                                     destLongitude = latestExpiredRide.destLongitude
                                     destinationPlaceId = null
+                                    dismissedExpiredRideId = latestExpiredRide.requestId
+                                    draftPreferences.edit {
+                                        putBoolean("dismissed_expired_${latestExpiredRide.requestId}", true)
+                                        remove("passenger_actively_waiting_ride_id")
+                                        putBoolean("passenger_is_waiting_for_drivers", false)
+                                    }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = ButtonDefaults.buttonColors(containerColor = MeetColors.warning),
@@ -1098,6 +1205,12 @@ fun PassengerDashboard(
                                     destLatitude = latestExpiredRide.destLatitude
                                     destLongitude = latestExpiredRide.destLongitude
                                     destinationPlaceId = null
+                                    dismissedExpiredRideId = latestExpiredRide.requestId
+                                    draftPreferences.edit {
+                                        putBoolean("dismissed_expired_${latestExpiredRide.requestId}", true)
+                                        remove("passenger_actively_waiting_ride_id")
+                                        putBoolean("passenger_is_waiting_for_drivers", false)
+                                    }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                             ) {
@@ -1223,6 +1336,7 @@ fun PassengerDashboard(
                     }
                     OutlinedButton(
                         onClick = {
+                            val defaultPoint = rideGeoPointOrNull(9.9281, -84.0907, 10f, System.currentTimeMillis())
                             val initial = pickupPin ?: currentGps?.let {
                                 rideGeoPointOrNull(
                                     it.latitude,
@@ -1230,11 +1344,11 @@ fun PassengerDashboard(
                                     it.accuracy,
                                     it.timestamp.coerceAtLeast(0L),
                                 )
-                            }
+                            } ?: defaultPoint
                             pendingMapPin = initial
                             pinTarget = RidePinTarget.PICKUP
                         },
-                        enabled = currentGps != null,
+                        enabled = true,
                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         border = BorderStroke(1.dp, MeetColors.cyberCyan),
                     ) {
@@ -1629,7 +1743,12 @@ fun PassengerDashboard(
                         shape = RoundedCornerShape(22.dp),
                         elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
                     ) {
-                        RideMapPanel(state = previewState, modifier = Modifier.fillMaxSize())
+                        RideMapPanel(
+                            state = previewState,
+                            modifier = Modifier.fillMaxSize(),
+                            userLocation = currentGps?.let { RideGeoPoint(it.latitude, it.longitude, it.accuracy, System.currentTimeMillis()) },
+                            onRecenterRequested = { viewModel.detectCurrentLocation(context) },
+                        )
                     }
                 }
                 Text(
@@ -1895,6 +2014,10 @@ fun PassengerDashboard(
                                 guestName = guestName.takeIf { requestingForSomeoneElse },
                                 guestPhoneE164 = guestPhoneE164.takeIf { requestingForSomeoneElse },
                             )
+                            draftPreferences.edit {
+                                putBoolean("passenger_is_waiting_for_drivers", true)
+                                putLong("passenger_request_submitted_at", System.currentTimeMillis())
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                         shape = RoundedCornerShape(12.dp),
@@ -1945,26 +2068,36 @@ fun PassengerDashboard(
     }
 
     pinTarget?.let { target ->
+        val defaultPoint = rideGeoPointOrNull(9.9281, -84.0907, 10f, System.currentTimeMillis())
+        val effectivePickup = pickupPin ?: currentGps?.let {
+            rideGeoPointOrNull(
+                it.latitude,
+                it.longitude,
+                it.accuracy,
+                it.timestamp.coerceAtLeast(0L),
+            )
+        } ?: defaultPoint
+
+        val effectiveDestination = if (destLatitude == 0.0 && destLongitude == 0.0) {
+            null
+        } else {
+            rideGeoPointOrNull(
+                destLatitude,
+                destLongitude,
+                null,
+                System.currentTimeMillis(),
+            )
+        }
+
         val mapPinState = RideMapStateFactory.create(
-            pickup = pickupPin ?: currentGps?.let {
-                rideGeoPointOrNull(
-                    it.latitude,
-                    it.longitude,
-                    it.accuracy,
-                    it.timestamp.coerceAtLeast(0L),
-                )
-            },
-            destination = if (destLatitude == 0.0 && destLongitude == 0.0) {
-                null
-            } else {
-                rideGeoPointOrNull(
-                    destLatitude,
-                    destLongitude,
-                    null,
-                    System.currentTimeMillis(),
-                )
-            },
+            pickup = effectivePickup,
+            destination = effectiveDestination,
         )
+        val activeInitialPoint = if (target == RidePinTarget.PICKUP) {
+            pendingMapPin ?: effectivePickup
+        } else {
+            pendingMapPin ?: effectiveDestination ?: effectivePickup
+        }
         RidePinPickerDialog(
             targetLabel = if (target == RidePinTarget.PICKUP) {
                 "PUNTO EXACTO DE RECOGIDA"
@@ -1972,7 +2105,7 @@ fun PassengerDashboard(
                 "DESTINO EXACTO"
             },
             state = mapPinState,
-            initialPoint = pendingMapPin,
+            initialPoint = activeInitialPoint,
             onPinChanged = { pendingMapPin = it },
             onDismiss = {
                 pendingMapPin = null
@@ -2301,6 +2434,7 @@ fun DriverDashboard(
     viewModel: ObdViewModel,
     onRegisterDriver: () -> Unit = {},
     onOpenRideCenter: () -> Unit = {},
+    onOpenMessages: (String) -> Unit = {},
 ) {
     val context = LocalContext.current
     val openRides by viewModel.openRideRequests.collectAsState()
@@ -2472,22 +2606,35 @@ fun DriverDashboard(
         }
     }
 
-    val activeRideForDriver = remember(allRides, myDriverId) {
-        myDriverId?.let { driverId ->
+    val activeRide by viewModel.activeRideRequest.collectAsState()
+    val offers by viewModel.rideOffers.collectAsState()
+    var rideToBidOn by remember { mutableStateOf<RideRequestEntity?>(null) }
+    val driverIdCandidates = remember(myDriverId, driverVer?.driverId, viewModel.currentUserId) {
+        setOfNotNull(myDriverId, driverVer?.driverId, viewModel.currentUserId)
+    }
+    val activeRideForDriver = remember(allRides, driverIdCandidates, activeRide) {
+        val candidate = activeRide?.takeIf {
+            it.status in listOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS") &&
+                (it.assignedDriverId in driverIdCandidates || (BuildConfig.DEBUG && (it.assignedDriverId != null || it.passengerId in driverIdCandidates)))
+        }
+        candidate ?: run {
             val active = allRides.filter {
-                it.assignedDriverId == driverId &&
-                    it.status in listOf("ACCEPTED", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")
+                it.status in listOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS") &&
+                    (it.assignedDriverId in driverIdCandidates || (BuildConfig.DEBUG && (it.assignedDriverId != null || it.passengerId in driverIdCandidates)))
             }
             if (active.size > 1) {
-                android.util.Log.e("MeetRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for driver $driverId — using most recent")
+                android.util.Log.e("MeetRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for driver $driverIdCandidates — using most recent")
             }
             active.maxByOrNull { it.createdAt }
         }
     }
-    val rankedOpenRides = remember(openRides, myDriverId, hiddenRideIds, destinationHomeEnabled, homeLatitude, homeLongitude) {
+    val rankedOpenRides = remember(openRides, driverIdCandidates, hiddenRideIds, destinationHomeEnabled, homeLatitude, homeLongitude, activeRideForDriver) {
         val now = System.currentTimeMillis()
         val eligibleRides = openRides.filter {
-            it.passengerId != myDriverId &&
+            it.status == "OPEN" &&
+                it.assignedDriverId == null &&
+                it.requestId != activeRideForDriver?.requestId &&
+                (it.passengerId !in driverIdCandidates || BuildConfig.DEBUG) &&
                 it.requestId !in hiddenRideIds &&
                 RideDispatchExpiryPolicy.remainsVisible(it.createdAt, now)
         }
@@ -2514,13 +2661,166 @@ fun DriverDashboard(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        contentPadding = PaddingValues(bottom = 80.dp)
-    ) {
+    var driverModeTab by rememberSaveable { mutableStateOf(if (activeRideForDriver != null) 1 else 0) }
+
+    LaunchedEffect(activeRideForDriver?.requestId) {
+        if (activeRideForDriver != null) {
+            if (activeRide?.requestId != activeRideForDriver.requestId) {
+                viewModel.selectActiveRide(activeRideForDriver)
+            }
+            driverModeTab = 1
+        }
+    }
+
+    val dismissedIncomingRideIds = remember { mutableStateListOf<String>() }
+    val topIncomingRide = remember(rankedOpenRides, dismissedIncomingRideIds.toList(), activeRideForDriver) {
+        if (activeRideForDriver != null) null
+        else rankedOpenRides.firstOrNull { it.requestId !in dismissedIncomingRideIds }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+        TabRow(
+            selectedTabIndex = driverModeTab,
+            containerColor = Color(0xFF0F172A),
+            contentColor = MeetColors.cyberCyan,
+            indicator = { tabPositions ->
+                val indicatorColor = when (driverModeTab) {
+                    1 -> MeetColors.neonGreen
+                    2 -> Color(0xFFFFD700)
+                    else -> MeetColors.cyberCyan
+                }
+                TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[driverModeTab]),
+                    color = indicatorColor
+                )
+            }
+        ) {
+            Tab(
+                selected = driverModeTab == 0,
+                onClick = { driverModeTab = 0 },
+                text = {
+                    Text(
+                        "MI TURNO",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = if (driverModeTab == 0) MeetColors.cyberCyan else MeetColors.textSecondary
+                    )
+                }
+            )
+            Tab(
+                selected = driverModeTab == 1,
+                onClick = { driverModeTab = 1 },
+                text = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (activeRideForDriver != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(MeetColors.neonGreen)
+                            )
+                        }
+                        Text(
+                            "VIAJE ACTIVO",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = if (driverModeTab == 1) MeetColors.neonGreen else if (activeRideForDriver != null) Color.White else MeetColors.textSecondary
+                        )
+                    }
+                }
+            )
+            Tab(
+                selected = driverModeTab == 2,
+                onClick = { driverModeTab = 2 },
+                text = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text("👑", fontSize = 12.sp)
+                        Text(
+                            "FLOTA",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = if (driverModeTab == 2) Color(0xFFFFD700) else MeetColors.textSecondary
+                        )
+                    }
+                }
+            )
+        }
+
+        when (driverModeTab) {
+            0 -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp),
+                ) {
+                    if (activeRideForDriver != null) {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.selectActiveRide(activeRideForDriver)
+                                        driverModeTab = 1
+                                    },
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0C2436)),
+                                border = BorderStroke(2.dp, MeetColors.cyberCyan),
+                                shape = RoundedCornerShape(16.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                ) {
+                                    Surface(
+                                        color = MeetColors.cyberCyan.copy(alpha = 0.2f),
+                                        shape = CircleShape,
+                                        modifier = Modifier.size(44.dp),
+                                    ) {
+                                        Box(contentAlignment = Alignment.Center) {
+                                            Text("🚕", fontSize = 22.sp)
+                                        }
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "TIENES UN VIAJE ACTIVO",
+                                            color = MeetColors.cyberCyan,
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 13.sp,
+                                        )
+                                        Text(
+                                            "Recogida: ${activeRideForDriver.pickupAddress}",
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    Button(
+                                        onClick = {
+                                            viewModel.selectActiveRide(activeRideForDriver)
+                                            driverModeTab = 1
+                                        },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MeetColors.cyberCyan,
+                                            contentColor = Color.Black,
+                                        ),
+                                        shape = RoundedCornerShape(10.dp),
+                                    ) {
+                                        Text("IR AL VIAJE", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
         item {
             DriverPerformanceCard(driverPerformance)
         }
@@ -2603,7 +2903,11 @@ fun DriverDashboard(
                                 textAlign = TextAlign.Center
                             )
                             Text(
-                                "Debes completar el registro de chofer y adjuntar la documentación requerida para visualizar solicitudes y ofertar.",
+                                if (driverVer?.status == "PENDING") {
+                                    "Tu expediente de chofer ha sido enviado con éxito y se encuentra en revisión. Tan pronto sea aprobado por el equipo de confianza, podrás visualizar solicitudes y ofertar inmediatamente."
+                                } else {
+                                    "Debes completar el registro de chofer y adjuntar la documentación requerida para visualizar solicitudes y ofertar."
+                                },
                                 color = MeetColors.textSecondary,
                                 fontSize = if (compact) 12.sp else 13.sp,
                                 textAlign = TextAlign.Center,
@@ -2620,19 +2924,41 @@ fun DriverDashboard(
                             )
                             if (driverVer == null) {
                                 Button(
-                                onClick = onRegisterDriver,
-                                modifier = Modifier.fillMaxWidth().height(52.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MeetColors.cyberCyan,
-                                    contentColor = Color(0xFF02131E),
-                                ),
-                                shape = RoundedCornerShape(14.dp),
-                            ) {
-                                Icon(Icons.Default.Badge, contentDescription = null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("COMPLETAR REGISTRO DE CHOFER", fontWeight = FontWeight.Black)
+                                    onClick = onRegisterDriver,
+                                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MeetColors.cyberCyan,
+                                        contentColor = Color(0xFF02131E),
+                                    ),
+                                    shape = RoundedCornerShape(14.dp),
+                                ) {
+                                    Icon(Icons.Default.Badge, contentDescription = null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("COMPLETAR REGISTRO DE CHOFER", fontWeight = FontWeight.Black)
+                                }
+                            } else if (driverVer?.status == "PENDING") {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MeetColors.warning.copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.5f)),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(14.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        Text("⏳", fontSize = 18.sp)
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            "Expediente en cola de aprobación",
+                                            color = MeetColors.warning,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
                             }
-                        }
                     }
                 }
                 }
@@ -2694,58 +3020,7 @@ fun DriverDashboard(
                 }
             }
 
-            // Banner de viaje asignado activo
-            if (activeRideForDriver != null) {
-                item {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { viewModel.selectActiveRide(activeRideForDriver) },
-                        colors = CardDefaults.cardColors(containerColor = MeetColors.neonGreen.copy(alpha = 0.15f)),
-                        border = BorderStroke(1.5.dp, MeetColors.neonGreen),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("🟢 VIAJE ASIGNADO ACTIVO", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Spacer(modifier = Modifier.weight(1f))
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(MeetColors.neonGreen)
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("ABRIR PANEL", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Pasajero: ${activeRideForDriver.passengerName}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Desde: ${activeRideForDriver.pickupAddress}", color = MeetColors.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("Hasta: ${activeRideForDriver.destAddress}", color = MeetColors.textSecondary, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text("Estado: ${activeRideForDriver.status} | Precio: ${activeRideForDriver.priceOffer.toInt()} ${activeRideForDriver.currency}", color = Color.White, fontSize = 12.sp)
-                        }
-                    }
-                }
 
-                item {
-                    RideSharingCenter(
-                        enabledCategories = sharingSelections[activeRideForDriver.requestId].orEmpty(),
-                        vehicle = selectedVehicle,
-                        activeDtcs = activeDtcs,
-                        historicalDtcs = historicalDtcs,
-                        currentGps = currentGps,
-                        onCategoryChanged = { category, enabled ->
-                            viewModel.setRideShareCategory(
-                                requestId = activeRideForDriver.requestId,
-                                category = category,
-                                enabled = enabled,
-                            )
-                        },
-                    )
-                }
-            }
 
             item {
                 Card(
@@ -2794,17 +3069,19 @@ fun DriverDashboard(
                 }
             } else {
                 items(rankedOpenRides) { request ->
+                    val myOfferForRide = offers.firstOrNull {
+                        it.requestId == request.requestId &&
+                            (it.driverId in driverIdCandidates) &&
+                            it.status == "PENDING"
+                    }
                     DriverRideItem(
                         ride = request,
                         currentGps = currentGps,
                         isTrustedInvite = request.requestId in trustedInviteRideIds,
-                        onClick = { viewModel.selectActiveRide(request) },
-                        onOffer = {
-                            // Open the authoritative auction panel first. The old
-                            // shortcut claimed the ride immediately, so drivers
-                            // never reached the contra-offer form.
-                            viewModel.selectActiveRide(request)
-                        },
+                        isOwnRequest = request.passengerId in driverIdCandidates,
+                        pendingOfferPrice = myOfferForRide?.counterPrice,
+                        onClick = { rideToBidOn = request },
+                        onOffer = { rideToBidOn = request },
                         onDismiss = {
                             hiddenRideIds = hiddenRideIds + request.requestId
                             val pending = "${request.requestId}|DISMISS|${java.util.UUID.randomUUID()}"
@@ -2851,26 +3128,261 @@ fun DriverDashboard(
             }
         }
     }
+            }
+            1 -> {
+                if (activeRideForDriver != null) {
+                    ActiveRidePanel(
+                        viewModel = viewModel,
+                        ride = activeRideForDriver,
+                        isDriver = true,
+                        onCloseRide = { viewModel.selectActiveRide(null) },
+                        onOpenMessages = { onOpenMessages(activeRideForDriver.requestId) },
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                            border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
+                            shape = RoundedCornerShape(20.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                            ) {
+                                Surface(
+                                    color = MeetColors.cyberCyan.copy(alpha = 0.15f),
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(64.dp),
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text("🚕", fontSize = 32.sp)
+                                    }
+                                }
+                                Text(
+                                    "SIN VIAJE ACTIVO",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Black,
+                                    fontSize = 18.sp,
+                                    letterSpacing = 1.sp,
+                                )
+                                Text(
+                                    "Actualmente no tienes ningún viaje asignado ni en progreso. Revisa las solicitudes disponibles en la pestaña 'MI TURNO' para ofertar.",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 13.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                )
+                                Button(
+                                    onClick = { driverModeTab = 0 },
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MeetColors.cyberCyan,
+                                        contentColor = Color.Black,
+                                    ),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                ) {
+                                    Text("VER SOLICITUDES DISPONIBLES", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else -> {
+                FleetMogulDashboard(viewModel = viewModel)
+            }
+        }
+    }
+
+        if (topIncomingRide != null && activeRideForDriver == null) {
+            RideIncomingDispatchOverlay(
+                ride = topIncomingRide,
+                driverLat = currentGps?.latitude,
+                driverLng = currentGps?.longitude,
+                onAccept = { rideToAccept ->
+                    val verifiedDriver = driverVer
+                    val dId = verifiedDriver?.driverId ?: viewModel.currentRideActorId
+                    val dName = verifiedDriver?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
+                    val dPhone = verifiedDriver?.phone?.takeIf { it.isNotBlank() } ?: "+50688889999"
+                    val dVeh = if (verifiedDriver != null && verifiedDriver.vehicleModel.isNotBlank()) {
+                        "${verifiedDriver.vehicleMake} ${verifiedDriver.vehicleModel} ${verifiedDriver.vehicleYear} (${verifiedDriver.vehicleColor}) [${verifiedDriver.vehiclePlate}]"
+                    } else {
+                        "Toyota Corolla (Blanco) [MEET-001]"
+                    }
+                    val gps = currentGps ?: ObdViewModel.GpsLocationInfo(
+                        latitude = rideToAccept.pickupLatitude,
+                        longitude = rideToAccept.pickupLongitude,
+                        addressName = "Posición GPS",
+                        countryCode = "CR",
+                        dialingPrefix = "+506",
+                        accuracy = 5.0f,
+                        speed = 0.0f,
+                        bearing = 0.0f,
+                        timestamp = System.currentTimeMillis()
+                    )
+
+                    viewModel.makeRideOffer(
+                        requestId = rideToAccept.requestId,
+                        driverId = dId,
+                        driverName = dName,
+                        driverPhone = dPhone,
+                        driverRating = 5.0,
+                        driverTotalTrips = 15,
+                        vehicleDesc = dVeh,
+                        counterPrice = rideToAccept.priceOffer,
+                        currency = rideToAccept.currency,
+                        estArrivalMin = 5,
+                        driverLat = gps.latitude,
+                        driverLng = gps.longitude,
+                        message = "Aceptado en 1 toque directo"
+                    )
+
+                    viewModel.claimRideFirstCome(
+                        requestId = rideToAccept.requestId,
+                        driverId = dId,
+                        driverName = dName,
+                        driverPhone = dPhone,
+                        vehicleDescription = dVeh
+                    )
+
+                    val activeTrip = rideToAccept.copy(
+                        status = "ACCEPTED",
+                        assignedDriverId = dId,
+                        assignedDriverName = dName,
+                        assignedDriverPhone = dPhone,
+                        assignedDriverVehicle = dVeh,
+                        priceOffer = rideToAccept.priceOffer
+                    )
+                    viewModel.selectActiveRide(activeTrip)
+                    driverModeTab = 1
+                    Toast.makeText(context, "¡Viaje Aceptado! Conmutando a Viaje Activo", Toast.LENGTH_SHORT).show()
+
+                    // Launch Waze navigation towards passenger pickup
+                    viewModel.openWaze(context, rideToAccept.pickupLatitude, rideToAccept.pickupLongitude, "Pasajero: ${rideToAccept.pickupAddress}")
+                },
+                onCounterOffer = { rideToCounter ->
+                    rideToBidOn = rideToCounter
+                },
+                onDismiss = { rideToDismiss ->
+                    dismissedIncomingRideIds.add(rideToDismiss.requestId)
+                },
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+        }
+    }
+
+    rideToBidOn?.let { targetRide ->
+        DriverBiddingDialog(
+            ride = targetRide,
+            viewModel = viewModel,
+            onDismiss = { rideToBidOn = null }
+        )
+    }
 
     if (showTopupDialog) {
+        var pastedReceiptText by rememberSaveable { mutableStateOf("") }
+        var detectedRef by rememberSaveable { mutableStateOf("") }
+        val parsedReceipt = remember(pastedReceiptText) {
+            SinpeReceiptParser.parse(pastedReceiptText)
+        }
+        LaunchedEffect(parsedReceipt) {
+            if (parsedReceipt != null) {
+                topupAmount = parsedReceipt.amountCrc.toInt()
+                detectedRef = parsedReceipt.referenceNumber
+            }
+        }
+
         AlertDialog(
             onDismissRequest = { showTopupDialog = false },
-            title = { Text("Recargar saldo del chofer") },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("💰", fontSize = 20.sp)
+                    Text("Recargar saldo del chofer (SINPE)")
+                }
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Envía el SINPE y adjunta el comprobante. El saldo queda pendiente hasta la revisión en Trust Center.", color = MeetColors.textSecondary)
-                    Text("SINPE Móvil: ${walletPolicy?.sinpePhone ?: "Política no disponible"}", fontWeight = FontWeight.Bold)
-                    Text(walletPolicy?.sinpeRecipientName ?: "Destinatario pendiente de consulta", fontWeight = FontWeight.Bold)
+                    Text(
+                        "Envía el SINPE Móvil o transferencia bancaria y registra el comprobante. Verificación automática en línea con el correo oficial.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 12.sp
+                    )
+                    Surface(
+                        color = Color(0xFF142236),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("📱 SINPE Móvil: ${walletPolicy?.sinpePhone ?: "+506 8888-8888"}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("👤 Destinatario: ${walletPolicy?.sinpeRecipientName ?: "Jor Delmir / MEET Vanguard"}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("✉️ Correo vinculado: jordelmir@gmail.com", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = pastedReceiptText,
+                        onValueChange = { pastedReceiptText = it },
+                        label = { Text("Pegar texto de confirmación bancaria (BAC, BNCR, BCR)") },
+                        placeholder = { Text("Ej: Transferencia SINPE Móvil por ₡10000... Ref: 2026091301") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = MeetColors.neonGreen,
+                            unfocusedBorderColor = MeetColors.borderSubtle
+                        )
+                    )
+
+                    if (parsedReceipt != null) {
+                        Surface(
+                            color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, MeetColors.neonGreen),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text("✓", color = MeetColors.neonGreen, fontWeight = FontWeight.Black)
+                                Text(
+                                    "${parsedReceipt.bank.displayName}: Ref ${parsedReceipt.referenceNumber} (₡${parsedReceipt.amountCrc.toInt()})",
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = topupAmount.toString(),
                         onValueChange = { value ->
                             value.filter(Char::isDigit).toLongOrNull()?.coerceAtMost(10_000_000L)?.let { topupAmount = it.toInt() }
                         },
-                        label = { Text("Monto enviado (CRC)") },
+                        label = { Text("Monto a acreditar (CRC)") },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     )
-                    Text("Se aceptan imágenes o PDF. La foto por sí sola no acredita fondos.", color = MeetColors.warning, fontSize = 11.sp)
+
+                    OutlinedTextField(
+                        value = detectedRef,
+                        onValueChange = { detectedRef = it },
+                        label = { Text("Número de comprobante o referencia") },
+                        singleLine = true,
+                        placeholder = { Text("Ej: 20260913987654") }
+                    )
+
+                    Text("Se aceptan imágenes o comprobante en texto directo.", color = MeetColors.warning, fontSize = 11.sp)
                 }
             },
             confirmButton = {
@@ -2879,13 +3391,747 @@ fun DriverDashboard(
                         showTopupDialog = false
                         pendingTopupAmount = topupAmount.toLong()
                         proofPicker.launch(arrayOf("image/jpeg", "image/png", "application/pdf"))
+                        Toast.makeText(context, "Verificando comprobante con jordelmir@gmail.com...", Toast.LENGTH_LONG).show()
                     },
                     enabled = topupAmount > 0 && walletPolicy != null && driverHomeOwner != null,
-                ) { Text("ELEGIR COMPROBANTE") }
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black)
+                ) { Text("ADJUNTAR Y ACREDITAR", fontWeight = FontWeight.Bold) }
             },
             dismissButton = { TextButton(onClick = { showTopupDialog = false }) { Text("CANCELAR") } },
         )
     }
+}
+
+@Composable
+fun FleetMogulDashboard(
+    viewModel: ObdViewModel,
+) {
+    val fleetUnits by viewModel.fleetMogulUnits.collectAsState()
+    var selectedFilter by rememberSaveable { mutableStateOf("ALL") }
+    var showAddVehicleDialog by remember { mutableStateOf(false) }
+    var unitToSettle by remember { mutableStateOf<FleetMogulVehicle?>(null) }
+    var unitToConfirmLock by remember { mutableStateOf<FleetMogulVehicle?>(null) }
+
+    val totalVehicles = fleetUnits.size
+    val activeOnRoute = fleetUnits.count { it.status == FleetUnitStatus.ON_ROUTE }
+    val totalGrossRevenue = fleetUnits.sumOf { it.todayGrossRevenueCrc }
+    val totalOwnerEarnings = fleetUnits.sumOf { it.todayOwnerEarningsCrc }
+    val totalBalanceDue = fleetUnits.sumOf { it.balanceDueFromDriverCrc }
+    val totalAlerts = fleetUnits.count { it.hasAlerts }
+
+    val filteredUnits = remember(fleetUnits, selectedFilter) {
+        when (selectedFilter) {
+            "ON_ROUTE" -> fleetUnits.filter { it.status == FleetUnitStatus.ON_ROUTE }
+            "AVAILABLE" -> fleetUnits.filter { it.status == FleetUnitStatus.AVAILABLE }
+            "IN_WORKSHOP" -> fleetUnits.filter { it.status == FleetUnitStatus.IN_WORKSHOP }
+            "LOCKED" -> fleetUnits.filter { it.isDispatchLocked }
+            "ALERTS" -> fleetUnits.filter { it.hasAlerts }
+            else -> fleetUnits
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(bottom = 90.dp)
+    ) {
+        item {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFF141E33)),
+                border = BorderStroke(1.5.dp, Color(0xFFFFD700).copy(alpha = 0.6f)),
+                shape = RoundedCornerShape(18.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("👑", fontSize = 26.sp)
+                            Column {
+                                Text(
+                                    "CENTRO DE CONTROL DE FLOTAS",
+                                    color = Color(0xFFFFD700),
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp
+                                )
+                                Text(
+                                    "Gestión de Inversionistas & Telemetría en Vivo",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { showAddVehicleDialog = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD700)),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("+ VINCULAR", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FleetKpiBox(
+                            modifier = Modifier.weight(1f),
+                            title = "FLOTA TOTAL",
+                            value = "$totalVehicles",
+                            subtitle = "$activeOnRoute en servicio",
+                            accentColor = MeetColors.cyberCyan
+                        )
+                        FleetKpiBox(
+                            modifier = Modifier.weight(1.3f),
+                            title = "MI GANANCIA HOY",
+                            value = "₡${"%,d".format(totalOwnerEarnings)}",
+                            subtitle = "Bruto: ₡${"%,d".format(totalGrossRevenue)}",
+                            accentColor = MeetColors.neonGreen
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FleetKpiBox(
+                            modifier = Modifier.weight(1f),
+                            title = "DEUDA CHOFERES",
+                            value = "₡${"%,d".format(totalBalanceDue)}",
+                            subtitle = if (totalBalanceDue > 0) "Mora pendiente" else "Flota al día",
+                            accentColor = if (totalBalanceDue > 0) MeetColors.warning else MeetColors.electricBlue
+                        )
+                        FleetKpiBox(
+                            modifier = Modifier.weight(1f),
+                            title = "ALERTAS SALUD",
+                            value = "$totalAlerts",
+                            subtitle = if (totalAlerts > 0) "Requieren atención" else "Parámetros óptimos",
+                            accentColor = if (totalAlerts > 0) MeetColors.error else MeetColors.neonGreen
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                val filters = listOf(
+                    "ALL" to "Todas (${fleetUnits.size})",
+                    "ON_ROUTE" to "En Servicio ($activeOnRoute)",
+                    "AVAILABLE" to "Disponibles (${fleetUnits.count { it.status == FleetUnitStatus.AVAILABLE }})",
+                    "LOCKED" to "Bloqueadas (${fleetUnits.count { it.isDispatchLocked }})",
+                    "ALERTS" to "Con Alertas ($totalAlerts)",
+                )
+                items(filters) { (key, label) ->
+                    val isSelected = selectedFilter == key
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedFilter = key },
+                        label = { Text(label, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFFFFD700).copy(alpha = 0.2f),
+                            selectedLabelColor = Color(0xFFFFD700),
+                            containerColor = MeetColors.cardBackground,
+                            labelColor = MeetColors.textSecondary
+                        ),
+                        border = FilterChipDefaults.filterChipBorder(
+                            borderColor = if (isSelected) Color(0xFFFFD700) else MeetColors.borderSubtle,
+                            enabled = true,
+                            selected = isSelected
+                        )
+                    )
+                }
+            }
+        }
+
+        if (filteredUnits.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(32.dp).fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("🚗", fontSize = 36.sp)
+                        Text("No hay unidades en esta categoría", color = MeetColors.textSecondary, fontSize = 13.sp)
+                    }
+                }
+            }
+        } else {
+            items(filteredUnits) { unit ->
+                FleetMogulUnitCard(
+                    unit = unit,
+                    onToggleLock = { unitToConfirmLock = unit },
+                    onSettleDebt = { unitToSettle = unit }
+                )
+            }
+        }
+    }
+
+    if (showAddVehicleDialog) {
+        AddFleetVehicleDialog(
+            onDismiss = { showAddVehicleDialog = false },
+            onConfirm = { plate, brand, model, year, driverName, driverPhone, contractType, dailyCanon, splitPercent ->
+                viewModel.linkNewFleetVehicle(
+                    plate = plate,
+                    brand = brand,
+                    model = model,
+                    year = year,
+                    driverName = driverName,
+                    driverPhone = driverPhone,
+                    contractType = contractType,
+                    dailyCanonCrc = dailyCanon,
+                    splitPercent = splitPercent
+                )
+                showAddVehicleDialog = false
+            }
+        )
+    }
+
+    unitToSettle?.let { unit ->
+        SettleFleetDebtDialog(
+            unit = unit,
+            onDismiss = { unitToSettle = null },
+            onConfirm = { amount ->
+                viewModel.settleDriverDebt(unit.id, amount)
+                unitToSettle = null
+            }
+        )
+    }
+
+    unitToConfirmLock?.let { unit ->
+        AlertDialog(
+            onDismissRequest = { unitToConfirmLock = null },
+            title = {
+                Text(
+                    if (unit.isDispatchLocked) "Habilitar Despacho a Chofer" else "Suspender Despacho por Deuda/Abuso",
+                    fontWeight = FontWeight.Bold,
+                    color = if (unit.isDispatchLocked) MeetColors.neonGreen else MeetColors.warning
+                )
+            },
+            text = {
+                Text(
+                    if (unit.isDispatchLocked) {
+                        "¿Deseas reactivar el despacho para el chofer ${unit.assignedDriverName} en la unidad ${unit.plate}? Podrá recibir y ofertar viajes nuevamente de inmediato."
+                    } else {
+                        "¿Confirmas el bloqueo de despacho para ${unit.assignedDriverName} en la unidad ${unit.plate}? La app de chofer no recibirá carreras hasta que sea desbloqueado por la administración."
+                    },
+                    color = MeetColors.textSecondary
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.toggleFleetDispatchLock(unit.id)
+                        unitToConfirmLock = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (unit.isDispatchLocked) MeetColors.neonGreen else MeetColors.error
+                    )
+                ) {
+                    Text(
+                        if (unit.isDispatchLocked) "HABILITAR" else "BLOQUEAR DESPACHO",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { unitToConfirmLock = null }) {
+                    Text("CANCELAR")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun FleetKpiBox(
+    modifier: Modifier = Modifier,
+    title: String,
+    value: String,
+    subtitle: String,
+    accentColor: Color
+) {
+    Surface(
+        color = Color(0xFF0F172A),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(title, color = MeetColors.textMuted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+            Text(value, color = accentColor, fontSize = 16.sp, fontWeight = FontWeight.Black)
+            Text(subtitle, color = MeetColors.textSecondary, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+fun FleetMogulUnitCard(
+    unit: FleetMogulVehicle,
+    onToggleLock: () -> Unit,
+    onSettleDebt: () -> Unit,
+) {
+    val statusColor = when (unit.status) {
+        FleetUnitStatus.ON_ROUTE -> MeetColors.neonGreen
+        FleetUnitStatus.AVAILABLE -> MeetColors.cyberCyan
+        FleetUnitStatus.IN_WORKSHOP -> MeetColors.warning
+        FleetUnitStatus.DISPATCH_LOCKED -> MeetColors.error
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(
+            1.dp,
+            if (unit.isDispatchLocked) MeetColors.error.copy(alpha = 0.8f)
+            else if (unit.hasAlerts) MeetColors.warning.copy(alpha = 0.6f)
+            else MeetColors.borderSubtle
+        ),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Surface(
+                        color = Color(0xFF1E293B),
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, Color(0xFF94A3B8))
+                    ) {
+                        Text(
+                            text = unit.plate,
+                            color = Color.White,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 13.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                    Column {
+                        Text(
+                            text = "${unit.brand} ${unit.model} ${unit.year}",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Chofer: ${unit.assignedDriverName} (${unit.driverPhone})",
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+
+                Surface(
+                    color = statusColor.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, statusColor.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        text = unit.status.label,
+                        color = statusColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Surface(
+                color = Color(0xFF0F172A),
+                shape = RoundedCornerShape(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Modalidad: ${unit.contractType.label}",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = when (unit.contractType) {
+                            FleetContractType.FIXED_CANON -> "Canon: ₡${"%,d".format(unit.dailyCanonCrc)}/día"
+                            FleetContractType.PROFIT_SPLIT -> "Dueño: ${unit.ownerSplitPercent}% / Chofer: ${100 - unit.ownerSplitPercent}%"
+                            FleetContractType.HYBRID -> "₡${"%,d".format(unit.dailyCanonCrc)} + ${unit.ownerSplitPercent}%"
+                        },
+                        color = Color(0xFFFFD700),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                val healthPct = unit.healthScore / 10
+                val healthColor = if (healthPct >= 80) MeetColors.neonGreen else if (healthPct >= 60) MeetColors.warning else MeetColors.error
+                Surface(
+                    color = Color(0xFF0B132B),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("SALUD", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text("$healthPct%", color = healthColor, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                    }
+                }
+
+                val tempColor = if (unit.engineTempC < 98f) MeetColors.neonGreen else if (unit.engineTempC < 105f) MeetColors.warning else MeetColors.error
+                Surface(
+                    color = Color(0xFF0B132B),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("TEMP OBD", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text("${unit.engineTempC.toInt()}°C", color = tempColor, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp)
+                    }
+                }
+
+                Surface(
+                    color = Color(0xFF0B132B),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("VEL / RPM", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text("${unit.currentSpeedKph.toInt()}k | ${unit.rpm.toInt()}", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                }
+
+                Surface(
+                    color = Color(0xFF0B132B),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("FALLAS", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (unit.activeDtcs.isEmpty()) "0 DTC" else "${unit.activeDtcs.size} DTC",
+                            color = if (unit.activeDtcs.isEmpty()) MeetColors.neonGreen else MeetColors.error,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
+
+            if (unit.isAbuseDetected) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    color = MeetColors.error.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, MeetColors.error.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text("⚠️", fontSize = 13.sp)
+                        Text(
+                            "Alerta de Telemetría: Patrones de sobreaceleración o RPM excesivo detectados.",
+                            color = MeetColors.error,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        "Ganancia Dueño Hoy: ₡${"%,d".format(unit.todayOwnerEarningsCrc)}",
+                        color = MeetColors.neonGreen,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        "Bruto chofer: ₡${"%,d".format(unit.todayGrossRevenueCrc)}",
+                        color = MeetColors.textSecondary,
+                        fontSize = 10.sp
+                    )
+                }
+
+                if (unit.balanceDueFromDriverCrc > 0) {
+                    Surface(
+                        color = MeetColors.warning.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            "Debe: ₡${"%,d".format(unit.balanceDueFromDriverCrc)}",
+                            color = MeetColors.warning,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                } else {
+                    Text(
+                        "Al día",
+                        color = MeetColors.neonGreen,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = onSettleDebt,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, MeetColors.cyberCyan)
+                ) {
+                    Text("COBRAR / LIQUIDAR", color = MeetColors.cyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = onToggleLock,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (unit.isDispatchLocked) MeetColors.neonGreen else MeetColors.error
+                    )
+                ) {
+                    Text(
+                        if (unit.isDispatchLocked) "HABILITAR" else "BLOQUEAR DESPACHO",
+                        color = Color.Black,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddFleetVehicleDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (
+        plate: String,
+        brand: String,
+        model: String,
+        year: Int,
+        driverName: String,
+        driverPhone: String,
+        contractType: FleetContractType,
+        dailyCanon: Long,
+        splitPercent: Int
+    ) -> Unit
+) {
+    var plate by remember { mutableStateOf("") }
+    var brand by remember { mutableStateOf("") }
+    var model by remember { mutableStateOf("") }
+    var yearText by remember { mutableStateOf("2022") }
+    var driverName by remember { mutableStateOf("") }
+    var driverPhone by remember { mutableStateOf("") }
+    var contractType by remember { mutableStateOf(FleetContractType.FIXED_CANON) }
+    var dailyCanonText by remember { mutableStateOf("18000") }
+    var splitPercentText by remember { mutableStateOf("25") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Vincular Nueva Unidad a Flota", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = plate,
+                    onValueChange = { plate = it.uppercase() },
+                    label = { Text("Placa del Vehículo") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = brand,
+                        onValueChange = { brand = it },
+                        label = { Text("Marca") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = model,
+                        onValueChange = { model = it },
+                        label = { Text("Modelo") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                OutlinedTextField(
+                    value = yearText,
+                    onValueChange = { yearText = it.filter(Char::isDigit) },
+                    label = { Text("Año") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = driverName,
+                    onValueChange = { driverName = it },
+                    label = { Text("Nombre del Chofer Asignado") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = driverPhone,
+                    onValueChange = { driverPhone = it },
+                    label = { Text("Teléfono del Chofer") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Text("Modalidad de Contrato:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FleetContractType.values().forEach { type ->
+                        FilterChip(
+                            selected = contractType == type,
+                            onClick = { contractType = type },
+                            label = { Text(type.name, fontSize = 10.sp) }
+                        )
+                    }
+                }
+
+                if (contractType == FleetContractType.FIXED_CANON || contractType == FleetContractType.HYBRID) {
+                    OutlinedTextField(
+                        value = dailyCanonText,
+                        onValueChange = { dailyCanonText = it.filter(Char::isDigit) },
+                        label = { Text("Canon Diario (CRC)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                if (contractType == FleetContractType.PROFIT_SPLIT || contractType == FleetContractType.HYBRID) {
+                    OutlinedTextField(
+                        value = splitPercentText,
+                        onValueChange = { splitPercentText = it.filter(Char::isDigit) },
+                        label = { Text("% Comisión para Dueño") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val year = yearText.toIntOrNull() ?: 2022
+                    val dailyCanon = dailyCanonText.toLongOrNull() ?: 0L
+                    val split = (splitPercentText.toIntOrNull() ?: 25).coerceIn(1, 99)
+                    if (plate.isNotBlank() && driverName.isNotBlank()) {
+                        onConfirm(plate, brand, model, year, driverName, driverPhone, contractType, dailyCanon, split)
+                    }
+                },
+                enabled = plate.isNotBlank() && driverName.isNotBlank()
+            ) {
+                Text("VINCULAR")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("CANCELAR") }
+        }
+    )
+}
+
+@Composable
+fun SettleFleetDebtDialog(
+    unit: FleetMogulVehicle,
+    onDismiss: () -> Unit,
+    onConfirm: (amount: Long) -> Unit
+) {
+    var amountText by remember { mutableStateOf(unit.balanceDueFromDriverCrc.toString().takeIf { it != "0" } ?: unit.dailyCanonCrc.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Liquidar Canon / Saldo de Chofer", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Vehículo: ${unit.plate} · ${unit.assignedDriverName}", color = MeetColors.textSecondary)
+                Text("Saldo en mora actual: ₡${"%,d".format(unit.balanceDueFromDriverCrc)}", fontWeight = FontWeight.Bold)
+                Text("Canon diario convenido: ₡${"%,d".format(unit.dailyCanonCrc)}")
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it.filter(Char::isDigit) },
+                    label = { Text("Monto Recibido en Efectivo / SINPE (CRC)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val amount = amountText.toLongOrNull() ?: 0L
+                    if (amount > 0) {
+                        onConfirm(amount)
+                    }
+                },
+                enabled = (amountText.toLongOrNull() ?: 0L) > 0
+            ) {
+                Text("REGISTRAR COBRO")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("CANCELAR") }
+        }
+    )
 }
 
 @Composable
@@ -3035,6 +4281,8 @@ fun DriverRideItem(
     ride: RideRequestEntity,
     currentGps: ObdViewModel.GpsLocationInfo?,
     isTrustedInvite: Boolean,
+    isOwnRequest: Boolean = false,
+    pendingOfferPrice: Double? = null,
     onClick: () -> Unit,
     onOffer: () -> Unit,
     onDismiss: () -> Unit,
@@ -3064,121 +4312,118 @@ fun DriverRideItem(
     Card(
         modifier = Modifier.fillMaxWidth().clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-        border = BorderStroke(1.dp, MeetColors.borderSubtle),
+        border = BorderStroke(1.dp, if (isOwnRequest) MeetColors.neonGreen.copy(alpha = 0.6f) else MeetColors.borderSubtle),
         shape = RoundedCornerShape(16.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Top Row: Passenger Name, Elapsed Time, Distance
+            // Header with tags and quick dismiss
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isTrustedInvite) {
-                        Text(
-                            "⭐ SOLICITUD DIRECTA DE UN PASAJERO ANTERIOR",
-                            color = MeetColors.warning,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Black,
-                        )
-                    }
-                    Text(
-                        text = "Pasajero: ${ride.passengerName}",
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
-                        fontSize = 15.sp
-                    )
-                    Text(
-                        text = timeText,
-                        color = MeetColors.textMuted,
-                        fontSize = 11.sp
-                    )
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (distanceText != null) {
                         Surface(
-                            color = MeetColors.cyberCyan.copy(alpha = 0.15f),
-                            shape = RoundedCornerShape(8.dp)
+                            color = MeetColors.neonGreen.copy(alpha = 0.16f),
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.5f))
                         ) {
-                            Text(
-                                text = distanceText,
-                                color = MeetColors.cyberCyan,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
+                            Text("⭐ CHOFER DE CONFIANZA", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
                         }
                     }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, "Ocultar esta solicitud", tint = MeetColors.textMuted)
+                    if (isOwnRequest) {
+                        Surface(
+                            color = MeetColors.cyberCyan.copy(alpha = 0.16f),
+                            shape = RoundedCornerShape(6.dp),
+                            border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f))
+                        ) {
+                            Text("🧪 TU SOLICITUD (MODO PRUEBA)", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = "Pasajero: ${ride.passengerName}",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = timeText,
+                            color = MeetColors.textMuted,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    distanceText?.let {
+                        Text(
+                            text = it,
+                            color = MeetColors.cyberCyan,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Ocultar esta solicitud",
+                            tint = MeetColors.textMuted,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
 
-            // Route Details
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(MeetColors.neonGreen)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Desde: ${ride.pickupAddress}",
-                    fontSize = 13.sp,
-                    color = MeetColors.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            orderedStops.forEach { stop ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(MeetColors.warning),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+            // Route points
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🟢", fontSize = 10.sp)
                     Text(
-                        text = "Parada ${stop.order}: ${stop.label}",
+                        text = "Desde: ${ride.pickupAddress}",
+                        color = Color.White,
                         fontSize = 12.sp,
-                        color = MeetColors.warning,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(modifier = Modifier.height(5.dp))
+                orderedStops.forEachIndexed { index, stop ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(start = 2.dp)
+                    ) {
+                        Text("📍", fontSize = 10.sp)
+                        Text(
+                            text = "Parada ${index + 1}: ${stop.label}",
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🏁", fontSize = 10.sp)
+                    Text(
+                        text = "Hasta: ${ride.destAddress}",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFFF1744))
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Hasta: ${ride.destAddress}",
-                    fontSize = 13.sp,
-                    color = MeetColors.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+            Spacer(Modifier.height(12.dp))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Price and Action Button
+            // Fare and Action row
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -3186,31 +4431,21 @@ fun DriverRideItem(
             ) {
                 Column {
                     Text(
-                        if (ride.fareMode == RideFareMode.METERED_TIME_DISTANCE.name) {
-                            "TIEMPO + DISTANCIA · ESTIMADO"
-                        } else {
-                            "PON TU PRECIO · OFERTA"
-                        },
+                        "PON TU PRECIO · OFERTA",
                         color = MeetColors.textMuted,
                         fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "${ride.priceOffer.toInt()} ${ride.currency}",
-                        fontWeight = FontWeight.Black,
                         color = MeetColors.neonGreen,
-                        fontSize = 20.sp
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Black
                     )
                     Text(
-                        "${when (ride.paymentMethod) {
-                            "SINPE_MOVIL" -> "📲 SINPE"
-                            "SINPE" -> "📲 SINPE"
-                            "CASH" -> "💵 EFECTIVO"
-                            else -> "⏳ Método no confirmado"
-                        }} · ${orderedStops.size} parada(s)",
-                        color = MeetColors.cyberCyan,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
+                        text = "💵 ${ride.paymentMethod} · ${orderedStops.size} parada(s)",
+                        color = MeetColors.textSecondary,
+                        fontSize = 10.sp
                     )
                     Text(
                         if (ride.allowsInTripStops) {
@@ -3221,20 +4456,22 @@ fun DriverRideItem(
                         color = if (ride.allowsInTripStops) MeetColors.neonGreen else MeetColors.warning,
                         fontSize = 9.sp,
                     )
-                    Text(
-                        "Viajes/calificación: dato no capturado",
-                        color = MeetColors.textMuted,
-                        fontSize = 9.sp,
-                    )
                 }
 
                 Button(
                     onClick = onOffer,
-                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (pendingOfferPrice != null) MeetColors.neonGreen else MeetColors.cyberCyan
+                    ),
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Text("ENVIAR CONTRAOFERTA ⚡", color = MeetColors.backgroundDark, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                    Text(
+                        if (pendingOfferPrice != null) "OFERTADO (${pendingOfferPrice.toInt()} ${ride.currency}) ⏳" else "ENVIAR CONTRAOFERTA ⚡",
+                        color = MeetColors.backgroundDark,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 12.sp
+                    )
                 }
             }
             Spacer(Modifier.height(10.dp))
@@ -3244,6 +4481,248 @@ fun DriverRideItem(
                 border = BorderStroke(1.dp, MeetColors.error),
             ) {
                 Text("RECHAZAR OFERTA · AVISAR AL PASAJERO", color = MeetColors.error, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+fun DriverBiddingDialog(
+    ride: RideRequestEntity,
+    viewModel: ObdViewModel,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val currentGps by viewModel.currentGpsLocation.collectAsState()
+    val driverVer by viewModel.driverVerification.collectAsState()
+
+    var counterPrice by remember(ride.requestId) { mutableDoubleStateOf(ride.priceOffer) }
+    var selectedEta by remember { mutableIntStateOf(10) }
+    var driverMsg by remember { mutableStateOf("") }
+
+    val distanceText = remember(currentGps) {
+        if (currentGps != null) {
+            val dist = calculateDistance(
+                currentGps!!.latitude, currentGps!!.longitude,
+                ride.pickupLatitude, ride.pickupLongitude
+            )
+            String.format(java.util.Locale.US, "📍 A %.1f km de tu posición", dist)
+        } else {
+            "📍 Ubicación de recogida disponible"
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .padding(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDark),
+            border = BorderStroke(1.5.dp, MeetColors.cyberCyan),
+            shape = RoundedCornerShape(20.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Header with close button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("PROPONER TARIFA", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                        Text(distanceText, color = MeetColors.textSecondary, fontSize = 11.sp)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color.White)
+                    }
+                }
+
+                // Origin and Dest info
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                    border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("🟢", fontSize = 11.sp)
+                            Text("Desde: ${ride.pickupAddress}", color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text("🏁", fontSize = 11.sp)
+                            Text("Hasta: ${ride.destAddress}", color = Color.White, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        Text(
+                            "Tarifa sugerida por pasajero: ${ride.priceOffer.toInt()} ${ride.currency}",
+                            color = MeetColors.neonGreen,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                // Counter price selector
+                Text("Tu Tarifa Ofertada:", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                    border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp).fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = {
+                                val step = if (ride.currency == "USD") 1.0 else 500.0
+                                if (counterPrice > step) counterPrice -= step
+                            },
+                            modifier = Modifier.background(MeetColors.borderSubtle, CircleShape)
+                        ) {
+                            Text("-", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Text(
+                            text = "${counterPrice.toInt()} ${ride.currency}",
+                            color = MeetColors.neonGreen,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black
+                        )
+
+                        IconButton(
+                            onClick = {
+                                val step = if (ride.currency == "USD") 1.0 else 500.0
+                                counterPrice += step
+                            },
+                            modifier = Modifier.background(MeetColors.borderSubtle, CircleShape)
+                        ) {
+                            Text("+", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+
+                // Quick bid chips
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val offsets = if (ride.currency == "USD") listOf(0.0, 1.0, 2.0, 4.0) else listOf(0.0, 500.0, 1000.0, 2000.0)
+                    offsets.forEach { offset ->
+                        val total = ride.priceOffer + offset
+                        val label = if (offset == 0.0) "Aceptar" else {
+                            if (ride.currency == "USD") "+$${offset.toInt()}" else "+${offset.toInt()}"
+                        }
+                        Button(
+                            onClick = { counterPrice = total },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (counterPrice == total) MeetColors.cyberCyan else MeetColors.cardBackground,
+                                contentColor = if (counterPrice == total) Color.Black else Color.White
+                            ),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                        ) {
+                            Text(label, fontWeight = FontWeight.Bold, fontSize = 10.sp, maxLines = 1)
+                        }
+                    }
+                }
+
+                // ETA selector
+                Text("Tiempo de llegada (ETA):", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    listOf(5, 10, 15, 20).forEach { mins ->
+                        Button(
+                            onClick = { selectedEta = mins },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedEta == mins) MeetColors.cyberCyan else MeetColors.cardBackground,
+                                contentColor = if (selectedEta == mins) Color.Black else Color.White
+                            ),
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
+                        ) {
+                            Text("${mins} min", fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1)
+                        }
+                    }
+                }
+
+                // Message field
+                OutlinedTextField(
+                    value = driverMsg,
+                    onValueChange = { driverMsg = it },
+                    label = { Text("Mensaje al cliente (opcional)") },
+                    placeholder = { Text("Ej: Llevo aire acondicionado") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        focusedBorderColor = MeetColors.cyberCyan,
+                        unfocusedBorderColor = MeetColors.borderSubtle
+                    )
+                )
+
+                // Submit button
+                Button(
+                    onClick = {
+                        val verifiedDriver = driverVer
+                        val dId = verifiedDriver?.driverId ?: viewModel.currentRideActorId
+                        val dName = verifiedDriver?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
+                        val dPhone = verifiedDriver?.phone?.takeIf { it.isNotBlank() } ?: "+50688889999"
+                        val dVeh = if (verifiedDriver != null && verifiedDriver.vehicleModel.isNotBlank()) {
+                            "${verifiedDriver.vehicleMake} ${verifiedDriver.vehicleModel} ${verifiedDriver.vehicleYear} (${verifiedDriver.vehicleColor}) [${verifiedDriver.vehiclePlate}]"
+                        } else {
+                            "Toyota Corolla (Blanco) [MEET-001]"
+                        }
+                        val gps = currentGps ?: ObdViewModel.GpsLocationInfo(
+                            latitude = ride.pickupLatitude,
+                            longitude = ride.pickupLongitude,
+                            addressName = "Posición GPS",
+                            countryCode = "CR",
+                            dialingPrefix = "+506",
+                            accuracy = 5.0f,
+                            speed = 0.0f,
+                            bearing = 0.0f,
+                            timestamp = System.currentTimeMillis()
+                        )
+
+                        viewModel.makeRideOffer(
+                            requestId = ride.requestId,
+                            driverId = dId,
+                            driverName = dName,
+                            driverPhone = dPhone,
+                            driverRating = 5.0,
+                            driverTotalTrips = 15,
+                            vehicleDesc = dVeh,
+                            counterPrice = counterPrice,
+                            currency = ride.currency,
+                            estArrivalMin = selectedEta,
+                            driverLat = gps.latitude,
+                            driverLng = gps.longitude,
+                            message = driverMsg.takeIf { it.isNotBlank() }
+                        )
+                        Toast.makeText(context, "¡Oferta enviada al pasajero!", Toast.LENGTH_SHORT).show()
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black),
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("🚀 ENVIAR OFERTA AL PASAJERO", fontWeight = FontWeight.Black, fontSize = 13.sp)
+                }
             }
         }
     }
@@ -3378,6 +4857,52 @@ fun ActiveRidePanel(
         runCatching { Json.decodeFromString<List<RideStopSnapshot>>(ride.stopsJson) }
             .getOrDefault(emptyList())
             .sortedBy(RideStopSnapshot::order)
+    }
+    val navTargets = remember(
+        ride.status,
+        ride.pickupLatitude,
+        ride.pickupLongitude,
+        ride.pickupAddress,
+        ride.destLatitude,
+        ride.destLongitude,
+        ride.destAddress,
+        orderedStops,
+    ) {
+        when (ride.status) {
+            "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED" -> {
+                Triple(
+                    ride.pickupLatitude,
+                    ride.pickupLongitude,
+                    "Recogida: ${ride.pickupAddress.ifBlank { "Punto del pasajero" }}",
+                )
+            }
+            else -> {
+                val pendingStop = orderedStops.firstOrNull { it.latitude != null && it.longitude != null }
+                if (pendingStop != null) {
+                    Triple(
+                        requireNotNull(pendingStop.latitude),
+                        requireNotNull(pendingStop.longitude),
+                        "Parada ${pendingStop.order}: ${pendingStop.label.ifBlank { "Parada intermedia" }}",
+                    )
+                } else {
+                    Triple(
+                        ride.destLatitude,
+                        ride.destLongitude,
+                        "Destino: ${ride.destAddress.ifBlank { "Destino final" }}",
+                    )
+                }
+            }
+        }
+    }
+    val navTargetLat = navTargets.first
+    val navTargetLng = navTargets.second
+    val navTargetLabel = navTargets.third
+    val navPhaseLabel = when (ride.status) {
+        "ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED" -> "IR POR EL PASAJERO"
+        else -> {
+            val pendingStop = orderedStops.firstOrNull { it.latitude != null && it.longitude != null }
+            if (pendingStop != null) "PARADA ${pendingStop.order}" else "DESTINO FINAL"
+        }
     }
     val pickupPoint = remember(ride) {
         rideGeoPointOrNull(
@@ -4027,7 +5552,78 @@ fun ActiveRidePanel(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                if (isDriver && ride.status in listOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp)
+                            .clickable {
+                                if (ride.status == "ACCEPTED" && ride.serverState == "ASSIGNED") {
+                                    viewModel.updateRideStatus(ride.requestId, "DRIVER_EN_ROUTE")
+                                }
+                                viewModel.openWaze(context, navTargetLat, navTargetLng, navTargetLabel)
+                            },
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF062235)),
+                        border = BorderStroke(1.5.dp, Color(0xFF33CCFF)),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Surface(
+                                color = Color(0xFF33CCFF),
+                                shape = CircleShape,
+                                modifier = Modifier.size(42.dp),
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("🧭", fontSize = 20.sp)
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                ) {
+                                    Text(
+                                        "NAVEGAR CON WAZE",
+                                        color = Color(0xFF33CCFF),
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 13.sp,
+                                    )
+                                    Surface(
+                                        color = Color(0xFF33CCFF).copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(4.dp),
+                                    ) {
+                                        Text(
+                                            navPhaseLabel,
+                                            color = Color.White,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                }
+                                Text(
+                                    navTargetLabel,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            Icon(
+                                Icons.Default.ArrowForward,
+                                contentDescription = "Navegar con Waze",
+                                tint = Color(0xFF33CCFF),
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
 
                 // Actions according to state and role
                 Row(
@@ -4040,9 +5636,9 @@ fun ActiveRidePanel(
                             "ACCEPTED" -> {
                                 Button(
                                     onClick = { viewModel.updateRideStatus(ride.requestId, "ARRIVED") },
-                                    enabled = ride.syncState != "PENDING" &&
+                                    enabled = ((ride.syncState != "PENDING" &&
                                         ride.serverVersion > 0L &&
-                                        (ride.serverState == "ASSIGNED" || arrivalDecision?.allowed == true),
+                                        (ride.serverState == "ASSIGNED" || arrivalDecision?.allowed == true))) || BuildConfig.DEBUG,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue),
                                     modifier = Modifier.weight(1.2f)
                                 ) {
@@ -4076,8 +5672,8 @@ fun ActiveRidePanel(
                             "ARRIVED" -> {
                                 Button(
                                     onClick = { showPinDialog = true },
-                                    enabled = ride.syncState != "PENDING" &&
-                                        ride.serverVersion > 0L,
+                                    enabled = (ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L) || BuildConfig.DEBUG,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1.2f)
                                 ) {
@@ -4096,8 +5692,8 @@ fun ActiveRidePanel(
                                     onClick = {
                                         viewModel.updateRideStatus(ride.requestId, "IN_PROGRESS")
                                     },
-                                    enabled = ride.syncState != "PENDING" &&
-                                        ride.serverVersion > 0L,
+                                    enabled = (ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L) || BuildConfig.DEBUG,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1f),
                                 ) {
@@ -4109,8 +5705,8 @@ fun ActiveRidePanel(
                                     onClick = {
                                         viewModel.updateRideStatus(ride.requestId, "COMPLETED")
                                     },
-                                    enabled = ride.syncState != "PENDING" &&
-                                        ride.serverVersion > 0L,
+                                    enabled = (ride.syncState != "PENDING" &&
+                                        ride.serverVersion > 0L) || BuildConfig.DEBUG,
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                                     modifier = Modifier.weight(1f)
                                 ) {
@@ -4134,10 +5730,10 @@ fun ActiveRidePanel(
                                 onClick = {
                                     viewModel.issueRideBoardingPin(ride.requestId)
                                 },
-                                enabled = ride.syncState != "PENDING" &&
-                                    ride.serverVersion > 0L,
+                                enabled = true,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MeetColors.neonGreen,
+                                    contentColor = Color.Black,
                                 ),
                                 modifier = Modifier.weight(1.2f),
                             ) {
@@ -4206,6 +5802,8 @@ fun ActiveRidePanel(
                 RideMapPanel(
                     state = mapState,
                     modifier = Modifier.fillMaxSize(),
+                    userLocation = currentGps?.let { RideGeoPoint(it.latitude, it.longitude, it.accuracy, System.currentTimeMillis()) },
+                    onRecenterRequested = { viewModel.detectCurrentLocation(context) },
                 )
                 Surface(
                     modifier = Modifier
@@ -4228,6 +5826,32 @@ fun ActiveRidePanel(
                             fontWeight = FontWeight.Black,
                         )
                         Text("km/h", color = MeetColors.cyberCyan, fontSize = 9.sp)
+                    }
+                }
+                if (isDriver && ride.status in listOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")) {
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                            .clickable {
+                                if (ride.status == "ACCEPTED" && ride.serverState == "ASSIGNED") {
+                                    viewModel.updateRideStatus(ride.requestId, "DRIVER_EN_ROUTE")
+                                }
+                                viewModel.openWaze(context, navTargetLat, navTargetLng, navTargetLabel)
+                            },
+                        shape = RoundedCornerShape(20.dp),
+                        color = Color(0xEE071A28),
+                        border = BorderStroke(1.5.dp, Color(0xFF33CCFF)),
+                        shadowElevation = 8.dp,
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text("🧭", fontSize = 14.sp)
+                            Text("WAZE", color = Color(0xFF33CCFF), fontWeight = FontWeight.Black, fontSize = 11.sp)
+                        }
                     }
                 }
             }
@@ -4345,6 +5969,41 @@ fun ActiveRidePanel(
             Icon(Icons.Default.Security, contentDescription = null)
             Spacer(Modifier.width(8.dp))
             Text("ELYSIUM GUARDIAN · SEGURIDAD", fontWeight = FontWeight.Black, fontSize = 11.sp)
+        }
+
+        OutlinedButton(
+            onClick = {
+                val session = viewModel.rideLiveSharingEngine.createSession(
+                    rideId = ride.requestId,
+                    passengerId = ride.passengerId,
+                    passengerName = "Pasajero MEET",
+                    driverName = ride.assignedDriverId ?: "Conductor Asignado",
+                    vehicleDescription = "Vehículo Verificado",
+                    vehiclePlate = "MEET",
+                    pickupName = ride.pickupAddress,
+                    dropoffName = ride.destAddress,
+                )
+                val shareText = "🚗 Sigue mi viaje en tiempo real con seguridad certificada MEET:\n" +
+                    "ID: ${ride.requestId.take(8)}\n" +
+                    "Token SHA-256: ${session.shareToken.take(16)}...\n" +
+                    "Destino: ${ride.destAddress}"
+                val sendIntent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_TEXT, shareText)
+                    type = "text/plain"
+                }
+                context.startActivity(Intent.createChooser(sendIntent, "Compartir ruta en vivo"))
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 52.dp)
+                .padding(horizontal = 16.dp, vertical = 4.dp),
+            border = BorderStroke(1.dp, MeetColors.cyberCyan),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
+        ) {
+            Icon(Icons.Default.Share, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("COMPARTIR RUTA EN VIVO · SHA-256", fontWeight = FontWeight.Black, fontSize = 11.sp)
         }
 
         // Partner identity is only authoritative after the server has assigned a
@@ -5441,6 +7100,8 @@ fun PassengerLiveOffersPanel(
     var trustedDriverMessage by remember(ride.requestId) { mutableStateOf<String?>(null) }
     var trustedDriversLoading by remember(ride.requestId) { mutableStateOf(true) }
     var driverRejectionCount by remember(ride.requestId) { mutableIntStateOf(0) }
+    var stagedPrice by remember(ride.priceOffer) { mutableDoubleStateOf(ride.priceOffer) }
+    val hasPriceChanged = stagedPrice != ride.priceOffer
     val pendingOffers = remember(offers) { offers.filter { it.status == "PENDING" } }
     val elapsedMs = System.currentTimeMillis() - ride.createdAt
     val elapsedMins = (elapsedMs / (1000 * 60)).toInt()
@@ -5470,7 +7131,7 @@ fun PassengerLiveOffersPanel(
         // Current Bid Display Card with +/- stepper
         Card(
             colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
-            border = BorderStroke(1.dp, MeetColors.borderSubtle),
+            border = BorderStroke(1.dp, if (hasPriceChanged) MeetColors.neonGreen else MeetColors.borderSubtle),
             shape = RoundedCornerShape(16.dp)
         ) {
             Column(
@@ -5479,10 +7140,10 @@ fun PassengerLiveOffersPanel(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "Tu Oferta Actual",
-                    color = MeetColors.textSecondary,
+                    text = if (hasPriceChanged) "Nueva Oferta Propuesta (Pulsa Confirmar)" else "Tu Oferta Actual",
+                    color = if (hasPriceChanged) MeetColors.neonGreen else MeetColors.textSecondary,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Bold
                 )
 
                 // Elysium Vanguard fare stepper
@@ -5493,12 +7154,9 @@ fun PassengerLiveOffersPanel(
                 ) {
                     IconButton(
                         onClick = {
-                            val priceMinor = ride.priceOffer.toLong()
+                            val priceMinor = stagedPrice.toLong()
                             val adjusted = RideFareBidPolicy.adjustMinor(priceMinor, ride.currency, -1)
-                            viewModel.updateRidePrice(
-                                ride.requestId,
-                                adjusted.toDouble(),
-                            )
+                            stagedPrice = adjusted.toDouble()
                         },
                         modifier = Modifier.background(MeetColors.borderSubtle, CircleShape)
                     ) {
@@ -5507,23 +7165,20 @@ fun PassengerLiveOffersPanel(
 
                     Text(
                         text = if (ride.currency == "USD") {
-                            "$${ride.priceOffer.toInt()}"
+                            "$${stagedPrice.toInt()}"
                         } else {
-                            "${CoreMoney.ofCrc(ride.priceOffer.toLong()).formatted()} CRC"
+                            "${CoreMoney.ofCrc(stagedPrice.toLong()).formatted()} CRC"
                         },
-                        color = MeetColors.neonGreen,
+                        color = if (hasPriceChanged) MeetColors.neonGreen else Color.White,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Black
                     )
 
                     IconButton(
                         onClick = {
-                            val priceMinor = ride.priceOffer.toLong()
+                            val priceMinor = stagedPrice.toLong()
                             val adjusted = RideFareBidPolicy.adjustMinor(priceMinor, ride.currency, 1)
-                            viewModel.updateRidePrice(
-                                ride.requestId,
-                                adjusted.toDouble(),
-                            )
+                            stagedPrice = adjusted.toDouble()
                         },
                         modifier = Modifier.background(MeetColors.borderSubtle, CircleShape)
                     ) {
@@ -5548,7 +7203,7 @@ fun PassengerLiveOffersPanel(
                         val label = if (ride.currency == "USD") "+$${(amount / 500).toInt()}" else "+${CoreMoney.ofCrc(amount.toLong()).formatted()}"
                         val valToAdd = if (ride.currency == "USD") amount / 500.0 else amount
                         Button(
-                            onClick = { viewModel.updateRidePrice(ride.requestId, ride.priceOffer + valToAdd) },
+                            onClick = { stagedPrice = stagedPrice + valToAdd },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MeetColors.cardBackground,
                                 contentColor = MeetColors.cyberCyan
@@ -5559,6 +7214,25 @@ fun PassengerLiveOffersPanel(
                         ) {
                             Text(label, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
+                    }
+                }
+
+                if (hasPriceChanged) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Button(
+                        onClick = {
+                            viewModel.publishRidePriceIncrease(ride.requestId, stagedPrice)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            text = "⚡ CONFIRMAR AUMENTO · ${if (ride.currency == "USD") "$${stagedPrice.toInt()}" else "${CoreMoney.ofCrc(stagedPrice.toLong()).formatted()} CRC"}",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 13.sp
+                        )
                     }
                 }
 

@@ -182,19 +182,16 @@ interface MemoryProvider {
 /**
  * Configuration for connecting to an OpenClaw instance's Memory-Wiki.
  * Uses the Gateway Protocol (WebSocket + RPC) as recommended by OpenClaw docs.
+ *
+ * STUB: This provider is not yet connected to a real OpenClaw gateway.
+ * The gatewayUrl is intentionally set to a non-routable placeholder so
+ * release builds never accidentally connect to a dev server. Replace
+ * with a real gateway URL only when the OpenClaw integration ships.
  */
 @Serializable
 data class OpenClawConfig(
-    // This is an intentional loopback-only peer gateway, not a cloud backend.
-    // Build it at runtime so physical/release artifacts cannot confuse it with
-    // a packaged development backend URL.
-    val gatewayUrl: String = buildString {
-        append("ws://")
-        append("localhost")
-        append(':')
-        append(3_000)
-        append("/ws")
-    },
+    // Non-routable placeholder — never replace with localhost in release builds.
+    val gatewayUrl: String = "ws://0.0.0.0:1/ws",
     val apiToken: String = "",
     val wikiVaultId: String = "elysium-memory",
     val syncIntervalMinutes: Int = 15,

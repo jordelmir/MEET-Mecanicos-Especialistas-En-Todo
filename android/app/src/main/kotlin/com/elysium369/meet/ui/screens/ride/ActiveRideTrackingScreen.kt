@@ -57,10 +57,11 @@ fun ActiveRideTrackingScreen(
     onCancelRide: () -> Unit,
     notice: String? = null,
     onBack: () -> Unit,
-    onCallDriver: (() -> Unit)?,
-    onMessageDriver: (() -> Unit)?,
-    onPay: (() -> Unit)?,
-    onRate: (() -> Unit)?,
+    onCallDriver: (() -> Unit)? = null,
+    onMessageDriver: (() -> Unit)? = null,
+    onPay: (() -> Unit)? = null,
+    onRate: (() -> Unit)? = null,
+    onGeneratePin: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var showSafetyCenter by remember { mutableStateOf(false) }
@@ -96,13 +97,19 @@ fun ActiveRideTrackingScreen(
                 label = ride.dropoff.displayName
             )
         )
-        ride.driverLocation?.takeIf { trackingTruth == com.elysium369.meet.ride.domain.TrackingFreshness.LIVE }?.let { loc ->
+        val driverPt = when {
+            ride.driverLocation != null -> GeoPoint(ride.driverLocation.latitude, ride.driverLocation.longitude)
+            ride.state == RideState.ARRIVED -> GeoPoint(ride.pickup.latitude, ride.pickup.longitude)
+            else -> null
+        }
+        driverPt?.let { pt ->
             markers.add(
                 GeoMarker(
                     id = "drv_loc",
                     role = GeoMarkerRole.PROVIDER_LIVE,
-                    point = GeoPoint(loc.latitude, loc.longitude),
-                    label = ride.driver?.name ?: "Conductor"
+                    point = pt,
+                    label = ride.driver?.name ?: "Conductor",
+                    isHighlighted = true
                 )
             )
         }
@@ -126,8 +133,15 @@ fun ActiveRideTrackingScreen(
                 }
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    val statusHeader = when {
+                        ride.state == RideState.ARRIVED -> "Conductor en el sitio"
+                        trackingTruth == com.elysium369.meet.ride.domain.TrackingFreshness.LIVE -> "Ubicación en vivo"
+                        trackingTruth == com.elysium369.meet.ride.domain.TrackingFreshness.RECENT -> "Ubicación reciente"
+                        ride.driverLocation != null -> "Ubicación en vivo"
+                        else -> "Ubicación GPS activa"
+                    }
                     Text(
-                        trackingTruth.label,
+                        statusHeader,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MeetColors.textPrimary
@@ -157,7 +171,12 @@ fun ActiveRideTrackingScreen(
             ) {
                 CommonMapPanel(
                     state = mapState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+                    recenterAlignment = Alignment.CenterEnd,
+                    recenterPadding = PaddingValues(end = 16.dp),
+                    userLocation = ride.passengerLocation?.let {
+                        GeoPoint(it.latitude, it.longitude, it.accuracy, it.timestamp)
+                    } ?: GeoPoint(ride.pickup.latitude, ride.pickup.longitude),
                 )
             }
 
@@ -246,10 +265,20 @@ fun ActiveRideTrackingScreen(
 
                         // ETA & Fare Pills
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            val etaText = when {
+                                ride.state == RideState.ARRIVED -> "¡En el punto!"
+                                ride.state in listOf(RideState.PASSENGER_ONBOARD, RideState.IN_PROGRESS) -> {
+                                    val duration = ride.fareQuote.estimatedDurationMin.takeIf { it > 0 } ?: 10
+                                    "~$duration min al destino"
+                                }
+                                ride.driver?.etaMinutes != null -> "~${ride.driver.etaMinutes} min"
+                                ride.fareQuote.estimatedDurationMin > 0 -> "~${ride.fareQuote.estimatedDurationMin} min"
+                                else -> "En camino"
+                            }
                             InfoPill(
                                 icon = { Icon(Icons.Default.DirectionsCar, null, tint = MeetColors.neonGreen) },
                                 label = "Llegada",
-                                value = ride.driver?.etaMinutes?.let { "~$it min" } ?: "No disponible",
+                                value = etaText,
                                 color = MeetColors.neonGreen,
                                 modifier = Modifier.weight(1f)
                             )
@@ -260,6 +289,44 @@ fun ActiveRideTrackingScreen(
                                 color = MeetColors.electricBlue,
                                 modifier = Modifier.weight(1f)
                             )
+                        }
+
+                        // Boarding PIN card when driver has arrived
+                        if (ride.state == RideState.ARRIVED) {
+                            if (ride.boardingPin != null) {
+                                Surface(
+                                    color = MeetColors.neonGreen.copy(alpha = 0.12f),
+                                    border = BorderStroke(1.dp, MeetColors.neonGreen),
+                                    shape = RoundedCornerShape(16.dp),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Column(
+                                        Modifier.padding(14.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                    ) {
+                                        Text("TU PIN PRIVADO DE ABORDAJE", color = MeetColors.textSecondary, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            ride.boardingPin.chunked(1).joinToString("  "),
+                                            color = MeetColors.neonGreen,
+                                            fontSize = 32.sp,
+                                            fontWeight = FontWeight.Black,
+                                            letterSpacing = 2.sp
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text("Díselo al conductor asignado para validar el abordaje", color = MeetColors.warning, fontSize = 10.sp)
+                                    }
+                                }
+                            } else if (onGeneratePin != null) {
+                                Button(
+                                    onClick = onGeneratePin,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black),
+                                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text("GENERAR PIN DE ABORDAJE 🔐", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
                         }
 
                         // Expandable details button

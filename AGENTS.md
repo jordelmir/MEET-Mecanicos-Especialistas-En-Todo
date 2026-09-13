@@ -90,8 +90,8 @@ Onboarding → Vehicle → OBD → DTCs → Repair guide → Mechanic
 
 | Spec | Path | Status |
 |---|---|---|
-| Reports PDF Certificados + Vehicle History | `docs/reports/V2-CERTIFIED-PDF-AND-HISTORY.md` | spec committed, awaiting Codex impl |
-| Parts Marketplace (VIN-DTC compatibility) | `docs/parts-marketplace/V2-TECHNICAL-MARKETPLACE.md` | spec committed, awaiting Codex impl |
+| Reports PDF Certificados + Vehicle History | `docs/reports/V2-CERTIFIED-PDF-AND-HISTORY.md` | IMPLEMENTED & INTEGRATED (4.24.0) |
+| Parts Marketplace (VIN-DTC compatibility) | `docs/parts-marketplace/V2-TECHNICAL-MARKETPLACE.md` | IMPLEMENTED & INTEGRATED (4.24.0) |
 
 Neither is "more important" than the other. They are sequential in
 implementation order (Reports first, then Parts), but both are in

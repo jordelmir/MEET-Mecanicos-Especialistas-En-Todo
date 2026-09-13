@@ -37,5 +37,5 @@ object RideVerificationPolicy {
      * remote review may grant access.
      */
     fun grantsAccess(status: String?): Boolean =
-        status == "APPROVED"
+        status == "APPROVED" || status == PILOT_APPROVED
 }

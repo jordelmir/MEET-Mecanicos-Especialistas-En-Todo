@@ -55,6 +55,7 @@ import com.elysium369.meet.ui.screens.marketos.LegalVanguardHub
 import com.elysium369.meet.ui.screens.marketos.PropertiesHub
 import com.elysium369.meet.ui.navigation.backOrHome
 import com.elysium369.meet.ui.navigation.navigateTopLevel
+import com.elysium369.meet.ui.navigation.safeNavigate
 import com.elysium369.meet.core.livelink.LiveLinkServer
 import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.identity.PrincipalAccessPolicy
@@ -268,6 +269,20 @@ fun MeetApp(
     val navController = rememberNavController()
     val liveLinkServer = remember { LiveLinkServer.shared() }
     var mainGraphEstablished by rememberSaveable { mutableStateOf(false) }
+
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    LaunchedEffect(navBackStackEntry?.destination?.route) {
+        navBackStackEntry?.destination?.route?.let { currentRoute ->
+            com.elysium369.meet.automation.AiAutomationBridge.currentRoute = currentRoute
+        }
+    }
+    LaunchedEffect(navController) {
+        com.elysium369.meet.automation.AiAutomationBridge.navEvents.collect { route ->
+            android.util.Log.i("AiAutomation", "Navigating to route from AI bus: $route")
+            navController.safeNavigate(route)
+        }
+    }
+
     val sharedPrefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
     val onboardingCompleted = sharedPrefs.getBoolean("onboarding_completed", false)
     val hasProfile = !sharedPrefs.getString("user_profile", null).isNullOrBlank()
@@ -980,6 +995,17 @@ fun MeetApp(
                     onOpenMessages = { navController.navigate("messages?serviceVertical=universal") },
                 )
             }
+            composable("universal_activity/{serviceId}") { backStackEntry ->
+                val serviceId = backStackEntry.arguments?.getString("serviceId").orEmpty()
+                val service = com.elysium369.meet.core.services.UniversalServiceCatalog.getById(serviceId)
+                    ?: com.elysium369.meet.core.services.UniversalServiceCatalog.definitions.first { it.id == "hardware_materials" }
+                com.elysium369.meet.ui.screens.universal.UniversalActivityWorkflowScreen(
+                    service = service,
+                    viewModel = obdViewModel,
+                    onNavigateBack = { navController.backOrHome() },
+                    onOpenMessages = { navController.navigate("messages?serviceVertical=universal") },
+                )
+            }
             composable("provider_registration") {
                 ProviderRegistrationScreen(
                     viewModel = obdViewModel,
@@ -990,6 +1016,64 @@ fun MeetApp(
                 PlatformTrustCenterScreen(
                     viewModel = obdViewModel,
                     onBack = { navController.backOrHome() },
+                    onNavigateToCommandCenter = { navController.navigate("meet_command_center") },
+                )
+            }
+            composable("meet_command_center") {
+                com.elysium369.meet.ui.screens.intelligence.MeetExecutiveCommandCenterScreen(
+                    onNavigateBack = { navController.backOrHome() },
+                    onNavigateToTrustCenter = { _ -> navController.navigate("platform_trust_center") },
+                )
+            }
+            composable("driver_command_center") {
+                com.elysium369.meet.ui.screens.intelligence.DriverCommandCenterScreen(
+                    driverId = obdViewModel.currentUserId ?: "demo-driver",
+                    onNavigateBack = { navController.backOrHome() },
+                    onNavigateToTrustCenter = { _ -> navController.navigate("platform_trust_center") },
+                )
+            }
+            composable("fleet_command_center") {
+                com.elysium369.meet.ui.screens.intelligence.FleetCommandCenterScreen(
+                    fleetId = "fleet-vanguard-01",
+                    onNavigateBack = { navController.backOrHome() },
+                    onNavigateToTrustCenter = { _ -> navController.navigate("platform_trust_center") },
+                )
+            }
+            composable("trust_center_hub") {
+                com.elysium369.meet.ui.screens.trust.TrustCenterHubScreen(
+                    principalId = obdViewModel.currentUserId ?: "demo-principal",
+                    organizationId = null,
+                    onNavigateBack = { navController.backOrHome() },
+                    onNavigateToCommandCenter = { navController.navigate("meet_command_center") },
+                )
+            }
+            composable("passenger_activity") {
+                com.elysium369.meet.ui.screens.intelligence.PassengerActivityScreen(
+                    passengerId = obdViewModel.currentUserId ?: "demo-passenger",
+                    onNavigateBack = { navController.backOrHome() },
+                    onNavigateToTrustCenter = { navController.navigate("trust_center_hub") },
+                )
+            }
+            composable("mechanic_business") {
+                com.elysium369.meet.ui.screens.intelligence.MechanicBusinessScreen(
+                    mechanicId = obdViewModel.currentUserId ?: "demo-mechanic",
+                    onNavigateBack = { navController.backOrHome() },
+                    onNavigateToTrustCenter = { navController.navigate("trust_center_hub") },
+                )
+            }
+            composable("workshop_command_center") {
+                com.elysium369.meet.ui.screens.intelligence.WorkshopCommandCenterScreen(
+                    workshopOrgId = "workshop-vanguard-01",
+                    onNavigateBack = { navController.backOrHome() },
+                    onNavigateToTrustCenter = { _ -> navController.navigate("trust_center_hub") },
+                )
+            }
+            composable("tow_command_center") {
+                com.elysium369.meet.ui.screens.intelligence.TowCommandCenterScreen(
+                    operatorOrOrgId = obdViewModel.currentUserId ?: "demo-tow-operator",
+                    isOrganization = false,
+                    onNavigateBack = { navController.backOrHome() },
+                    onNavigateToTrustCenter = { navController.navigate("trust_center_hub") },
                 )
             }
             composable("repair_case_detail/{caseId}") { backStack ->
@@ -1229,12 +1313,18 @@ fun MeetApp(
             }
 
             composable(MeetDestinations.RIDE_ACTIVE_TRACKING) {
+                val context = LocalContext.current
+                val currentGps by obdViewModel.currentGpsLocation.collectAsState()
+                LaunchedEffect(Unit) {
+                    obdViewModel.detectCurrentLocation(context)
+                }
                 val activeRideReq by obdViewModel.activeRideRequest.collectAsState()
                 var rideNotice by remember { mutableStateOf<String?>(null) }
                 LaunchedEffect(Unit) {
                     obdViewModel.rideVerificationNotice.collect { rideNotice = it }
                 }
                 val activeRide = activeRideReq?.let { req ->
+                    val now = System.currentTimeMillis()
                     val parsedState = runCatching {
                         com.elysium369.meet.ride.domain.RideState.valueOf(
                             when (req.serverState) {
@@ -1244,6 +1334,15 @@ fun MeetApp(
                         )
                     }.getOrNull() ?: com.elysium369.meet.ride.domain.RideState.UNKNOWN
 
+                    val etaMin = when {
+                        parsedState == com.elysium369.meet.ride.domain.RideState.ARRIVED -> 0
+                        parsedState in listOf(
+                            com.elysium369.meet.ride.domain.RideState.PASSENGER_ONBOARD,
+                            com.elysium369.meet.ride.domain.RideState.IN_PROGRESS
+                        ) -> req.estimatedDurationMin.takeIf { it > 0 } ?: 10
+                        else -> req.estimatedDurationMin.takeIf { it > 0 } ?: 5
+                    }
+
                     val matchedDriver = req.assignedDriverId?.let { driverId ->
                         com.elysium369.meet.ui.screens.ride.MatchedDriver(
                             driverId = driverId,
@@ -1252,10 +1351,83 @@ fun MeetApp(
                             totalTrips = null,
                             vehicle = req.assignedDriverVehicle,
                             plate = null,
-                            etaMinutes = null,
-                            distanceMeters = null
+                            phone = req.assignedDriverPhone,
+                            etaMinutes = etaMin,
+                            distanceMeters = (req.estimatedDistanceKm * 1000.0).toInt()
                         )
                     }
+
+                    val isDriverRole = obdViewModel.rideDriverMode.value || (req.assignedDriverId != null && req.assignedDriverId == obdViewModel.currentUserId)
+
+                    val driverLoc = when {
+                        parsedState == com.elysium369.meet.ride.domain.RideState.ARRIVED -> {
+                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
+                                latitude = req.pickupLatitude,
+                                longitude = req.pickupLongitude,
+                                accuracy = req.pickupAccuracy.takeIf { it in 1f..100f } ?: 5f,
+                                timestamp = now,
+                                receivedAt = now,
+                                sequenceId = 1L,
+                                source = "ARRIVED_CONFIRMED"
+                            )
+                        }
+                        currentGps != null && isDriverRole -> {
+                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
+                                latitude = currentGps!!.latitude,
+                                longitude = currentGps!!.longitude,
+                                accuracy = currentGps!!.accuracy.coerceIn(1f, 100f),
+                                timestamp = now,
+                                receivedAt = now,
+                                sequenceId = 1L,
+                                source = "DRIVER_DEVICE_GPS"
+                            )
+                        }
+                        currentGps != null -> {
+                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
+                                latitude = currentGps!!.latitude,
+                                longitude = currentGps!!.longitude,
+                                accuracy = currentGps!!.accuracy.coerceIn(1f, 100f),
+                                timestamp = now,
+                                receivedAt = now,
+                                sequenceId = 1L,
+                                source = "GPS_TRACKING"
+                            )
+                        }
+                        req.pickupLatitude != 0.0 -> {
+                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
+                                latitude = req.pickupLatitude,
+                                longitude = req.pickupLongitude,
+                                accuracy = 10f,
+                                timestamp = now,
+                                receivedAt = now,
+                                sequenceId = 1L,
+                                source = "PICKUP_ORIGIN"
+                            )
+                        }
+                        else -> null
+                    }
+
+                    val passengerLoc = currentGps?.let { gps ->
+                        com.elysium369.meet.ui.screens.ride.RideLocationPoint(
+                            latitude = gps.latitude,
+                            longitude = gps.longitude,
+                            accuracy = gps.accuracy.coerceIn(1f, 100f),
+                            timestamp = now,
+                            receivedAt = now,
+                            sequenceId = 1L,
+                            source = "PASSENGER_DEVICE_GPS"
+                        )
+                    } ?: if (req.pickupLatitude != 0.0) {
+                        com.elysium369.meet.ui.screens.ride.RideLocationPoint(
+                            latitude = req.pickupLatitude,
+                            longitude = req.pickupLongitude,
+                            accuracy = req.pickupAccuracy.coerceIn(1f, 100f),
+                            timestamp = now,
+                            receivedAt = now,
+                            sequenceId = 1L,
+                            source = "PICKUP_COORDINATES"
+                        )
+                    } else null
 
                     com.elysium369.meet.ui.screens.ride.ActiveRideViewState(
                         rideId = req.requestId,
@@ -1305,7 +1477,10 @@ fun MeetApp(
                                 }
                             )
                         },
-                        state = parsedState
+                        state = parsedState,
+                        driverLocation = driverLoc,
+                        passengerLocation = passengerLoc,
+                        boardingPin = req.boardingPin
                     )
                 }
 
@@ -1321,8 +1496,21 @@ fun MeetApp(
                                 actorRole = "PASSENGER"
                             )
                         },
-                        onCallDriver = null,
-                        onMessageDriver = null,
+                        onGeneratePin = {
+                            obdViewModel.issueRideBoardingPin(activeRide.rideId)
+                        },
+                        onCallDriver = activeRide.driver?.phone?.takeIf { it.isNotBlank() }?.let { phone ->
+                            {
+                                val dialIntent = android.content.Intent(
+                                    android.content.Intent.ACTION_DIAL,
+                                    android.net.Uri.parse("tel:$phone")
+                                )
+                                context.startActivity(dialIntent)
+                            }
+                        },
+                        onMessageDriver = {
+                            navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.RIDE_HOME)
+                        },
                         onPay = null,
                         onRate = null,
                         onBack = { navController.backOrHome() }

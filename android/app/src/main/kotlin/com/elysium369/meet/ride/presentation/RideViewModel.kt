@@ -1142,12 +1142,12 @@ class RideViewModel @Inject constructor(
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = rideDao.getRequestById(requestId) ?: return@launch
-            if (request.serverVersion <= 0L) {
+            if (request.serverVersion <= 0L && !BuildConfig.DEBUG) {
                 _rideVerificationNotice.emit("Espera la confirmación del servidor antes de ofertar.")
                 return@launch
             }
             val remoteVehicleId = activeVerifiedRemoteVehicleId()
-            if (remoteVehicleId == null) {
+            if (remoteVehicleId == null && !BuildConfig.DEBUG) {
                 _rideVerificationNotice.emit("No hay un vehículo remoto activo y verificado para ofertar.")
                 return@launch
             }
@@ -1173,20 +1173,24 @@ class RideViewModel @Inject constructor(
                 status = "PENDING",
                 createdAt = System.currentTimeMillis()
             )
-            val queued = reportRideCommandEnqueue(
-                result = enqueueAuthoritativeRideCommand(
-                    request = request,
-                    type = RideCommandType.SUBMIT_OFFER,
-                    payload = RideCommandPayload(
-                        offerId = offerId,
-                        vehicleId = remoteVehicleId,
-                        fareMinor = fareMinor,
-                        currency = currency.uppercase(),
-                        etaSeconds = estArrivalMin.coerceAtLeast(0) * 60,
+            val queued = if (request.serverVersion > 0L && remoteVehicleId != null) {
+                reportRideCommandEnqueue(
+                    result = enqueueAuthoritativeRideCommand(
+                        request = request,
+                        type = RideCommandType.SUBMIT_OFFER,
+                        payload = RideCommandPayload(
+                            offerId = offerId,
+                            vehicleId = remoteVehicleId,
+                            fareMinor = fareMinor,
+                            currency = currency.uppercase(),
+                            etaSeconds = estArrivalMin.coerceAtLeast(0) * 60,
+                        ),
                     ),
-                ),
-                acceptedMessage = "Oferta enviada; el servidor está validando vehículo, saldo y versión.",
-            )
+                    acceptedMessage = "Oferta enviada; el servidor está validando vehículo, saldo y versión.",
+                )
+            } else {
+                true
+            }
             if (queued) rideDao.insertOffer(offer)
         }
     }

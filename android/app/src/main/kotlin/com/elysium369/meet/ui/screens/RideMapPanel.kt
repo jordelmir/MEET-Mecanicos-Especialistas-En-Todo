@@ -15,12 +15,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.ui.zIndex
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
@@ -56,6 +58,10 @@ import com.elysium369.meet.ride.map.RideMapAvatarSelection
 import com.elysium369.meet.ride.map.RideMapAvatarStore
 import com.elysium369.meet.ride.map.RideMapState
 import com.elysium369.meet.ride.map.RideMarkerRole
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.Icon as ComposeIcon
 import org.maplibre.android.MapLibre
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
@@ -105,6 +111,11 @@ fun RideMapPanel(
     onPinSelectionChanged: ((RideGeoPoint) -> Unit)? = null,
     onPinSelectionConfirmed: ((RideGeoPoint) -> Unit)? = null,
     onPinSelectionCancelled: (() -> Unit)? = null,
+    showRecenterButton: Boolean = true,
+    recenterButtonAlignment: Alignment = Alignment.CenterEnd,
+    recenterButtonPadding: PaddingValues = PaddingValues(end = 12.dp),
+    userLocation: RideGeoPoint? = null,
+    onRecenterRequested: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -118,7 +129,21 @@ fun RideMapPanel(
     var configuredMap by remember { mutableStateOf<MapLibreMap?>(null) }
     var userControlsCamera by remember { mutableStateOf(false) }
     var lastCameraSignature by remember { mutableStateOf<String?>(null) }
-    var pinSelectionPoint by remember { mutableStateOf(pinSelectionInitialPoint) }
+    val defaultFallbackPoint = remember {
+        RideGeoPoint(
+            latitude = 9.9281,
+            longitude = -84.0907,
+            accuracyMeters = 10f,
+            capturedAtEpochMs = System.currentTimeMillis(),
+        )
+    }
+    val effectiveInitialPoint = remember(pinSelectionInitialPoint, state) {
+        pinSelectionInitialPoint?.takeIf { kotlin.math.abs(it.latitude) > 0.01 || kotlin.math.abs(it.longitude) > 0.01 }
+            ?: state.markers.firstOrNull()?.point?.takeIf { kotlin.math.abs(it.latitude) > 0.01 || kotlin.math.abs(it.longitude) > 0.01 }
+            ?: state.route.firstOrNull()?.takeIf { kotlin.math.abs(it.latitude) > 0.01 || kotlin.math.abs(it.longitude) > 0.01 }
+            ?: defaultFallbackPoint
+    }
+    var pinSelectionPoint by remember { mutableStateOf(pinSelectionInitialPoint ?: effectiveInitialPoint) }
     var pinCameraInitialized by remember { mutableStateOf(false) }
     var recenterRequest by remember { mutableIntStateOf(0) }
     val currentPinSelectionEnabled by rememberUpdatedState(pinSelectionEnabled)
@@ -153,24 +178,21 @@ fun RideMapPanel(
         }
     }
 
-    val pinInitialPointAvailable = pinSelectionInitialPoint != null
-    LaunchedEffect(pinSelectionEnabled, pinInitialPointAvailable, latestMap, styleReady) {
+    LaunchedEffect(pinSelectionEnabled, effectiveInitialPoint, latestMap, styleReady) {
         if (!pinSelectionEnabled) return@LaunchedEffect
         if (pinCameraInitialized) return@LaunchedEffect
         val map = latestMap ?: return@LaunchedEffect
         if (!styleReady) return@LaunchedEffect
-        pinSelectionInitialPoint?.let { point ->
-            pinCameraInitialized = true
-            pinSelectionPoint = point
-            userControlsCamera = true
-            map.animateCamera(
-                CameraUpdateFactory.newLatLngZoom(
-                    LatLng(point.latitude, point.longitude),
-                    17.0,
-                ),
-                450,
-            )
-        }
+        pinCameraInitialized = true
+        pinSelectionPoint = effectiveInitialPoint
+        userControlsCamera = true
+        map.animateCamera(
+            CameraUpdateFactory.newLatLngZoom(
+                LatLng(effectiveInitialPoint.latitude, effectiveInitialPoint.longitude),
+                16.8,
+            ),
+            350,
+        )
     }
 
     DisposableEffect(lifecycleOwner, mapView) {
@@ -227,6 +249,14 @@ fun RideMapPanel(
                             isTiltGesturesEnabled = true
                             zoomRate = 0.85f
                         }
+                        if (pinSelectionEnabled) {
+                            map.moveCamera(
+                                CameraUpdateFactory.newLatLngZoom(
+                                    LatLng(effectiveInitialPoint.latitude, effectiveInitialPoint.longitude),
+                                    16.8,
+                                )
+                            )
+                        }
                         view.setOnTouchListener { touchedView, event ->
                             when (event.actionMasked) {
                                 MotionEvent.ACTION_DOWN,
@@ -253,6 +283,9 @@ fun RideMapPanel(
                             if (currentPinSelectionEnabled) {
                                 val target = map.cameraPosition.target
                                     ?: return@addOnCameraIdleListener
+                                if (kotlin.math.abs(target.latitude) < 0.01 && kotlin.math.abs(target.longitude) < 0.01) {
+                                    return@addOnCameraIdleListener
+                                }
                                 val point = RideGeoPoint(
                                     latitude = target.latitude,
                                     longitude = target.longitude,
@@ -279,8 +312,16 @@ fun RideMapPanel(
                                 applyVanguardRoadHierarchy(map)
                                 styleReady = true
                                 mapError = null
+                                if (pinSelectionEnabled) {
+                                    map.moveCamera(
+                                        CameraUpdateFactory.newLatLngZoom(
+                                            LatLng(effectiveInitialPoint.latitude, effectiveInitialPoint.longitude),
+                                            16.8,
+                                        )
+                                    )
+                                }
                                 val signature = state.cameraSignature()
-                                renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = true)
+                                renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = !pinSelectionEnabled)
                                 lastCameraSignature = signature
                             }
                         }
@@ -373,15 +414,11 @@ fun RideMapPanel(
                 }
                 Spacer(Modifier.height(8.dp))
                 MapControlButton("◎") {
-                    pinSelectionInitialPoint?.let { point ->
-                        latestMap?.animateCamera(
-                            CameraUpdateFactory.newLatLngZoom(
-                                LatLng(point.latitude, point.longitude),
-                                17.25,
-                            ),
-                            320,
-                        )
-                    }
+                    val target = resolveRealUserCoordinates(context, userLocation, state, defaultFallbackPoint)
+                    latestMap?.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(target, 17.25),
+                        300,
+                    )
                 }
             }
             pinSelectionPoint?.let { point ->
@@ -405,26 +442,42 @@ fun RideMapPanel(
                     )
                 }
             }
-        } else if (state.markers.isNotEmpty()) {
+        }
+
+        if (showRecenterButton && !pinSelectionEnabled) {
             FloatingActionButton(
                 onClick = {
                     userControlsCamera = false
                     lastCameraSignature = null
                     recenterRequest += 1
+                    onRecenterRequested?.invoke()
                     latestMap?.let { map ->
-                        renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = true)
-                        lastCameraSignature = state.cameraSignature()
+                        val target = resolveRealUserCoordinates(context, userLocation, state, defaultFallbackPoint)
+                        map.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(target, 16.8),
+                            300,
+                        )
                     }
                 },
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
-                    .size(44.dp),
+                    .align(recenterButtonAlignment)
+                    .padding(recenterButtonPadding)
+                    .size(48.dp)
+                    .zIndex(20f)
+                    .border(
+                        BorderStroke(1.5.dp, ComposeColor(0xFF00E5FF)),
+                        CircleShape,
+                    ),
                 shape = CircleShape,
-                containerColor = ComposeColor(0xFF07131E).copy(alpha = 0.92f),
+                containerColor = ComposeColor(0xFF07131E).copy(alpha = 0.94f),
                 contentColor = ComposeColor(0xFF00E5FF),
             ) {
-                Text("◎", fontWeight = FontWeight.Black)
+                ComposeIcon(
+                    imageVector = Icons.Default.MyLocation,
+                    contentDescription = "Centrar en mi ubicación GPS",
+                    tint = ComposeColor(0xFF00E5FF),
+                    modifier = Modifier.size(26.dp),
+                )
             }
         }
 
@@ -509,6 +562,54 @@ private fun RideMapStatus(
             )
             .padding(horizontal = 14.dp, vertical = 10.dp),
     )
+}
+
+private fun resolveRealUserCoordinates(
+    context: Context,
+    explicitUserLocation: RideGeoPoint?,
+    state: RideMapState,
+    fallback: RideGeoPoint,
+): LatLng {
+    if (explicitUserLocation != null && (kotlin.math.abs(explicitUserLocation.latitude) > 0.01 || kotlin.math.abs(explicitUserLocation.longitude) > 0.01)) {
+        return LatLng(explicitUserLocation.latitude, explicitUserLocation.longitude)
+    }
+
+    val userMarker = state.marker(RideMarkerRole.PASSENGER_GPS)
+        ?: state.marker(RideMarkerRole.DRIVER)
+        ?: state.marker(RideMarkerRole.PICKUP)
+    if (userMarker != null && (kotlin.math.abs(userMarker.point.latitude) > 0.01 || kotlin.math.abs(userMarker.point.longitude) > 0.01)) {
+        return LatLng(userMarker.point.latitude, userMarker.point.longitude)
+    }
+
+    try {
+        if (androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? android.location.LocationManager
+            val lastGps = locationManager?.getLastKnownLocation(android.location.LocationManager.GPS_PROVIDER)
+            val lastNetwork = locationManager?.getLastKnownLocation(android.location.LocationManager.NETWORK_PROVIDER)
+            val bestLoc = listOfNotNull(lastGps, lastNetwork)
+                .filter { kotlin.math.abs(it.latitude) > 0.01 || kotlin.math.abs(it.longitude) > 0.01 }
+                .maxByOrNull { it.time }
+            if (bestLoc != null) {
+                return LatLng(bestLoc.latitude, bestLoc.longitude)
+            }
+        }
+    } catch (_: Exception) {
+    }
+
+    val routePt = state.route.firstOrNull()?.takeIf { kotlin.math.abs(it.latitude) > 0.01 || kotlin.math.abs(it.longitude) > 0.01 }
+    if (routePt != null) {
+        return LatLng(routePt.latitude, routePt.longitude)
+    }
+
+    return LatLng(fallback.latitude, fallback.longitude)
 }
 
 private fun renderRideState(

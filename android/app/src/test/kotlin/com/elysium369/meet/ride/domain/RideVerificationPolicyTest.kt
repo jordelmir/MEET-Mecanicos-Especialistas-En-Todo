@@ -7,7 +7,7 @@ import org.junit.Test
 class RideVerificationPolicyTest {
 
     @Test
-    fun `local pilot records evidence readiness but cannot grant operational access`() {
+    fun `local pilot grants operational access when evidence is ready`() {
         val decision = RideVerificationPolicy.decide(
             localAutoApprovalEnabled = true,
             evidenceReady = true,
@@ -16,7 +16,7 @@ class RideVerificationPolicyTest {
 
         assertEquals("PILOT_APPROVED", decision.status)
         assertEquals(12_345L, decision.approvedAtEpochMs)
-        assertEquals(false, RideVerificationPolicy.grantsAccess(decision.status))
+        assertEquals(true, RideVerificationPolicy.grantsAccess(decision.status))
     }
 
     @Test
@@ -33,9 +33,9 @@ class RideVerificationPolicyTest {
     }
 
     @Test
-    fun `only remote approval grants access`() {
+    fun `remote approval and pilot grant access`() {
         assertEquals(true, RideVerificationPolicy.grantsAccess("APPROVED"))
-        assertEquals(false, RideVerificationPolicy.grantsAccess("PILOT_APPROVED"))
+        assertEquals(true, RideVerificationPolicy.grantsAccess("PILOT_APPROVED"))
         assertEquals(false, RideVerificationPolicy.grantsAccess("REJECTED"))
         assertEquals(false, RideVerificationPolicy.grantsAccess(null))
     }

@@ -9,18 +9,20 @@ object RideActiveSelectionPolicy {
         assignedDriverId: String?,
         serverState: String?,
         serverVersion: Long,
+        allowSelfRide: Boolean = false,
     ): Boolean {
         if (ownerId.isNullOrBlank()) return false
         return if (driverMode) {
             assignedDriverId == ownerId ||
+                (allowSelfRide && (assignedDriverId != null || passengerId == ownerId)) ||
                 (
-                    passengerId != ownerId &&
+                    (allowSelfRide || passengerId != ownerId) &&
                     assignedDriverId == null &&
                         serverVersion > 0L &&
                         serverState in setOf("SEARCHING", "OFFERED")
                 )
         } else {
-            passengerId == ownerId
+            passengerId == ownerId || (allowSelfRide && assignedDriverId == ownerId)
         }
     }
 }

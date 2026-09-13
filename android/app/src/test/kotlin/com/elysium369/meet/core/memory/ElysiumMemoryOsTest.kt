@@ -114,7 +114,8 @@ class ElysiumMemoryOsTest {
     @Test
     fun `openclaw config has sensible defaults`() {
         val config = OpenClawConfig()
-        assertEquals("ws://localhost:3000/ws", config.gatewayUrl)
+        // Non-routable placeholder — never localhost in release builds
+        assertEquals("ws://0.0.0.0:1/ws", config.gatewayUrl)
         assertEquals("elysium-memory", config.wikiVaultId)
         assertEquals(15, config.syncIntervalMinutes)
         assertTrue(config.enableDreaming)
