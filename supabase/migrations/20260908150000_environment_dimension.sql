@@ -123,13 +123,16 @@ END;
 $$;
 
 -- 9. Default existing data to PILOT (since we're past SANDBOX for current users).
--- Only for users who have completed verification.
+-- Only for drivers whose dispatch vehicle is already verified. Passenger
+-- verification authority is introduced later and must not be invented here.
 UPDATE public.ride_profiles
 SET environment = 'PILOT'
-WHERE user_id IN (
-    SELECT driver_id FROM public.driver_verifications WHERE status = 'APPROVED'
-    UNION
-    SELECT passenger_id FROM public.passenger_verifications WHERE status = 'APPROVED'
+WHERE EXISTS (
+    SELECT 1
+    FROM public.ride_driver_vehicles vehicle
+    WHERE vehicle.driver_id = public.ride_profiles.user_id
+      AND vehicle.is_active
+      AND vehicle.verification_status = 'VERIFIED'
 );
 
 COMMENT ON TYPE public.deployment_environment IS
