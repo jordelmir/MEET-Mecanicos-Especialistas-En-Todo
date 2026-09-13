@@ -76,6 +76,7 @@ import com.elysium369.meet.ride.map.resilientRidePlaceSearchProvider
 import com.elysium369.meet.ride.map.resilientRideRoutingProvider
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ride.domain.RideDriverPresencePolicy
+import com.elysium369.meet.ride.domain.RideDispatchExpiryPolicy
 import com.elysium369.meet.ride.data.RideProjectionConnectionState
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
@@ -85,6 +86,9 @@ import com.elysium369.meet.ride.traffic.RideEtaEvidenceLevel
 import com.elysium369.meet.ride.traffic.RideEtaSegment
 import com.elysium369.meet.ride.notification.RideNotificationCoordinator
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
+import com.elysium369.meet.ride.data.remote.RideDispatchGateway
+import com.elysium369.meet.ride.data.remote.RideDriverPerformance
+import com.elysium369.meet.ride.data.remote.TrustedRideDriver
 import com.elysium369.meet.ride.data.remote.RideWalletPolicy
 import com.elysium369.meet.ride.data.remote.RideWalletBalance
 import kotlinx.coroutines.launch
@@ -160,6 +164,12 @@ fun RideServiceScreen(
     val passengerVerification by viewModel.passengerVerification.collectAsState()
     val passengerRegistrationMissing = passengerVerification == null
     val driverRegistrationMissing = driverVerification == null
+    val voicePreferences = remember(context) {
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+    }
+    var rideVoiceEnabled by remember {
+        mutableStateOf(voicePreferences.getBoolean("voice_feedback_enabled", true))
+    }
     var showProfile by rememberSaveable { mutableStateOf(false) }
     var profileInitialTab by rememberSaveable { mutableIntStateOf(0) }
     var showRideMenu by remember { mutableStateOf(false) }
@@ -175,6 +185,48 @@ fun RideServiceScreen(
             // Restart the owner-scoped realtime channel and force an RLS catch-up.
             viewModel.startRideProjectionSync()
             viewModel.refreshRideProjectionNow()
+        }
+    }
+    LaunchedEffect(presenceOwnerId) {
+        if (presenceOwnerId == null) return@LaunchedEffect
+        while (true) {
+            runCatching { RideDispatchGateway.expireStaleRequests() }
+                .onSuccess { viewModel.refreshRideProjectionNow() }
+            delay(60_000L)
+        }
+    }
+    LaunchedEffect(activeRide?.requestId, activeRide?.serverState, driverMode) {
+        if (!driverMode && activeRide?.serverState == "EXPIRED") {
+            viewModel.selectActiveRide(null)
+        }
+    }
+    LaunchedEffect(
+        presenceOwnerId,
+        driverMode,
+        activeRide?.requestId,
+        activeRide?.serverState,
+        rideVoiceEnabled,
+    ) {
+        if (presenceOwnerId == null || !rideVoiceEnabled) return@LaunchedEffect
+        val state = activeRide?.serverState ?: activeRide?.status ?: "DASHBOARD"
+        val guideKey = "${if (driverMode) "DRIVER" else "PASSENGER"}:$state:${activeRide?.requestId.orEmpty()}"
+        val preferenceKey = "ride_voice_last_context_$presenceOwnerId"
+        if (voicePreferences.getString(preferenceKey, null) == guideKey) return@LaunchedEffect
+        val guidance = when {
+            driverMode && activeRide == null -> "Estás en modo chofer. Revisa las solicitudes, envía una contraoferta o limpia las que no quieras atender. Usa el interruptor para volver a pasajero."
+            !driverMode && activeRide == null -> "Estás en modo pasajero. Elige destino, tarifa y forma de pago; luego publica tu solicitud. Puedes silenciar esta guía con el botón del altavoz."
+            driverMode && state in setOf("ASSIGNED", "DRIVER_EN_ROUTE") -> "Viaje asignado. Dirígete al punto de recogida y marca tu llegada solamente cuando estés allí."
+            driverMode && state in setOf("ARRIVED", "PASSENGER_ONBOARD") -> "Confirma al pasajero con el código de abordaje antes de iniciar el viaje."
+            driverMode && state == "IN_PROGRESS" -> "Viaje en curso. Sigue la ruta y completa el viaje únicamente al llegar al destino."
+            !driverMode && state in setOf("SEARCHING", "OFFERED") -> "Tu solicitud está publicada. Puedes comparar ofertas, invitar a un chofer que ya conoces o cancelar el viaje."
+            !driverMode && state in setOf("ASSIGNED", "DRIVER_EN_ROUTE") -> "Chofer asignado. Revisa su información y espera en el punto de recogida."
+            !driverMode && state in setOf("ARRIVED", "PASSENGER_ONBOARD") -> "Tu chofer llegó. Confirma que el vehículo coincide y comparte el código de abordaje solamente con él."
+            !driverMode && state == "COMPLETED" -> "Viaje completado. Califica el servicio y, si deseas dejar propina, entrégala en efectivo o por SINPE directamente al chofer."
+            else -> null
+        }
+        guidance?.let {
+            voicePreferences.edit { putString(preferenceKey, guideKey) }
+            viewModel.voiceFeedbackManager.speak(es = it)
         }
     }
     val presenceKey = RideDriverPresencePolicy.storageKey(presenceOwnerId)
@@ -233,13 +285,6 @@ fun RideServiceScreen(
             )
         }
         }
-    }
-
-    LaunchedEffect(Unit) {
-        viewModel.voiceFeedbackManager.speak(
-            es = "Bienvenido a Elysium Viajes y Movilidad Segura. Puedes solicitar un viaje con tarifa transparente y conductores verificados.",
-            en = "Welcome to Elysium Rides and Mobility. Request a safe ride with transparent fares and verified drivers."
-        )
     }
 
     Scaffold(
@@ -365,12 +410,22 @@ fun RideServiceScreen(
                             Icon(Icons.Default.Chat, "Mensajes", tint = MeetColors.cyberCyan)
                         }
                         IconButton(onClick = {
-                            viewModel.voiceFeedbackManager.speak(
-                                es = "Elysium Viajes: Monitoreo de seguridad satelital, telemetría y subasta de tarifas en tiempo real.",
-                                en = "Elysium Rides: Real-time satellite security tracking and transparent fare bidding."
-                            )
+                            rideVoiceEnabled = !rideVoiceEnabled
+                            viewModel.voiceFeedbackManager.setEnabled(rideVoiceEnabled)
+                            if (rideVoiceEnabled) {
+                                viewModel.voiceFeedbackManager.speak(
+                                    es = "Guía de voz activada.",
+                                    en = "Voice guidance enabled.",
+                                )
+                            } else {
+                                Toast.makeText(context, "Guía de voz silenciada", Toast.LENGTH_SHORT).show()
+                            }
                         }) {
-                            Icon(Icons.Default.VolumeUp, "Voz Asistente", tint = MeetColors.neonGreen)
+                            Icon(
+                                if (rideVoiceEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                                if (rideVoiceEnabled) "Silenciar guía de voz" else "Activar guía de voz",
+                                tint = if (rideVoiceEnabled) MeetColors.neonGreen else MeetColors.textMuted,
+                            )
                         }
                         Column(
                             horizontalAlignment = Alignment.End,
@@ -799,6 +854,31 @@ fun PassengerDashboard(
         }
         active.maxByOrNull { it.createdAt }
     }
+    val latestExpiredRide = remember(userRides) {
+        userRides
+            .filter { it.serverState == "EXPIRED" || it.status == "EXPIRED" }
+            .maxByOrNull { it.createdAt }
+            ?.takeIf { System.currentTimeMillis() - it.createdAt <= 24 * 60 * 60 * 1000L }
+    }
+    val expiredRepriceMinor = remember(latestExpiredRide) {
+        latestExpiredRide?.let { expired ->
+            val currentMinor = expired.priceOfferMinor.takeIf { it > 0L }
+                ?: if (expired.currency == "CRC") expired.priceOffer.toLong() else (expired.priceOffer * 100.0).toLong()
+            RideDispatchExpiryPolicy.recommendedOpenBidMinor(currentMinor, expired.currency)
+        }
+    }
+
+    LaunchedEffect(latestExpiredRide?.requestId) {
+        val expired = latestExpiredRide ?: return@LaunchedEffect
+        val announcedKey = "expired_voice_${expired.requestId}"
+        if (!draftPreferences.getBoolean(announcedKey, false)) {
+            draftPreferences.edit { putBoolean(announcedKey, true) }
+            viewModel.voiceFeedbackManager.speak(
+                es = "Tu solicitud venció después de treinta minutos. Vuelve a pedir por tiempo y distancia, o usa Pon tu precio. Te recomendamos subir la oferta para aumentar la probabilidad de aceptación.",
+                en = "Your request expired after thirty minutes. Request again by time and distance, or raise your offer with Name your price.",
+            )
+        }
+    }
 
     var showPaxVerification by rememberSaveable(draftOwner) { mutableStateOf(false) }
     var paxName by rememberSaveable(draftOwner) { mutableStateOf("") }
@@ -976,6 +1056,62 @@ fun PassengerDashboard(
             }
             // Don't show ride request form if not verified
         } else {
+            if (latestExpiredRide != null) {
+                item(key = "expired-${latestExpiredRide.requestId}") {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = MeetColors.warning.copy(alpha = 0.12f)),
+                        border = BorderStroke(1.5.dp, MeetColors.warning),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text("⏱️ LA SOLICITUD VENCIÓ", color = MeetColors.warning, fontWeight = FontWeight.Black)
+                            Text(
+                                "Después de 30 minutos salió de la lista de choferes. Vuelve a solicitar el viaje por Tiempo + Distancia o aumenta tu oferta en Pon tu precio.",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                            )
+                            Button(
+                                onClick = {
+                                    fareMode = RideFareMode.OPEN_BID
+                                    expiredRepriceMinor?.let { recommended ->
+                                        offerPrice = if (latestExpiredRide.currency == "CRC") recommended.toDouble() else recommended / 100.0
+                                    }
+                                    isUsd = latestExpiredRide.currency == "USD"
+                                    destAddress = latestExpiredRide.destAddress
+                                    destLatitude = latestExpiredRide.destLatitude
+                                    destLongitude = latestExpiredRide.destLongitude
+                                    destinationPlaceId = null
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.warning),
+                            ) {
+                                Text("PON TU PRECIO · SUBIR OFERTA", color = Color.Black, fontWeight = FontWeight.Black)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    fareMode = RideFareMode.METERED_TIME_DISTANCE
+                                    isUsd = latestExpiredRide.currency == "USD"
+                                    destAddress = latestExpiredRide.destAddress
+                                    destLatitude = latestExpiredRide.destLatitude
+                                    destLongitude = latestExpiredRide.destLongitude
+                                    destinationPlaceId = null
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("VOLVER A PEDIR · TIEMPO + DISTANCIA")
+                            }
+                            Text(
+                                "Confirma de nuevo el destino antes de publicar. No se crea ni cobra otro viaje automáticamente.",
+                                color = MeetColors.textMuted,
+                                fontSize = 10.sp,
+                            )
+                        }
+                    }
+                }
+            }
             // Banner de viaje activo si lo hay
             if (activeRideForPassenger != null) {
                 item {
@@ -2202,6 +2338,17 @@ fun DriverDashboard(
     var topupAmount by rememberSaveable { mutableStateOf(15000) }
     var pendingTopupAmount by remember { mutableStateOf<Long?>(null) }
     val walletScope = rememberCoroutineScope()
+    val dispatchScope = rememberCoroutineScope()
+    var driverPerformance by remember(driverHomeOwner) { mutableStateOf<RideDriverPerformance?>(null) }
+    var dispatchMessage by remember(driverHomeOwner) { mutableStateOf<String?>(null) }
+    var hiddenRideIds by remember(driverHomeOwner) {
+        mutableStateOf(
+            driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty()
+                .mapNotNull { it.substringBefore('|').takeIf(String::isNotBlank) }
+                .toSet(),
+        )
+    }
+    var trustedInviteRideIds by remember(driverHomeOwner) { mutableStateOf(emptySet<String>()) }
     val proofPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -2249,6 +2396,29 @@ fun DriverDashboard(
             .onFailure { walletMessage = "No se pudo consultar el saldo persistente: ${it.message?.take(100)}" }
         runCatching { PlatformTrustCenterGateway.loadOwnWalletTopups() }
             .onSuccess { walletTopups = it }
+        runCatching { RideDispatchGateway.decisions() }
+            .onSuccess { decisions -> hiddenRideIds = hiddenRideIds + decisions.map { it.tripId } }
+        runCatching { RideDispatchGateway.performance() }
+            .onSuccess { driverPerformance = it }
+        runCatching { RideDispatchGateway.trustedInvites() }
+            .onSuccess { invites ->
+                trustedInviteRideIds = invites.filter { it.state in setOf("PENDING", "SEEN") }.map { it.tripId }.toSet()
+            }
+
+        // Owner-scoped offline queue: UI decisions apply immediately and retry
+        // with the same idempotency key when connectivity returns.
+        val pending = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toSet()
+        pending.forEach { encoded ->
+            val parts = encoded.split('|')
+            if (parts.size == 3) {
+                runCatching { RideDispatchGateway.decideRequest(parts[0], parts[1], parts[2]) }
+                    .onSuccess {
+                        val remaining = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toMutableSet()
+                        remaining.remove(encoded)
+                        driverPrefs.edit { putStringSet("pending_driver_decisions", remaining) }
+                    }
+            }
+        }
     }
     LaunchedEffect(driverHomeOwner, driverVer?.status) {
         if (driverHomeOwner == null || !RideVerificationPolicy.grantsAccess(driverVer?.status)) {
@@ -2262,6 +2432,30 @@ fun DriverDashboard(
                 walletBalance = runCatching { PlatformTrustCenterGateway.walletBalance() }
                     .getOrDefault(walletBalance)
             }
+    }
+    LaunchedEffect(driverHomeOwner, driverVer?.status) {
+        if (driverHomeOwner == null || !RideVerificationPolicy.grantsAccess(driverVer?.status)) {
+            return@LaunchedEffect
+        }
+        while (true) {
+            val pending = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toSet()
+            pending.forEach { encoded ->
+                val parts = encoded.split('|')
+                if (parts.size == 3) {
+                    runCatching { RideDispatchGateway.decideRequest(parts[0], parts[1], parts[2]) }
+                        .onSuccess {
+                            val remaining = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toMutableSet()
+                            remaining.remove(encoded)
+                            driverPrefs.edit { putStringSet("pending_driver_decisions", remaining) }
+                        }
+                }
+            }
+            runCatching { RideDispatchGateway.trustedInvites() }
+                .onSuccess { invites ->
+                    trustedInviteRideIds = invites.filter { it.state in setOf("PENDING", "SEEN") }.map { it.tripId }.toSet()
+                }
+            delay(15_000L)
+        }
     }
 
     LaunchedEffect(viewModel) {
@@ -2290,8 +2484,13 @@ fun DriverDashboard(
             active.maxByOrNull { it.createdAt }
         }
     }
-    val rankedOpenRides = remember(openRides, myDriverId, destinationHomeEnabled, homeLatitude, homeLongitude) {
-        val eligibleRides = openRides.filter { it.passengerId != myDriverId }
+    val rankedOpenRides = remember(openRides, myDriverId, hiddenRideIds, destinationHomeEnabled, homeLatitude, homeLongitude) {
+        val now = System.currentTimeMillis()
+        val eligibleRides = openRides.filter {
+            it.passengerId != myDriverId &&
+                it.requestId !in hiddenRideIds &&
+                RideDispatchExpiryPolicy.remainsVisible(it.createdAt, now)
+        }
         if (!destinationHomeEnabled || homeLatitude == null || homeLongitude == null) {
             eligibleRides
         } else {
@@ -2322,6 +2521,9 @@ fun DriverDashboard(
         verticalArrangement = Arrangement.spacedBy(16.dp),
         contentPadding = PaddingValues(bottom = 80.dp)
     ) {
+        item {
+            DriverPerformanceCard(driverPerformance)
+        }
         item {
             DriverWalletCard(
                 policy = walletPolicy,
@@ -2595,14 +2797,56 @@ fun DriverDashboard(
                     DriverRideItem(
                         ride = request,
                         currentGps = currentGps,
+                        isTrustedInvite = request.requestId in trustedInviteRideIds,
                         onClick = { viewModel.selectActiveRide(request) },
                         onOffer = {
                             // Open the authoritative auction panel first. The old
                             // shortcut claimed the ride immediately, so drivers
                             // never reached the contra-offer form.
                             viewModel.selectActiveRide(request)
-                        }
+                        },
+                        onDismiss = {
+                            hiddenRideIds = hiddenRideIds + request.requestId
+                            val pending = "${request.requestId}|DISMISS|${java.util.UUID.randomUUID()}"
+                            val queued = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toMutableSet().apply { add(pending) }
+                            driverPrefs.edit { putStringSet("pending_driver_decisions", queued) }
+                            dispatchScope.launch {
+                                runCatching {
+                                    val parts = pending.split('|')
+                                    RideDispatchGateway.decideRequest(parts[0], parts[1], parts[2])
+                                }.onSuccess {
+                                    val remaining = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toMutableSet().apply { remove(pending) }
+                                    driverPrefs.edit { putStringSet("pending_driver_decisions", remaining) }
+                                    dispatchMessage = "Solicitud ocultada en tu cuenta."
+                                }.onFailure {
+                                    dispatchMessage = "Solicitud ocultada aquí; se sincronizará al recuperar internet."
+                                }
+                            }
+                        },
+                        onReject = {
+                            hiddenRideIds = hiddenRideIds + request.requestId
+                            val pending = "${request.requestId}|REJECT|${java.util.UUID.randomUUID()}"
+                            val queued = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toMutableSet().apply { add(pending) }
+                            driverPrefs.edit { putStringSet("pending_driver_decisions", queued) }
+                            dispatchScope.launch {
+                                runCatching {
+                                    val parts = pending.split('|')
+                                    RideDispatchGateway.decideRequest(parts[0], parts[1], parts[2])
+                                }.onSuccess {
+                                    val remaining = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toMutableSet().apply { remove(pending) }
+                                    driverPrefs.edit { putStringSet("pending_driver_decisions", remaining) }
+                                    dispatchMessage = "Oferta rechazada. El pasajero fue avisado y su solicitud sigue activa."
+                                }.onFailure {
+                                    dispatchMessage = "Rechazo guardado; se sincronizará al recuperar internet."
+                                }
+                            }
+                        },
                     )
+                }
+            }
+            dispatchMessage?.let { message ->
+                item {
+                    Text(message, color = MeetColors.cyberCyan, fontSize = 11.sp)
                 }
             }
         }
@@ -2757,11 +3001,44 @@ fun PassengerRideItem(
 }
 
 @Composable
+private fun DriverPerformanceCard(performance: RideDriverPerformance?) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF07131E)),
+        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.55f)),
+        shape = RoundedCornerShape(16.dp),
+    ) {
+        Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Text("TU DESEMPEÑO REAL", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MetricPill(
+                    "Aceptación",
+                    performance?.acceptanceRatePercent?.let { String.format(Locale.US, "%.1f%%", it) } ?: "Sin datos",
+                )
+                MetricPill(
+                    "Finalizados",
+                    performance?.completionRatePercent?.let { String.format(Locale.US, "%.1f%%", it) } ?: "Sin datos",
+                )
+            }
+            Text(
+                performance?.let {
+                    "${it.offersAccepted}/${it.offersSubmitted} ofertas aceptadas · ${it.tripsCompleted} viajes completados"
+                } ?: "Supabase aún no tiene actividad suficiente para calcular porcentajes.",
+                color = MeetColors.textMuted,
+                fontSize = 10.sp,
+            )
+        }
+    }
+}
+
+@Composable
 fun DriverRideItem(
     ride: RideRequestEntity,
     currentGps: ObdViewModel.GpsLocationInfo?,
+    isTrustedInvite: Boolean,
     onClick: () -> Unit,
-    onOffer: () -> Unit
+    onOffer: () -> Unit,
+    onDismiss: () -> Unit,
+    onReject: () -> Unit,
 ) {
     val orderedStops = remember(ride.stopsJson) {
         runCatching { Json.decodeFromString<List<RideStopSnapshot>>(ride.stopsJson) }
@@ -2798,6 +3075,14 @@ fun DriverRideItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
+                    if (isTrustedInvite) {
+                        Text(
+                            "⭐ SOLICITUD DIRECTA DE UN PASAJERO ANTERIOR",
+                            color = MeetColors.warning,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                        )
+                    }
                     Text(
                         text = "Pasajero: ${ride.passengerName}",
                         fontWeight = FontWeight.ExtraBold,
@@ -2811,18 +3096,23 @@ fun DriverRideItem(
                     )
                 }
 
-                if (distanceText != null) {
-                    Surface(
-                        color = MeetColors.cyberCyan.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = distanceText,
-                            color = MeetColors.cyberCyan,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (distanceText != null) {
+                        Surface(
+                            color = MeetColors.cyberCyan.copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = distanceText,
+                                color = MeetColors.cyberCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, "Ocultar esta solicitud", tint = MeetColors.textMuted)
                     }
                 }
             }
@@ -2946,6 +3236,14 @@ fun DriverRideItem(
                 ) {
                     Text("ENVIAR CONTRAOFERTA ⚡", color = MeetColors.backgroundDark, fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                 }
+            }
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = onReject,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, MeetColors.error),
+            ) {
+                Text("RECHAZAR OFERTA · AVISAR AL PASAJERO", color = MeetColors.error, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -3872,9 +4170,9 @@ fun ActiveRidePanel(
                                 TipDialog(
                                     currency = ride.currency,
                                     onDismiss = { showTipDialog = false },
-                                    onConfirm = { tipMinor ->
+                                    onConfirm = { tipMinor, deliveryMethod ->
                                         showTipDialog = false
-                                        viewModel.submitTip(ride.requestId, tipMinor, ride.currency)
+                                        viewModel.submitTip(ride.requestId, tipMinor, ride.currency, deliveryMethod)
                                     },
                                 )
                             }
@@ -5137,11 +5435,31 @@ fun PassengerLiveOffersPanel(
     onCloseRide: () -> Unit,
 ) {
     val currentLocale = rememberRideJavaLocale()
+    val trustedDriverScope = rememberCoroutineScope()
     var showCancellationDialog by remember { mutableStateOf(false) }
+    var trustedDrivers by remember(ride.requestId) { mutableStateOf(emptyList<TrustedRideDriver>()) }
+    var trustedDriverMessage by remember(ride.requestId) { mutableStateOf<String?>(null) }
+    var trustedDriversLoading by remember(ride.requestId) { mutableStateOf(true) }
+    var driverRejectionCount by remember(ride.requestId) { mutableIntStateOf(0) }
     val pendingOffers = remember(offers) { offers.filter { it.status == "PENDING" } }
     val elapsedMs = System.currentTimeMillis() - ride.createdAt
     val elapsedMins = (elapsedMs / (1000 * 60)).toInt()
     val timeText = if (elapsedMins <= 0) "hace un momento" else "hace $elapsedMins min"
+
+    LaunchedEffect(ride.requestId) {
+        trustedDriversLoading = true
+        runCatching { RideDispatchGateway.trustedDrivers() }
+            .onSuccess { trustedDrivers = it }
+            .onFailure { trustedDriverMessage = "No se pudo consultar tu historial de choferes." }
+        trustedDriversLoading = false
+    }
+    LaunchedEffect(ride.requestId) {
+        while (true) {
+            driverRejectionCount = runCatching { RideDispatchGateway.rejectionCount(ride.requestId) }
+                .getOrDefault(driverRejectionCount)
+            delay(10_000L)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -5260,6 +5578,73 @@ fun PassengerLiveOffersPanel(
         if (showCancellationDialog) {
             AuthoritativeRideCancellationDialog(viewModel, ride.requestId, RideActorRole.PASSENGER) {
                 showCancellationDialog = false
+            }
+        }
+
+        if (trustedDriversLoading || trustedDrivers.isNotEmpty()) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MeetColors.neonGreen.copy(alpha = 0.08f)),
+                border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.55f)),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text("CHOFERES DE TU CONFIANZA", color = MeetColors.neonGreen, fontWeight = FontWeight.Black)
+                    Text(
+                        "Puedes invitar directamente a un chofer que ya completó un viaje contigo. La solicitud seguirá disponible para la red.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 11.sp,
+                    )
+                    if (trustedDriversLoading) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                    } else {
+                        trustedDrivers.take(5).forEach { driver ->
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(driver.displayName, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "${driver.completedTrips} viaje(s) juntos · ${driver.vehicleName ?: "Vehículo pendiente"}",
+                                        color = MeetColors.textMuted,
+                                        fontSize = 9.sp,
+                                    )
+                                }
+                                Button(
+                                    onClick = {
+                                        trustedDriverScope.launch {
+                                            runCatching { RideDispatchGateway.inviteTrustedDriver(ride.requestId, driver.driverId) }
+                                                .onSuccess { trustedDriverMessage = "Invitación enviada a ${driver.displayName}." }
+                                                .onFailure { trustedDriverMessage = "No se pudo enviar la invitación: ${it.message?.take(90)}" }
+                                        }
+                                    },
+                                    enabled = driver.isAvailable,
+                                ) {
+                                    Text(if (driver.isAvailable) "INVITAR" else "NO DISPONIBLE")
+                                }
+                            }
+                        }
+                    }
+                    trustedDriverMessage?.let { Text(it, color = MeetColors.cyberCyan, fontSize = 10.sp) }
+                }
+            }
+        }
+
+        // Radar search indicator with elapsed time
+        if (driverRejectionCount > 0) {
+            Surface(
+                color = MeetColors.warning.copy(alpha = 0.12f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MeetColors.warning),
+            ) {
+                Text(
+                    if (driverRejectionCount == 1) {
+                        "Un chofer rechazó tu oferta. Tu solicitud sigue activa para otros choferes."
+                    } else {
+                        "$driverRejectionCount choferes rechazaron tu oferta. Tu solicitud sigue activa; considera subir el precio."
+                    },
+                    modifier = Modifier.padding(12.dp),
+                    color = MeetColors.warning,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
 
@@ -6141,7 +6526,7 @@ private fun MetricPill(label: String, value: String) {
 private fun TipDialog(
     currency: String,
     onDismiss: () -> Unit,
-    onConfirm: (Long) -> Unit,
+    onConfirm: (Long, String) -> Unit,
 ) {
     val presetTips = if (currency == "CRC") {
         listOf(500L, 1000L, 2000L, 5000L)
@@ -6150,13 +6535,15 @@ private fun TipDialog(
     }
     var customTip by remember { mutableStateOf("") }
     var selectedPreset by remember { mutableStateOf<Long?>(null) }
+    var deliveryMethod by remember { mutableStateOf("CASH") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Propina para el chofer 💚", fontWeight = FontWeight.Bold) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Agradecé el servicio con una propina voluntaria.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                Text("Agradecé y dignificá el trabajo del chofer con una propina voluntaria.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                Text("La propina se entrega directamente al chofer. MEET no la suma a ningún saldo.", color = MeetColors.warning, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     presetTips.forEach { amount ->
@@ -6180,15 +6567,33 @@ private fun TipDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
+                Text("¿Cómo la entregarás?", color = Color.White, fontWeight = FontWeight.Bold)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = deliveryMethod == "CASH",
+                        onClick = { deliveryMethod = "CASH" },
+                        label = { Text("💵 En persona") },
+                    )
+                    FilterChip(
+                        selected = deliveryMethod == "SINPE",
+                        onClick = { deliveryMethod = "SINPE" },
+                        label = { Text("📲 SINPE al chofer") },
+                    )
+                }
+                Text(
+                    if (deliveryMethod == "CASH") "Entrégala personalmente al finalizar." else "Envíala al SINPE que el chofer te confirme.",
+                    color = MeetColors.neonGreen,
+                    fontSize = 11.sp,
+                )
             }
         },
         confirmButton = {
             val tipMinor = selectedPreset ?: com.elysium369.meet.ride.domain.RideTipPolicy.parseMajor(customTip, currency)
             TextButton(
-                onClick = { tipMinor?.let { onConfirm(it) } },
+                onClick = { tipMinor?.let { onConfirm(it, deliveryMethod) } },
                 enabled = tipMinor != null && com.elysium369.meet.ride.domain.RideTipPolicy.isValid(tipMinor, currency),
             ) {
-                Text("ENVIAR PROPINA", fontWeight = FontWeight.Bold)
+                Text("REGISTRAR COMPROMISO", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("SALTEAR") } },

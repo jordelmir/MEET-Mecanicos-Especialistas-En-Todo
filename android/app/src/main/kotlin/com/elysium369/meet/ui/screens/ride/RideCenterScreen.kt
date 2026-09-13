@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens.ride
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,12 +29,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.edit
 import com.elysium369.meet.data.local.entities.RideRequestEntity
+import com.elysium369.meet.ride.data.remote.RideDispatchGateway
+import com.elysium369.meet.ride.domain.RideDispatchExpiryPolicy
 import com.elysium369.meet.ride.domain.RideFareMode
 import com.elysium369.meet.ride.domain.RideStopSnapshot
 import com.elysium369.meet.ui.screens.calculateDistance
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
+import java.util.UUID
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
 private enum class RideCenterFilter(val label: String) {
@@ -55,11 +62,96 @@ fun RideCenterScreen(
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val driverVer by viewModel.driverVerification.collectAsState()
     val myDriverId = viewModel.currentUserId ?: driverVer?.driverId
+    val context = LocalContext.current
+    val driverPrefs = remember(context, myDriverId) {
+        context.getSharedPreferences(
+            "elysium_ride_driver_ops_${myDriverId ?: "signed_out"}",
+            Context.MODE_PRIVATE,
+        )
+    }
+    val dispatchScope = rememberCoroutineScope()
+    val voicePreferences = remember(context) {
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+    }
 
     var activeFilter by remember { mutableStateOf(RideCenterFilter.ALL) }
+    var voiceEnabled by remember {
+        mutableStateOf(voicePreferences.getBoolean("voice_feedback_enabled", true))
+    }
+    var hiddenRideIds by remember(myDriverId) {
+        mutableStateOf(
+            driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty()
+                .mapNotNull { it.substringBefore('|').takeIf(String::isNotBlank) }
+                .toSet(),
+        )
+    }
+    var dispatchMessage by remember(myDriverId) { mutableStateOf<String?>(null) }
+    var clockMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
 
-    val eligibleRides = remember(openRides, myDriverId) {
-        openRides.filter { it.passengerId != myDriverId }
+    fun queueDriverDecisions(rides: List<RideRequestEntity>, action: String) {
+        if (rides.isEmpty()) return
+        val queuedEntries = rides.map { "${it.requestId}|$action|${UUID.randomUUID()}" }
+        hiddenRideIds = hiddenRideIds + rides.map(RideRequestEntity::requestId)
+        val persisted = driverPrefs.getStringSet("pending_driver_decisions", emptySet())
+            .orEmpty()
+            .toMutableSet()
+            .apply { addAll(queuedEntries) }
+        driverPrefs.edit { putStringSet("pending_driver_decisions", persisted) }
+        dispatchMessage = if (action == "REJECT") {
+            "Oferta rechazada aquí. El pasajero será avisado y su solicitud seguirá activa."
+        } else {
+            "Solicitud eliminada de tu Centro de viajes."
+        }
+        dispatchScope.launch {
+            queuedEntries.forEach { encoded ->
+                val parts = encoded.split('|')
+                runCatching { RideDispatchGateway.decideRequest(parts[0], parts[1], parts[2]) }
+                    .onSuccess {
+                        val remaining = driverPrefs
+                            .getStringSet("pending_driver_decisions", emptySet())
+                            .orEmpty()
+                            .toMutableSet()
+                            .apply { remove(encoded) }
+                        driverPrefs.edit { putStringSet("pending_driver_decisions", remaining) }
+                    }
+            }
+        }
+    }
+
+    LaunchedEffect(myDriverId) {
+        if (myDriverId == null) return@LaunchedEffect
+        viewModel.startRideProjectionSync()
+        while (true) {
+            clockMillis = System.currentTimeMillis()
+            runCatching { RideDispatchGateway.expireStaleRequests() }
+            viewModel.refreshRideProjectionNow()
+            runCatching { RideDispatchGateway.decisions() }
+                .onSuccess { decisions -> hiddenRideIds = hiddenRideIds + decisions.map { it.tripId } }
+            val pending = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toSet()
+            pending.forEach { encoded ->
+                val parts = encoded.split('|')
+                if (parts.size == 3) {
+                    runCatching { RideDispatchGateway.decideRequest(parts[0], parts[1], parts[2]) }
+                        .onSuccess {
+                            val remaining = driverPrefs
+                                .getStringSet("pending_driver_decisions", emptySet())
+                                .orEmpty()
+                                .toMutableSet()
+                                .apply { remove(encoded) }
+                            driverPrefs.edit { putStringSet("pending_driver_decisions", remaining) }
+                        }
+                }
+            }
+            delay(15_000L)
+        }
+    }
+
+    val eligibleRides = remember(openRides, myDriverId, hiddenRideIds, clockMillis) {
+        openRides.filter {
+            it.passengerId != myDriverId &&
+                it.requestId !in hiddenRideIds &&
+                RideDispatchExpiryPolicy.remainsVisible(it.createdAt, clockMillis)
+        }
     }
 
     val filteredRides = remember(eligibleRides, activeFilter) {
@@ -99,6 +191,28 @@ fun RideCenterScreen(
                         )
                     }
                 },
+                actions = {
+                    IconButton(onClick = {
+                        voiceEnabled = !voiceEnabled
+                        viewModel.voiceFeedbackManager.setEnabled(voiceEnabled)
+                        if (voiceEnabled) {
+                            viewModel.voiceFeedbackManager.speak(es = "Guía de voz activada.")
+                        }
+                    }) {
+                        Icon(
+                            if (voiceEnabled) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                            if (voiceEnabled) "Silenciar toda la guía de voz" else "Activar guía de voz",
+                            tint = if (voiceEnabled) MeetColors.neonGreen else MeetColors.textMuted,
+                        )
+                    }
+                    IconButton(onClick = { viewModel.refreshRideProjectionNow() }) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = "Sincronizar solicitudes con Supabase",
+                            tint = MeetColors.cyberCyan,
+                        )
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MeetColors.backgroundDark,
                 ),
@@ -129,6 +243,29 @@ fun RideCenterScreen(
                     color = MeetColors.cyberCyan,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
+                )
+            }
+
+            if (eligibleRides.isNotEmpty()) {
+                OutlinedButton(
+                    onClick = { queueDriverDecisions(eligibleRides, "DISMISS") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    border = BorderStroke(1.dp, MeetColors.textMuted),
+                ) {
+                    Icon(Icons.Default.ClearAll, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("LIMPIAR TODAS DE MI CENTRO")
+                }
+            }
+
+            dispatchMessage?.let { message ->
+                Text(
+                    message,
+                    color = MeetColors.cyberCyan,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 )
             }
 
@@ -210,6 +347,8 @@ fun RideCenterScreen(
                             ride = ride,
                             currentGps = currentGps,
                             onSelect = { onSelectRide(ride) },
+                            onDismiss = { queueDriverDecisions(listOf(ride), "DISMISS") },
+                            onReject = { queueDriverDecisions(listOf(ride), "REJECT") },
                         )
                     }
                 }
@@ -223,6 +362,8 @@ private fun RideCenterCard(
     ride: RideRequestEntity,
     currentGps: ObdViewModel.GpsLocationInfo?,
     onSelect: () -> Unit,
+    onDismiss: () -> Unit,
+    onReject: () -> Unit,
 ) {
     val orderedStops = remember(ride.stopsJson) {
         runCatching { Json.decodeFromString<List<RideStopSnapshot>>(ride.stopsJson) }
@@ -265,7 +406,7 @@ private fun RideCenterCard(
                 .fillMaxWidth()
                 .padding(16.dp),
         ) {
-            // ── Row 1: Badge + Payment badge
+            // ── Row 1: Badge + Payment badge + permanent owner-scoped dismiss
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -285,18 +426,26 @@ private fun RideCenterCard(
                     )
                 }
 
-                // Payment badge
-                Surface(
-                    color = MeetColors.cardBackground,
-                    shape = RoundedCornerShape(6.dp),
-                ) {
-                    Text(
-                        text = "$paymentIcon $paymentLabel",
-                        color = MeetColors.textSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        color = MeetColors.cardBackground,
+                        shape = RoundedCornerShape(6.dp),
+                    ) {
+                        Text(
+                            text = "$paymentIcon $paymentLabel",
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        )
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "Quitar solicitud de mi Centro de viajes",
+                            tint = Color.White,
+                        )
+                    }
                 }
             }
 
@@ -485,6 +634,19 @@ private fun RideCenterCard(
                     color = Color.White,
                     fontWeight = FontWeight.ExtraBold,
                     fontSize = 15.sp,
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onReject,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, Color(0xFFFF5252)),
+            ) {
+                Text(
+                    "RECHAZAR OFERTA · AVISAR AL PASAJERO",
+                    color = Color(0xFFFF5252),
+                    fontWeight = FontWeight.Bold,
                 )
             }
 

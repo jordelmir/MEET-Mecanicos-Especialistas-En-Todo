@@ -49,13 +49,13 @@ class RideCompletionHelper(
         }
     }
 
-    fun submitTip(rideId: String, tipMinor: Long, currency: String) {
+    fun submitTip(rideId: String, tipMinor: Long, currency: String, deliveryMethod: String) {
         scope.launch(Dispatchers.IO) {
             val actor = currentUserId()
             val ride = rideDao.getRequestById(rideId)
             if (actor == null || ride?.passengerId != actor ||
                 ride.serverState != "COMPLETED" || ride.currency != currency ||
-                !RideTipPolicy.isValid(tipMinor, currency)
+                !RideTipPolicy.isValid(tipMinor, currency) || deliveryMethod !in setOf("CASH", "SINPE")
             ) {
                 noticeEmitter("La propina requiere un viaje completado de tu cuenta y un importe válido.")
                 return@launch
@@ -68,15 +68,24 @@ class RideCompletionHelper(
                         put("p_ride_id", JsonPrimitive(rideId))
                         put("p_tip_minor", JsonPrimitive(tipMinor))
                         put("p_currency", JsonPrimitive(currency))
+                        put("p_delivery_method", JsonPrimitive(deliveryMethod))
                     },
                 )
                 val receipt = kotlinx.serialization.json.Json.parseToJsonElement(response.data).jsonObject
                 check(receipt["ok"]?.jsonPrimitive?.booleanOrNull == true)
                 check(receipt["tip_minor"]?.jsonPrimitive?.content?.toLongOrNull() == tipMinor)
                 check(receipt["currency"]?.jsonPrimitive?.content == currency)
+                check(receipt["delivery_method"]?.jsonPrimitive?.content == deliveryMethod)
+                check(receipt["delivery_state"]?.jsonPrimitive?.content == "PLEDGED")
+                check(receipt["wallet_credited"]?.jsonPrimitive?.booleanOrNull == false)
                 rideDao.recordConfirmedTip(rideId, actor, tipMinor)
                 if (currentUserId() == actor) {
-                    noticeEmitter("Propina registrada: ${RideTipPolicy.display(tipMinor, currency)} $currency. Pago pendiente de confirmación.")
+                    val instruction = if (deliveryMethod == "CASH") {
+                        "Entrégala personalmente al chofer."
+                    } else {
+                        "Envíala por SINPE directamente al chofer."
+                    }
+                    noticeEmitter("Compromiso de propina registrado: ${RideTipPolicy.display(tipMinor, currency)} $currency. $instruction No se creó saldo digital.")
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled

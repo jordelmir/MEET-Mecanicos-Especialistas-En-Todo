@@ -118,6 +118,20 @@ open class VoiceFeedbackManager @Inject constructor(
         }
     }
 
+    /** Global user-controlled voice switch shared by passenger and driver modes. */
+    open fun setEnabled(enabled: Boolean) {
+        context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("voice_feedback_enabled", enabled)
+            .apply()
+        if (!enabled) {
+            synchronized(speechQueue) { speechQueue.clear() }
+            tts?.stop()
+            _isSpeaking.value = false
+            abandonFocus()
+        }
+    }
+
     private fun speakInternal(es: String, en: String, queueMode: Int) {
         try {
             val prefs = context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE)

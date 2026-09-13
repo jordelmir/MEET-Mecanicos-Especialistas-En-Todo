@@ -6771,8 +6771,8 @@ class ObdViewModel @Inject constructor(
         rideCompletionHelper.exportGpsForensicTrail(rideId)
     }
 
-    fun submitTip(rideId: String, tipMinor: Long, currency: String) {
-        rideCompletionHelper.submitTip(rideId, tipMinor, currency)
+    fun submitTip(rideId: String, tipMinor: Long, currency: String, deliveryMethod: String) {
+        rideCompletionHelper.submitTip(rideId, tipMinor, currency, deliveryMethod)
     }
 
     fun getCurrentTrip(): TripEntity? {
