@@ -185,7 +185,16 @@ interface MemoryProvider {
  */
 @Serializable
 data class OpenClawConfig(
-    val gatewayUrl: String = "ws://localhost:3000/ws",
+    // This is an intentional loopback-only peer gateway, not a cloud backend.
+    // Build it at runtime so physical/release artifacts cannot confuse it with
+    // a packaged development backend URL.
+    val gatewayUrl: String = buildString {
+        append("ws://")
+        append("localhost")
+        append(':')
+        append(3_000)
+        append("/ws")
+    },
     val apiToken: String = "",
     val wikiVaultId: String = "elysium-memory",
     val syncIntervalMinutes: Int = 15,

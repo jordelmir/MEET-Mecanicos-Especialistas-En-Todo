@@ -92,19 +92,24 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-    v_terminal text;
+    v_forbidden boolean := false;
 BEGIN
-    -- Only check when transitioning TO a terminal state
-    IF NEW.status IN ('COMPLETED', 'CANCELLED', 'DISPUTED') THEN
-        SELECT status INTO v_terminal
-        FROM public.trips
-        WHERE trip_id = NEW.trip_id;
-
-        IF v_terminal IN ('COMPLETED', 'CANCELLED', 'DISPUTED') THEN
-            RAISE EXCEPTION USING
-                errcode = 'P0001',
-                message = format('TRIP_ALREADY_TERMINAL: trip %s is already %s', NEW.trip_id, v_terminal);
-        END IF;
+    -- Mobility owns lifecycle in trips.state. COMPLETED/CANCELLED may escalate
+    -- only to DISPUTED; DISPUTED is irreversible.
+    v_forbidden :=
+        (OLD.state = 'DISPUTED' AND NEW.state IS DISTINCT FROM OLD.state)
+        OR (
+            OLD.state IN ('COMPLETED', 'CANCELLED')
+            AND NEW.state IS DISTINCT FROM OLD.state
+            AND NEW.state <> 'DISPUTED'
+        );
+    IF v_forbidden THEN
+        RAISE EXCEPTION USING
+            errcode = '23514',
+            message = format(
+                'TERMINAL_TRIP_TRANSITION_FORBIDDEN: trip %s %s -> %s',
+                OLD.trip_id, OLD.state, NEW.state
+            );
     END IF;
 
     RETURN NEW;
@@ -113,7 +118,7 @@ $$;
 
 DROP TRIGGER IF EXISTS ride_trip_terminal_guard ON public.trips;
 CREATE TRIGGER ride_trip_terminal_guard
-    BEFORE UPDATE OF status ON public.trips
+    BEFORE UPDATE OF state ON public.trips
     FOR EACH ROW
     EXECUTE FUNCTION public.ride_trip_terminal_guard();
 
@@ -136,4 +141,4 @@ COMMENT ON FUNCTION public.ride_wallet_balance_guard() IS
 COMMENT ON FUNCTION public.ride_commission_capture_guard() IS
     'P0 invariant: each commission reservation can only be captured once.';
 COMMENT ON FUNCTION public.ride_trip_terminal_guard() IS
-    'P0 invariant: trip can only reach one terminal state (COMPLETED/CANCELLED/DISPUTED).';
+    'P0 invariant: completed/cancelled trips may only escalate to disputed; disputed is irreversible.';
