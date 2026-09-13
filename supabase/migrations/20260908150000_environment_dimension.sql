@@ -9,8 +9,8 @@ BEGIN
     END IF;
 END $$;
 
--- 2. Add environment column to profiles.
-ALTER TABLE public.profiles
+-- 2. Add environment column to the canonical ride identity table.
+ALTER TABLE public.ride_profiles
     ADD COLUMN IF NOT EXISTS environment public.deployment_environment NOT NULL DEFAULT 'SANDBOX';
 
 -- 3. Add environment to ride_requests for cross-environment isolation.
@@ -38,15 +38,14 @@ DECLARE
 BEGIN
     -- Get passenger environment
     SELECT environment INTO v_passenger_env
-    FROM public.profiles
-    WHERE id = NEW.passenger_id;
+    FROM public.ride_profiles
+    WHERE user_id = NEW.rider_id;
 
     -- If passenger is SANDBOX, the driver must also be SANDBOX
     IF v_passenger_env = 'SANDBOX' THEN
         SELECT p.environment INTO v_driver_env
-        FROM public.profiles p
-        JOIN public.trips t ON t.driver_id = p.id
-        WHERE t.trip_id = NEW.trip_id;
+        FROM public.ride_profiles p
+        WHERE p.user_id = NEW.driver_id;
 
         IF v_driver_env IS NOT NULL AND v_driver_env <> 'SANDBOX' THEN
             RAISE EXCEPTION USING
@@ -61,7 +60,7 @@ $$;
 
 DROP TRIGGER IF EXISTS ride_cross_environment_guard ON public.trips;
 CREATE TRIGGER ride_cross_environment_guard
-    BEFORE INSERT OR UPDATE ON public.trips
+    BEFORE INSERT OR UPDATE OF rider_id, driver_id ON public.trips
     FOR EACH ROW
     EXECUTE FUNCTION public.ride_cross_environment_guard();
 
@@ -110,10 +109,10 @@ AS $$
 BEGIN
     -- Only allow forward migration: SANDBOX → PILOT → PRODUCTION
     IF p_from_env = 'SANDBOX' AND p_to_env = 'PILOT' THEN
-        UPDATE public.profiles SET environment = p_to_env WHERE id = p_user_id;
+        UPDATE public.ride_profiles SET environment = p_to_env WHERE user_id = p_user_id;
         UPDATE public.ride_wallets SET environment = p_to_env WHERE driver_id = p_user_id;
     ELSIF p_from_env = 'PILOT' AND p_to_env = 'PRODUCTION' THEN
-        UPDATE public.profiles SET environment = p_to_env WHERE id = p_user_id;
+        UPDATE public.ride_profiles SET environment = p_to_env WHERE user_id = p_user_id;
         UPDATE public.ride_wallets SET environment = p_to_env WHERE driver_id = p_user_id;
     ELSE
         RAISE EXCEPTION USING
@@ -125,9 +124,9 @@ $$;
 
 -- 9. Default existing data to PILOT (since we're past SANDBOX for current users).
 -- Only for users who have completed verification.
-UPDATE public.profiles
+UPDATE public.ride_profiles
 SET environment = 'PILOT'
-WHERE id IN (
+WHERE user_id IN (
     SELECT driver_id FROM public.driver_verifications WHERE status = 'APPROVED'
     UNION
     SELECT passenger_id FROM public.passenger_verifications WHERE status = 'APPROVED'
