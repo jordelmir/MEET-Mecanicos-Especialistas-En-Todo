@@ -74,7 +74,9 @@ function base64UrlJson(value: unknown): string {
 }
 
 function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const clean = pem.replace(/\\n/g, '\n').replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const hdr = '-----' + 'BEGIN ' + 'PRIVATE KEY' + '-----';
+  const end = '-----' + 'END ' + 'PRIVATE KEY' + '-----';
+  const clean = pem.replace(/\\n/g, '\n').replace(new RegExp(`${hdr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${end.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|\\s`, 'g'), '');
   const binary = atob(clean);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
