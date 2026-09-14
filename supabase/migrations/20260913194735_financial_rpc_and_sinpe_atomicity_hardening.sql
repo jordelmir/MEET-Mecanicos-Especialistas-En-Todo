@@ -28,20 +28,19 @@ BEGIN
     FOREACH v_func_name IN ARRAY v_funcs LOOP
         FOR v_rec IN
             SELECT p.oid,
-                   pg_catalog.pg_get_function_arguments(p.oid) AS args
+                   pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
             FROM pg_proc p
             JOIN pg_namespace n ON p.pronamespace = n.oid
             WHERE n.nspname = 'public'
               AND p.proname = v_func_name
-            ORDER BY (SELECT count(*) FROM unnest(p.proargtypes) t)  -- prefer overload with most args
+            ORDER BY (SELECT count(*) FROM unnest(p.proargtypes) t)
         LOOP
-            -- REVOKE from both public and anon (idempotent)
             EXECUTE format(
                 'REVOKE ALL ON FUNCTION public.%I(%s) FROM public, anon',
                 v_func_name, v_rec.args
             );
             RAISE NOTICE 'REVOKE %: OK', v_func_name;
-            EXIT;  -- handle first (most-specific) overload only
+            EXIT;
         END LOOP;
     END LOOP;
 END $$;
@@ -71,7 +70,7 @@ DECLARE
     v_rec record;
 BEGIN
     FOR v_rec IN
-        SELECT pg_catalog.pg_get_function_arguments(p.oid) AS args
+        SELECT pg_catalog.pg_get_function_identity_arguments(p.oid) AS args
         FROM pg_proc p
         JOIN pg_namespace n ON p.pronamespace = n.oid
         WHERE n.nspname = 'public' AND p.proname = 'ride_driver_wallet_credit_v1'
