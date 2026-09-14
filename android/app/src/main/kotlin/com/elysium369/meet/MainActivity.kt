@@ -394,18 +394,14 @@ fun MeetApp(
         containerColor = Color(0xFF060612),
         bottomBar = {
             // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect
-            val currentRoute = navController.currentBackStackEntryAsState().value
-                ?.destination?.route
             val hideNavRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
-            if (currentRoute !in hideNavRoutes && currentRoute != null) {
+            if (activeRoute !in hideNavRoutes && activeRoute != null) {
                 MeetBottomNavigation(navController)
             }
         },
         topBar = {
-            val currentRoute = navController.currentBackStackEntryAsState().value
-                ?.destination?.route
             val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
-            if (currentRoute !in hideBarRoutes && currentRoute != null) {
+            if (activeRoute !in hideBarRoutes && activeRoute != null) {
                 Box(modifier = Modifier.statusBarsPadding()) {
                     ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
                 }
@@ -420,10 +416,8 @@ fun MeetApp(
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
-            val currentRoute = navController.currentBackStackEntryAsState().value
-                ?.destination?.route
             val hideBgRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
-            if (currentRoute !in hideBgRoutes && currentRoute != null) {
+            if (activeRoute !in hideBgRoutes && activeRoute != null) {
                 HolographicBackgroundShared()
             }
             val towRepository = obdViewModel.towCommandRepository

@@ -8621,15 +8621,8 @@ class ObdViewModel @Inject constructor(
                 }
             }
             is com.elysium369.meet.automation.AiAction.AdvanceRideStatus -> {
-                viewModelScope.launch {
-                    val ride = withContext(Dispatchers.IO) { rideDao.getRequestById(action.rideId) }
-                    if (ride != null) {
-                        val updated = ride.copy(status = action.newStatus)
-                        withContext(Dispatchers.IO) { rideDao.insertRequest(updated) }
-                        applyActiveRide(updated)
-                        dumpAiStateSnapshot()
-                    }
-                }
+                Log.w("AiAutomation", "Arbitrary ride status advance rejected: transitions must be server-authoritative")
+                dumpAiStateSnapshot()
             }
             is com.elysium369.meet.automation.AiAction.SubmitOffer -> {
                 viewModelScope.launch {

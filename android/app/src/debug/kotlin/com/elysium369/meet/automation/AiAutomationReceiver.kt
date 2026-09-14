@@ -4,10 +4,15 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.elysium369.meet.BuildConfig
 
 class AiAutomationReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context?, intent: Intent?) {
+        if (!BuildConfig.DEBUG) {
+            Log.w(TAG, "Rejected automation command in non-debug build")
+            return
+        }
         if (intent == null) return
         val action = intent.action ?: return
         Log.i(TAG, "AiAutomationReceiver received action: $action")
