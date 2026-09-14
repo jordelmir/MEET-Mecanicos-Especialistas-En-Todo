@@ -470,10 +470,10 @@ REVOKE ALL ON FUNCTION public.cancel_ride(uuid, bigint, uuid, text) FROM public,
 GRANT EXECUTE ON FUNCTION public.cancel_ride(uuid, bigint, uuid, text) TO authenticated;
 
 -- 8. Concurrency guard on ride acceptance (Section 4): Two drivers cannot win the same ride
+-- Fixed: Client proposes offer_id; server authoritatively locks offer and derives driver_id.
 CREATE OR REPLACE FUNCTION public.accept_ride_offer(
     p_ride_id uuid,
     p_offer_id uuid,
-    p_driver_id uuid,
     p_expected_version bigint,
     p_idempotency_key uuid
 )
@@ -485,6 +485,8 @@ AS $$
 DECLARE
     v_actor uuid := auth.uid();
     v_ride record;
+    v_offer record;
+    v_driver_id uuid;
     v_existing jsonb;
     v_next_version bigint;
 BEGIN
@@ -523,10 +525,27 @@ BEGIN
         RAISE EXCEPTION 'RIDE_ALREADY_ASSIGNED' USING errcode = '23505';
     END IF;
 
+    -- Server-authoritative resolution: Lock offer and verify relationships
+    SELECT ro.*
+      INTO v_offer
+      FROM public.ride_offers ro
+     WHERE ro.id = p_offer_id
+       AND ro.request_id = p_ride_id
+     FOR UPDATE;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'OFFER_NOT_FOUND' USING errcode = 'P0002';
+    END IF;
+
+    IF v_offer.state <> 'PENDING' THEN
+        RAISE EXCEPTION 'OFFER_NOT_ACCEPTABLE' USING errcode = '40001';
+    END IF;
+
+    v_driver_id := v_offer.driver_id;
     v_next_version := COALESCE(v_ride.state_version, v_ride.version) + 1;
 
     UPDATE public.ride_requests
-       SET assigned_driver_id = p_driver_id,
+       SET assigned_driver_id = v_driver_id,
            state = 'ASSIGNED',
            state_version = v_next_version,
            version = v_next_version,
@@ -552,7 +571,7 @@ BEGIN
             'rideId', p_ride_id,
             'status', 'ASSIGNED',
             'state', 'ASSIGNED',
-            'assignedDriverId', p_driver_id,
+            'assignedDriverId', v_driver_id,
             'version', v_next_version
         )
     );
@@ -561,11 +580,12 @@ BEGIN
         'rideId', p_ride_id,
         'status', 'ASSIGNED',
         'state', 'ASSIGNED',
-        'assignedDriverId', p_driver_id,
+        'assignedDriverId', v_driver_id,
         'version', v_next_version
     );
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.accept_ride_offer(uuid, uuid, uuid, bigint, uuid) FROM public, anon;
-GRANT EXECUTE ON FUNCTION public.accept_ride_offer(uuid, uuid, uuid, bigint, uuid) TO authenticated;
+REVOKE ALL ON FUNCTION public.accept_ride_offer(uuid, uuid, bigint, uuid) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.accept_ride_offer(uuid, uuid, bigint, uuid) TO authenticated;
+

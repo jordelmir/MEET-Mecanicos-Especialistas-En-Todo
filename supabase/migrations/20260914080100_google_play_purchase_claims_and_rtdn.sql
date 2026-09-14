@@ -68,15 +68,20 @@ BEGIN
     ON CONFLICT (package_name, purchase_token_hash)
     DO NOTHING;
 
-    SELECT owner_user_id
-      INTO v_owner
+    SELECT *
+      INTO v_claim
       FROM public.google_play_purchase_claims
      WHERE package_name = p_package_name
        AND purchase_token_hash = p_purchase_token_hash
      FOR UPDATE;
 
-    IF v_owner IS DISTINCT FROM p_owner_user_id THEN
+    IF v_claim.owner_user_id IS DISTINCT FROM p_owner_user_id THEN
         RAISE EXCEPTION 'PURCHASE_ALREADY_CLAIMED'
+            USING errcode = '23505';
+    END IF;
+
+    IF v_claim.product_id <> p_product_id OR v_claim.product_type <> p_product_type THEN
+        RAISE EXCEPTION 'PURCHASE_METADATA_MISMATCH'
             USING errcode = '23505';
     END IF;
 
@@ -85,7 +90,7 @@ BEGIN
      WHERE package_name = p_package_name
        AND purchase_token_hash = p_purchase_token_hash;
 
-    RETURN v_owner;
+    RETURN v_claim.owner_user_id;
 END;
 $$;
 

@@ -274,6 +274,18 @@ Deno.serve(async request => {
     const packageName = env('GOOGLE_PLAY_PACKAGE_NAME');
     const google = await verifyWithGoogle(input);
     const tokenHash = await sha256(input.purchaseToken);
+
+    // Verify subscription product ID matches Google response lineItems
+    if (input.productType === 'subs') {
+      const lineItems = Array.isArray(google.lineItems)
+        ? (google.lineItems as Array<Record<string, unknown>>)
+        : [];
+      const hasMatchingProduct = lineItems.some(item => item.productId === input.productId);
+      if (!hasMatchingProduct && lineItems.length > 0) {
+        return jsonResponse(400, { error: 'PURCHASE_PRODUCT_MISMATCH' }, correlationId);
+      }
+    }
+
     const status = classifyStatus(input.productType, google);
     const expiresAt = extractExpiry(input.productType, google);
 
