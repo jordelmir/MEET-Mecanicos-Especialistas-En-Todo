@@ -1319,6 +1319,7 @@ fun MeetApp(
                     obdViewModel.detectCurrentLocation(context)
                 }
                 val activeRideReq by obdViewModel.activeRideRequest.collectAsState()
+                val isDriverMode by obdViewModel.rideDriverMode.collectAsState()
                 var rideNotice by remember { mutableStateOf<String?>(null) }
                 LaunchedEffect(Unit) {
                     obdViewModel.rideVerificationNotice.collect { rideNotice = it }
@@ -1357,7 +1358,7 @@ fun MeetApp(
                         )
                     }
 
-                    val isDriverRole = obdViewModel.rideDriverMode.value || (req.assignedDriverId != null && req.assignedDriverId == obdViewModel.currentUserId)
+                    val isDriverRole = isDriverMode || (req.assignedDriverId != null && req.assignedDriverId == obdViewModel.currentUserId)
 
                     val driverLoc = when {
                         parsedState == com.elysium369.meet.ride.domain.RideState.ARRIVED -> {
