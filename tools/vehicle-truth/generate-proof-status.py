@@ -66,7 +66,10 @@ def main() -> None:
         }
 
     mandatory = [value for value in gates.values()]
-    artifact_proof_complete = bool(artifacts) and all(item["present"] and item["sha256"] for item in artifacts.values())
+    artifact_proof_complete = bool(artifacts) and all(
+        item["present"] and item["sizeBytes"] and item["sha256"]
+        for item in artifacts.values()
+    )
     software_verified = bool(mandatory) and all(value == "PASSED" for value in mandatory) and artifact_proof_complete
 
     hardware_conformance_state = "PENDING_PHYSICAL_CORPUS"
@@ -76,7 +79,9 @@ def main() -> None:
     verification_levels = {
         "sourceIntegrity": "SOURCE_VERIFIED" if software_verified else "SOURCE_UNVERIFIED",
         "softwareState": "SOFTWARE_VERIFIED" if software_verified else "SOFTWARE_UNVERIFIED",
-        "deviceRuntime": "DEVICE_VERIFIED",
+        # Compiling an instrumentation APK and verifier preflight cannot prove
+        # that these exact artifact bytes ran on a physical Android device.
+        "deviceRuntime": "DEVICE_UNVERIFIED",
         "vehicleHardware": hardware_conformance_state,
         "calibrationAuthority": calibration_authority_state,
         "overallState": (
@@ -105,6 +110,8 @@ def main() -> None:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if mandatory and all(value == "PASSED" for value in mandatory) and not artifact_proof_complete:
+        raise SystemExit("CI gates passed but required artifact evidence is missing or empty")
 
 
 if __name__ == "__main__":

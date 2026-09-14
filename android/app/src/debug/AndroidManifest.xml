@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <permission
+        android:name="com.elysium369.meet.permission.AI_AUTOMATION"
+        android:protectionLevel="signature" />
+
     <application>
         <!-- Explicitly debug-only: never merged into a release APK. -->
         <receiver
@@ -7,6 +12,16 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="com.elysium369.meet.AI_TEST" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".automation.AiAutomationReceiver"
+            android:exported="true"
+            android:permission="com.elysium369.meet.permission.AI_AUTOMATION">
+            <intent-filter>
+                <action android:name="com.elysium369.meet.AI_NAVIGATE" />
+                <action android:name="com.elysium369.meet.AI_ACTION" />
             </intent-filter>
         </receiver>
     </application>

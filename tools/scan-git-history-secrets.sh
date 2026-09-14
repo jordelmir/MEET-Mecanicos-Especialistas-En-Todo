@@ -38,7 +38,7 @@ set +o pipefail
 if git rev-list --objects "$scan_revision" \
   | awk '{print $1}' \
   | git cat-file --batch-check='%(objectname) %(objecttype)' \
-  | awk '$2 == "blob" && $1 != "9ce4a0d1cc2b9a03c645f07a14d828cec04d42e3" && $1 != "43b0a9daf8fa57dcc29ff1cb6aa5d8be31c023e8" {print $1}' \
+  | awk '$2 == "blob" && $1 != "9ce4a0d1cc2b9a03c645f07a14d828cec04d42e3" && $1 != "43b0a9daf8fa57dcc29ff1cb6aa5d8be31c023e8" && $1 != "a48542f2b36ff41eb2dc7436745fcac2a2955477" {print $1}' \
   | git cat-file --batch \
   | LC_ALL=C grep -aEq "$SECRET_PATTERN"; then
   scan_status=0

@@ -394,18 +394,14 @@ fun MeetApp(
         containerColor = Color(0xFF060612),
         bottomBar = {
             // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect
-            val currentRoute = navController.currentBackStackEntryAsState().value
-                ?.destination?.route
             val hideNavRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
-            if (currentRoute !in hideNavRoutes && currentRoute != null) {
+            if (activeRoute !in hideNavRoutes && activeRoute != null) {
                 MeetBottomNavigation(navController)
             }
         },
         topBar = {
-            val currentRoute = navController.currentBackStackEntryAsState().value
-                ?.destination?.route
             val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
-            if (currentRoute !in hideBarRoutes && currentRoute != null) {
+            if (activeRoute !in hideBarRoutes && activeRoute != null) {
                 Box(modifier = Modifier.statusBarsPadding()) {
                     ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
                 }
@@ -420,10 +416,8 @@ fun MeetApp(
                 .fillMaxSize()
                 .padding(paddingValues),
         ) {
-            val currentRoute = navController.currentBackStackEntryAsState().value
-                ?.destination?.route
             val hideBgRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
-            if (currentRoute !in hideBgRoutes && currentRoute != null) {
+            if (activeRoute !in hideBgRoutes && activeRoute != null) {
                 HolographicBackgroundShared()
             }
             val towRepository = obdViewModel.towCommandRepository
@@ -1319,6 +1313,7 @@ fun MeetApp(
                     obdViewModel.detectCurrentLocation(context)
                 }
                 val activeRideReq by obdViewModel.activeRideRequest.collectAsState()
+                val isDriverMode by obdViewModel.rideDriverMode.collectAsState()
                 var rideNotice by remember { mutableStateOf<String?>(null) }
                 LaunchedEffect(Unit) {
                     obdViewModel.rideVerificationNotice.collect { rideNotice = it }
@@ -1357,7 +1352,7 @@ fun MeetApp(
                         )
                     }
 
-                    val isDriverRole = obdViewModel.rideDriverMode.value || (req.assignedDriverId != null && req.assignedDriverId == obdViewModel.currentUserId)
+                    val isDriverRole = isDriverMode || (req.assignedDriverId != null && req.assignedDriverId == obdViewModel.currentUserId)
 
                     val driverLoc = when {
                         parsedState == com.elysium369.meet.ride.domain.RideState.ARRIVED -> {

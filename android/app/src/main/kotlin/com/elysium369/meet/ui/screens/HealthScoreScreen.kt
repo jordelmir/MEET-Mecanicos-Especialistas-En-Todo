@@ -71,7 +71,8 @@ fun HealthScoreScreen(
 
     val civilizationalScore by viewModel.civilizationalHealthScore.collectAsState()
     val civilizationalTimeline by viewModel.civilizationalTimeline.collectAsState()
-    val maintenancePlan = remember(viewModel.selectedVehicle.collectAsState().value) {
+    val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val maintenancePlan = remember(selectedVehicle) {
         viewModel.getMaintenancePlan()
     }
 

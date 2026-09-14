@@ -5,7 +5,7 @@ import { analyticsQueue } from './analyticsQueue';
 import { getAnonymousId, getOpenStats, getSessionId, markAppOpen } from './analyticsSession';
 import type { AnalyticsEvent, AnalyticsEventName, AnalyticsProperties } from './analyticsTypes';
 
-const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? '2.2.0-web';
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? 'unknown';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SENSITIVE_KEYS = ['email', 'phone', 'telefono', 'vin', 'address', 'direccion', 'identification', 'cedula', 'accesscode', 'token', 'purchasetoken'];
 
@@ -172,4 +172,3 @@ export const analytics = {
     return analyticsQueue.snapshot();
   },
 };
-

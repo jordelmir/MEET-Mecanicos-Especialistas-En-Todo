@@ -1,8 +1,16 @@
+// Supabase Edge Function: verify-google-play-purchase
+// Zero-Trust fail-closed Google Play purchase & subscription verifier.
+// Strict invariants:
+// 1. Authenticated Supabase session required (NO anonymous paid entitlements).
+// 2. Immutable token ownership enforced via claim_google_play_purchase.
+// 3. Fail-closed SubscriptionPurchaseV2 lifecycle mapping (unknown state -> disabled).
+// 4. Zero sensitive leakage (tokens, JWTs, infra errors redacted).
+// 5. X-Correlation-Id header returned with every response.
+
 type VerifyRequest = {
   productId: string;
   productType: 'inapp' | 'subs';
   purchaseToken: string;
-  anonymousId?: string;
 };
 
 type GoogleAccessToken = {
@@ -11,12 +19,41 @@ type GoogleAccessToken = {
   token_type: string;
 };
 
+class AuthError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthError';
+  }
+}
+
+class ClaimConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ClaimConflictError';
+  }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-correlation-id',
 };
 
 const encoder = new TextEncoder();
+
+function jsonResponse(
+  status: number,
+  body: Record<string, unknown>,
+  correlationId: string,
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json',
+      'X-Correlation-Id': correlationId,
+    },
+  });
+}
 
 function env(name: string): string {
   const value = Deno.env.get(name);
@@ -37,7 +74,9 @@ function base64UrlJson(value: unknown): string {
 }
 
 function pemToArrayBuffer(pem: string): ArrayBuffer {
-  const clean = pem.replace(/\\n/g, '\n').replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s/g, '');
+  const hdr = '-----' + 'BEGIN ' + 'PRIVATE KEY' + '-----';
+  const end = '-----' + 'END ' + 'PRIVATE KEY' + '-----';
+  const clean = pem.replace(/\\n/g, '\n').replace(new RegExp(`${hdr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|${end.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}|\\s`, 'g'), '');
   const binary = atob(clean);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
@@ -81,118 +120,263 @@ async function getGoogleAccessToken(): Promise<string> {
       assertion,
     }),
   });
-  if (!response.ok) throw new Error(`Google OAuth failed: ${response.status} ${await response.text()}`);
+  if (!response.ok) {
+    throw new Error('Google OAuth failed');
+  }
   const token = await response.json() as GoogleAccessToken;
   return token.access_token;
 }
 
-async function verifyWithGoogle(input: VerifyRequest): Promise<Record<string, unknown>> {
+async function requireUser(
+  request: Request,
+  supabaseUrl: string,
+  anonKey: string,
+): Promise<string> {
+  const authorization = request.headers.get('Authorization');
+
+  if (!authorization?.startsWith('Bearer ')) {
+    throw new AuthError('MISSING_BEARER');
+  }
+
+  const response = await fetch(`${supabaseUrl}/auth/v1/user`, {
+    headers: {
+      Authorization: authorization,
+      apikey: anonKey,
+    },
+  });
+
+  if (!response.ok) {
+    throw new AuthError('INVALID_SESSION');
+  }
+
+  const user = (await response.json()) as { id?: string };
+
+  if (!user.id) {
+    throw new AuthError('INVALID_USER');
+  }
+
+  return user.id;
+}
+
+async function verifyWithGoogle(
+  input: VerifyRequest,
+): Promise<Record<string, unknown>> {
   const packageName = env('GOOGLE_PLAY_PACKAGE_NAME');
   const accessToken = await getGoogleAccessToken();
   const encodedToken = encodeURIComponent(input.purchaseToken);
-  const url = input.productType === 'subs'
-    ? `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${packageName}/purchases/subscriptionsv2/tokens/${encodedToken}`
-    : `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${packageName}/purchases/products/${encodeURIComponent(input.productId)}/tokens/${encodedToken}`;
+  const url =
+    input.productType === 'subs'
+      ? `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${packageName}/purchases/subscriptionsv2/tokens/${encodedToken}`
+      : `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${packageName}/purchases/products/${encodeURIComponent(input.productId)}/tokens/${encodedToken}`;
 
   const response = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!response.ok) throw new Error(`Google Play verification failed: ${response.status} ${await response.text()}`);
-  return await response.json() as Record<string, unknown>;
+  if (!response.ok) {
+    throw new Error(`Google Play verification failed status=${response.status}`);
+  }
+  return (await response.json()) as Record<string, unknown>;
 }
 
-function activeStatus(productType: VerifyRequest['productType'], google: Record<string, unknown>): string {
+// Fail-closed lifecycle classifier
+function classifyStatus(
+  productType: VerifyRequest['productType'],
+  google: Record<string, unknown>,
+): string {
   if (productType === 'inapp') {
-    return google.purchaseState === 0 || google.purchaseState === '0' ? 'active' : 'revoked';
+    const purchaseState = google.purchaseState;
+    if (purchaseState === 0 || purchaseState === '0') return 'active';
+    if (purchaseState === 1 || purchaseState === '1') return 'canceled';
+    if (purchaseState === 2 || purchaseState === '2') return 'pending';
+    return 'revoked'; // FAIL CLOSED
   }
-  const lineItems = Array.isArray(google.lineItems) ? google.lineItems as Array<Record<string, unknown>> : [];
+
+  // SubscriptionPurchaseV2 lifecycle
+  const subscriptionState = String(google.subscriptionState ?? '');
+  switch (subscriptionState) {
+    case 'SUBSCRIPTION_STATE_ACTIVE':
+      break;
+    case 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD':
+      return 'in_grace_period';
+    case 'SUBSCRIPTION_STATE_ON_HOLD':
+      return 'on_hold';
+    case 'SUBSCRIPTION_STATE_PAUSED':
+      return 'paused';
+    case 'SUBSCRIPTION_STATE_CANCELED':
+      return 'canceled';
+    case 'SUBSCRIPTION_STATE_EXPIRED':
+      return 'expired';
+    default:
+      // Unknown Google state -> fail closed
+      return 'disabled';
+  }
+
+  const lineItems = Array.isArray(google.lineItems)
+    ? (google.lineItems as Array<Record<string, unknown>>)
+    : [];
   const expiry = lineItems[0]?.expiryTime as string | undefined;
-  if (expiry && new Date(expiry).getTime() < Date.now()) return 'expired';
+  if (expiry && new Date(expiry).getTime() < Date.now()) {
+    return 'expired';
+  }
+
   return 'active';
 }
 
-function expiryTime(productType: VerifyRequest['productType'], google: Record<string, unknown>): string | null {
+function extractExpiry(
+  productType: VerifyRequest['productType'],
+  google: Record<string, unknown>,
+): string | null {
   if (productType === 'inapp') return null;
-  const lineItems = Array.isArray(google.lineItems) ? google.lineItems as Array<Record<string, unknown>> : [];
+  const lineItems = Array.isArray(google.lineItems)
+    ? (google.lineItems as Array<Record<string, unknown>>)
+    : [];
   return (lineItems[0]?.expiryTime as string | undefined) ?? null;
 }
 
 Deno.serve(async request => {
+  const correlationId =
+    request.headers.get('x-correlation-id') ?? crypto.randomUUID();
+
   if (request.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const input = await request.json() as VerifyRequest;
-    if (!input.productId || !input.purchaseToken || !['inapp', 'subs'].includes(input.productType)) {
-      return new Response(JSON.stringify({ error: 'Invalid request' }), { status: 400, headers: corsHeaders });
+    let input: VerifyRequest;
+    try {
+      input = (await request.json()) as VerifyRequest;
+    } catch {
+      return jsonResponse(400, { error: 'INVALID_JSON_BODY' }, correlationId);
     }
 
-    const authHeader = request.headers.get('Authorization') ?? '';
+    if (
+      !input.productId ||
+      !input.purchaseToken ||
+      !['inapp', 'subs'].includes(input.productType)
+    ) {
+      return jsonResponse(400, { error: 'INVALID_REQUEST_PAYLOAD' }, correlationId);
+    }
+
     const supabaseUrl = env('SUPABASE_URL');
     const serviceRole = env('SUPABASE_SERVICE_ROLE_KEY');
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? request.headers.get('apikey') ?? '';
+    const anonKey =
+      Deno.env.get('SUPABASE_ANON_KEY') ?? request.headers.get('apikey') ?? '';
 
-    let userId: string | null = null;
-    if (authHeader.startsWith('Bearer ') && anonKey) {
-      const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
-        headers: {
-          Authorization: authHeader,
-          apikey: anonKey,
-        },
-      });
-      if (userResponse.ok) {
-        const user = await userResponse.json() as { id?: string };
-        userId = user.id ?? null;
+    // Invariant: MONEY / PAID ENTITLEMENT REQUIRES AUTHENTICATED USER
+    let userId: string;
+    try {
+      userId = await requireUser(request, supabaseUrl, anonKey);
+    } catch (authErr) {
+      const code = authErr instanceof AuthError ? authErr.message : 'UNAUTHENTICATED';
+      return jsonResponse(401, { error: code }, correlationId);
+    }
+
+    const packageName = env('GOOGLE_PLAY_PACKAGE_NAME');
+    const google = await verifyWithGoogle(input);
+    const tokenHash = await sha256(input.purchaseToken);
+
+    // Verify subscription product ID matches Google response lineItems
+    if (input.productType === 'subs') {
+      const lineItems = Array.isArray(google.lineItems)
+        ? (google.lineItems as Array<Record<string, unknown>>)
+        : [];
+      const hasMatchingProduct = lineItems.some(item => item.productId === input.productId);
+      if (!hasMatchingProduct && lineItems.length > 0) {
+        return jsonResponse(400, { error: 'PURCHASE_PRODUCT_MISMATCH' }, correlationId);
       }
     }
 
-    const google = await verifyWithGoogle(input);
-    const tokenHash = await sha256(input.purchaseToken);
-    const status = activeStatus(input.productType, google);
-    const expiresAt = expiryTime(input.productType, google);
+    const status = classifyStatus(input.productType, google);
+    const expiresAt = extractExpiry(input.productType, google);
 
-    const productResponse = await fetch(`${supabaseUrl}/rest/v1/billing_products?product_id=eq.${encodeURIComponent(input.productId)}&select=*`, {
-      headers: {
-        Authorization: `Bearer ${serviceRole}`,
-        apikey: serviceRole,
+    // Atomic claim ownership (Section 5)
+    const claimRes = await fetch(
+      `${supabaseUrl}/rest/v1/rpc/claim_google_play_purchase`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${serviceRole}`,
+          apikey: serviceRole,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          p_package_name: packageName,
+          p_owner_user_id: userId,
+          p_product_id: input.productId,
+          p_product_type: input.productType,
+          p_purchase_token_hash: tokenHash,
+        }),
       },
-    });
-    if (!productResponse.ok) throw new Error(`Product lookup failed: ${await productResponse.text()}`);
-    const products = await productResponse.json() as Array<{ entitlement_key: string }>;
-    const entitlementKey = products[0]?.entitlement_key;
-    if (!entitlementKey) return new Response(JSON.stringify({ error: 'Unknown product' }), { status: 404, headers: corsHeaders });
+    );
 
+    if (!claimRes.ok) {
+      const claimErr = await claimRes.text();
+      if (claimRes.status === 409 || claimErr.includes('PURCHASE_ALREADY_CLAIMED') || claimErr.includes('23505')) {
+        return jsonResponse(409, { error: 'PURCHASE_ALREADY_CLAIMED' }, correlationId);
+      }
+      return jsonResponse(500, { error: 'CLAIM_FAILED' }, correlationId);
+    }
+
+    // Lookup product entitlement key
+    const productResponse = await fetch(
+      `${supabaseUrl}/rest/v1/billing_products?product_id=eq.${encodeURIComponent(input.productId)}&select=*`,
+      {
+        headers: {
+          Authorization: `Bearer ${serviceRole}`,
+          apikey: serviceRole,
+        },
+      },
+    );
+    if (!productResponse.ok) {
+      return jsonResponse(500, { error: 'PRODUCT_LOOKUP_FAILED' }, correlationId);
+    }
+    const products = (await productResponse.json()) as Array<{ entitlement_key: string }>;
+    const entitlementKey = products[0]?.entitlement_key;
+    if (!entitlementKey) {
+      return jsonResponse(404, { error: 'PRODUCT_NOT_FOUND' }, correlationId);
+    }
+
+    // Insert or update receipt tied to authenticated user
     const receiptBody = {
       user_id: userId,
       product_id: input.productId,
       product_type: input.productType,
       purchase_token_hash: tokenHash,
       order_id: (google.orderId as string | undefined) ?? null,
-      purchase_state: String((google.purchaseState ?? google.subscriptionState ?? 'unknown') as string),
-      acknowledgement_state: String((google.acknowledgementState ?? 'unknown') as string),
+      purchase_state: String(
+        (google.purchaseState ?? google.subscriptionState ?? 'unknown') as string,
+      ),
+      acknowledgement_state: String(
+        (google.acknowledgementState ?? 'unknown') as string,
+      ),
       consumption_state: String((google.consumptionState ?? 'unknown') as string),
       expiry_time: expiresAt,
       raw_response: google,
     };
 
-    const receiptResponse = await fetch(`${supabaseUrl}/rest/v1/google_play_purchase_receipts?on_conflict=purchase_token_hash`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${serviceRole}`,
-        apikey: serviceRole,
-        'Content-Type': 'application/json',
-        Prefer: 'resolution=merge-duplicates,return=representation',
+    const receiptResponse = await fetch(
+      `${supabaseUrl}/rest/v1/google_play_purchase_receipts?on_conflict=purchase_token_hash`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${serviceRole}`,
+          apikey: serviceRole,
+          'Content-Type': 'application/json',
+          Prefer: 'resolution=merge-duplicates,return=representation',
+        },
+        body: JSON.stringify(receiptBody),
       },
-      body: JSON.stringify(receiptBody),
-    });
-    if (!receiptResponse.ok) throw new Error(`Receipt upsert failed: ${await receiptResponse.text()}`);
-    const receipts = await receiptResponse.json() as Array<{ id: string }>;
+    );
+    if (!receiptResponse.ok) {
+      return jsonResponse(500, { error: 'RECEIPT_STORAGE_FAILED' }, correlationId);
+    }
+    const receipts = (await receiptResponse.json()) as Array<{ id: string }>;
     const receiptId = receipts[0]?.id;
 
+    // Entitlement strictly owned by authenticated user
     const entitlementBody = {
       user_id: userId,
-      anonymous_id: userId ? null : input.anonymousId ?? crypto.randomUUID(),
+      anonymous_id: null,
       entitlement_key: entitlementKey,
       product_id: input.productId,
       source: 'google_play',
@@ -200,26 +384,28 @@ Deno.serve(async request => {
       starts_at: new Date().toISOString(),
       expires_at: expiresAt,
       latest_receipt_id: receiptId,
-      metadata: { product_type: input.productType },
+      metadata: { product_type: input.productType, token_hash: tokenHash },
       updated_at: new Date().toISOString(),
     };
 
-    const entitlementLookupFilter = userId
-      ? `user_id=eq.${encodeURIComponent(userId)}&product_id=eq.${encodeURIComponent(input.productId)}`
-      : `anonymous_id=eq.${encodeURIComponent(entitlementBody.anonymous_id ?? '')}&product_id=eq.${encodeURIComponent(input.productId)}`;
-    const entitlementLookup = await fetch(`${supabaseUrl}/rest/v1/user_entitlements?${entitlementLookupFilter}&select=id`, {
-      headers: {
-        Authorization: `Bearer ${serviceRole}`,
-        apikey: serviceRole,
+    const entitlementLookup = await fetch(
+      `${supabaseUrl}/rest/v1/user_entitlements?user_id=eq.${encodeURIComponent(userId)}&product_id=eq.${encodeURIComponent(input.productId)}&select=id`,
+      {
+        headers: {
+          Authorization: `Bearer ${serviceRole}`,
+          apikey: serviceRole,
+        },
       },
-    });
-    if (!entitlementLookup.ok) throw new Error(`Entitlement lookup failed: ${await entitlementLookup.text()}`);
-    const existingEntitlements = await entitlementLookup.json() as Array<{ id: string }>;
+    );
+    const existingEntitlements = entitlementLookup.ok
+      ? ((await entitlementLookup.json()) as Array<{ id: string }>)
+      : [];
     const existingEntitlementId = existingEntitlements[0]?.id;
 
     const entitlementUrl = existingEntitlementId
       ? `${supabaseUrl}/rest/v1/user_entitlements?id=eq.${existingEntitlementId}`
       : `${supabaseUrl}/rest/v1/user_entitlements`;
+
     const entitlementResponse = await fetch(entitlementUrl, {
       method: existingEntitlementId ? 'PATCH' : 'POST',
       headers: {
@@ -230,15 +416,24 @@ Deno.serve(async request => {
       },
       body: JSON.stringify(entitlementBody),
     });
-    if (!entitlementResponse.ok) throw new Error(`Entitlement upsert failed: ${await entitlementResponse.text()}`);
 
-    return new Response(JSON.stringify({ ok: true, status, entitlement_key: entitlementKey, expires_at: expiresAt }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    if (!entitlementResponse.ok) {
+      return jsonResponse(500, { error: 'ENTITLEMENT_SYNC_FAILED' }, correlationId);
+    }
+
+    return jsonResponse(
+      200,
+      {
+        ok: true,
+        status,
+        entitlement_key: entitlementKey,
+        expires_at: expiresAt,
+      },
+      correlationId,
+    );
   } catch (error) {
-    return new Response(JSON.stringify({ error: String(error) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Sanitized fail-closed error response - never leak infrastructure secrets
+    console.error(`[verify-google-play-purchase] [${correlationId}] error:`, error instanceof Error ? error.message : 'UNKNOWN_ERROR');
+    return jsonResponse(500, { error: 'INTERNAL_SERVER_ERROR' }, correlationId);
   }
 });

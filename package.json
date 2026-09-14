@@ -4,6 +4,7 @@
   "version": "4.24.0",
   "type": "module",
   "scripts": {
+    "check:versions": "node tools/verify-version-sync.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

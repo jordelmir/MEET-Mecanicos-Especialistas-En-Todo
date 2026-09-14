@@ -9,6 +9,8 @@ on:
       - "tests/diagnostics/**"
       - "tests/parity/**"
       - "tools/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/diagnostic-v2-release-gates.yml"
   push:
     branches: [main]
@@ -19,6 +21,8 @@ on:
       - "tests/diagnostics/**"
       - "tests/parity/**"
       - "tools/**"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/diagnostic-v2-release-gates.yml"
   workflow_dispatch:
 
@@ -88,6 +92,8 @@ jobs:
         run: bash tools/verify-production-guards.sh
       - name: Production invariant negative self-tests
         run: bash tools/test-production-guards.sh
+      - name: Proof status evidence regression tests
+        run: python3 tools/vehicle-truth/test-generate-proof-status.py
       - name: Require protected online Android configuration
         shell: bash
         run: |
@@ -228,9 +234,8 @@ jobs:
         continue-on-error: true
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          pattern: meet-release-evidence-*
+          name: meet-release-evidence-${{ github.sha }}
           path: proof-artifacts
-          merge-multiple: true
       - name: Generate proof status only from job outcomes and artifact bytes
         run: |
           VERSION_NAME=$(grep 'versionName =' android/app/build.gradle.kts | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
@@ -242,11 +247,12 @@ jobs:
             --version-name "${VERSION_NAME}" \
             --version-code "${VERSION_CODE}" \
             --gate "release-gates=${{ needs.release-gates.result }}" \
-            --artifact "debug-apk=proof-artifacts/app-debug.apk" \
-            --artifact "release-apk=proof-artifacts/app-release.apk" \
-            --artifact "release-aab=proof-artifacts/app-release.aab" \
-            --artifact "sbom=proof-artifacts/meet-release.cdx.json"
+            --artifact "debug-apk=proof-artifacts/outputs/apk/debug/app-debug.apk" \
+            --artifact "release-apk=proof-artifacts/outputs/apk/release/app-release.apk" \
+            --artifact "release-aab=proof-artifacts/outputs/bundle/release/app-release.aab" \
+            --artifact "sbom=proof-artifacts/reports/sbom/meet-release.cdx.json"
       - name: Archive proof status
+        if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: meet-proof-status-${{ github.sha }}

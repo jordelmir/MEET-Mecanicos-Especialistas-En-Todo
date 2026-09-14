@@ -378,4 +378,66 @@ class ProductionTruthGuardTest {
         supervisor.disconnect()
         assertEquals(com.elysium369.meet.core.obd.TransportHealth.DISCONNECTED, supervisor.health.value.transport)
     }
+
+    // ── 7. ZERO DOUBLE MONEY & FINANCIAL RESILIENCE GUARDS ──
+
+    @Test
+    fun minorUnitsEnforcesNonNegativeInvariantTest() {
+        val valid = com.elysium369.meet.core.money.MinorUnits(5000L)
+        assertEquals(5000L, valid.value)
+
+        val money = com.elysium369.meet.core.money.Money.of(valid, CurrencyCode.CRC)
+        assertEquals(valid, money.amount)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            com.elysium369.meet.core.money.MinorUnits(-1L)
+        }
+    }
+
+    @Test
+    fun sensitiveLogRedactsPiiTest() {
+        val phone = com.elysium369.meet.core.logging.SensitiveLog.phone("+50688889999")
+        assertTrue(phone.endsWith("99"))
+        assertTrue(phone.startsWith("*"))
+        assertFalse(phone.contains("8888"))
+
+        val token = com.elysium369.meet.core.logging.SensitiveLog.token("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9")
+        assertTrue(token.contains("***"))
+        assertFalse(token.contains("OiJIUzI1NiIsInR5"))
+
+        val vin = com.elysium369.meet.core.logging.SensitiveLog.vin("KMHCG41BP6U123456")
+        assertEquals("***123456", vin)
+    }
+
+    @Test
+    fun retryPolicyRejectsTerminalPaymentFailuresTest() {
+        val policy = com.elysium369.meet.core.resilience.RetryPolicy()
+        val terminalCodes = listOf(
+            "CARD_DECLINED",
+            "INVALID_TOKEN",
+            "FORBIDDEN",
+            "INVALID_STATE",
+            "INSUFFICIENT_FUNDS"
+        )
+        for (code in terminalCodes) {
+            val failure = com.elysium369.meet.core.error.DomainFailure.TerminalDependency("PSP", code)
+            assertFalse(
+                "Code $code must never be retryable",
+                policy.isRetryable(failure)
+            )
+        }
+
+        val retryable = com.elysium369.meet.core.error.DomainFailure.RetryableDependency("PSP_TIMEOUT")
+        assertTrue(policy.isRetryable(retryable))
+    }
+
+    @Test
+    fun paymentTimeoutResolvesToReconciliationNotBlindRetryTest() {
+        val resolution = com.elysium369.meet.core.resilience.ExecutionDeadlines.resolvePaymentTimeout()
+        assertEquals(
+            com.elysium369.meet.core.resilience.ExecutionDeadlines.PaymentTimeoutResolution.RECONCILE_UNKNOWN,
+            resolution
+        )
+    }
 }
+

@@ -57,6 +57,7 @@ fun PassengerRideRequestScreen(
     val scope = rememberCoroutineScope()
 
     val currentGps by viewModel.currentGpsLocation.collectAsState()
+    val passengerVerification by viewModel.passengerVerification.collectAsState()
 
     var pickup by remember(currentGps) {
         mutableStateOf(
@@ -352,7 +353,7 @@ fun PassengerRideRequestScreen(
                     val curPickup = pickup
                     val curDropoff = dropoff
                     val curQuote = fareQuote
-                    val passenger = viewModel.passengerVerification.collectAsState().value
+                    val passenger = passengerVerification
                     val passengerName = passenger?.fullName?.takeIf { it.isNotBlank() }
                         ?: viewModel.currentUserId?.takeIf { it.isNotBlank() }
                     val passengerPhone = passenger?.phone?.takeIf { it.isNotBlank() }

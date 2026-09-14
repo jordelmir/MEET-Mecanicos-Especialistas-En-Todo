@@ -4,6 +4,18 @@ import java.text.NumberFormat
 import java.util.Locale
 
 /**
+ * Value class wrapping non-negative minor monetary units.
+ */
+@JvmInline
+value class MinorUnits(val value: Long) {
+    init {
+        require(value >= 0) {
+            "Money cannot contain negative minor units: $value"
+        }
+    }
+}
+
+/**
  * MEET Vehicle Life OS — Immutable Financial Value Object.
  * Enforces Doctrine #7: Zero Double/Float representations for monetary amounts.
  * Stores values strictly as minor units (e.g., cents, centavos) in [Long].
@@ -15,6 +27,8 @@ data class Money(
     val amountMinor: Long,
     val currency: CurrencyCode
 ) : Comparable<Money> {
+
+    val amount: MinorUnits get() = MinorUnits(amountMinor)
 
     init {
         require(amountMinor >= 0) { "Money amount cannot be negative: $amountMinor" }
@@ -63,6 +77,8 @@ data class Money(
 
     companion object {
         fun zero(currency: CurrencyCode): Money = Money(0L, currency)
+
+        fun of(amount: MinorUnits, currency: CurrencyCode): Money = Money(amount.value, currency)
 
         fun of(amountMinor: Long, currency: String): Money = Money(amountMinor, CurrencyCode.fromString(currency))
 

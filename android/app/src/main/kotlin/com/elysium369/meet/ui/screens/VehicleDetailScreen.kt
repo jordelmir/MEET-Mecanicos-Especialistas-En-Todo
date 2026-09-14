@@ -69,6 +69,7 @@ fun VehicleDetailScreen(
     val repairHistory by viewModel.repairHistory.collectAsState()
     val totalMaintCost by viewModel.totalMaintenanceCost.collectAsState()
     val totalRepairCost by viewModel.totalRepairCost.collectAsState()
+    val vehicle by viewModel.vehicle.collectAsState()
 
     var showAddDialog by remember { mutableStateOf(false) }
     var showReportCustomizer by remember { mutableStateOf(false) }
@@ -188,7 +189,6 @@ fun VehicleDetailScreen(
         }
 
         if (showAddDialog) {
-            val vehicle = viewModel.vehicle.collectAsState().value
             val context = androidx.compose.ui.platform.LocalContext.current
             val avgDailyKm = viewModel.calculateAverageDailyKm()
 
