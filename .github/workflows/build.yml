@@ -7,6 +7,22 @@ on:
     branches: [main]
 
 jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Verify Android and web version agreement
+        run: npm run check:versions
+      - name: Web and shared contract tests
+        run: npm test
+      - name: Build web application
+        run: npm run build
+
   build:
     runs-on: ubuntu-latest
     steps:

@@ -64,3 +64,6 @@ jobs:
             exit 1
           fi
           echo "Privilege boundaries verified: PASS"
+
+      - name: Verify financial RPC authorization and atomic reconciliation
+        run: psql "$DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/financial_rpc_privileges.sql
