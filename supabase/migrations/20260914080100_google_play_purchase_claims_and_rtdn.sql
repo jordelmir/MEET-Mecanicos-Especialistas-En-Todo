@@ -41,7 +41,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-    v_owner uuid;
+    v_claim record;
 BEGIN
     IF p_owner_user_id IS NULL THEN
         RAISE EXCEPTION 'IDENTITY_REQUIRED' USING errcode = '28000';
