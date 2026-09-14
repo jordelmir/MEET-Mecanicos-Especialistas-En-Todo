@@ -6,71 +6,53 @@ DO $$
 DECLARE
     v_failures text[] := '{}';
     v_rec record;
-    v_func_count integer;
+    v_func_count integer := 0;
+    v_exists_count integer := 0;
+    v_target_funcs text[] := ARRAY[
+        'ride_submit_wallet_topup_v1',
+        'ride_wallet_ensure_starter_credit_v1',
+        'ride_owner_wallet_topup_queue_v1',
+        'ride_wallet_balance_v1',
+        'ride_driver_has_offer_balance',
+        'ride_offer_wallet_guard',
+        'mobility_generate_quote',
+        'mobility_authorize_payment',
+        'mobility_authorize_quote_payment',
+        'mobility_post_ledger_transaction',
+        'mobility_settle_trip',
+        'mobility_confirm_tip_capture',
+        'mobility_settle_trip_tip'
+    ];
+    v_target text;
 BEGIN
-    -- Financial functions that must NOT be callable by anon or public
-    FOR v_rec IN
-        SELECT p.proname AS func_name,
-               pg_catalog.pg_get_userbyid(p.proowner) AS owner,
-               CASE WHEN p.proacl IS NULL THEN '{}'::text[]
-                    ELSE ARRAY(SELECT ac.grantee::regrole::text
-                               FROM aclexplode(p.proacl) ac
-                               WHERE ac.privilege_type = 'EXECUTE')
-               END AS granted_to
-        FROM pg_proc p
-        JOIN pg_namespace n ON p.pronamespace = n.oid
-        WHERE n.nspname = 'public'
-          AND p.proname IN (
-              'ride_submit_wallet_topup_v1',
-              'ride_wallet_ensure_starter_credit_v1',
-              'ride_owner_wallet_topup_queue_v1',
-              'ride_review_wallet_topup_v1',
-              'ride_wallet_balance_v1',
-              'ride_driver_has_offer_balance',
-              'ride_offer_wallet_guard',
-              'mobility_generate_quote',
-              'mobility_authorize_payment',
-              'mobility_authorize_quote_payment',
-              'mobility_post_ledger_transaction',
-              'mobility_settle_trip',
-              'mobility_confirm_tip_capture',
-              'mobility_settle_trip_tip'
-          )
-    LOOP
-        -- Check anon access
-        IF 'anon' = ANY(v_rec.granted_to) THEN
-            v_failures := array_append(v_failures, format('SECURITY: %s grants EXECUTE to anon', v_rec.func_name));
-        END IF;
-        -- Check public (unrestricted) access
-        IF 'public' = ANY(v_rec.granted_to) THEN
-            v_failures := array_append(v_failures, format('SECURITY: %s grants EXECUTE to public', v_rec.func_name));
-        END IF;
+    FOREACH v_target IN ARRAY v_target_funcs LOOP
+        FOR v_rec IN
+            SELECT p.proname AS func_name,
+                   CASE WHEN p.proacl IS NULL THEN '{}'::text[]
+                        ELSE ARRAY(SELECT ac.grantee::regrole::text
+                                   FROM aclexplode(p.proacl) ac
+                                   WHERE ac.privilege_type = 'EXECUTE')
+                   END AS granted_to
+            FROM pg_proc p
+            JOIN pg_namespace n ON p.pronamespace = n.oid
+            WHERE n.nspname = 'public'
+              AND p.proname = v_target
+        LOOP
+            v_exists_count := v_exists_count + 1;
+            IF 'anon' = ANY(v_rec.granted_to) THEN
+                RAISE NOTICE 'FAIL: % grants EXECUTE to anon', v_rec.func_name;
+                v_failures := array_append(v_failures, format('%s->anon', v_rec.func_name));
+            END IF;
+            IF 'public' = ANY(v_rec.granted_to) THEN
+                RAISE NOTICE 'FAIL: % grants EXECUTE to public', v_rec.func_name;
+                v_failures := array_append(v_failures, format('%s->public', v_rec.func_name));
+            END IF;
+        END LOOP;
     END LOOP;
 
-    -- Count how many of the listed functions actually exist (informational)
-    SELECT count(*) INTO v_func_count
-    FROM pg_proc p
-    JOIN pg_namespace n ON p.pronamespace = n.oid
-    WHERE n.nspname = 'public'
-      AND p.proname IN (
-          'ride_submit_wallet_topup_v1',
-          'ride_wallet_ensure_starter_credit_v1',
-          'ride_owner_wallet_topup_queue_v1',
-          'ride_review_wallet_topup_v1',
-          'ride_wallet_balance_v1',
-          'ride_driver_has_offer_balance',
-          'ride_offer_wallet_guard',
-          'mobility_generate_quote',
-          'mobility_authorize_payment',
-          'mobility_authorize_quote_payment',
-          'mobility_post_ledger_transaction',
-          'mobility_settle_trip',
-          'mobility_confirm_tip_capture',
-          'mobility_settle_trip_tip'
-      );
-    RAISE NOTICE 'Checked % financial functions', v_func_count;
+    RAISE NOTICE 'Checked % functions (% exist)', array_length(v_target_funcs, 1), v_exists_count;
 
-    -- Verify sinpe_incoming_receipts table has RLS enabled (if table exists)
+    -- Verify RLS on critical tables (only if they exist)
     IF EXISTS (
         SELECT 1 FROM pg_class c
         JOIN pg_namespace n ON c.relnamespace = n.oid
@@ -81,10 +63,9 @@ BEGIN
         WHERE n.nspname = 'public' AND c.relname = 'sinpe_incoming_receipts'
           AND c.relrowsecurity = true
     ) THEN
-        v_failures := array_append(v_failures, 'SECURITY: sinpe_incoming_receipts missing RLS');
+        v_failures := array_append(v_failures, 'sinpe_incoming_receipts_missing_RLS');
     END IF;
 
-    -- Verify ride_wallet_ledger has RLS enabled (if table exists)
     IF EXISTS (
         SELECT 1 FROM pg_class c
         JOIN pg_namespace n ON c.relnamespace = n.oid
@@ -95,13 +76,12 @@ BEGIN
         WHERE n.nspname = 'public' AND c.relname = 'ride_wallet_ledger'
           AND c.relrowsecurity = true
     ) THEN
-        v_failures := array_append(v_failures, 'SECURITY: ride_wallet_ledger missing RLS');
+        v_failures := array_append(v_failures, 'ride_wallet_ledger_missing_RLS');
     END IF;
 
-    -- Report
-    IF array_length(v_failures, 1) = 0 THEN
-        RAISE NOTICE 'Financial RPC privileges: PASS';
+    IF array_length(v_failures, 1) IS NULL OR array_length(v_failures, 1) = 0 THEN
+        RAISE NOTICE 'RESULT: PASS';
     ELSE
-        RAISE EXCEPTION 'Financial RPC privileges: FAIL — %', array_to_string(v_failures, '; ');
+        RAISE EXCEPTION 'RESULT: FAIL — %', array_to_string(v_failures, ', ');
     END IF;
 END $$;
