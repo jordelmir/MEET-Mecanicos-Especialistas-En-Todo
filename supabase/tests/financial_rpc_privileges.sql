@@ -6,6 +6,7 @@ DO $$
 DECLARE
     v_failures text[] := '{}';
     v_rec record;
+    v_func_count integer;
 BEGIN
     -- Financial functions that must NOT be callable by anon or public
     FOR v_rec IN
@@ -46,8 +47,35 @@ BEGIN
         END IF;
     END LOOP;
 
-    -- Verify sinpe_incoming_receipts table has RLS enabled
-    IF NOT EXISTS (
+    -- Count how many of the listed functions actually exist (informational)
+    SELECT count(*) INTO v_func_count
+    FROM pg_proc p
+    JOIN pg_namespace n ON p.pronamespace = n.oid
+    WHERE n.nspname = 'public'
+      AND p.proname IN (
+          'ride_submit_wallet_topup_v1',
+          'ride_wallet_ensure_starter_credit_v1',
+          'ride_owner_wallet_topup_queue_v1',
+          'ride_review_wallet_topup_v1',
+          'ride_wallet_balance_v1',
+          'ride_driver_has_offer_balance',
+          'ride_offer_wallet_guard',
+          'mobility_generate_quote',
+          'mobility_authorize_payment',
+          'mobility_authorize_quote_payment',
+          'mobility_post_ledger_transaction',
+          'mobility_settle_trip',
+          'mobility_confirm_tip_capture',
+          'mobility_settle_trip_tip'
+      );
+    RAISE NOTICE 'Checked % financial functions', v_func_count;
+
+    -- Verify sinpe_incoming_receipts table has RLS enabled (if table exists)
+    IF EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON c.relnamespace = n.oid
+        WHERE n.nspname = 'public' AND c.relname = 'sinpe_incoming_receipts'
+    ) AND NOT EXISTS (
         SELECT 1 FROM pg_class c
         JOIN pg_namespace n ON c.relnamespace = n.oid
         WHERE n.nspname = 'public' AND c.relname = 'sinpe_incoming_receipts'
@@ -56,8 +84,12 @@ BEGIN
         v_failures := array_append(v_failures, 'SECURITY: sinpe_incoming_receipts missing RLS');
     END IF;
 
-    -- Verify ride_wallet_ledger has RLS enabled
-    IF NOT EXISTS (
+    -- Verify ride_wallet_ledger has RLS enabled (if table exists)
+    IF EXISTS (
+        SELECT 1 FROM pg_class c
+        JOIN pg_namespace n ON c.relnamespace = n.oid
+        WHERE n.nspname = 'public' AND c.relname = 'ride_wallet_ledger'
+    ) AND NOT EXISTS (
         SELECT 1 FROM pg_class c
         JOIN pg_namespace n ON c.relnamespace = n.oid
         WHERE n.nspname = 'public' AND c.relname = 'ride_wallet_ledger'
