@@ -279,9 +279,9 @@ BEGIN
     DELETE FROM public.ride_wallet_topups WHERE driver_id = v_test_driver;
     DELETE FROM public.ride_wallets WHERE driver_id = v_test_driver;
 
-    -- Create test wallet
-    INSERT INTO public.ride_wallets (driver_id, balance_crc, currency, environment)
-    VALUES (v_test_driver, 0, 'CRC', 'SANDBOX')
+    -- Create test wallet (balance is computed from ledger, not stored)
+    INSERT INTO public.ride_wallets (driver_id, currency, environment)
+    VALUES (v_test_driver, 'CRC', 'SANDBOX')
     ON CONFLICT (driver_id) DO NOTHING;
 
     -- TEST 1: Topup idempotency — same transfer_reference credited exactly once
