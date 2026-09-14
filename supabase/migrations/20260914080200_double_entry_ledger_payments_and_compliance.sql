@@ -49,17 +49,23 @@ ALTER TABLE public.ledger_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ledger_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ledger_entries ENABLE ROW LEVEL SECURITY;
 
-REVOKE ALL ON public.ledger_accounts,
-               public.ledger_transactions,
-               public.ledger_entries
-FROM anon, authenticated;
-
--- Owner can read their own accounts
+-- Owner can read their own accounts (policy must exist before REVOKE)
 CREATE POLICY "ledger_accounts_owner_read"
     ON public.ledger_accounts
     FOR SELECT
     TO authenticated
     USING (owner_user_id = auth.uid());
+
+-- Revoke broad client writes AFTER policies are set
+REVOKE ALL ON public.ledger_accounts,
+               public.ledger_transactions,
+               public.ledger_entries
+FROM anon;
+
+-- Revoke direct INSERT/UPDATE/DELETE from authenticated (policies still allow SELECT)
+REVOKE INSERT, UPDATE, DELETE ON public.ledger_accounts FROM authenticated;
+REVOKE ALL ON public.ledger_transactions FROM authenticated;
+REVOKE ALL ON public.ledger_entries FROM authenticated;
 
 -- 4. Idempotent Ledger Posting Function (Section 11)
 CREATE OR REPLACE FUNCTION public.post_ledger_transaction(
