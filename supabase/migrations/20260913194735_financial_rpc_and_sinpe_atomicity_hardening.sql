@@ -1,78 +1,49 @@
 -- Migration: 20260913194735_financial_rpc_and_sinpe_atomicity_hardening.sql
 -- Closes privilege gaps found during Codex audit:
---   1. 7 wallet/SINPE RPCs had NO explicit REVOKE — public could call SECURITY DEFINER functions
+--   1. Wallet functions: original migrations revoke from public but NOT from anon
 --   2. SINPE RPCs had GRANT but no explicit REVOKE PUBLIC/ANON
 --   3. ride_driver_wallet_credit_v1 lacked explicit REVOKE
 
 -- ============================================================
--- 1. Wallet functions: explicit REVOKE from public/anon
---    These are SECURITY DEFINER but without REVOKE, public role
---    inherits EXECUTE permission. Each guard checks auth.uid()
---    internally, but defense-in-depth requires explicit REVOKE.
+-- 1. Wallet functions: add REVOKE from anon (public already revoked by earlier migrations)
+--    Uses dynamic SQL to discover exact function signature from pg_proc,
+--    so REVOKE always matches even if signatures change.
 -- ============================================================
 
--- ride_submit_wallet_topup_v1 — driver submits a SINPE topup
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
-               WHERE n.nspname='public' AND p.proname='ride_submit_wallet_topup_v1') THEN
-        EXECUTE 'REVOKE ALL ON FUNCTION public.ride_submit_wallet_topup_v1(bigint,text,text,text,text,text,text,text) FROM public, anon';
-        EXECUTE 'GRANT EXECUTE ON FUNCTION public.ride_submit_wallet_topup_v1(bigint,text,text,text,text,text,text,text) TO authenticated';
-    END IF;
-END $$;
-
--- ride_wallet_ensure_starter_credit_v1 — credits verified driver
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
-               WHERE n.nspname='public' AND p.proname='ride_wallet_ensure_starter_credit_v1') THEN
-        EXECUTE 'REVOKE ALL ON FUNCTION public.ride_wallet_ensure_starter_credit_v1() FROM public, anon';
-        EXECUTE 'GRANT EXECUTE ON FUNCTION public.ride_wallet_ensure_starter_credit_v1() TO authenticated';
-    END IF;
-END $$;
-
--- ride_owner_wallet_topup_queue_v1 — admin reviews topup queue
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
-               WHERE n.nspname='public' AND p.proname='ride_owner_wallet_topup_queue_v1') THEN
-        EXECUTE 'REVOKE ALL ON FUNCTION public.ride_owner_wallet_topup_queue_v1(text,integer) FROM public, anon';
-        EXECUTE 'GRANT EXECUTE ON FUNCTION public.ride_owner_wallet_topup_queue_v1(text,integer) TO authenticated';
-    END IF;
-END $$;
-
--- ride_review_wallet_topup_v1 — admin approves/rejects topup
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
-               WHERE n.nspname='public' AND p.proname='ride_review_wallet_topup_v1') THEN
-        EXECUTE 'REVOKE ALL ON FUNCTION public.ride_review_wallet_topup_v1(uuid,text,text) FROM public, anon';
-        EXECUTE 'GRANT EXECUTE ON FUNCTION public.ride_review_wallet_topup_v1(uuid,text,text) TO authenticated';
-    END IF;
-END $$;
-
--- ride_wallet_balance_v1 — driver reads own balance
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
-               WHERE n.nspname='public' AND p.proname='ride_wallet_balance_v1') THEN
-        EXECUTE 'REVOKE ALL ON FUNCTION public.ride_wallet_balance_v1() FROM public, anon';
-        EXECUTE 'GRANT EXECUTE ON FUNCTION public.ride_wallet_balance_v1() TO authenticated';
-    END IF;
-END $$;
-
--- ride_driver_has_offer_balance — checks if driver can afford offer
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
-               WHERE n.nspname='public' AND p.proname='ride_driver_has_offer_balance') THEN
-        EXECUTE 'REVOKE ALL ON FUNCTION public.ride_driver_has_offer_balance(uuid,bigint,text) FROM public, anon';
-        EXECUTE 'GRANT EXECUTE ON FUNCTION public.ride_driver_has_offer_balance(uuid,bigint,text) TO authenticated';
-    END IF;
-END $$;
-
--- ride_offer_wallet_guard — trigger function (SECURITY DEFINER)
--- Trigger functions are invoked by the DB engine, not by client RPC.
--- Explicitly revoke public EXECUTE as defense-in-depth.
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
-               WHERE n.nspname='public' AND p.proname='ride_offer_wallet_guard') THEN
-        EXECUTE 'REVOKE ALL ON FUNCTION public.ride_offer_wallet_guard() FROM public, anon';
-    END IF;
+DO $$
+DECLARE
+    v_func_name text;
+    v_rec record;
+    v_sig text;
+    v_funcs text[] := ARRAY[
+        'ride_submit_wallet_topup_v1',
+        'ride_wallet_ensure_starter_credit_v1',
+        'ride_owner_wallet_topup_queue_v1',
+        'ride_owner_decide_wallet_topup_v1',
+        'ride_wallet_balance_v1',
+        'ride_driver_has_offer_balance',
+        'ride_offer_wallet_guard'
+    ];
+BEGIN
+    FOREACH v_func_name IN ARRAY v_funcs LOOP
+        FOR v_rec IN
+            SELECT p.oid,
+                   pg_catalog.pg_get_function_arguments(p.oid) AS args
+            FROM pg_proc p
+            JOIN pg_namespace n ON p.pronamespace = n.oid
+            WHERE n.nspname = 'public'
+              AND p.proname = v_func_name
+            ORDER BY (SELECT count(*) FROM unnest(p.proargtypes) t)  -- prefer overload with most args
+        LOOP
+            -- REVOKE from both public and anon (idempotent)
+            EXECUTE format(
+                'REVOKE ALL ON FUNCTION public.%I(%s) FROM public, anon',
+                v_func_name, v_rec.args
+            );
+            RAISE NOTICE 'REVOKE %: OK', v_func_name;
+            EXIT;  -- handle first (most-specific) overload only
+        END LOOP;
+    END LOOP;
 END $$;
 
 -- ============================================================
@@ -92,15 +63,30 @@ GRANT EXECUTE ON FUNCTION public.sinpe_claim_receipt_v1(text, numeric)
     TO authenticated;
 
 -- ============================================================
--- 3. Wallet credit helper
+-- 3. Wallet credit helper (service_role only)
 -- ============================================================
 
-DO $$ BEGIN
-    IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON p.pronamespace=n.oid
-               WHERE n.nspname='public' AND p.proname='ride_driver_wallet_credit_v1') THEN
-        EXECUTE 'REVOKE ALL ON FUNCTION public.ride_driver_wallet_credit_v1(uuid,bigint,text,text) FROM public, anon';
-        EXECUTE 'GRANT EXECUTE ON FUNCTION public.ride_driver_wallet_credit_v1(uuid,bigint,text,text) TO service_role';
-    END IF;
+DO $$
+DECLARE
+    v_rec record;
+BEGIN
+    FOR v_rec IN
+        SELECT pg_catalog.pg_get_function_arguments(p.oid) AS args
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public' AND p.proname = 'ride_driver_wallet_credit_v1'
+    LOOP
+        EXECUTE format(
+            'REVOKE ALL ON FUNCTION public.ride_driver_wallet_credit_v1(%s) FROM public, anon',
+            v_rec.args
+        );
+        EXECUTE format(
+            'GRANT EXECUTE ON FUNCTION public.ride_driver_wallet_credit_v1(%s) TO service_role',
+            v_rec.args
+        );
+        RAISE NOTICE 'ride_driver_wallet_credit_v1: locked to service_role';
+        EXIT;
+    END LOOP;
 END $$;
 
 -- ============================================================
