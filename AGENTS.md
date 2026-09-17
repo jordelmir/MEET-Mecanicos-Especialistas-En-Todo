@@ -84,6 +84,13 @@ Onboarding → Vehicle → OBD → DTCs → Repair guide → Mechanic
 6. **Never break the cross-runtime parity** between TS and Kotlin.
    `bash tests/parity/ci-verify.sh` must stay green.
 
+7. **Never perform optimistic state mutations in Rides.** The UI must
+   never synthesize `status = "ACCEPTED"`, mark `IN_PROGRESS`, or simulate
+   boarding PIN verification locally. All state transitions must originate
+   as durable outbox commands (`RideCommandType`), transition through the server
+   RPC, and be projected back into Room with `serverVersion > 0` before updating
+   the UI state. See `docs/rides/MEET_RIDES_V9_APK_RECOVERY_SPEC.md`.
+
 ---
 
 ## V2 specs (currently in flight, both will ship)

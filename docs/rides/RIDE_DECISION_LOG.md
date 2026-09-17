@@ -80,3 +80,19 @@
 - **Chosen Option**: **Separate verification truths with fail-closed enforcement**.
 - **Evidence**: Verified in `RideEligibilityPolicyTest` and `RideActorOwnershipContractTest`.
 - **Revisit Condition**: Permanent safety invariant.
+
+---
+
+## ADR-006: Server-Authoritative Ride Claim Lifecycle & Elimination of Optimistic Mutations
+
+- **Date**: 2026-09-17
+- **SHA**: `1dddf561`
+- **Context**: Mobile client UI previously synthesized `status = "ACCEPTED"` and navigated to active ride view before server ACK, creating ghost state regressions when server rejected requests due to version conflict or concurrency.
+- **Alternatives Considered**:
+  1. Optimistic Room update with automatic rollback upon WorkManager rejection.
+  2. Pure server authority with UI waiting in `Pending` state until Room receives server projection.
+- **Trade-offs**: Optimistic updates give illusion of zero latency, but fail catastrophically under real-world distributed conditions (ghost active trips that suddenly vanish after 1 second). Pure server authority ensures 100% truth consistency at the cost of a clear loading state (`"CONFIRMANDO…"`).
+- **Chosen Option**: **Pure Server Authority via Transactional Outbox + `RideClaimUiState.Pending` + Room Projection Promotion (`Won`)**.
+- **Evidence**: Verified in `RideClaimProjectionContractTest`, `RideDriverFeedPolicyTest`, and `verify-ride-android-authority.sh`. All 2,077 tests green.
+- **Revisit Condition**: Permanent architecture invariant. No composable may ever write synthetic `ACCEPTED` states.
+
