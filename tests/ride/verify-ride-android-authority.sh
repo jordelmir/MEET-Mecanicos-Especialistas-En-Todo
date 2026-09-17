@@ -145,4 +145,20 @@ if rg -Fq 'Uri.parse("tel:' "$ride_screen" ||
   exit 1
 fi
 
+if rg -q 'steps=false' "$routing"; then
+  echo "ride Android authority contract: FAIL (turn-by-turn routing still disables steps)" >&2
+  exit 1
+fi
+
+cockpit="$repo_root/android/app/src/main/kotlin/com/elysium369/meet/ride/driver/ui/DriverActiveTripCockpit.kt"
+[[ -f "$cockpit" ]] || {
+  echo "ride Android authority contract: FAIL (driver active trip cockpit missing)" >&2
+  exit 1
+}
+
+if rg -q 'SupabaseModule|postgrest|\.rpc\(' "$cockpit"; then
+  echo "ride Android authority contract: FAIL (cockpit bypasses application/outbox boundary)" >&2
+  exit 1
+fi
+
 echo "ride Android authority contract: PASS"
