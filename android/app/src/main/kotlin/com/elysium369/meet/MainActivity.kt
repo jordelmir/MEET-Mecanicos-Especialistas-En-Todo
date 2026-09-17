@@ -1280,37 +1280,9 @@ fun MeetApp(
                 )
             }
             composable(MeetDestinations.RIDE_CENTER) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                val driverVer by obdViewModel.driverVerification.collectAsState()
                 com.elysium369.meet.ui.screens.ride.RideCenterScreen(
                     viewModel = obdViewModel,
                     onBack = { navController.popBackStack() },
-                    onSelectRide = { ride ->
-                        val dId = driverVer?.driverId ?: obdViewModel.currentRideActorId
-                        val dName = driverVer?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
-                        val dPhone = driverVer?.phone?.takeIf { it.isNotBlank() } ?: ""
-                        val dVeh = if (driverVer != null && driverVer?.vehicleModel?.isNotBlank() == true) {
-                            "${driverVer?.vehicleMake} ${driverVer?.vehicleModel} ${driverVer?.vehicleYear} (${driverVer?.vehicleColor}) [${driverVer?.vehiclePlate}]"
-                        } else {
-                            "Vehículo pendiente de validar"
-                        }
-                        obdViewModel.acceptRideComplete(
-                            requestId = ride.requestId,
-                            driverId = dId,
-                            driverName = dName,
-                            driverPhone = dPhone,
-                            vehicleDescription = dVeh,
-                            pickupLat = ride.pickupLatitude,
-                            pickupLng = ride.pickupLongitude,
-                        ) { success, _ ->
-                            if (success) {
-                                android.widget.Toast.makeText(context, "¡Viaje asignado! Conduce hacia el pasajero 🚕", android.widget.Toast.LENGTH_SHORT).show()
-                                navController.popBackStack()
-                            } else {
-                                android.widget.Toast.makeText(context, "No se pudo aceptar el viaje en este momento", android.widget.Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    },
                 )
             }
             composable("ai") {

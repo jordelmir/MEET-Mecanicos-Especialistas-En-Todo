@@ -57,11 +57,11 @@ private enum class RideCenterFilter(val label: String) {
 fun RideCenterScreen(
     viewModel: ObdViewModel,
     onBack: () -> Unit,
-    onSelectRide: (RideRequestEntity) -> Unit,
 ) {
     val openRides by viewModel.openRideRequests.collectAsState()
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val driverVer by viewModel.driverVerification.collectAsState()
+    val claimState by viewModel.rideClaimUiState.collectAsState()
     val myDriverId = viewModel.currentUserId ?: driverVer?.driverId ?: viewModel.currentRideActorId.takeIf { it.isNotBlank() }
     val context = LocalContext.current
     val driverPrefs = remember(context, myDriverId) {
@@ -121,11 +121,9 @@ fun RideCenterScreen(
 
     LaunchedEffect(myDriverId) {
         if (myDriverId == null) return@LaunchedEffect
-        viewModel.startRideProjectionSync()
         while (true) {
             clockMillis = System.currentTimeMillis()
             runCatching { RideDispatchGateway.expireStaleRequests() }
-            viewModel.refreshRideProjectionNow()
             runCatching { RideDispatchGateway.decisions() }
                 .onSuccess { decisions -> hiddenRideIds = hiddenRideIds + decisions.map { it.tripId } }
             val pending = driverPrefs.getStringSet("pending_driver_decisions", emptySet()).orEmpty().toSet()
@@ -148,13 +146,14 @@ fun RideCenterScreen(
     }
 
     val eligibleRides = remember(openRides, myDriverId, hiddenRideIds, clockMillis) {
-        openRides.filter {
-            it.status == "OPEN" &&
-                it.assignedDriverId == null &&
-                (it.passengerId != myDriverId || BuildConfig.DEBUG) &&
-                it.requestId !in hiddenRideIds &&
-                RideDispatchExpiryPolicy.remainsVisible(it.createdAt, clockMillis)
-        }
+        val actorIds = setOfNotNull(myDriverId)
+        com.elysium369.meet.ride.driver.RideDriverFeedPolicy.eligibleRides(
+            rides = openRides,
+            actorIds = actorIds,
+            activeRideId = null,
+            hiddenRideIds = hiddenRideIds,
+            nowEpochMs = clockMillis,
+        )
     }
 
     val filteredRides = remember(eligibleRides, activeFilter) {
@@ -346,11 +345,15 @@ fun RideCenterScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     items(filteredRides, key = { it.requestId }) { ride ->
+                        val isPending = (claimState as? ObdViewModel.RideClaimUiState.Pending)?.requestId == ride.requestId
                         RideCenterCard(
                             ride = ride,
                             currentGps = currentGps,
                             isOwnRequest = ride.passengerId == myDriverId,
-                            onSelect = { onSelectRide(ride) },
+                            isPending = isPending,
+                            onSelect = {
+                                viewModel.claimRideFirstCome(ride.requestId)
+                            },
                             onDismiss = { queueDriverDecisions(listOf(ride), "DISMISS") },
                             onReject = { queueDriverDecisions(listOf(ride), "REJECT") },
                         )
@@ -366,6 +369,7 @@ private fun RideCenterCard(
     ride: RideRequestEntity,
     currentGps: ObdViewModel.GpsLocationInfo?,
     isOwnRequest: Boolean = false,
+    isPending: Boolean = false,
     onSelect: () -> Unit,
     onDismiss: () -> Unit,
     onReject: () -> Unit,
@@ -641,24 +645,42 @@ private fun RideCenterCard(
             // ── Row 6: CTA Button
             Button(
                 onClick = onSelect,
+                enabled = !isPending,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MeetColors.cyberCyan,
                     contentColor = Color.Black,
+                    disabledContainerColor = MeetColors.cyberCyan.copy(alpha = 0.4f),
+                    disabledContentColor = Color.Black.copy(alpha = 0.6f),
                 ),
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(vertical = 14.dp),
             ) {
-                Text(
-                    text = if (isOpenBid) {
-                        "Aceptar por ${ride.currency} ${ride.priceOffer.toInt()} 🚕"
-                    } else {
-                        "Enviar oferta"
-                    },
-                    color = Color.Black,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 15.sp,
-                )
+                if (isPending) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(18.dp),
+                        color = Color.Black,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "CONFIRMANDO…",
+                        color = Color.Black,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 14.sp,
+                    )
+                } else {
+                    Text(
+                        text = if (isOpenBid) {
+                            "Aceptar por ${ride.currency} ${ride.priceOffer.toInt()} 🚕"
+                        } else {
+                            "Enviar oferta"
+                        },
+                        color = Color.Black,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp,
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
