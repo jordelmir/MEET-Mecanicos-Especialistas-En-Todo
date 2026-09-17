@@ -1,7 +1,9 @@
 package com.elysium369.meet.ride.work
 
 import android.content.Context
+import android.util.Log
 import androidx.hilt.work.HiltWorker
+import com.elysium369.meet.BuildConfig
 import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -125,6 +127,26 @@ class RideCommandSyncWorker @AssistedInject constructor(
             when (val result = gateway.execute(command)) {
                 is RideCommandGatewayResult.Accepted -> {
                     val now = System.currentTimeMillis()
+                    if (BuildConfig.DEBUG) {
+                        Log.i(
+                            "MeetRides",
+                            buildString {
+                                append("COMMAND_ACK")
+                                append(" type=")
+                                append(entity.commandType)
+                                append(" ride=")
+                                append(entity.rideId.take(8))
+                                append(" expectedVersion=")
+                                append(entity.expectedVersion)
+                                append(" serverVersion=")
+                                append(result.serverVersion)
+                                append(" status=")
+                                append(result.status)
+                                append(" correlation=")
+                                append(result.correlationId)
+                            }
+                        )
+                    }
                     RideObservability.record(
                         RideObservability.event(
                             type = entity.commandType.successTelemetryType(),
@@ -215,6 +237,28 @@ class RideCommandSyncWorker @AssistedInject constructor(
                     }
                 }
                 is RideCommandGatewayResult.Rejected -> {
+                    if (BuildConfig.DEBUG) {
+                        Log.w(
+                            "MeetRides",
+                            buildString {
+                                append("COMMAND_REJECTED")
+                                append(" type=")
+                                append(entity.commandType)
+                                append(" ride=")
+                                append(entity.rideId.take(8))
+                                append(" expectedVersion=")
+                                append(entity.expectedVersion)
+                                append(" currentVersion=")
+                                append(result.currentServerVersion)
+                                append(" code=")
+                                append(result.code)
+                                append(" retryable=")
+                                append(result.retryable)
+                                append(" correlation=")
+                                append(result.correlationId)
+                            }
+                        )
+                    }
                     if (entity.commandType == RideCommandType.VERIFY_BOARDING_PIN.name &&
                         result.code.startsWith("BOARDING_PIN_")
                     ) {
