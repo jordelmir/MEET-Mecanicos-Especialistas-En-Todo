@@ -63,6 +63,19 @@ class RideRemoteProjectionMapperTest {
         assertNull(remote(state = "CANCELLED").toLocal(existing(), emptyList(), null).boardingPin)
     }
 
+    @Test fun `server completion closes stale passenger trip and leaves rating available`() {
+        val stale = existing().copy(
+            status = "IN_PROGRESS",
+            serverState = "IN_PROGRESS",
+            passengerRating = null,
+        )
+        val completed = remote(state = "COMPLETED").toLocal(stale, emptyList(), null)
+        assertEquals("COMPLETED", completed.status)
+        assertEquals("COMPLETED", completed.serverState)
+        assertNull(completed.boardingPin)
+        assertNull(completed.passengerRating)
+    }
+
     @Test fun `canonical passenger supersedes stale owner without inheriting private fields`() {
         val result = remote(owner = "passenger-B").toLocal(existing(), emptyList(), null)
         assertEquals("passenger-B", result.passengerId)

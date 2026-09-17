@@ -52,9 +52,17 @@ class RideRatingSubmissionTest {
         }
         assertTrue(submit(version = 0).isFailure)
         assertTrue(submit(driver = null).isFailure)
-        assertTrue(submit(passengerRating = false).isFailure)
+        assertTrue(submit(actor = "passenger", passengerRating = false).isFailure)
         assertEquals(0, calls)
         assertEquals(0, writes)
+    }
+
+    @Test fun `assigned driver can rate passenger after confirmed completion`() {
+        assertTrue(submit(actor = "driver", passengerRating = false).isSuccess)
+        assertTrue(submit(actor = "other", passengerRating = false).isFailure)
+        assertTrue(submit(actor = "driver", passengerRating = false, state = "IN_PROGRESS").isFailure)
+        assertEquals(1, calls)
+        assertEquals(1, writes)
     }
 
     @Test fun `invalid ratings never get silently clamped or truncated`() {

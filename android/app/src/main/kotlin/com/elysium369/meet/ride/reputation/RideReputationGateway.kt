@@ -19,6 +19,7 @@ interface RideReputationGateway {
         rating: Int,
         compliments: List<RideCompliment> = emptyList(),
     ): Result<Boolean>
+    suspend fun recordPassengerFeedback(tripId: String, rating: Int): Result<Boolean>
 }
 
 class SupabaseRideReputationGateway @Inject constructor() : RideReputationGateway {
@@ -51,6 +52,17 @@ class SupabaseRideReputationGateway @Inject constructor() : RideReputationGatewa
             })
         }
         val response = SupabaseManager.client.postgrest.rpc("ride_record_trip_feedback_v1", params).data
+        json.parseToJsonElement(response).jsonObject["success"]?.jsonPrimitive?.booleanOrNull == true
+    }
+
+    override suspend fun recordPassengerFeedback(tripId: String, rating: Int): Result<Boolean> = runCatching {
+        val response = SupabaseManager.client.postgrest.rpc(
+            "ride_record_passenger_feedback_v1",
+            buildJsonObject {
+                put("p_trip_id", tripId)
+                put("p_rating", rating)
+            },
+        ).data
         json.parseToJsonElement(response).jsonObject["success"]?.jsonPrimitive?.booleanOrNull == true
     }
 }
