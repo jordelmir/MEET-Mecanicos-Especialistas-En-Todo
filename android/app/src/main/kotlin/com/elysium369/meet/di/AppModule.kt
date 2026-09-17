@@ -4586,6 +4586,13 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_74_75 = object : Migration(74, 75) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // V8: Add driverArrivedAt epoch ms for authoritative waiting counter
+            db.execSQL("ALTER TABLE `ride_requests` ADD COLUMN `driverArrivedAt` INTEGER DEFAULT NULL")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4647,6 +4654,7 @@ object AppModule {
             MIGRATION_71_72,
             MIGRATION_72_73,
             MIGRATION_73_74,
+            MIGRATION_74_75,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -4870,6 +4878,21 @@ object AppModule {
     fun provideRideCommandGateway(
         gateway: com.elysium369.meet.ride.data.remote.SupabaseRideCommandGateway
     ): com.elysium369.meet.ride.data.remote.RideCommandGateway = gateway
+
+    @Provides
+    @Singleton
+    fun provideRideCommandBus(
+        bus: com.elysium369.meet.ride.application.DefaultRideCommandBus
+    ): com.elysium369.meet.ride.application.RideCommandBus = bus
+
+    @Provides
+    @Singleton
+    fun provideRideRoutingProvider(): com.elysium369.meet.ride.map.RideRoutingProvider {
+        return com.elysium369.meet.ride.map.resilientRideRoutingProvider(
+            primaryEndpoint = com.elysium369.meet.BuildConfig.RIDE_ROUTER_URL,
+            fallbackEndpoint = com.elysium369.meet.BuildConfig.RIDE_ROUTER_FALLBACK_URL,
+        )
+    }
 
     @Provides
     @Singleton

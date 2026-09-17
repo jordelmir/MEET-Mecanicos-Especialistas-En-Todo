@@ -412,7 +412,8 @@ data class RideRequestEntity(
     val driverRating: Double? = null,     // Calificación dada al pasajero
     val tipAmountMinor: Long? = null,     // Propina en moneda menor (CRC o centavos USD)
     val createdAt: Long,
-    val completedAt: Long? = null
+    val completedAt: Long? = null,
+    val driverArrivedAt: Long? = null,
 )
 
 @Entity(
