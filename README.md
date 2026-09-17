@@ -15,17 +15,21 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión actual publicada: 4.24.0 (`versionCode 57`)
+## Versión actual publicada: 4.25.0 (`versionCode 58`)
 
-La versión 4.24.0 representa el hito más completo de la plataforma, unificando el ciclo técnico automotriz completo:
+La versión 4.25.0 incorpora la **Orden Maestra V9 de MEET Rides**, consolidando la autoridad estricta del servidor en la nube y eliminando el desfasaje de estado en movilidad, al tiempo que preserva y fortalece el ciclo técnico automotriz completo:
 
+- **MEET Rides V9 — Autoridad Servidor & Fin del Viaje Fantasma:** La aplicación Android ya no proyecta de forma optimista estados locales (`ACCEPTED`) antes del acuse remoto. La aceptación de solicitudes utiliza una cola persistente transaccional (*Outbox*) y solo se refleja en pantalla tras la confirmación remota con versión (`serverVersion > 0`).
+- **Feedback Visual Honesto en Tiempo Real:** El botón de acción pasa inmediatamente a estado inhabilitado con spinner e indicación `"CONFIRMANDO…"`. Si ocurre una colisión de concurrencia o rechazo por el servidor, la causa se imputa con transparencia.
+- **Cero Telemetría Falsa:** Eliminación completa de datos inventados, marcas/modelos placeholder (como "Toyota Corolla 2018 Gris"), calificaciones cableadas (`5.0`) y suplantación de ubicación del conductor con la del pasajero.
+- **Separación Limpia de Intenciones (CLAIM vs SUBMIT_OFFER):** La aceptación con un toque a la tarifa publicada y la contraoferta personalizada se desacoplan en canales de comando independientes sin emisiones paralelas.
+- **Invariantes Idénticos en Debug y Release:** Eliminación de cualquier bypass de inspección vehicular, PIN de abordaje o balance mínimo en modo desarrollo.
 - **V2 Reportes PDF Certificados & Historial Técnico:** Generador multi-página certificado con carátula forense, Pre-Scan, hallazgos DTC, evidencia fotográfica, firma pericial y Post-Scan con comparador de estados (`BeforeAfterComparator`).
 - **Encadenamiento Criptográfico por Vehículo:** Cada reporte enlaza criptográficamente al reporte anterior (`hash_N = SHA-256(canonical(report_N) + hash_N-1)`), alertando manipulación (`TAMPERED`) de inmediato.
 - **Código QR Forense Zero-PII:** Código QR de 6 campos canónicos (`report_id`, `integrity_hash`, `vehicle_id`, `generated_at`, `report_type`, `verifier_url`) sin exponer datos privados (VIN/placa/teléfono).
 - **V2 Marketplace Técnico de Repuestos:** Conexión directa DTC ↔ Catálogo Técnico ↔ Visual 3D Atlas (`G4ED` / `VehicleTechnicalAtlas3dCatalog`). Cotizaciones en tiempo real con clasificación anti-fraude (`OK`, `WARN`, `BLOCK`) y sellos de mejor opción (`BEST_COMPATIBILITY`, `CHEAPEST`, `FASTEST_DELIVERY`, `BEST_WARRANTY`).
 - **Billetera & Reconciliación Bancaria SINPE Móvil:** Conciliación automatizada de transferencias bancarias vía email webhook (BAC, BNCR, BCR, etc.) con acreditación instantánea a la billetera del conductor (`ride_driver_wallet_credit_v1`).
-- **Preparación Google Play Store:** Compilación limpia en modo Release con optimización R8, shrink resources y reglas ProGuard que blindan los contratos de paridad cruzada TS ↔ Kotlin. Generación de Android App Bundle firmado (`app-release.aab`).
-- **Gate de Calidad Unitario:** 2.027 pruebas unitarias pasando al 100% con cero fallos y paridad cruzada continua (`ci-verify.sh`).
+- **Gate de Calidad Unitario:** 2.077 pruebas unitarias pasando al 100% con cero fallos y paridad cruzada continua (`ci-verify.sh`).
 
 La versión 4.9.0 añade identidad visual personalizable al mapa de Viajes: cuatro
 emblemas originales para conductor y cuatro avatares originales para pasajero,

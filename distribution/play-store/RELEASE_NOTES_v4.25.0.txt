@@ -1,0 +1,29 @@
+<es-419>
+Novedades de la versión 4.25.0:
+• MEET Rides V9: Autoridad de servidor estricta en la aceptación de viajes con cola outbox persistente y fin de viajes fantasma.
+• Feedback visual honesto en tiempo real: Estados transicionales 'CONFIRMANDO…' e imputación clara de causas de rechazo.
+• Cero telemetría ficticia: Eliminación total de datos simulados y protección estricta de vehículos, ubicaciones y calificaciones.
+• Separación limpia de transacciones: Separación atómica entre aceptación de tarifa publicada (CLAIM) y contraofertas (SUBMIT_OFFER).
+• Invariantes idénticos en Debug y Release: Auditoría estricta de inspección vehicular, PIN de abordaje y control de concurrencia.
+• Reportes PDF Certificados v2 con sello SHA-256, Pre/Post-Scan y Marketplace Técnico VIN-DTC integrados.
+</es-419>
+
+<en-US>
+What's new in version 4.25.0:
+• MEET Rides V9: Strict server authority for driver ride acceptance with persistent outbox queuing and zero phantom trips.
+• Real-time Honest Visual Feedback: Responsive 'CONFIRMING…' states and transparent rejection reporting for concurrency races.
+• Zero Fabricated Telemetry: Complete elimination of mock vehicles, synthetic ratings, and placeholder locations.
+• Clean Separation of Intent: Strict atomic boundaries between claiming published fares and submitting driver counter-offers.
+• Identical Invariants in Debug & Release: Rigorous enforcement of boarding PINs, vehicle verification, and concurrency controls.
+• Certified Forensic Reports v2 with canonical SHA-256 seal, Pre/Post-Scan, and VIN-DTC Technical Marketplace.
+</en-US>
+
+<pt-BR>
+Novidades da versão 4.25.0:
+• MEET Rides V9: Autoridade estrita de servidor para aceitação de viagens com fila outbox persistente e fim de viagens fantasma.
+• Feedback visual transparente em tempo real: Estados transicionais 'CONFIRMANDO…' e exibição clara de rejeições por concorrência.
+• Zero telemetria fictícia: Eliminação total de veículos simulados, notas artificiais e localizações de preenchimento.
+• Separação atômica de intenção: Limites rigorosos entre aceitação de tarifa publicada (CLAIM) e envio de contraproposta (SUBMIT_OFFER).
+• Invariantes idênticos em Debug e Release: Verificação obrigatória de PIN de embarque, vistoria veicular e controle de concorrência.
+• Laudos Técnicos Certificados v2 com selo criptográfico SHA-256, Pre/Post-Scan e Catálogo de Autopeças VIN-DTC.
+</pt-BR>

@@ -1,0 +1,29 @@
+<es-419>
+Novedades de la versión 4.24.0:
+• Lanzamiento Mundial y Viral: Enlaces universales y compartición directa de reportes y viajes por WhatsApp y redes.
+• Reportes Certificados v2 con Sello Criptográfico SHA-256, Pre-Scan y Post-Scan verificables por QR en web.
+• Integración completa de Viajes y Auxilio Mecánico con despacho en mapa vectorial y estimación de ruta en vivo.
+• Escáner OBD-II mejorado: soporte universal para adaptadores Bluetooth, BLE y WiFi con base DTC offline.
+• Marketplace Técnico: Compatibilidad exacta VIN-DTC y cotizaciones blindadas contra fraude.
+• Soporte multilingüe internacional y optimización completa para Android 16 (Target SDK 36).
+</es-419>
+
+<en-US>
+What's new in version 4.24.0:
+• Worldwide Launch & Viral Sharing: Deep links and 1-tap instant share for certified vehicle reports and live trip tracking.
+• Certified Forensic Reports v2 with canonical SHA-256 cryptographic seal, Pre/Post-scan verification, and tamper-proof QR.
+• Unified Mobility & Roadside Dispatch: Real-time vector map tracking, live route estimation, and secure driver matching.
+• Enhanced Professional OBD-II Scanner: Universal support for Bluetooth classic, BLE, and WiFi adapters with offline DTC database.
+• Technical Parts Marketplace: Precision VIN-DTC compatibility engine with anti-fraud quote ranking.
+• Multilingual support and full compliance for Android 16 (Target SDK 36).
+</en-US>
+
+<pt-BR>
+Novidades da versão 4.24.0:
+• Lançamento Global e Viral: Links universais e compartilhamento direto de laudos e viagens no WhatsApp e redes sociais.
+• Laudos Técnicos Certificados v2 com selo criptográfico SHA-256 e verificação de Pre/Post-Scan via QR Code.
+• Mobilidade e Socorro Mecânico Integrados com rastreamento em mapa vetorial em tempo real e cálculo dinâmico de rotas.
+• Scanner OBD-II Profissional: Compatibilidade universal com adaptadores Bluetooth, BLE e Wi-Fi com banco DTC offline.
+• Catálogo de Autopeças Técnicas: Compatibilidade precisa por motor e código DTC com proteção antifraude.
+• Suporte multilíngue e conformidade total com o Android 16 (Target SDK 36).
+</pt-BR>
