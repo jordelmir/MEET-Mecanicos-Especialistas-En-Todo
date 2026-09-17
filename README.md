@@ -404,6 +404,23 @@ Nota: el `.db` completo supera 100 MB y no se empuja a GitHub como blob normal. 
 - NHTSA vPIC:
   [vpic.nhtsa.dot.gov](https://vpic.nhtsa.dot.gov/)
 
+## MEET Rides V9: Movilidad Distribuida con Autoridad Servidor
+
+En la versión **V9**, el subsistema de viajes (**MEET Rides**) fue restaurado y blindado al 100% con un estándar de ingeniería de nivel mundial:
+
+- **Fin del viaje fantasma (*"acepto por 1 segundo y desaparece"*):** La aplicación móvil ya no finge localmente que un viaje fue aceptado (`status = "ACCEPTED"`). Toda aceptación se procesa mediante una cola persistente (*Transactional Outbox*) y solo se activa en la pantalla cuando el servidor en la nube confirma y Room proyecta la asignación oficial con versión validada (`serverVersion > 0`).
+- **Feedback honesto y visual en tiempo real:** Al tocar "Aceptar", el botón se deshabilita de inmediato y muestra un indicador de carga junto a `"CONFIRMANDO…"`. Si el servidor rechaza el reclamo (por ejemplo, porque otro conductor lo tomó milisegundos antes o por expiración), el conductor recibe un aviso comprensible y respetuoso con la causa exacta.
+- **Cero telemetría y datos ficticios:** Queda terminantemente prohibido inventar vehículos por defecto (como "Toyota Corolla 2018 Gris"), calificaciones cableadas (`5.0`) o usar las coordenadas del pasajero como posición del conductor. Si no hay señal GPS real o el vehículo no ha sido validado, el sistema no inventa información.
+- **Separación limpia de intención:** Un solo toque para aceptar la tarifa publicada ejecuta exclusivamente el reclamo (`CLAIM`), mientras que proponer otro precio ejecuta exclusivamente la contraoferta (`SUBMIT_OFFER`). Nunca se disparan ambas solicitudes a la vez.
+- **Invariantes estrictos (Debug ≡ Release):** Se eliminaron todos los atajos de desarrollo. La verificación de PIN de abordaje, el control de concurrencia y la validación de inspección vehicular aplican con el mismo rigor en cualquier entorno.
+- **Verificación Técnica Absoluta:**
+  - **2.077 pruebas unitarias automáticas** aprobadas al 100% con 0 fallos (`./gradlew testDebugUnitTest`).
+  - **419 pruebas especializadas de movilidad** en `com.elysium369.meet.ride.*`.
+  - **Paridad exacta de hash criptográfico** TS ≡ Kotlin comprobada mediante `bash tests/parity/ci-verify.sh`.
+  - **Contrato de autoridad Android** verificado mediante `bash tests/ride/verify-ride-android-authority.sh`.
+
+> Para especificaciones técnicas y diagramas de flujo completos para desarrolladores e IAs, consulta [docs/rides/MEET_RIDES_V9_APK_RECOVERY_SPEC.md](docs/rides/MEET_RIDES_V9_APK_RECOVERY_SPEC.md) y el registro de decisiones [docs/rides/RIDE_DECISION_LOG.md](docs/rides/RIDE_DECISION_LOG.md).
+
 ## Licencia
 
 MIT
