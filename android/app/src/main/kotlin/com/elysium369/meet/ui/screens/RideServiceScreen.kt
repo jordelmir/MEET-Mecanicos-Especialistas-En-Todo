@@ -93,6 +93,7 @@ import com.elysium369.meet.ride.map.resilientRideRoutingProvider
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ride.domain.RideDriverPresencePolicy
 import com.elysium369.meet.ride.domain.RideDispatchExpiryPolicy
+import com.elysium369.meet.ride.driver.RideDriverFeedPolicy
 import com.elysium369.meet.ride.data.RideProjectionConnectionState
 import com.elysium369.meet.ride.traffic.RideRoadIncidentType
 import com.elysium369.meet.ride.traffic.RideRoadSide
@@ -3230,6 +3231,7 @@ fun DriverDashboard(
 
     val activeRide by viewModel.activeRideRequest.collectAsState()
     val offers by viewModel.rideOffers.collectAsState()
+    val rideClaimUiState by viewModel.rideClaimUiState.collectAsState()
     var rideToBidOn by remember { mutableStateOf<RideRequestEntity?>(null) }
     val driverIdCandidates = remember(myDriverId, driverVer?.driverId, viewModel.currentUserId, viewModel.currentRideActorId) {
         setOfNotNull(myDriverId, driverVer?.driverId, viewModel.currentUserId, viewModel.currentRideActorId)
@@ -3274,14 +3276,13 @@ fun DriverDashboard(
     }
     val rankedOpenRides = remember(openRides, driverIdCandidates, hiddenRideIds, destinationHomeEnabled, homeLatitude, homeLongitude, activeRideForDriver) {
         val now = System.currentTimeMillis()
-        val eligibleRides = openRides.filter {
-            it.status == "OPEN" &&
-                it.assignedDriverId == null &&
-                it.requestId != activeRideForDriver?.requestId &&
-                it.passengerId !in driverIdCandidates &&
-                it.requestId !in hiddenRideIds &&
-                RideDispatchExpiryPolicy.remainsVisible(it.createdAt, now)
-        }
+        val eligibleRides = RideDriverFeedPolicy.eligibleRides(
+            rides = openRides,
+            actorIds = driverIdCandidates,
+            activeRideId = activeRideForDriver?.requestId,
+            hiddenRideIds = hiddenRideIds,
+            nowEpochMs = now
+        )
         if (!destinationHomeEnabled || homeLatitude == null || homeLongitude == null) {
             eligibleRides
         } else {
@@ -3740,36 +3741,9 @@ fun DriverDashboard(
                         isTrustedInvite = request.requestId in trustedInviteRideIds,
                         isOwnRequest = request.passengerId in driverIdCandidates,
                         pendingOfferPrice = myOfferForRide?.counterPrice,
+                        isPending = (rideClaimUiState as? ObdViewModel.RideClaimUiState.Pending)?.requestId == request.requestId,
                         onClick = { rideToBidOn = request },
-                        onAccept = {
-                            val verifiedDriver = driverVer
-                            val dId = verifiedDriver?.driverId ?: viewModel.currentRideActorId
-                            val dName = verifiedDriver?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
-                            val dPhone = verifiedDriver?.phone?.takeIf { it.isNotBlank() } ?: ""
-                            val dVeh = if (verifiedDriver != null && verifiedDriver.vehicleModel.isNotBlank()) {
-                                "${verifiedDriver.vehicleMake} ${verifiedDriver.vehicleModel} ${verifiedDriver.vehicleYear} (${verifiedDriver.vehicleColor}) [${verifiedDriver.vehiclePlate}]"
-                            } else {
-                                "Vehículo pendiente de validar"
-                            }
-                            viewModel.acceptRideComplete(
-                                requestId = request.requestId,
-                                driverId = dId,
-                                driverName = dName,
-                                driverPhone = dPhone,
-                                vehicleDescription = dVeh,
-                                pickupLat = request.pickupLatitude,
-                                pickupLng = request.pickupLongitude,
-                            ) { success, updatedRide ->
-                                if (success && updatedRide != null) {
-                                    driverModeTab = 1
-                                    hudNoticeType = ToastType.SUCCESS
-                                    hudNoticeMessage = "Solicitud enviada; esperando confirmación del servidor"
-                                } else {
-                                    hudNoticeType = ToastType.ERROR
-                                    hudNoticeMessage = "Error al aceptar viaje."
-                                }
-                            }
-                        },
+                        onAccept = { viewModel.claimRideFirstCome(request.requestId) },
                         onOffer = { rideToBidOn = request },
                         onDismiss = {
                             hiddenRideIds = hiddenRideIds + request.requestId
@@ -3897,35 +3871,7 @@ fun DriverDashboard(
                 driverLng = currentGps?.longitude,
                 onAccept = { rideToAccept ->
                     handledDispatchRideIds.add(rideToAccept.requestId)
-                    val verifiedDriver = driverVer
-                    val dId = verifiedDriver?.driverId ?: viewModel.currentRideActorId
-                    val dName = verifiedDriver?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
-                    val dPhone = verifiedDriver?.phone?.takeIf { it.isNotBlank() } ?: ""
-                    val dVeh = if (verifiedDriver != null && verifiedDriver.vehicleModel.isNotBlank()) {
-                        "${verifiedDriver.vehicleMake} ${verifiedDriver.vehicleModel} ${verifiedDriver.vehicleYear} (${verifiedDriver.vehicleColor}) [${verifiedDriver.vehiclePlate}]"
-                    } else {
-                        "Vehículo pendiente de validar"
-                    }
-
-                    // ═══ FULL ACCEPT: Local DB + Supabase + State ═══
-                    viewModel.acceptRideComplete(
-                        requestId = rideToAccept.requestId,
-                        driverId = dId,
-                        driverName = dName,
-                        driverPhone = dPhone,
-                        vehicleDescription = dVeh,
-                        pickupLat = rideToAccept.pickupLatitude,
-                        pickupLng = rideToAccept.pickupLongitude,
-                    ) { success, updatedRide ->
-                        if (success && updatedRide != null) {
-                            driverModeTab = 1
-                            hudNoticeType = ToastType.SUCCESS
-                            hudNoticeMessage = "Solicitud enviada; esperando confirmación del servidor"
-                        } else {
-                            hudNoticeType = ToastType.ERROR
-                            hudNoticeMessage = "Error al aceptar viaje. Intenta de nuevo."
-                        }
-                    }
+                    viewModel.claimRideFirstCome(rideToAccept.requestId)
                 },
                 onCounterOffer = { rideToCounter ->
                     handledDispatchRideIds.add(rideToCounter.requestId)
@@ -4957,6 +4903,7 @@ fun DriverRideItem(
     isTrustedInvite: Boolean,
     isOwnRequest: Boolean = false,
     pendingOfferPrice: Double? = null,
+    isPending: Boolean = false,
     onClick: () -> Unit,
     onAccept: () -> Unit,
     onOffer: () -> Unit,
@@ -5169,19 +5116,36 @@ fun DriverRideItem(
                 ) {
                     Button(
                         onClick = onAccept,
+                        enabled = !isPending,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MeetColors.neonGreen,
-                            contentColor = Color.Black
+                            contentColor = Color.Black,
+                            disabledContainerColor = MeetColors.neonGreen.copy(alpha = 0.5f),
+                            disabledContentColor = Color.Black.copy(alpha = 0.7f),
                         ),
                         shape = RoundedCornerShape(10.dp),
                         contentPadding = PaddingValues(vertical = 12.dp)
                     ) {
-                        Text(
-                            "ACEPTAR VIAJE (${ride.priceOffer.toInt()} ${ride.currency}) 🚕",
-                            fontWeight = FontWeight.Black,
-                            fontSize = 14.sp
-                        )
+                        if (isPending) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = Color.Black,
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "CONFIRMANDO…",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 14.sp
+                            )
+                        } else {
+                            Text(
+                                "ACEPTAR VIAJE (${ride.priceOffer.toInt()} ${ride.currency}) 🚕",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 14.sp
+                            )
+                        }
                     }
 
                     Spacer(Modifier.height(8.dp))
@@ -5413,62 +5377,17 @@ fun DriverBiddingDialog(
                 val isDirectAccept = counterPrice == ride.priceOffer
                 Button(
                     onClick = {
-                        val verifiedDriver = driverVer
-                        val dId = verifiedDriver?.driverId ?: viewModel.currentRideActorId
-                        val dName = verifiedDriver?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
-                        val dPhone = verifiedDriver?.phone?.takeIf { it.isNotBlank() } ?: ""
-                        val dVeh = if (verifiedDriver != null && verifiedDriver.vehicleModel.isNotBlank()) {
-                            "${verifiedDriver.vehicleMake} ${verifiedDriver.vehicleModel} ${verifiedDriver.vehicleYear} (${verifiedDriver.vehicleColor}) [${verifiedDriver.vehiclePlate}]"
-                        } else {
-                            "Vehículo pendiente de validar"
-                        }
                         if (isDirectAccept) {
-                            viewModel.acceptRideComplete(
-                                requestId = ride.requestId,
-                                driverId = dId,
-                                driverName = dName,
-                                driverPhone = dPhone,
-                                vehicleDescription = dVeh,
-                                pickupLat = ride.pickupLatitude,
-                                pickupLng = ride.pickupLongitude,
-                            ) { success, updatedRide ->
-                                if (success && updatedRide != null) {
-                                    Toast.makeText(context, "Solicitud enviada; esperando confirmación del servidor", Toast.LENGTH_SHORT).show()
-                                    onAccepted()
-                                    onDismiss()
-                                } else {
-                                    Toast.makeText(context, "Error al aceptar viaje.", Toast.LENGTH_SHORT).show()
-                                }
-                            }
+                            viewModel.claimRideFirstCome(ride.requestId)
+                            onDismiss()
                         } else {
-                            val gps = currentGps ?: ObdViewModel.GpsLocationInfo(
-                                latitude = ride.pickupLatitude,
-                                longitude = ride.pickupLongitude,
-                                addressName = "Posición GPS",
-                                countryCode = "CR",
-                                dialingPrefix = "+506",
-                                accuracy = 5.0f,
-                                speed = 0.0f,
-                                bearing = 0.0f,
-                                timestamp = System.currentTimeMillis()
-                            )
-
                             viewModel.makeRideOffer(
                                 requestId = ride.requestId,
-                                driverId = dId,
-                                driverName = dName,
-                                driverPhone = dPhone,
-                                driverRating = 5.0,
-                                driverTotalTrips = 15,
-                                vehicleDesc = dVeh,
                                 counterPrice = counterPrice,
                                 currency = ride.currency,
                                 estArrivalMin = selectedEta,
-                                driverLat = gps.latitude,
-                                driverLng = gps.longitude,
                                 message = driverMsg.takeIf { it.isNotBlank() }
                             )
-                            Toast.makeText(context, "¡Oferta enviada al pasajero!", Toast.LENGTH_SHORT).show()
                             onDismiss()
                         }
                     },

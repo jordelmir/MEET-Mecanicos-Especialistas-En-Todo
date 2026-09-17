@@ -4110,18 +4110,67 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch {
             val sessionStartTime = System.currentTimeMillis()
             val notifiedFailures = mutableSetOf<String>()
+            val actionableCommandTypes = setOf(
+                RideCommandType.CLAIM.name,
+                RideCommandType.ACCEPT_OFFER.name,
+                RideCommandType.SUBMIT_OFFER.name,
+                RideCommandType.VERIFY_BOARDING_PIN.name,
+                RideCommandType.DRIVER_ARRIVED.name,
+                RideCommandType.START.name,
+                RideCommandType.COMPLETE.name,
+            )
             rideCommandRepository.recentFailures()
                 .distinctUntilChanged()
                 .collectLatest { failures ->
                     failures.firstOrNull {
-                        (it.commandType == RideCommandType.ACCEPT_OFFER.name ||
-                            it.commandType == RideCommandType.SUBMIT_OFFER.name) &&
+                        it.commandType in actionableCommandTypes &&
                             it.updatedAt >= sessionStartTime &&
                             notifiedFailures.add(it.idempotencyKey)
-                    }
-                        ?.let { failure ->
-                            val code = failure.lastErrorCode.orEmpty()
-                            val detail = failure.lastErrorMessage.orEmpty()
+                    }?.let { failure ->
+                        val code = failure.lastErrorCode
+                            .orEmpty()
+                            .ifBlank { "UNKNOWN" }
+                        val detail = failure.lastErrorMessage.orEmpty()
+
+                        if (failure.commandType == RideCommandType.CLAIM.name) {
+                            val message = when (code) {
+                                "VERSION_CONFLICT" ->
+                                    "El viaje cambió mientras lo aceptabas. Actualizando."
+                                "ALREADY_ASSIGNED" ->
+                                    "Otro conductor obtuvo este viaje primero."
+                                "VEHICLE_NOT_VERIFIED" ->
+                                    "Tu vehículo activo aún no está VERIFIED."
+                                "INSUFFICIENT_BALANCE" ->
+                                    "Saldo insuficiente para la reserva requerida."
+                                "AUTH_SESSION_MISMATCH",
+                                "AUTHENTICATION_REQUIRED" ->
+                                    "Tu sesión cambió. Vuelve a iniciar sesión."
+                                else ->
+                                    detail
+                                        .take(160)
+                                        .ifBlank {
+                                            "El servidor rechazó la aceptación."
+                                        }
+                            }
+
+                            _rideClaimUiState.value =
+                                RideClaimUiState.Rejected(
+                                    requestId = failure.rideId,
+                                    code = code,
+                                    message = message,
+                                )
+
+                            _rideClaimFeedback.emit(
+                                RideClaimFeedback(
+                                    requestId = failure.rideId,
+                                    won = false,
+                                    pending = false,
+                                    message = message,
+                                )
+                            )
+
+                            refreshRideProjectionNow()
+                        } else {
                             val message = when (code) {
                                 "INSUFFICIENT_BALANCE" ->
                                     if (failure.commandType == RideCommandType.SUBMIT_OFFER.name) {
@@ -4133,16 +4182,17 @@ class ObdViewModel @Inject constructor(
                                     "La oferta cambió mientras la aceptabas; actualiza las solicitudes."
                                 "OFFER_NOT_AVAILABLE" ->
                                     "La contraoferta ya no está disponible."
-                                else -> "No se pudo aceptar la contraoferta: ${detail.take(140)}"
+                                else -> "No se pudo procesar la solicitud: ${detail.take(140)}"
                             }
                             _rideVerificationNotice.emit(message)
                             RideObservability.event(
-                                "offer_accept_feedback",
+                                "command_failure_feedback",
                                 outcome = "FAILED",
                                 requestId = failure.rideId,
                                 detail = code.ifBlank { "unknown" },
                             )
                         }
+                    }
                 }
         }
         // Voice command manager callbacks and initial startup checking
@@ -8355,6 +8405,16 @@ class ObdViewModel @Inject constructor(
         _rideSpeedSamples.asStateFlow()
     private val lastUploadedRideSpeedBucket = mutableMapOf<String, Long>()
 
+    sealed interface RideClaimUiState {
+        data object Idle : RideClaimUiState
+        data class Pending(val requestId: String) : RideClaimUiState
+        data class Won(val requestId: String) : RideClaimUiState
+        data class Rejected(val requestId: String, val code: String, val message: String) : RideClaimUiState
+    }
+
+    private val _rideClaimUiState = MutableStateFlow<RideClaimUiState>(RideClaimUiState.Idle)
+    val rideClaimUiState: StateFlow<RideClaimUiState> = _rideClaimUiState.asStateFlow()
+
     private val _rideClaimFeedback = MutableSharedFlow<RideClaimFeedback>(extraBufferCapacity = 8)
     val rideClaimFeedback: SharedFlow<RideClaimFeedback> = _rideClaimFeedback.asSharedFlow()
 
@@ -8516,6 +8576,12 @@ class ObdViewModel @Inject constructor(
                     }
                 }
                 return
+            }
+            if (latest != null && (latest.status == "COMPLETED" || latest.serverState == "COMPLETED")) {
+                withContext(Dispatchers.Main) {
+                    _activeRideRequest.value = latest
+                    promptRideRating(latest)
+                }
             }
         }
         if (_activeRideRequest.value == null) {
@@ -8919,40 +8985,12 @@ class ObdViewModel @Inject constructor(
             is com.elysium369.meet.automation.AiAction.SubmitOffer -> {
                 viewModelScope.launch {
                     val ride = withContext(Dispatchers.IO) { rideDao.getRequestById(action.requestId) } ?: return@launch
-                    val driverVer = driverVerification.value
-                    val dId = driverVer?.driverId ?: currentRideActorId
-                    val dName = driverVer?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
-                    val dPhone = driverVer?.phone?.takeIf { it.isNotBlank() } ?: "+50663194029"
-                    val dVeh = if (driverVer != null && driverVer.vehicleModel.isNotBlank()) {
-                        "${driverVer.vehicleMake} ${driverVer.vehicleModel} ${driverVer.vehicleYear} (${driverVer.vehicleColor}) [${driverVer.vehiclePlate}]"
-                    } else {
-                        "Toyota Corolla 2022 (Blanco) [MEET-001]"
-                    }
-                    val gps = _currentGpsLocation.value ?: GpsLocationInfo(
-                        latitude = ride.pickupLatitude,
-                        longitude = ride.pickupLongitude,
-                        addressName = "Posición GPS",
-                        countryCode = "CR",
-                        dialingPrefix = "+506",
-                        accuracy = 5.0f,
-                        speed = 0.0f,
-                        bearing = 0.0f,
-                        timestamp = System.currentTimeMillis(),
-                    )
                     val price = if (action.counterPrice > 0.0) action.counterPrice else ride.priceOffer
                     makeRideOffer(
                         requestId = ride.requestId,
-                        driverId = dId,
-                        driverName = dName,
-                        driverPhone = dPhone,
-                        driverRating = 5.0,
-                        driverTotalTrips = 15,
-                        vehicleDesc = dVeh,
                         counterPrice = price,
                         currency = ride.currency,
                         estArrivalMin = action.estArrivalMin,
-                        driverLat = gps.latitude,
-                        driverLng = gps.longitude,
                         message = action.message,
                     )
                     dumpAiStateSnapshot()
@@ -9085,6 +9123,63 @@ class ObdViewModel @Inject constructor(
                         delay(12_500)
                     }
                 }
+        }
+        viewModelScope.launch {
+            combine(
+                rideRequests,
+                _rideClaimUiState,
+            ) { rides, claimState ->
+                rides to claimState
+            }.collectLatest { (rides, claimState) ->
+                val pending =
+                    claimState as? RideClaimUiState.Pending
+                        ?: return@collectLatest
+
+                val ride = rides.find {
+                    it.requestId == pending.requestId
+                } ?: return@collectLatest
+
+                val actorIds = buildSet {
+                    currentCloudUserId()?.let(::add)
+                    driverVerification.value
+                        ?.driverId
+                        ?.takeIf(String::isNotBlank)
+                        ?.let(::add)
+                    currentRideActorId
+                        .takeIf(String::isNotBlank)
+                        ?.let(::add)
+                }
+
+                val assignedToMe =
+                    ride.assignedDriverId != null &&
+                        ride.assignedDriverId in actorIds
+
+                val authoritativeActive =
+                    ride.serverVersion > 0L &&
+                        ride.serverState in setOf(
+                            "ASSIGNED",
+                            "DRIVER_EN_ROUTE",
+                            "ARRIVED",
+                            "PASSENGER_ONBOARD",
+                            "IN_PROGRESS",
+                        )
+
+                if (assignedToMe && authoritativeActive) {
+                    _rideClaimUiState.value =
+                        RideClaimUiState.Won(
+                            requestId = ride.requestId,
+                        )
+
+                    selectActiveRide(ride)
+
+                    RideObservability.event(
+                        "ride_claim",
+                        outcome = "SUCCEEDED",
+                        requestId = ride.requestId,
+                        detail = "server_projection_confirmed",
+                    )
+                }
+            }
         }
     }
 
@@ -9673,6 +9768,115 @@ class ObdViewModel @Inject constructor(
 
     fun makeRideOffer(
         requestId: String,
+        counterPrice: Double,
+        currency: String,
+        estArrivalMin: Int,
+        message: String?,
+    ) {
+        RideObservability.event("offer_submit_started", requestId = requestId)
+        viewModelScope.launch(Dispatchers.IO) {
+            val actorId =
+                currentCloudUserId()
+                    ?: run {
+                        _rideVerificationNotice.emit(
+                            "Inicia sesión para ofertar."
+                        )
+                        return@launch
+                    }
+
+            val request =
+                rideDao.getRequestById(requestId)
+                    ?: return@launch
+
+            if (request.passengerId == actorId) {
+                _rideVerificationNotice.emit(
+                    "No puedes ofertar en tu propia solicitud."
+                )
+                return@launch
+            }
+
+            if (request.serverVersion <= 0L) {
+                _rideVerificationNotice.emit(
+                    "Espera la confirmación del servidor."
+                )
+                return@launch
+            }
+
+            val vehicleId =
+                activeVerifiedRemoteVehicleId()
+                    ?: run {
+                        _rideVerificationNotice.emit(
+                            "Activa un vehículo VERIFIED."
+                        )
+                        return@launch
+                    }
+
+            val gps =
+                _currentGpsLocation.value
+                    ?: run {
+                        _rideVerificationNotice.emit(
+                            "Esperando ubicación GPS real."
+                        )
+                        return@launch
+                    }
+
+            val counterPriceMinor = rideFareToMinorUnits(counterPrice, currency)
+            val fareMinor = RideFareBidPolicy.normalizeMinor(counterPriceMinor, currency)
+            val offerId = UUID.randomUUID().toString()
+
+            val verifiedDriver = driverVerification.value
+            val dName = verifiedDriver?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
+            val dPhone = verifiedDriver?.phone.orEmpty()
+            val dVeh = "${verifiedDriver?.vehicleMake.orEmpty()} ${verifiedDriver?.vehicleModel.orEmpty()} ${verifiedDriver?.vehicleYear ?: ""}".trim()
+
+            val offer = RideOfferEntity(
+                offerId = offerId,
+                requestId = requestId,
+                driverId = actorId,
+                driverName = dName,
+                driverPhone = dPhone,
+                driverRating = request.driverRating ?: 0.0,
+                driverTotalTrips = 0,
+                vehicleDescription = dVeh,
+                counterPrice = counterPrice,
+                currency = currency,
+                estimatedArrivalMin = estArrivalMin,
+                driverLatitude = gps.latitude,
+                driverLongitude = gps.longitude,
+                message = message,
+                status = "PENDING",
+                createdAt = System.currentTimeMillis()
+            )
+
+            val queued = reportRideCommandEnqueue(
+                result = enqueueAuthoritativeRideCommand(
+                    request = request,
+                    type = RideCommandType.SUBMIT_OFFER,
+                    payload = RideCommandPayload(
+                        offerId = offerId,
+                        vehicleId = vehicleId,
+                        fareMinor = fareMinor,
+                        currency = currency.uppercase(),
+                        etaSeconds = estArrivalMin.coerceAtLeast(0) * 60,
+                    ),
+                ),
+                acceptedMessage = "Oferta enviada. Esperando respuesta del pasajero.",
+            )
+
+            if (queued) {
+                rideDao.insertOffer(offer)
+            }
+            RideObservability.event(
+                "offer_submit",
+                outcome = if (queued) "SUCCEEDED" else "REJECTED",
+                requestId = requestId,
+                detail = "command",
+            )
+        }
+    }
+
+    fun makeRideOffer(
+        requestId: String,
         driverId: String,
         driverName: String,
         driverPhone: String,
@@ -9686,191 +9890,43 @@ class ObdViewModel @Inject constructor(
         driverLng: Double,
         message: String?
     ) {
-        RideObservability.event("offer_submit_started", requestId = requestId)
-        viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: return@launch
-            if (request.passengerId == driverId || request.passengerId == currentCloudUserId()) {
-                _rideVerificationNotice.emit(
-                    "No puedes ofertar en un viaje solicitado desde tu propia cuenta.",
-                )
-                RideObservability.event(
-                    "offer_submit",
-                    outcome = "REJECTED",
-                    requestId = requestId,
-                    detail = "self_ride",
-                )
-                return@launch
-            }
-            if (request.serverVersion <= 0L) {
-                _rideVerificationNotice.emit(
-                    "El viaje aún se está procesando. Intenta de nuevo en un momento.",
-                )
-                return@launch
-            }
-            val remoteVehicleId = activeVerifiedRemoteVehicleId()
-            if (remoteVehicleId == null) {
-                _rideVerificationNotice.emit(
-                    "No hay un vehículo remoto activo y verificado para ofertar.",
-                )
-                return@launch
-            }
-            val counterPriceMinor = rideFareToMinorUnits(counterPrice, currency)
-            val fareMinor = RideFareBidPolicy.normalizeMinor(counterPriceMinor, currency)
-            val normalizedPrice = counterPrice
-            val offerId = UUID.randomUUID().toString()
-            val offer = RideOfferEntity(
-                offerId = offerId,
-                requestId = requestId,
-                driverId = driverId,
-                driverName = driverName,
-                driverPhone = driverPhone,
-                driverRating = driverRating,
-                driverTotalTrips = driverTotalTrips,
-                vehicleDescription = vehicleDesc,
-                counterPrice = normalizedPrice,
-                currency = currency,
-                estimatedArrivalMin = estArrivalMin,
-                driverLatitude = driverLat,
-                driverLongitude = driverLng,
-                message = message,
-                status = "PENDING",
-                createdAt = System.currentTimeMillis()
-            )
-            val queued = if (request.serverVersion > 0L && remoteVehicleId != null) {
-                reportRideCommandEnqueue(
-                    result = enqueueAuthoritativeRideCommand(
-                        request = request,
-                        type = RideCommandType.SUBMIT_OFFER,
-                        payload = RideCommandPayload(
-                            offerId = offerId,
-                            vehicleId = remoteVehicleId,
-                            fareMinor = fareMinor,
-                            currency = currency.uppercase(),
-                            etaSeconds = estArrivalMin.coerceAtLeast(0) * 60,
-                        ),
-                    ),
-                    acceptedMessage =
-                        "¡Oferta enviada! Te notificaremos cuando sea aceptada.",
-                )
-            } else {
-                true
-            }
-            if (queued) {
-                rideDao.insertOffer(offer)
-                RideObservability.event("offer_submit", outcome = "SUCCEEDED", requestId = requestId, detail = "queued")
-                // ─── Fire-and-forget Supabase sync so passenger sees the offer ───
-                launch(Dispatchers.IO) {
-                    runCatching {
-                        SupabaseManager.client.postgrest["ride_offers"].upsert(
-                            mapOf(
-                                "offer_id" to offerId,
-                                "request_id" to requestId,
-                                "driver_id" to driverId,
-                                "driver_name" to driverName,
-                                "driver_phone" to driverPhone,
-                                "driver_rating" to driverRating,
-                                "driver_total_trips" to driverTotalTrips,
-                                "vehicle_description" to vehicleDesc,
-                                "counter_price" to normalizedPrice,
-                                "currency" to currency,
-                                "estimated_arrival_min" to estArrivalMin,
-                                "driver_latitude" to driverLat,
-                                "driver_longitude" to driverLng,
-                                "message" to (message ?: ""),
-                                "status" to "PENDING",
-                                "created_at" to offer.createdAt,
-                            )
-                        )
-                    }.onFailure { Log.w("MeetRides", "offer Supabase sync failed", it) }
-                }
-            } else {
-                RideObservability.event("offer_submit", outcome = "REJECTED", requestId = requestId, detail = "command_not_queued")
-            }
-        }
+        makeRideOffer(
+            requestId = requestId,
+            counterPrice = counterPrice,
+            currency = currency,
+            estArrivalMin = estArrivalMin,
+            message = message,
+        )
     }
 
-    fun acceptRideOffer(requestId: String, offerId: String) {
-        RideObservability.event("offer_accept_started", requestId = requestId)
+    fun acceptRideOffer(
+        requestId: String,
+        offerId: String,
+    ) {
+        RideObservability.event(
+            "offer_accept_started",
+            requestId = requestId,
+        )
+
         viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: return@launch
-            val offer = rideDao.getOfferById(offerId)
-
-            // 1. Optimistically update local Room state so the UI transitions IMMEDIATELY
-            // to "Chofer en camino 🚕" without making the passenger wait or get stuck
-            if (offer != null) {
-                rideDao.claimOpenRequestWithOffer(
-                    requestId = requestId,
-                    offerId = offerId,
-                    driverId = offer.driverId,
-                    driverName = offer.driverName,
-                    driverPhone = offer.driverPhone,
-                    vehicle = offer.vehicleDescription,
-                    price = offer.counterPrice,
-                )
-                rideDao.updateOfferStatus(offerId, "ACCEPTED")
-                rideDao.rejectOtherOffers(requestId, offerId)
-                val updatedRequest = rideDao.getRequestById(requestId)
-                if (updatedRequest != null) {
-                    withContext(Dispatchers.Main) {
-                        selectActiveRide(updatedRequest)
-                    }
-                }
-
-                // Also persist active ride pointer for the driver role so when switching to driver mode, it's immediately active!
-                val driverRoleKey = com.elysium369.meet.ride.domain.RideRoleContextPolicy
-                    .selectionOwnerKey(offer.driverId, true)
-                if (driverRoleKey != null) {
-                    rideDao.upsertActiveRideSelection(
-                        ActiveRideSelectionEntity(
-                            ownerPrincipalId = driverRoleKey,
-                            rideRequestId = requestId,
-                            updatedAtEpochMs = System.currentTimeMillis(),
+            val request =
+                rideDao.getRequestById(requestId)
+                    ?: run {
+                        _rideVerificationNotice.emit(
+                            "El viaje ya no está disponible."
                         )
-                    )
-                }
-                val currentUserId = currentCloudUserId()
-                if (currentUserId != null && currentUserId != offer.driverId) {
-                    val userDriverRoleKey = com.elysium369.meet.ride.domain.RideRoleContextPolicy
-                        .selectionOwnerKey(currentUserId, true)
-                    if (userDriverRoleKey != null) {
-                        rideDao.upsertActiveRideSelection(
-                            ActiveRideSelectionEntity(
-                                ownerPrincipalId = userDriverRoleKey,
-                                rideRequestId = requestId,
-                                updatedAtEpochMs = System.currentTimeMillis(),
-                            )
-                        )
+                        return@launch
                     }
-                }
-            }
 
             if (request.serverVersion <= 0L) {
                 _rideVerificationNotice.emit(
-                    "¡Oferta aceptada! Chofer asignado.",
+                    "Actualizando el viaje antes de aceptar la oferta."
                 )
+
+                refreshRideProjectionNow()
                 return@launch
             }
 
-            // 2. Pre-sync offer to Supabase to guarantee presence in ride_offers table
-            if (offer != null) {
-                runCatching {
-                    val client = SupabaseModule.client
-                    if (client.auth.currentUserOrNull() != null) {
-                        client.postgrest["ride_offers"].upsert(
-                            buildJsonObject {
-                                put("id", offer.offerId)
-                                put("request_id", requestId)
-                                put("driver_id", offer.driverId)
-                                put("fare_minor", if (offer.counterPriceMinor > 0) offer.counterPriceMinor else rideFareToMinorUnits(offer.counterPrice, offer.currency))
-                                put("currency", offer.currency.uppercase())
-                                put("state", "PENDING")
-                            }
-                        )
-                    }
-                }
-            }
-
-            // 3. Enqueue authoritative ACCEPT_OFFER command
             val queued = reportRideCommandEnqueue(
                 result = enqueueAuthoritativeRideCommand(
                     request = request,
@@ -9878,9 +9934,171 @@ class ObdViewModel @Inject constructor(
                     payload = RideCommandPayload(offerId = offerId),
                 ),
                 acceptedMessage =
-                    "¡Oferta aceptada! El chofer va en camino.",
+                    "Aceptando oferta. Esperando confirmación del servidor.",
             )
-            RideObservability.event("offer_accept", outcome = if (queued) "SUCCEEDED" else "REJECTED", requestId = requestId, detail = "command")
+
+            RideObservability.event(
+                "offer_accept",
+                outcome =
+                    if (queued) "PENDING"
+                    else "REJECTED",
+                requestId = requestId,
+                detail =
+                    "server_authority_required",
+            )
+        }
+    }
+
+    fun claimRideFirstCome(
+        requestId: String,
+    ) {
+        if (requestId.isBlank()) {
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            val actorId = currentCloudUserId()
+
+            if (actorId.isNullOrBlank()) {
+                _rideClaimFeedback.emit(
+                    RideClaimFeedback(
+                        requestId = requestId,
+                        won = false,
+                        pending = false,
+                        message = "Inicia sesión antes de aceptar un viaje.",
+                    )
+                )
+                return@launch
+            }
+
+            val request = rideDao.getRequestById(requestId)
+
+            if (request == null) {
+                _rideClaimFeedback.emit(
+                    RideClaimFeedback(
+                        requestId = requestId,
+                        won = false,
+                        pending = false,
+                        message = "La solicitud ya no está disponible.",
+                    )
+                )
+                refreshRideProjectionNow()
+                return@launch
+            }
+
+            if (request.passengerId == actorId) {
+                _rideClaimFeedback.emit(
+                    RideClaimFeedback(
+                        requestId = requestId,
+                        won = false,
+                        pending = false,
+                        message = "No puedes aceptar un viaje solicitado por tu propia cuenta.",
+                    )
+                )
+                return@launch
+            }
+
+            if (request.serverVersion <= 0L) {
+                _rideClaimFeedback.emit(
+                    RideClaimFeedback(
+                        requestId = requestId,
+                        won = false,
+                        pending = false,
+                        message =
+                            "La solicitud todavía no fue confirmada por el servidor.",
+                    )
+                )
+                refreshRideProjectionNow()
+                return@launch
+            }
+
+            if (
+                request.assignedDriverId != null ||
+                request.status != "OPEN"
+            ) {
+                _rideClaimFeedback.emit(
+                    RideClaimFeedback(
+                        requestId = requestId,
+                        won = false,
+                        pending = false,
+                        message =
+                            "El viaje cambió de estado. Actualizando solicitudes.",
+                    )
+                )
+                refreshRideProjectionNow()
+                return@launch
+            }
+
+            val remoteVehicleId =
+                activeVerifiedRemoteVehicleId()
+
+            if (remoteVehicleId == null) {
+                _rideClaimFeedback.emit(
+                    RideClaimFeedback(
+                        requestId = requestId,
+                        won = false,
+                        pending = false,
+                        message =
+                            "Necesitas un vehículo activo y VERIFIED para aceptar viajes.",
+                    )
+                )
+
+                refreshRideDriverVehicles()
+                return@launch
+            }
+
+            val result = enqueueAuthoritativeRideCommand(
+                request = request,
+                type = RideCommandType.CLAIM,
+                payload = RideCommandPayload(
+                    vehicleId = remoteVehicleId,
+                ),
+            )
+
+            val queued =
+                result is RideCommandEnqueueResult.Enqueued ||
+                    result is RideCommandEnqueueResult.AlreadyQueued
+
+            if (queued) {
+                _rideClaimUiState.value =
+                    RideClaimUiState.Pending(requestId)
+            }
+
+            _rideClaimFeedback.emit(
+                RideClaimFeedback(
+                    requestId = requestId,
+                    won = false,
+                    pending = queued,
+                    message = when {
+                        queued ->
+                            "Confirmando viaje con el servidor…"
+
+                        result is
+                            RideCommandEnqueueResult.AuthenticationRequired ->
+                            "La sesión expiró. Inicia sesión nuevamente."
+
+                        result is
+                            RideCommandEnqueueResult.InvalidCommand ->
+                            result.message
+
+                        result is
+                            RideCommandEnqueueResult.IdempotencyConflict ->
+                            result.message
+
+                        else ->
+                            "No se pudo enviar la aceptación."
+                    },
+                )
+            )
+
+            if (queued) {
+                RideObservability.event(
+                    "ride_claim",
+                    outcome = "PENDING",
+                    requestId = requestId,
+                    detail = "awaiting_server_authority",
+                )
+            }
         }
     }
 
@@ -9891,70 +10109,7 @@ class ObdViewModel @Inject constructor(
         driverPhone: String,
         vehicleDescription: String,
     ) {
-        if (requestId.isBlank() || driverId.isBlank()) return
-        viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: return@launch
-            if (request.serverVersion <= 0L) {
-                _rideClaimFeedback.emit(
-                    RideClaimFeedback(
-                        requestId = requestId,
-                        won = false,
-                        message = "Este viaje aún no está disponible. Intenta de nuevo.",
-                    ),
-                )
-                return@launch
-            }
-            val remoteVehicleId = activeVerifiedRemoteVehicleId()
-            if (remoteVehicleId == null) {
-                _rideClaimFeedback.emit(
-                    RideClaimFeedback(
-                        requestId = requestId,
-                        won = false,
-                        message = "Activa un vehículo verificado antes de confirmar.",
-                    ),
-                )
-                return@launch
-            }
-            val result = enqueueAuthoritativeRideCommand(
-                request = request,
-                type = RideCommandType.CLAIM,
-                payload = RideCommandPayload(vehicleId = remoteVehicleId),
-            )
-            val queued = result is RideCommandEnqueueResult.Enqueued ||
-                result is RideCommandEnqueueResult.AlreadyQueued
-            _rideClaimFeedback.emit(
-                RideClaimFeedback(
-                    requestId = requestId,
-                    won = false,
-                    pending = queued,
-                    message = if (queued) {
-                        "¡Solicitud enviada! Asignando viaje..."
-                    } else {
-                        when (result) {
-                            RideCommandEnqueueResult.AuthenticationRequired ->
-                                "Inicia sesión antes de confirmar el viaje."
-                            is RideCommandEnqueueResult.InvalidCommand ->
-                                result.message
-                            is RideCommandEnqueueResult.IdempotencyConflict ->
-                                result.message
-                            else -> "No se pudo encolar la confirmación."
-                        }
-                    },
-                ),
-            )
-            voiceFeedbackManager.speak(
-                if (queued) {
-                    "¡Solicitud enviada! Asignando viaje..."
-                } else {
-                    "No se pudo enviar la confirmación del viaje."
-                },
-                if (queued) {
-                    "Confirmation sent. Waiting for the secure server decision."
-                } else {
-                    "The ride confirmation could not be sent."
-                },
-            )
-        }
+        claimRideFirstCome(requestId)
     }
 
     /** Submit a direct claim; the server projection decides whether this driver won. */
@@ -9968,132 +10123,95 @@ class ObdViewModel @Inject constructor(
         pickupLng: Double,
         onResult: (success: Boolean, updatedRide: RideRequestEntity?) -> Unit,
     ) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val actorId = currentCloudUserId()
-            val request = rideDao.getRequestById(requestId)
-            if (request == null) {
-                _rideVerificationNotice.emit("Viaje no encontrado.")
-                withContext(Dispatchers.Main) { onResult(false, null) }
-                return@launch
-            }
-
-            val isSelfOrTestRide = BuildConfig.DEBUG ||
-                actorId == request.passengerId ||
-                request.passengerId.startsWith("passenger_") ||
-                request.requestId.startsWith("demo_")
-
-            var vehicleId = activeVerifiedRemoteVehicleId()
-            if (vehicleId == null && isSelfOrTestRide) {
-                vehicleId = driverVerification.value?.driverId ?: actorId ?: UUID.randomUUID().toString()
-            }
-
-            if (actorId.isNullOrBlank() && !isSelfOrTestRide) {
-                _rideVerificationNotice.emit("Inicia sesión para aceptar viajes.")
-                withContext(Dispatchers.Main) { onResult(false, null) }
-                return@launch
-            }
-
-            if (!isSelfOrTestRide && actorId == request.passengerId) {
-                _rideVerificationNotice.emit("No puedes aceptar un viaje creado desde tu propia cuenta en producción.")
-                withContext(Dispatchers.Main) { onResult(false, null) }
-                return@launch
-            }
-
-            if (vehicleId == null) {
-                _rideVerificationNotice.emit("Se requiere un vehículo activo y verificado para aceptar viajes.")
-                withContext(Dispatchers.Main) { onResult(false, null) }
-                return@launch
-            }
-
-            if (isSelfOrTestRide || request.serverVersion <= 0L) {
-                rideDao.claimOpenRequest(
-                    requestId = requestId,
-                    driverId = driverId,
-                    driverName = driverName,
-                    driverPhone = driverPhone,
-                    vehicle = vehicleDescription,
-                )
-                val updated = rideDao.getRequestById(requestId)
-                if (updated != null) {
-                    val driverRoleKey = com.elysium369.meet.ride.domain.RideRoleContextPolicy
-                        .selectionOwnerKey(driverId, true)
-                    if (driverRoleKey != null) {
-                        rideDao.upsertActiveRideSelection(
-                            ActiveRideSelectionEntity(
-                                ownerPrincipalId = driverRoleKey,
-                                rideRequestId = requestId,
-                                updatedAtEpochMs = System.currentTimeMillis(),
-                            )
-                        )
-                    }
-                    withContext(Dispatchers.Main) {
-                        selectActiveRide(updated)
-                        onResult(true, updated)
-                    }
-                    _rideVerificationNotice.emit("¡Viaje asignado con éxito!")
-                } else {
-                    withContext(Dispatchers.Main) { onResult(false, null) }
-                }
-                return@launch
-            }
-
-            val queued = reportRideCommandEnqueue(
-                result = enqueueAuthoritativeRideCommand(
-                    request = request,
-                    type = RideCommandType.CLAIM,
-                    payload = RideCommandPayload(vehicleId = vehicleId),
-                ),
-                acceptedMessage = "Solicitud de viaje enviada; esperando confirmación del servidor.",
-            )
-            withContext(Dispatchers.Main) { onResult(queued, request.takeIf { queued }) }
-        }
+        claimRideFirstCome(requestId)
+        onResult(true, null)
     }
 
-    fun verifyRideBoardingPin(requestId: String, candidate: String) {
+    fun verifyRideBoardingPin(
+        requestId: String,
+        candidate: String,
+    ) {
         if (!candidate.matches(Regex("[0-9]{4}"))) {
-            _ridePinFeedback.tryEmit("El PIN debe contener exactamente cuatro dígitos.")
+            _ridePinFeedback.tryEmit(
+                "El PIN debe contener exactamente cuatro dígitos."
+            )
             return
         }
-        viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: return@launch
 
-            if (request.serverVersion <= 0L || request.serverState != "ARRIVED") {
+        viewModelScope.launch(Dispatchers.IO) {
+            val request =
+                rideDao.getRequestById(requestId)
+                    ?: run {
+                        _ridePinFeedback.emit(
+                            "El viaje ya no está disponible."
+                        )
+                        return@launch
+                    }
+
+            if (
+                request.serverVersion <= 0L ||
+                request.serverState != "ARRIVED"
+            ) {
                 _ridePinFeedback.emit(
-                    "El conductor debe confirmar su llegada antes de verificar el PIN.",
+                    "El servidor todavía no confirmó la llegada."
                 )
+                refreshRideProjectionNow()
                 return@launch
             }
+
             val queued = reportRideCommandEnqueue(
                 result = enqueueAuthoritativeRideCommand(
                     request = request,
-                    type = RideCommandType.VERIFY_BOARDING_PIN,
-                    payload = RideCommandPayload(boardingPin = candidate),
+                    type =
+                        RideCommandType.VERIFY_BOARDING_PIN,
+                    payload = RideCommandPayload(
+                        boardingPin = candidate,
+                    ),
                 ),
                 acceptedMessage =
-                    "PIN enviado. Verificando...",
+                    "Verificando PIN con el servidor.",
             )
+
             if (queued) {
                 _ridePinFeedback.emit(
-                    "Verificando PIN. El viaje iniciará cuando se confirme.",
+                    "Verificando PIN. El viaje no iniciará hasta recibir confirmación."
                 )
             }
         }
     }
 
-    fun issueRideBoardingPin(requestId: String) {
+    fun issueRideBoardingPin(
+        requestId: String,
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: return@launch
-            if (request.serverVersion > 0L && request.serverState == "ARRIVED") {
-                reportRideCommandEnqueue(
-                    result = enqueueAuthoritativeRideCommand(
-                        request = request,
-                        type = RideCommandType.ISSUE_BOARDING_PIN,
-                    ),
-                    acceptedMessage =
-                        "Solicitando PIN al servidor. Se mostrará cuando esté confirmado.",
+            val request =
+                rideDao.getRequestById(requestId)
+                    ?: return@launch
+
+            if (
+                request.serverVersion <= 0L ||
+                request.serverState != "ARRIVED"
+            ) {
+                _ridePinFeedback.emit(
+                    "El PIN sólo puede generarse cuando la llegada esté confirmada."
                 )
-            } else {
-                _ridePinFeedback.emit("El PIN estará disponible cuando el servidor confirme la llegada del conductor.")
+                return@launch
+            }
+
+            val queued = reportRideCommandEnqueue(
+                result = enqueueAuthoritativeRideCommand(
+                    request = request,
+                    type =
+                        RideCommandType.ISSUE_BOARDING_PIN,
+                ),
+                acceptedMessage =
+                    "Generando PIN privado en el servidor.",
+            )
+
+            if (queued) {
+                _ridePinFeedback.emit(
+                    "Generando PIN…"
+                )
             }
         }
     }
