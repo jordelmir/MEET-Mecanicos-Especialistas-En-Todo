@@ -47,6 +47,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -155,8 +157,13 @@ fun RideMapPanel(
             .distinct()
     }
     val mapView = remember {
-        MapLibre.getInstance(context.applicationContext)
-        MapView(context).apply { onCreate(null) }
+        try {
+            MapLibre.getInstance(context.applicationContext)
+            MapView(context).apply { onCreate(null) }
+        } catch (t: Throwable) {
+            android.util.Log.e("RideMapPanel", "Error initializing MapLibre", t)
+            null
+        }
     }
     val failureListener = remember {
         MapView.OnDidFailLoadingMapListener { error ->
@@ -196,47 +203,70 @@ fun RideMapPanel(
     }
 
     DisposableEffect(lifecycleOwner, mapView) {
+        val currentMapView = mapView ?: return@DisposableEffect onDispose {}
         val lifecycle = lifecycleOwner.lifecycle
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
-                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                Lifecycle.Event.ON_START -> currentMapView.onStart()
+                Lifecycle.Event.ON_RESUME -> currentMapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> currentMapView.onPause()
+                Lifecycle.Event.ON_STOP -> currentMapView.onStop()
+                Lifecycle.Event.ON_DESTROY -> currentMapView.onDestroy()
                 else -> Unit
             }
         }
         lifecycle.addObserver(observer)
-        mapView.addOnDidFailLoadingMapListener(failureListener)
+        currentMapView.addOnDidFailLoadingMapListener(failureListener)
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            mapView.onStart()
+            currentMapView.onStart()
         }
         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-            mapView.onResume()
+            currentMapView.onResume()
         }
 
         onDispose {
-            mapView.removeOnDidFailLoadingMapListener(failureListener)
+            currentMapView.removeOnDidFailLoadingMapListener(failureListener)
             lifecycle.removeObserver(observer)
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                mapView.onPause()
+                currentMapView.onPause()
             }
             if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-                mapView.onStop()
+                currentMapView.onStop()
             }
-            if (!mapView.isDestroyed) {
-                mapView.onDestroy()
+            if (!currentMapView.isDestroyed) {
+                currentMapView.onDestroy()
             }
             routePulseController.release()
         }
     }
 
     Box(modifier = modifier) {
-        AndroidView(
-            factory = { mapView },
-            modifier = Modifier.fillMaxSize(),
-            update = { view ->
+        if (mapView == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(ComposeColor(0xFF08121E)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "CONECTANDO MAPA VECTORIAL",
+                        color = ComposeColor(0xFF00E5FF),
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "Iniciando visualizador de navegación...",
+                        color = ComposeColor(0xFF9E9E9E),
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+        } else {
+            AndroidView(
+                factory = { mapView },
+                modifier = Modifier.fillMaxSize(),
+                update = { view ->
                 view.getMapAsync { map ->
                     latestMap = map
                     if (configuredMap !== map) {
@@ -329,6 +359,7 @@ fun RideMapPanel(
                 }
             },
         )
+    }
 
         if (state.markers.isEmpty()) {
             RideMapStatus(

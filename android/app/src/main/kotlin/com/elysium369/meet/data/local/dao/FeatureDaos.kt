@@ -958,13 +958,14 @@ interface RideDao {
         """
         UPDATE ride_requests
         SET status = 'ACCEPTED',
+            serverState = 'ACCEPTED',
             assignedDriverId = :driverId,
             assignedDriverName = :driverName,
             assignedDriverPhone = :driverPhone,
             assignedDriverVehicle = :vehicle,
             finalPrice = priceOffer
         WHERE requestId = :requestId
-          AND (status = 'OPEN' OR status = 'ACCEPTED' OR assignedDriverId = :driverId OR assignedDriverId IS NULL)
+          AND (status = 'OPEN' OR status = 'ACCEPTED' OR status = 'PENDING_PUBLICATION' OR assignedDriverId = :driverId OR assignedDriverId IS NULL)
         """
     )
     suspend fun claimOpenRequest(

@@ -55,6 +55,10 @@ android {
         versionCode = 57
         versionName = "4.24.0"
 
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a"))
+        }
+
         val meetBuildSha = providers.environmentVariable("MEET_BUILD_SHA")
             .orElse(providers.environmentVariable("GITHUB_SHA"))
             .orElse("LOCAL_UNVERIFIED")
@@ -405,6 +409,7 @@ dependencies {
     implementation("androidx.media3:media3-common:$media3Version")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
     androidTestImplementation("androidx.test:core:1.5.0")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")

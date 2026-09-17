@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.SettingsBackupRestore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -32,6 +33,7 @@ import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.EliteTopAppBar
 import com.elysium369.meet.ui.components.PhantomSectionHeader
+import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -45,7 +47,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BackupSettingsScreen(navController: NavController) {
+fun BackupSettingsScreen(navController: NavController, viewModel: ObdViewModel) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val backupManager = remember { GoogleDriveBackupManager(context) }
@@ -54,6 +56,8 @@ fun BackupSettingsScreen(navController: NavController) {
     var isBackingUp by remember { mutableStateOf(false) }
     var isRestoring by remember { mutableStateOf(false) }
     var showRestoreConfirmation by remember { mutableStateOf(false) }
+    var showDeleteAccountConfirmation by remember { mutableStateOf(false) }
+    val deletionState by viewModel.accountDeletionState.collectAsState()
     var lastBackupTime by remember {
         mutableStateOf(
             context.getSharedPreferences("meet_backup_prefs", Context.MODE_PRIVATE)
@@ -374,6 +378,55 @@ fun BackupSettingsScreen(navController: NavController) {
                 }
             }
 
+            // ============================================================
+            //  SECCIÓN: ELIMINAR CUENTA (Google Play Store requirement)
+            // ============================================================
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                Column {
+                    PhantomSectionHeader(label = "ZONA DE PELIGRO", accentColor = MeetColors.error)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    EliteCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        glowColor = MeetColors.error.copy(alpha = 0.3f),
+                        backgroundColor = MeetColors.backgroundDeep,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                AnimatedNeonIcon(
+                                    imageVector = Icons.Default.DeleteForever,
+                                    contentDescription = "Eliminar",
+                                    tint = MeetColors.error,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        "Eliminar mi cuenta",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 16.sp,
+                                    )
+                                    Text(
+                                        "Esta acción es irreversible. Se eliminarán todos tus datos, viajes, servicios, vehículos y perfiles de proveedor.",
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 12.sp,
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(16.dp))
+                            EliteButton(
+                                onClick = { showDeleteAccountConfirmation = true },
+                                text = "ELIMINAR CUENTA PERMANENTEMENTE",
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                color = MeetColors.error,
+                            )
+                        }
+                    }
+                }
+            }
+
             // Bottom spacer
             item { Spacer(modifier = Modifier.height(32.dp)) }
         }
@@ -429,6 +482,124 @@ fun BackupSettingsScreen(navController: NavController) {
                     Text("CANCELAR", color = Color.White)
                 }
             }
+        )
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // ████ CONFIRM DELETE ACCOUNT DIALOG ████
+    // ═══════════════════════════════════════════════════════════════════════════
+    if (showDeleteAccountConfirmation) {
+        var confirmText by remember { mutableStateOf("") }
+        val isDeleting = deletionState is ObdViewModel.AccountDeletionState.InProgress
+
+        AlertDialog(
+            onDismissRequest = {
+                if (!isDeleting) {
+                    showDeleteAccountConfirmation = false
+                    viewModel.resetAccountDeletionState()
+                }
+            },
+            containerColor = MeetColors.backgroundDeep,
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AnimatedNeonIcon(
+                        imageVector = Icons.Default.DeleteForever,
+                        contentDescription = "Eliminar",
+                        tint = MeetColors.error,
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "¿Eliminar tu cuenta?",
+                        color = MeetColors.error,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                    )
+                }
+            },
+            text = {
+                Column {
+                    Text(
+                        "⚠️ Esta acción es PERMANENTE e IRREVERSIBLE.\n\n" +
+                        "Se eliminarán:\n" +
+                        "• Todos tus viajes y solicitudes\n" +
+                        "• Tus vehículos registrados\n" +
+                        "• Tus perfiles de proveedor\n" +
+                        "• Tus calificaciones y mensajes\n" +
+                        "• Tus datos de diagnóstico OBD\n\n" +
+                        "Escribe ELIMINAR para confirmar:",
+                        color = MeetColors.textSecondary,
+                        fontSize = 13.sp,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = confirmText,
+                        onValueChange = { confirmText = it.uppercase() },
+                        enabled = !isDeleting,
+                        placeholder = { Text("ELIMINAR", color = MeetColors.textSecondary.copy(alpha = 0.4f)) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = MeetColors.error,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = MeetColors.error,
+                            unfocusedBorderColor = MeetColors.textSecondary,
+                            cursorColor = MeetColors.error,
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+
+                    when (val state = deletionState) {
+                        is ObdViewModel.AccountDeletionState.InProgress -> {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = MeetColors.error,
+                                    strokeWidth = 2.dp,
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Eliminando datos...", color = MeetColors.error, fontSize = 12.sp)
+                            }
+                        }
+                        is ObdViewModel.AccountDeletionState.Failed -> {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(state.error, color = MeetColors.error, fontSize = 12.sp)
+                        }
+                        is ObdViewModel.AccountDeletionState.Completed -> {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(state.message, color = MeetColors.neonGreen, fontSize = 12.sp)
+                            LaunchedEffect(Unit) {
+                                kotlinx.coroutines.delay(2500)
+                                System.exit(0)
+                            }
+                        }
+                        else -> {}
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.deleteAccount(context) },
+                    enabled = confirmText == "ELIMINAR" && !isDeleting,
+                ) {
+                    Text(
+                        "ELIMINAR PERMANENTEMENTE",
+                        color = if (confirmText == "ELIMINAR" && !isDeleting)
+                            MeetColors.error else MeetColors.textSecondary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteAccountConfirmation = false
+                        viewModel.resetAccountDeletionState()
+                    },
+                    enabled = !isDeleting,
+                ) {
+                    Text("CANCELAR", color = Color.White)
+                }
+            },
         )
     }
 }

@@ -62,7 +62,7 @@ fun RideCenterScreen(
     val openRides by viewModel.openRideRequests.collectAsState()
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val driverVer by viewModel.driverVerification.collectAsState()
-    val myDriverId = viewModel.currentUserId ?: driverVer?.driverId
+    val myDriverId = viewModel.currentUserId ?: driverVer?.driverId ?: viewModel.currentRideActorId.takeIf { it.isNotBlank() }
     val context = LocalContext.current
     val driverPrefs = remember(context, myDriverId) {
         context.getSharedPreferences(
@@ -378,7 +378,7 @@ private fun RideCenterCard(
 
     val isOpenBid = ride.fareMode == RideFareMode.OPEN_BID.name
     val fareModeLabel = if (isOpenBid) "Poné Tu Precio" else "Tiempo + Distancia"
-    val fareModeBadgeColor = if (isOpenBid) Color(0xFFFF8C00) else MeetColors.cyberCyan
+    val fareModeBadgeColor = MeetColors.cyberCyan
 
     val distanceToPickup = remember(currentGps, ride) {
         currentGps?.let {
@@ -402,8 +402,8 @@ private fun RideCenterCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
-        border = BorderStroke(1.dp, MeetColors.borderSubtle),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(
@@ -616,16 +616,16 @@ private fun RideCenterCard(
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { onSelect() },
-                            color = if (index == 0) Color(0xFFFF8C00).copy(alpha = 0.15f) else MeetColors.cardBackground,
+                            color = if (index == 0) MeetColors.cyberCyan.copy(alpha = 0.15f) else MeetColors.cardBackground,
                             shape = RoundedCornerShape(8.dp),
                             border = BorderStroke(
                                 1.dp,
-                                if (index == 0) Color(0xFFFF8C00) else MeetColors.borderSubtle,
+                                if (index == 0) MeetColors.cyberCyan else MeetColors.borderSubtle,
                             ),
                         ) {
                             Text(
                                 text = "${ride.currency} $price",
-                                color = if (index == 0) Color(0xFFFF8C00) else MeetColors.textSecondary,
+                                color = if (index == 0) MeetColors.cyberCyan else MeetColors.textSecondary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 textAlign = TextAlign.Center,
@@ -643,19 +643,20 @@ private fun RideCenterCard(
                 onClick = onSelect,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isOpenBid) Color(0xFFFF8C00) else MeetColors.cyberCyan,
+                    containerColor = MeetColors.cyberCyan,
+                    contentColor = Color.Black,
                 ),
                 shape = RoundedCornerShape(12.dp),
                 contentPadding = PaddingValues(vertical = 14.dp),
             ) {
                 Text(
                     text = if (isOpenBid) {
-                        "Aceptar por ${ride.currency} ${ride.priceOffer.toInt()}"
+                        "Aceptar por ${ride.currency} ${ride.priceOffer.toInt()} 🚕"
                     } else {
                         "Enviar oferta"
                     },
-                    color = Color.White,
-                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.Black,
+                    fontWeight = FontWeight.Black,
                     fontSize = 15.sp,
                 )
             }

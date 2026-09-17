@@ -92,7 +92,7 @@ fun RideProfileScreen(
             RideProfileAnalytics.passenger(roleRides, id)
         }
     }
-    var tab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 3)) }
+    var tab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 2)) }
     var supportRide by remember { mutableStateOf<RideRequestEntity?>(null) }
     var showAddVehicle by remember { mutableStateOf(false) }
 
@@ -148,7 +148,6 @@ fun RideProfileScreen(
             ) {
                 listOf(
                     Icons.Default.Person to "Perfil",
-                    Icons.Default.History to "Historial",
                     Icons.Default.SupportAgent to "Soporte",
                     Icons.Default.LocationOn to "Iconos",
                 ).forEachIndexed { index, item ->
@@ -171,8 +170,7 @@ fun RideProfileScreen(
                     onAddVehicle = { showAddVehicle = true },
                     onActivateVehicle = viewModel::activateRideDriverVehicle,
                 )
-                1 -> RideHistoryPanel(roleRides, onOpenSupport = { supportRide = it })
-                2 -> RideSupportPanel(
+                1 -> RideSupportPanel(
                     summary = summary,
                     rides = roleRides,
                     onOpenCase = { supportRide = it },
@@ -639,7 +637,7 @@ private fun RatingDistribution(data: RideProfileSummary) {
 }
 
 @Composable
-private fun RideHistoryPanel(
+internal fun RideHistoryPanel(
     rides: List<RideRequestEntity>,
     onOpenSupport: ((RideRequestEntity) -> Unit)? = null,
 ) {
@@ -763,14 +761,14 @@ private fun RideSupportPanel(
             }
         }
         item {
-            ProfileSection("HISTORIAL DE INCONVENIENTES") {
+            ProfileSection("INCIDENCIAS Y CANCELACIONES") {
                 Text(
                     "${summary?.cancelledTrips ?: 0} cancelaciones registradas en este perfil.",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "Los detalles sensibles permanecen en el historial del viaje; no se inventan casos ni resoluciones.",
+                    "Los detalles sensibles permanecen en cada viaje finalizado; no se inventan casos ni resoluciones.",
                     color = MeetColors.textMuted,
                     fontSize = 10.sp,
                 )
@@ -847,7 +845,7 @@ private fun RideSupportPanel(
                             fontSize = 11.sp,
                         )
                         Text(
-                            "Abre el viaje desde Historial para revisar la evidencia y conversación capturadas.",
+                            "Abre el viaje desde Viajes finalizados para revisar la evidencia y conversación capturadas.",
                             color = MeetColors.textMuted,
                             fontSize = 9.sp,
                         )

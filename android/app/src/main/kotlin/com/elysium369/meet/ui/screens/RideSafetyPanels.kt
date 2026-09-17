@@ -43,6 +43,19 @@ import com.elysium369.meet.ride.domain.RideConsentPolicy
 import com.elysium369.meet.ride.domain.RideGuardianPolicy
 import com.elysium369.meet.ride.domain.RideSafetySignalType
 import com.elysium369.meet.ride.domain.RideShareCategory
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.style.TextAlign
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import java.text.DateFormat
@@ -250,20 +263,40 @@ fun RideCancellationDialog(
     submitting: Boolean = false,
     failureMessage: String? = null,
 ) {
-    // Passenger cancellation is a normal, non-safety operation. Preselect a
-    // truthful neutral reason so the primary action is usable immediately;
-    // safety-sensitive reasons still require an explicit user selection.
+    // Preselect a default valid reason so the confirmation is actionable immediately
     var selected by remember(actorRole) {
         mutableStateOf<RideCancellationReason?>(
-            RideCancellationReason.CHANGE_OF_PLANS.takeIf { actorRole == RideActorRole.PASSENGER },
+            when (actorRole) {
+                RideActorRole.PASSENGER -> RideCancellationReason.CHANGE_OF_PLANS
+                RideActorRole.DRIVER -> RideCancellationReason.PASSENGER_NO_SHOW
+                else -> null
+            },
         )
     }
     var detail by remember { mutableStateOf("") }
+    var isProcessingCancel by remember { mutableStateOf(false) }
+    val isCancelling = submitting || isProcessingCancel
     val isValid = selected?.let { RideCancellationPolicy.isDetailValid(it, detail) } == true
 
+    val infiniteTransition = rememberInfiniteTransition(label = "cancelPulsing")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.45f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "cancelAlphaPulse",
+    )
+
     AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Cancelar viaje de forma segura") },
+        onDismissRequest = { if (!isCancelling) onDismiss() },
+        title = {
+            Text(
+                if (isCancelling) "Cancelando Servicio..." else "Cancelar viaje de forma segura",
+                fontWeight = FontWeight.Bold,
+            )
+        },
         text = {
             Column(
                 modifier = Modifier
@@ -271,59 +304,106 @@ fun RideCancellationDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = "${if (actorRole == RideActorRole.DRIVER) "Conductor" else "Pasajero"}: selecciona el motivo real. Los casos de seguridad se señalan para revisión; la política y los cargos dependen de la confirmación del servidor.",
-                    fontSize = 12.sp,
-                )
-                if (submitting) Text("Cancelación pendiente de confirmación. Puedes volver; la solicitud permanece guardada.")
-                failureMessage?.let { Text(it, color = MeetColors.error) }
-                RideCancellationPolicy.reasonsFor(actorRole).forEach { reason ->
-                    OutlinedButton(
-                        onClick = { selected = reason },
-                        modifier = Modifier.fillMaxWidth(),
-                        border = BorderStroke(
-                            1.dp,
-                            when {
-                                selected == reason -> MeetColors.cyberCyan
-                                reason.safetyRelated -> MeetColors.warning.copy(alpha = 0.7f)
-                                else -> MeetColors.borderSubtle
-                            },
-                        ),
+                if (isCancelling) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFF1E0E12)),
+                        border = BorderStroke(1.5.dp, Color(0xFFEF5350).copy(alpha = pulseAlpha)),
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
                     ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator(
+                                    color = Color(0xFFEF5350),
+                                    strokeWidth = 3.5.dp,
+                                    modifier = Modifier.size(48.dp),
+                                )
+                                Text("❌", fontSize = 16.sp)
+                            }
+                            Text(
+                                text = "Cancelando viaje de forma segura...",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                modifier = Modifier.alpha(pulseAlpha),
+                            )
+                            Text(
+                                text = "Reconciliando estado del servicio y liberando la unidad...",
+                                color = MeetColors.textSecondary,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center,
+                            )
+                            LinearProgressIndicator(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp),
+                                color = Color(0xFFEF5350),
+                                trackColor = Color(0xFF3B181C),
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "${if (actorRole == RideActorRole.DRIVER) "Conductor" else "Pasajero"}: selecciona el motivo real. Los casos de seguridad se señalan para revisión; la política y los cargos dependen de la confirmación del servidor.",
+                        fontSize = 12.sp,
+                    )
+                    failureMessage?.let { Text(it, color = MeetColors.error) }
+                    RideCancellationPolicy.reasonsFor(actorRole).forEach { reason ->
+                        OutlinedButton(
+                            onClick = { selected = reason },
+                            modifier = Modifier.fillMaxWidth(),
+                            border = BorderStroke(
+                                1.dp,
+                                when {
+                                    selected == reason -> MeetColors.cyberCyan
+                                    reason.safetyRelated -> MeetColors.warning.copy(alpha = 0.7f)
+                                    else -> MeetColors.borderSubtle
+                                },
+                            ),
+                        ) {
+                            Text(
+                                text = reason.cancellationLabel(),
+                                fontSize = 11.sp,
+                                color = if (reason.safetyRelated) MeetColors.warning else Color.White,
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = detail,
+                        onValueChange = { detail = it.take(500) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = {
+                            Text(
+                                if (selected == RideCancellationReason.OTHER) {
+                                    "Detalle obligatorio"
+                                } else {
+                                    "Detalle opcional"
+                                },
+                            )
+                        },
+                        supportingText = { Text("${detail.length}/500") },
+                        minLines = 2,
+                    )
+                    selected?.let { reason ->
+                        val decision = RideCancellationPolicy.evaluate(reason)
                         Text(
-                            text = reason.cancellationLabel(),
+                            text = if (decision.requiresSafetyReview) {
+                                "Este caso requiere revisión de seguridad."
+                            } else {
+                                "La cancelación quedará registrada en el historial."
+                            },
+                            color = if (decision.requiresSafetyReview) MeetColors.warning else MeetColors.textSecondary,
                             fontSize = 11.sp,
-                            color = if (reason.safetyRelated) MeetColors.warning else Color.White,
                         )
                     }
-                }
-                OutlinedTextField(
-                    value = detail,
-                    onValueChange = { detail = it.take(500) },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = {
-                        Text(
-                            if (selected == RideCancellationReason.OTHER) {
-                                "Detalle obligatorio"
-                            } else {
-                                "Detalle opcional"
-                            },
-                        )
-                    },
-                    supportingText = { Text("${detail.length}/500") },
-                    minLines = 2,
-                )
-                selected?.let { reason ->
-                    val decision = RideCancellationPolicy.evaluate(reason)
-                    Text(
-                        text = if (decision.requiresSafetyReview) {
-                            "Este caso requiere revisión de seguridad."
-                        } else {
-                            "La cancelación quedará registrada en el historial."
-                        },
-                        color = if (decision.requiresSafetyReview) MeetColors.warning else MeetColors.textSecondary,
-                        fontSize = 11.sp,
-                    )
                 }
             }
         },
@@ -331,18 +411,39 @@ fun RideCancellationDialog(
             Button(
                 onClick = {
                     selected?.let {
+                        isProcessingCancel = true
                         onConfirm(it, detail.trim().takeIf(String::isNotEmpty))
                     }
                 },
-                enabled = isValid && !submitting,
+                enabled = isValid && !isCancelling,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEF5350)),
             ) {
-                Text("CONFIRMAR CANCELACIÓN", fontWeight = FontWeight.Bold)
+                if (isCancelling) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Text("CANCELANDO...", fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Text("CONFIRMAR CANCELACIÓN", fontWeight = FontWeight.Bold)
+                }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("VOLVER")
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isCancelling,
+            ) {
+                Text(
+                    "VOLVER",
+                    color = if (!isCancelling) MeetColors.textSecondary else MeetColors.textSecondary.copy(alpha = 0.3f),
+                )
             }
         },
     )

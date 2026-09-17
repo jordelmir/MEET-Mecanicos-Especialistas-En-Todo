@@ -36,6 +36,19 @@ class MeetApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            if (throwable is java.net.SocketException ||
+                throwable is java.io.EOFException ||
+                throwable is java.io.InterruptedIOException ||
+                throwable.cause is java.net.SocketException
+            ) {
+                android.util.Log.w("ElysiumApplication", "Suppressed transient network abort on ${thread.name}: ${throwable.message}")
+                return@setDefaultUncaughtExceptionHandler
+            }
+            previousHandler?.uncaughtException(thread, throwable)
+        }
         
         // Initialize custom theme colors
         com.elysium369.meet.ui.theme.MeetColors.initialize(this)

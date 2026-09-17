@@ -14,8 +14,8 @@ object RideRatingSubmission {
         persistConfirmed: suspend () -> Unit,
     ): Result<Unit> {
         val rejection = when {
-            actorId.isNullOrBlank() || actorId != passengerId -> "Sólo el pasajero autenticado puede calificar este viaje."
-            !passengerRating -> "La calificación del pasajero requiere confirmación del servidor; no está disponible."
+            actorId.isNullOrBlank() || (if (passengerRating) actorId != passengerId else actorId != assignedDriverId) ->
+                "Sólo la cuenta participante correspondiente puede calificar este viaje."
             serverVersion <= 0 || serverState != "COMPLETED" || assignedDriverId.isNullOrBlank() ->
                 "El servidor debe confirmar el cierre del viaje antes de calificar."
             !stars.isFinite() || stars !in 1.0..5.0 || stars % 1.0 != 0.0 ->

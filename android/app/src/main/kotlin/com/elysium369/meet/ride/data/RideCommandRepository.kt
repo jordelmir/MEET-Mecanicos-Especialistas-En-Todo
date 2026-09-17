@@ -44,6 +44,9 @@ class RideCommandRepository @Inject constructor(
 
     fun cancellationCommands(requestId: String) = outboxDao.cancellationCommands(requestId)
 
+    fun latestBoardingPinVerification(requestId: String) =
+        outboxDao.latestBoardingPinVerification(requestId)
+
     fun pendingCount(): Flow<Int> = outboxDao.pendingCount()
 
     suspend fun cancelStuckPendingPublication(rideId: String): Int =

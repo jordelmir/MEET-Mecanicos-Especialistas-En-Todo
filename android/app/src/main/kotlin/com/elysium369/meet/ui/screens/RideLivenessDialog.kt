@@ -72,13 +72,15 @@ fun RideLivenessDialog(
         var provider: ProcessCameraProvider? = null
         var analysis: ImageAnalysis? = null
         var preview: Preview? = null
-        val detector = FaceDetection.getClient(
-            FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
-                .enableTracking()
-                .build(),
-        )
+        val detector = runCatching {
+            FaceDetection.getClient(
+                FaceDetectorOptions.Builder()
+                    .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                    .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_ALL)
+                    .enableTracking()
+                    .build(),
+            )
+        }.getOrNull()
         if (hasPermission) {
             cameraError = null
             val future = ProcessCameraProvider.getInstance(context)
@@ -115,7 +117,7 @@ fun RideLivenessDialog(
             analysis?.clearAnalyzer()
             val ownedUseCases = listOfNotNull(preview, analysis).toTypedArray()
             if (ownedUseCases.isNotEmpty()) provider?.unbind(*ownedUseCases)
-            detector.close()
+            detector?.close()
         }
     }
 
@@ -219,12 +221,17 @@ fun RideLivenessDialog(
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 private fun analyzeBlinkFrame(
     proxy: ImageProxy,
-    detector: com.google.mlkit.vision.face.FaceDetector,
+    detector: com.google.mlkit.vision.face.FaceDetector?,
     disposed: AtomicBoolean,
     challenge: RidePresenceChallenge,
     onState: (RidePresenceChallenge.State, String?, String?) -> Unit,
 ) {
     if (disposed.get()) { proxy.close(); return }
+    if (detector == null) {
+        proxy.close()
+        onState(challenge.reset(), null, "Módulo de detección facial no disponible.")
+        return
+    }
     val mediaImage = proxy.image ?: run { proxy.close(); return }
     try {
         detector.process(InputImage.fromMediaImage(mediaImage, proxy.imageInfo.rotationDegrees))
@@ -248,7 +255,7 @@ private fun analyzeBlinkFrame(
                     "No se pudo analizar la cámara. Reintenta la prueba con buena iluminación.")
             }
             .addOnCompleteListener { proxy.close() }
-    } catch (_: Exception) {
+    } catch (_: Throwable) {
         proxy.close()
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             if (!disposed.get() && !challenge.isComplete) onState(challenge.reset(), null,

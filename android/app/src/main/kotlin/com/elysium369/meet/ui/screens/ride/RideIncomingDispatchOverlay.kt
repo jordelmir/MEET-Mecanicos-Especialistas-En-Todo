@@ -110,9 +110,7 @@ fun RideIncomingDispatchOverlay(
             colors = CardDefaults.cardColors(
                 containerColor = Color(0xFF0D1826)
             ),
-            border = BorderStroke(2.dp, Brush.horizontalGradient(
-                listOf(MeetColors.neonGreen, MeetColors.cyberCyan, Color(0xFFFFD700))
-            ))
+            border = BorderStroke(1.5.dp, MeetColors.cyberCyan)
         ) {
             Column(
                 modifier = Modifier
@@ -127,7 +125,7 @@ fun RideIncomingDispatchOverlay(
                         .fillMaxWidth()
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp)),
-                    color = if (isUrgent) MeetColors.error else MeetColors.neonGreen,
+                    color = if (isUrgent) MeetColors.error else MeetColors.cyberCyan,
                     trackColor = Color(0xFF1B2E4B),
                 )
 
@@ -142,7 +140,7 @@ fun RideIncomingDispatchOverlay(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Surface(
-                            color = MeetColors.neonGreen.copy(alpha = 0.2f),
+                            color = MeetColors.cyberCyan.copy(alpha = 0.2f),
                             shape = CircleShape,
                             modifier = Modifier.size(28.dp)
                         ) {
@@ -152,7 +150,7 @@ fun RideIncomingDispatchOverlay(
                         }
                         Text(
                             "NUEVO VIAJE DISPONIBLE",
-                            color = MeetColors.neonGreen,
+                            color = MeetColors.cyberCyan,
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
                             letterSpacing = 0.5.sp
@@ -309,47 +307,53 @@ fun RideIncomingDispatchOverlay(
                         ),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.FlashOn,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
                         Text(
-                            "+₡500",
+                            "CONTRAOFERTA ⚡",
                             fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
+                            fontSize = 11.sp
                         )
                     }
 
                     // Dominant 1-Tap Real Ride Acceptance
                     Button(
                         onClick = {
-                            isDismissed = true
-                            onAccept(ride)
+                            if (!isDismissed) {
+                                isDismissed = true
+                                onAccept(ride)
+                            }
                         },
+                        enabled = !isDismissed,
                         modifier = Modifier
                             .weight(0.58f)
                             .height(48.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = MeetColors.neonGreen,
-                            contentColor = Color.Black
+                            containerColor = if (isDismissed) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.neonGreen,
+                            contentColor = Color.Black,
+                            disabledContainerColor = MeetColors.neonGreen.copy(alpha = 0.4f),
+                            disabledContentColor = Color.Black.copy(alpha = 0.5f),
                         ),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Navigation,
-                            contentDescription = null,
-                            tint = Color.Black,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "ACEPTAR VIAJE",
-                            fontWeight = FontWeight.Black,
-                            fontSize = 13.sp
-                        )
+                        if (isDismissed) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color.Black,
+                                strokeWidth = 2.dp,
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "ACEPTANDO...",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 13.sp
+                            )
+                        } else {
+                            Text(
+                                "ACEPTAR VIAJE (₡${ride.priceOffer.toInt()}) 🚕",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }

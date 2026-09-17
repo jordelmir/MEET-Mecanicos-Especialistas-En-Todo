@@ -4,6 +4,12 @@ import com.elysium369.meet.ui.components.AnimatedNeonIcon
 
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.theme.MeetTheme
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import android.os.Bundle
 import android.os.Build
 import android.content.Context
@@ -117,6 +123,7 @@ class MainActivity : ComponentActivity() {
     private val viewModel: ObdViewModel by viewModels()
     private var passwordRecoveryRequested by mutableStateOf(false)
     private var passwordRecoverySessionImported by mutableStateOf(false)
+    private var pendingDeepLinkRoute by mutableStateOf<String?>(null)
 
     companion object {
         /** Volatile flag so ObdViewModel can check BT permission status before starting the FGS. */
@@ -152,6 +159,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         passwordRecoveryRequested = handleAuthenticationIntent(intent)
+        pendingDeepLinkRoute = resolveDeepLinkRoute(intent)
 
         // Pre-check if permissions are already granted (e.g. from previous session)
         bluetoothPermissionsGranted = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -176,6 +184,10 @@ class MainActivity : ComponentActivity() {
                         passwordRecoveryRequested = false
                         passwordRecoverySessionImported = false
                     },
+                    initialDeepLinkRoute = pendingDeepLinkRoute,
+                    onDeepLinkHandled = {
+                        pendingDeepLinkRoute = null
+                    },
                 )
             }
         }
@@ -185,6 +197,34 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         passwordRecoveryRequested = handleAuthenticationIntent(intent)
+        pendingDeepLinkRoute = resolveDeepLinkRoute(intent)
+    }
+
+    private fun resolveDeepLinkRoute(intent: Intent?): String? {
+        val uri = intent?.data ?: return null
+        val path = uri.path.orEmpty()
+        val host = uri.host.orEmpty()
+        val scheme = uri.scheme.orEmpty()
+
+        if (scheme == "meet") {
+            return when (host) {
+                "verify" -> MeetDestinations.CAMPAIGNS
+                "ride" -> MeetDestinations.RIDE_HOME
+                "diagnostic" -> MeetDestinations.DTCS
+                "invite" -> MeetDestinations.HOME
+                else -> null
+            }
+        }
+        if (scheme == "https" && (host == "elysium-vanguard.app" || host == "meet.elysium-vanguard.app")) {
+            return when {
+                path.startsWith("/verify") -> MeetDestinations.CAMPAIGNS
+                path.startsWith("/ride") -> MeetDestinations.RIDE_HOME
+                path.startsWith("/diagnostic") -> MeetDestinations.DTCS
+                path.startsWith("/invite") -> MeetDestinations.HOME
+                else -> null
+            }
+        }
+        return null
     }
 
     private fun handleAuthenticationIntent(intent: Intent?): Boolean {
@@ -232,6 +272,8 @@ fun MeetApp(
     passwordRecoveryRequested: Boolean = false,
     passwordRecoverySessionReady: Boolean = false,
     onPasswordRecoveryHandled: () -> Unit = {},
+    initialDeepLinkRoute: String? = null,
+    onDeepLinkHandled: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val authStatus by SupabaseModule.client.auth.sessionStatus.collectAsState()
@@ -280,6 +322,12 @@ fun MeetApp(
         com.elysium369.meet.automation.AiAutomationBridge.navEvents.collect { route ->
             android.util.Log.i("AiAutomation", "Navigating to route from AI bus: $route")
             navController.safeNavigate(route)
+        }
+    }
+    LaunchedEffect(initialDeepLinkRoute) {
+        initialDeepLinkRoute?.let { targetRoute ->
+            navController.safeNavigate(targetRoute)
+            onDeepLinkHandled()
         }
     }
 
@@ -424,7 +472,23 @@ fun MeetApp(
             NavHost(
                 navController = navController,
                 startDestination = startDestination,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                enterTransition = {
+                    fadeIn(tween(300, easing = FastOutSlowInEasing)) +
+                        slideInHorizontally(tween(350, easing = FastOutSlowInEasing)) { it / 6 }
+                },
+                exitTransition = {
+                    fadeOut(tween(250, easing = FastOutSlowInEasing)) +
+                        slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { -it / 6 }
+                },
+                popEnterTransition = {
+                    fadeIn(tween(300, easing = FastOutSlowInEasing)) +
+                        slideInHorizontally(tween(350, easing = FastOutSlowInEasing)) { -it / 6 }
+                },
+                popExitTransition = {
+                    fadeOut(tween(250, easing = FastOutSlowInEasing)) +
+                        slideOutHorizontally(tween(300, easing = FastOutSlowInEasing)) { it / 6 }
+                },
             ) {
             composable("onboarding") {
                 OnboardingScreen(
@@ -736,7 +800,7 @@ fun MeetApp(
                 )
             }
             composable("backup_settings") {
-                BackupSettingsScreen(navController = navController)
+                BackupSettingsScreen(navController = navController, viewModel = obdViewModel)
             }
             composable("fleet_chat_list/{businessId}") { backStack ->
                 val businessId = backStack.arguments?.getString("businessId") ?: ""
@@ -1216,12 +1280,36 @@ fun MeetApp(
                 )
             }
             composable(MeetDestinations.RIDE_CENTER) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val driverVer by obdViewModel.driverVerification.collectAsState()
                 com.elysium369.meet.ui.screens.ride.RideCenterScreen(
                     viewModel = obdViewModel,
                     onBack = { navController.popBackStack() },
                     onSelectRide = { ride ->
-                        obdViewModel.selectActiveRide(ride)
-                        navController.popBackStack()
+                        val dId = driverVer?.driverId ?: obdViewModel.currentRideActorId
+                        val dName = driverVer?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
+                        val dPhone = driverVer?.phone?.takeIf { it.isNotBlank() } ?: ""
+                        val dVeh = if (driverVer != null && driverVer?.vehicleModel?.isNotBlank() == true) {
+                            "${driverVer?.vehicleMake} ${driverVer?.vehicleModel} ${driverVer?.vehicleYear} (${driverVer?.vehicleColor}) [${driverVer?.vehiclePlate}]"
+                        } else {
+                            "Vehículo pendiente de validar"
+                        }
+                        obdViewModel.acceptRideComplete(
+                            requestId = ride.requestId,
+                            driverId = dId,
+                            driverName = dName,
+                            driverPhone = dPhone,
+                            vehicleDescription = dVeh,
+                            pickupLat = ride.pickupLatitude,
+                            pickupLng = ride.pickupLongitude,
+                        ) { success, _ ->
+                            if (success) {
+                                android.widget.Toast.makeText(context, "¡Viaje asignado! Conduce hacia el pasajero 🚕", android.widget.Toast.LENGTH_SHORT).show()
+                                navController.popBackStack()
+                            } else {
+                                android.widget.Toast.makeText(context, "No se pudo aceptar el viaje en este momento", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     },
                 )
             }
@@ -1317,6 +1405,15 @@ fun MeetApp(
                 var rideNotice by remember { mutableStateOf<String?>(null) }
                 LaunchedEffect(Unit) {
                     obdViewModel.rideVerificationNotice.collect { rideNotice = it }
+                }
+                LaunchedEffect(activeRideReq?.status, activeRideReq?.serverState) {
+                    val req = activeRideReq
+                    if (req != null && (req.status == "COMPLETED" || req.serverState == "COMPLETED")) {
+                        obdViewModel.promptRideRating(req)
+                        navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.RIDE_HOME) {
+                            popUpTo(MeetDestinations.RIDE_ACTIVE_TRACKING) { inclusive = true }
+                        }
+                    }
                 }
                 val activeRide = activeRideReq?.let { req ->
                     val now = System.currentTimeMillis()
@@ -1507,7 +1604,12 @@ fun MeetApp(
                             navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.RIDE_HOME)
                         },
                         onPay = null,
-                        onRate = null,
+                        onRate = {
+                            activeRideReq?.let { obdViewModel.promptRideRating(it) }
+                            navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.RIDE_HOME) {
+                                popUpTo(MeetDestinations.RIDE_ACTIVE_TRACKING) { inclusive = true }
+                            }
+                        },
                         onBack = { navController.backOrHome() }
                     )
                 } else {

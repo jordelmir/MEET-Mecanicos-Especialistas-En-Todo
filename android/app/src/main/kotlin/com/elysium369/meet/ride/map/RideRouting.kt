@@ -7,12 +7,27 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
+data class RideRouteManeuver(
+    val distanceMeters: Double,
+    val durationSeconds: Double,
+    val streetName: String,
+    val type: String,
+    val modifier: String?,
+    val location: RideGeoPoint,
+) {
+    init {
+        require(distanceMeters >= 0.0) { "Maneuver distance cannot be negative" }
+        require(durationSeconds >= 0.0) { "Maneuver duration cannot be negative" }
+    }
+}
+
 data class RideRoadRoute(
     val geometry: List<RideGeoPoint>,
     val distanceMeters: Double,
     val durationSeconds: Double,
     val attribution: String,
     val source: RideMapDataSource = RideMapDataSource.NETWORK,
+    val maneuvers: List<RideRouteManeuver> = emptyList(),
 ) {
     init {
         require(geometry.size >= 2) { "Road route requires at least two points" }
@@ -49,7 +64,7 @@ class OsrmRideRoutingProvider(
         val base = endpoint.trimEnd('/')
         val url = URI.create(
             "$base/route/v1/driving/$coordinates" +
-                "?overview=full&geometries=geojson&steps=false",
+                "?overview=full&geometries=geojson&steps=true",
         ).toURL()
         val connection = url.openConnection() as HttpURLConnection
         try {
@@ -84,17 +99,64 @@ private data class OsrmRouteResponse(
 )
 
 @Serializable
-private data class OsrmRouteWire(
-    val distance: Double = -1.0,
-    val duration: Double = -1.0,
-    val geometry: OsrmGeometryWire = OsrmGeometryWire(),
-)
-
-@Serializable
 private data class OsrmGeometryWire(
     val type: String = "",
     val coordinates: List<List<Double>> = emptyList(),
 )
+
+@Serializable
+private data class OsrmRouteWire(
+    val distance: Double = -1.0,
+    val duration: Double = -1.0,
+    val geometry: OsrmGeometryWire = OsrmGeometryWire(),
+    val legs: List<OsrmLegWire> = emptyList(),
+)
+
+@Serializable
+private data class OsrmLegWire(
+    val steps: List<OsrmStepWire> = emptyList(),
+)
+
+@Serializable
+private data class OsrmStepWire(
+    val distance: Double = -1.0,
+    val duration: Double = -1.0,
+    val name: String = "",
+    val maneuver: OsrmManeuverWire = OsrmManeuverWire(),
+)
+
+@Serializable
+private data class OsrmManeuverWire(
+    val type: String = "",
+    val modifier: String? = null,
+    val location: List<Double> = emptyList(),
+)
+
+private fun OsrmStepWire.toDomain(
+    capturedAtEpochMs: Long,
+): RideRouteManeuver? {
+    if (distance < 0.0 || duration < 0.0) {
+        return null
+    }
+    val longitude = maneuver.location.getOrNull(0) ?: return null
+    val latitude = maneuver.location.getOrNull(1) ?: return null
+    val point = runCatching {
+        RideGeoPoint(
+            latitude = latitude,
+            longitude = longitude,
+            accuracyMeters = null,
+            capturedAtEpochMs = capturedAtEpochMs,
+        )
+    }.getOrNull() ?: return null
+    return RideRouteManeuver(
+        distanceMeters = distance,
+        durationSeconds = duration,
+        streetName = name.trim(),
+        type = maneuver.type.ifBlank { "turn" },
+        modifier = maneuver.modifier?.takeIf(String::isNotBlank),
+        location = point,
+    )
+}
 
 internal fun parseOsrmRoute(
     raw: String,
@@ -134,10 +196,16 @@ internal fun parseOsrmRoute(
     if (points.size < 2 || route.distance < 0.0 || route.duration < 0.0) {
         throw RideRoutingException("Ruta vial incompleta")
     }
+    val maneuvers = route.legs
+        .asSequence()
+        .flatMap { it.steps.asSequence() }
+        .mapNotNull { step -> step.toDomain(capturedAtEpochMs) }
+        .toList()
     return RideRoadRoute(
         geometry = points,
         distanceMeters = route.distance,
         durationSeconds = route.duration,
         attribution = "Ruta $providerLabel · © OpenStreetMap contributors",
+        maneuvers = maneuvers,
     )
 }

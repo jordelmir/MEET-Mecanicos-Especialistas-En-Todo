@@ -1,18 +1,24 @@
 package com.elysium369.meet.ui.screens
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -60,18 +66,34 @@ fun TripScreen(
                 val tabs = listOf("HISTORIAL", "ANÁLISIS FODA")
                 tabs.forEachIndexed { index, tabName ->
                     val isSelected = selectedTab == index
+                    val animBg by animateColorAsState(
+                        targetValue = if (isSelected) MeetColors.neonGreen else Color.Transparent,
+                        animationSpec = tween(350, easing = FastOutSlowInEasing),
+                        label = "tab-bg-$index",
+                    )
+                    val animTextColor by animateColorAsState(
+                        targetValue = if (isSelected) MeetColors.backgroundDeep else MeetColors.textSecondary,
+                        animationSpec = tween(350),
+                        label = "tab-text-$index",
+                    )
+                    val tabScale by animateFloatAsState(
+                        targetValue = if (isSelected) 1f else 0.95f,
+                        animationSpec = spring(dampingRatio = 0.5f, stiffness = 600f),
+                        label = "tab-scale-$index",
+                    )
                     Box(
                         modifier = Modifier
                             .weight(1f)
+                            .graphicsLayer { scaleX = tabScale; scaleY = tabScale }
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isSelected) MeetColors.neonGreen else Color.Transparent)
+                            .background(animBg)
                             .clickable { selectedTab = index }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = tabName,
-                            color = if (isSelected) MeetColors.backgroundDeep else MeetColors.textSecondary,
+                            color = animTextColor,
                             fontWeight = FontWeight.Black,
                             fontSize = 12.sp,
                             letterSpacing = 1.sp
@@ -253,8 +275,13 @@ fun TripScreen(
                             }
                         }
 
-                        items(trips.sortedByDescending { it.startedAt }) { trip ->
-                            TripCard(trip, isPremium, onExportPdf)
+                        itemsIndexed(
+                            trips.sortedByDescending { it.startedAt },
+                            key = { _, trip -> trip.startedAt },
+                        ) { index, trip ->
+                            AnimatedEntrance(index) {
+                                TripCard(trip, isPremium, onExportPdf)
+                            }
                         }
                         
                         item {
@@ -345,40 +372,48 @@ fun TripScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         item {
-                            EcoFodaQuadrant(
-                                title = "FORTALEZAS",
-                                subtitle = "Estilo de Conducción Óptimo",
-                                icon = "✓",
-                                color = MeetColors.success,
-                                items = strengthsList
-                            )
+                            AnimatedEntrance(0) {
+                                EcoFodaQuadrant(
+                                    title = "FORTALEZAS",
+                                    subtitle = "Estilo de Conducción Óptimo",
+                                    icon = "✓",
+                                    color = MeetColors.success,
+                                    items = strengthsList
+                                )
+                            }
                         }
                         item {
-                            EcoFodaQuadrant(
-                                title = "OPORTUNIDADES",
-                                subtitle = "Acciones para Maximizar Kilometraje",
-                                icon = "★",
-                                color = MeetColors.cyberCyan,
-                                items = opportunitiesList
-                            )
+                            AnimatedEntrance(1) {
+                                EcoFodaQuadrant(
+                                    title = "OPORTUNIDADES",
+                                    subtitle = "Acciones para Maximizar Kilometraje",
+                                    icon = "★",
+                                    color = MeetColors.cyberCyan,
+                                    items = opportunitiesList
+                                )
+                            }
                         }
                         item {
-                            EcoFodaQuadrant(
-                                title = "DEBILIDADES",
-                                subtitle = "Puntos Críticos de Consumo",
-                                icon = "⚠",
-                                color = MeetColors.warning,
-                                items = weaknessesList
-                            )
+                            AnimatedEntrance(2) {
+                                EcoFodaQuadrant(
+                                    title = "DEBILIDADES",
+                                    subtitle = "Puntos Críticos de Consumo",
+                                    icon = "⚠",
+                                    color = MeetColors.warning,
+                                    items = weaknessesList
+                                )
+                            }
                         }
                         item {
-                            EcoFodaQuadrant(
-                                title = "AMENAZAS",
-                                subtitle = "Riesgos de Desgaste y Multas",
-                                icon = "⚡",
-                                color = MeetColors.error,
-                                items = threatsList
-                            )
+                            AnimatedEntrance(3) {
+                                EcoFodaQuadrant(
+                                    title = "AMENAZAS",
+                                    subtitle = "Riesgos de Desgaste y Multas",
+                                    icon = "⚡",
+                                    color = MeetColors.error,
+                                    items = threatsList
+                                )
+                            }
                         }
                         item {
                             Spacer(Modifier.height(20.dp))
@@ -400,8 +435,15 @@ fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> 
         else -> MeetColors.error
     }
 
+    // Animated score bar fill
+    val animatedFill by animateFloatAsState(
+        targetValue = trip.ecoScore.toFloat() / 100f,
+        animationSpec = tween(800, delayMillis = 200, easing = FastOutSlowInEasing),
+        label = "trip-bar-fill",
+    )
+
     EliteCard(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().holographicShimmer(shimmerAlpha = 0.05f),
         glowColor = scoreColor.copy(alpha = 0.15f),
         borderColor = scoreColor.copy(alpha = 0.25f)
     ) {
@@ -454,7 +496,7 @@ fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> 
             
             Spacer(modifier = Modifier.height(12.dp))
             
-            // Score visual bar indicator
+            // Animated score visual bar
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -465,9 +507,13 @@ fun TripCard(trip: TripEntity, isPremium: Boolean, onExportPdf: (TripEntity) -> 
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .fillMaxWidth(trip.ecoScore.toFloat() / 100f)
+                        .fillMaxWidth(animatedFill)
                         .clip(RoundedCornerShape(2.dp))
-                        .background(scoreColor)
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(scoreColor, scoreColor.copy(alpha = 0.6f))
+                            )
+                        )
                 )
             }
             
@@ -503,42 +549,75 @@ fun EcoScoreGauge(
         else -> MeetColors.error
     }
 
+    // Animated sweep angle — springs to target on first composition
+    val animatedSweep by animateFloatAsState(
+        targetValue = 360f * (score.toFloat() / 100f),
+        animationSpec = tween(1200, easing = FastOutSlowInEasing),
+        label = "gauge-sweep",
+    )
+
+    // Animated score number
+    val animatedScore by animateIntAsState(
+        targetValue = score,
+        animationSpec = tween(1000, easing = FastOutSlowInEasing),
+        label = "gauge-score",
+    )
+
+    // Glow pulse
+    val infiniteTransition = rememberInfiniteTransition(label = "gauge-pulse")
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.15f,
+        targetValue = 0.4f,
+        animationSpec = infiniteRepeatable(
+            tween(1500, easing = FastOutSlowInEasing),
+            RepeatMode.Reverse,
+        ),
+        label = "gauge-glow",
+    )
+
     Box(
         modifier = modifier.size(80.dp),
         contentAlignment = Alignment.Center
     ) {
-        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             val strokeWidth = 6.dp.toPx()
             val radius = (size.minDimension - strokeWidth) / 2
             val center = Offset(size.width / 2, size.height / 2)
-            
-            // Draw background circle track
+
+            // Outer glow ring
+            drawCircle(
+                color = gaugeColor.copy(alpha = glowAlpha),
+                radius = radius + 4.dp.toPx(),
+                center = center,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx()),
+            )
+
+            // Background circle track
             drawCircle(
                 color = MeetColors.cardBackground,
                 radius = radius,
                 center = center,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = strokeWidth
-                )
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth),
             )
-            
-            // Draw progress arc
+
+            // Animated progress arc with rounded caps
             drawArc(
                 color = gaugeColor,
                 startAngle = -90f,
-                sweepAngle = 360f * (score.toFloat() / 100f),
+                sweepAngle = animatedSweep,
                 useCenter = false,
                 topLeft = Offset(center.x - radius, center.y - radius),
                 size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2),
                 style = androidx.compose.ui.graphics.drawscope.Stroke(
-                    width = strokeWidth
-                )
+                    width = strokeWidth,
+                    cap = StrokeCap.Round,
+                ),
             )
         }
-        
+
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "$score",
+                text = "$animatedScore",
                 color = Color.White,
                 fontWeight = FontWeight.Black,
                 fontSize = 20.sp
