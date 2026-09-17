@@ -1142,12 +1142,12 @@ class RideViewModel @Inject constructor(
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = rideDao.getRequestById(requestId) ?: return@launch
-            if (request.serverVersion <= 0L && !BuildConfig.DEBUG) {
+            if (request.serverVersion <= 0L) {
                 _rideVerificationNotice.emit("Espera la confirmación del servidor antes de ofertar.")
                 return@launch
             }
             val remoteVehicleId = activeVerifiedRemoteVehicleId()
-            if (remoteVehicleId == null && !BuildConfig.DEBUG) {
+            if (remoteVehicleId == null) {
                 _rideVerificationNotice.emit("No hay un vehículo remoto activo y verificado para ofertar.")
                 return@launch
             }
