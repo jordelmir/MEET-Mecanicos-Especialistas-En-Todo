@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MEET — Automotive Diagnostic &amp; Mobility OS</string>
+    <string name="hce_service_desc">MEET Vehicle Access Digital Key</string>
+
+    <!-- Play Store: Location Permission Disclosure -->
+    <string name="location_disclosure_title">Location Permission</string>
+    <string name="location_disclosure_message">MEET collects your real-time location to display your position to the passenger/driver during active trips and roadside assistance missions. Location data is strictly used for transportation and roadside rescue services and is never shared with third parties for advertising purposes.</string>
+    <string name="location_disclosure_accept">Accept and Continue</string>
+    <string name="location_disclosure_decline">Decline</string>
+
+    <!-- Play Store: Background Location Disclosure -->
+    <string name="background_location_disclosure_title">Background Location Access</string>
+    <string name="background_location_disclosure_message">MEET requires background location access to continue tracking your route during active trips and rescue dispatches when the app is minimized or the screen is locked. This ensures passenger safety and precise fare metering. Background tracking automatically stops as soon as the trip ends.</string>
+
+    <!-- Play Store: UGC Moderation -->
+    <string name="ugc_terms_of_use_title">Terms of Use — User-Generated Content</string>
+    <string name="ugc_terms_of_use_message">By using the chat, ratings, or any user-generated content features in MEET, you agree to our Terms of Use. Offensive content, spam, harassment, fraud, or unlawful material is strictly prohibited and subject to immediate moderation and account suspension.</string>
+
+    <!-- Play Store: Account Deletion -->
+    <string name="account_deletion_info">You can delete your account from Settings → Delete Account, or by visiting https://elysium-vanguard.app/delete-account from any web browser.</string>
+</resources>

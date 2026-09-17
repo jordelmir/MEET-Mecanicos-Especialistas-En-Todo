@@ -87,6 +87,8 @@ internal data class RemoteRideRequestProjection(
     val createdAt: String,
     @SerialName("completed_at")
     val completedAt: String? = null,
+    @SerialName("driver_arrived_at")
+    val driverArrivedAt: String? = null,
 )
 
 @Serializable
@@ -192,6 +194,9 @@ class RideRemoteProjectionRepository @Inject constructor(
                     return RideProjectionRefreshResult.AuthenticationRequired
                 }
                 val existing = rideDao.getRequestById(remote.id)
+                if (existing != null && remote.version < existing.serverVersion) {
+                    return@forEach
+                }
                 val orderedStops = stops[remote.id].orEmpty().map { stop ->
                     RideStopSnapshot(
                         order = stop.stopOrder,
@@ -335,8 +340,9 @@ internal fun RemoteRideRequestProjection.toLocal(
         assignedDriverName: String? = null,
         assignedDriverVehicle: String? = null,
     ): RideRequestEntity {
-        val activeStatuses = setOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")
-        val terminalStatuses = setOf("COMPLETED", "CANCELLED")
+        val resolvedStatus = state.toLegacyStatus()
+        val resolvedServerState = state
+        val resolvedDriverId = assignedDriverId
 
         val ownedExisting = existing?.takeIf { it.passengerId == passengerId }
         val ownerUnchanged = ownedExisting != null
@@ -345,6 +351,12 @@ internal fun RemoteRideRequestProjection.toLocal(
         val keepPin = assignmentUnchanged && state in setOf("ASSIGNED", "DRIVER_EN_ROUTE", "ARRIVED")
         val offeredMajor = offeredFareMinor.toLegacyMajor(currency)
         val finalMajor = finalFareMinor?.toLegacyMajor(currency)
+
+        val resolvedDriverName = assignedDriverName?.takeIf { it.isNotBlank() }
+            ?: ownedExisting?.assignedDriverName?.takeIf { assignmentUnchanged }
+        val resolvedDriverPhone = ownedExisting?.assignedDriverPhone?.takeIf { assignmentUnchanged }
+        val resolvedDriverVehicle = assignedDriverVehicle?.takeIf { it.isNotBlank() }
+            ?: ownedExisting?.assignedDriverVehicle?.takeIf { assignmentUnchanged }
 
         return RideRequestEntity(
             requestId = id,
@@ -377,18 +389,16 @@ internal fun RemoteRideRequestProjection.toLocal(
             allowsInTripStops = allowsInTripStops,
             quoteVersion = quoteVersion,
             fareBreakdownJson = fareBreakdown.toString(),
-            status = state.toLegacyStatus(),
+            status = resolvedStatus,
             acceptedOfferId = acceptedOfferId
                 ?: ownedExisting?.acceptedOfferId?.takeIf { assignmentUnchanged },
-            assignedDriverId = assignedDriverId,
-            assignedDriverName = assignedDriverName?.takeIf { it.isNotBlank() }
-                ?: ownedExisting?.assignedDriverName?.takeIf { assignmentUnchanged },
-            assignedDriverPhone = ownedExisting?.assignedDriverPhone?.takeIf { assignmentUnchanged },
-            assignedDriverVehicle = assignedDriverVehicle?.takeIf { it.isNotBlank() }
-                ?: ownedExisting?.assignedDriverVehicle?.takeIf { assignmentUnchanged },
+            assignedDriverId = resolvedDriverId,
+            assignedDriverName = resolvedDriverName,
+            assignedDriverPhone = resolvedDriverPhone,
+            assignedDriverVehicle = resolvedDriverVehicle,
             finalPrice = finalMajor,
             finalPriceMinor = finalFareMinor,
-            serverState = state,
+            serverState = resolvedServerState,
             serverVersion = version,
             serverAssignedVehicleId = assignedVehicleId,
             syncState = "SYNCED",
@@ -403,6 +413,9 @@ internal fun RemoteRideRequestProjection.toLocal(
             completedAt = completedAt?.toEpochMillisOr(
                 ownedExisting?.completedAt ?: 0L,
             )?.takeIf { it > 0L },
+            driverArrivedAt = driverArrivedAt?.toEpochMillisOr(
+                ownedExisting?.driverArrivedAt ?: 0L,
+            )?.takeIf { it > 0L } ?: ownedExisting?.driverArrivedAt,
         )
     }
 

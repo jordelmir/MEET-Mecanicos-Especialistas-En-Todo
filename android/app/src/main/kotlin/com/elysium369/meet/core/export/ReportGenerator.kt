@@ -659,13 +659,23 @@ class ReportGenerator(private val context: Context) {
 
     fun shareReport(pdfFile: File) {
         val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
+        val shareMessage = buildString {
+            append("🚗 *Reporte Certificado MEET / Elysium Vanguard*\n")
+            append("Documento: ${pdfFile.nameWithoutExtension}\n\n")
+            append("✅ Inspección técnica con sellado forense e integridad criptográfica SHA-256.\n")
+            append("🔍 Puedes validar la autenticidad del reporte escaneando su código QR o en:\n")
+            append("https://elysium-vanguard.app/verify\n\n")
+            append("📲 Descarga la app oficial de diagnóstico automotriz y asistencia vial en Google Play:\n")
+            append("https://play.google.com/store/apps/details?id=${context.packageName}")
+        }
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/pdf"; putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Diagnóstico Elysium Vanguard — ${pdfFile.nameWithoutExtension}")
-            putExtra(Intent.EXTRA_TEXT, "Adjunto el reporte de diagnóstico generado por Elysium Vanguard AI.")
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Reporte Certificado MEET — ${pdfFile.nameWithoutExtension}")
+            putExtra(Intent.EXTRA_TEXT, shareMessage)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        val chooser = Intent.createChooser(shareIntent, "Compartir diagnóstico")
+        val chooser = Intent.createChooser(shareIntent, "Compartir reporte certificado")
         chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(chooser)
     }

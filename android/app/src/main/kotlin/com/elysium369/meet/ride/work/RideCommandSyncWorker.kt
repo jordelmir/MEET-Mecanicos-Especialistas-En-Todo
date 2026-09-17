@@ -11,6 +11,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.elysium369.meet.data.local.dao.RideDao
+import com.elysium369.meet.data.local.entities.ActiveRideSelectionEntity
 import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.ride.data.local.RideCommandOutboxDao
 import com.elysium369.meet.ride.data.local.RideCommandOutboxEntity
@@ -197,8 +198,30 @@ class RideCommandSyncWorker @AssistedInject constructor(
                         // or a later projection refresh cannot resurrect it.
                         rideDao.clearActiveRideSelectionsForRide(entity.rideId)
                     }
+                    if (entity.commandType == RideCommandType.CLAIM.name &&
+                        result.status in setOf("CLAIMED", "ASSIGNED")
+                    ) {
+                        val ownerKey = com.elysium369.meet.ride.domain.RideRoleContextPolicy
+                            .selectionOwnerKey(entity.actorSessionUserId, true)
+                        if (ownerKey != null) {
+                            rideDao.upsertActiveRideSelection(
+                                ActiveRideSelectionEntity(
+                                    ownerPrincipalId = ownerKey,
+                                    rideRequestId = entity.rideId,
+                                    updatedAtEpochMs = now,
+                                ),
+                            )
+                        }
+                    }
                 }
                 is RideCommandGatewayResult.Rejected -> {
+                    if (entity.commandType == RideCommandType.VERIFY_BOARDING_PIN.name &&
+                        result.code.startsWith("BOARDING_PIN_")
+                    ) {
+                        // A rejected PIN leaves the trip ARRIVED. Restore its
+                        // projection so the driver can try again or request a new PIN.
+                        reconcileSnapshot(entity, syncState = "SYNCED", correlationId = result.correlationId)
+                    }
                     RideObservability.record(
                         RideObservability.event(
                             type = result.rejectionTelemetryType(),

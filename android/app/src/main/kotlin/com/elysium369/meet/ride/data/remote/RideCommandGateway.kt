@@ -189,8 +189,24 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                 val data = requireNotNull(response.data) {
                     "Successful command response omitted data"
                 }
+                val status = data.text("status") ?: "ACCEPTED"
+                if (command.type == RideCommandType.VERIFY_BOARDING_PIN &&
+                    status in setOf("INVALID", "LOCKED", "EXPIRED_OR_USED")
+                ) {
+                    return RideCommandGatewayResult.Rejected(
+                        code = "BOARDING_PIN_$status",
+                        message = when (status) {
+                            "INVALID" -> "PIN incorrecto. Solicita el código vigente al pasajero."
+                            "LOCKED" -> "PIN bloqueado temporalmente por intentos fallidos."
+                            else -> "El PIN expiró o ya fue usado. Solicita uno nuevo."
+                        },
+                        retryable = false,
+                        currentServerVersion = data.long("version"),
+                        correlationId = response.correlationId,
+                    )
+                }
                 RideCommandGatewayResult.Accepted(
-                    status = data.text("status") ?: "ACCEPTED",
+                    status = status,
                     serverVersion = data.long("version")
                         ?: error("Successful command response omitted version"),
                     finalPriceMinor = data.long("customer_total_minor"),

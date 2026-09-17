@@ -66,7 +66,7 @@
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
-        android:label="OBD2 Elysium Vanguard"
+        android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:usesCleartextTraffic="false"
@@ -91,6 +91,20 @@
                     android:scheme="meet"
                     android:host="auth"
                     android:pathPrefix="/password-recovery" />
+            </intent-filter>
+            <!-- Universal App Links & Deep Links (Viral loops: Verified Reports, Live Rides, Invites) -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="elysium-vanguard.app" android:pathPrefix="/verify" />
+                <data android:scheme="https" android:host="elysium-vanguard.app" android:pathPrefix="/ride" />
+                <data android:scheme="https" android:host="elysium-vanguard.app" android:pathPrefix="/invite" />
+                <data android:scheme="https" android:host="elysium-vanguard.app" android:pathPrefix="/diagnostic" />
+                <data android:scheme="meet" android:host="verify" />
+                <data android:scheme="meet" android:host="ride" />
+                <data android:scheme="meet" android:host="invite" />
+                <data android:scheme="meet" android:host="diagnostic" />
             </intent-filter>
         </activity>
         

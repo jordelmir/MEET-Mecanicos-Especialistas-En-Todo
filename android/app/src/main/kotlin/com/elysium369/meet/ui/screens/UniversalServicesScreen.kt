@@ -142,6 +142,7 @@ fun UniversalServicesScreen(
                     Brush.verticalGradient(listOf(Color(0xFF061523), Color(0xFF080319))),
                 ),
         ) {
+            // ── Provider-only header: service board or registration prompt ──
             if (providerMode) {
                 if (myProfile != null) {
                     ProviderServiceBoard(
@@ -180,169 +181,172 @@ fun UniversalServicesScreen(
                         }
                     }
                 }
-                val infiniteTransition = rememberInfiniteTransition(label = "universal-radar-loop")
-                val universalRadarPulse by infiniteTransition.animateFloat(
-                    initialValue = 0.88f,
-                    targetValue = 1.15f,
-                    animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-                    label = "univ-pulse",
-                )
-                val universalRadarGlowAlpha by infiniteTransition.animateFloat(
-                    initialValue = 0.35f,
-                    targetValue = 1.0f,
-                    animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Reverse),
-                    label = "univ-glow",
-                )
+            }
 
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    placeholder = { Text("¿Qué necesitas? Tubos PVC, plomero, cerradura, cables…") },
-                    leadingIcon = { Icon(Icons.Default.Search, null, tint = MeetColors.cyberCyan) },
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
-                    shape = RoundedCornerShape(14.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
-                        focusedBorderColor = MeetColors.cyberCyan,
-                        unfocusedBorderColor = Color(0xFF6B2D91),
-                    ),
-                )
+            // ── Shared content: search, map, catalog, requests (visible in BOTH modes) ──
+            val infiniteTransition = rememberInfiniteTransition(label = "universal-radar-loop")
+            val universalRadarPulse by infiniteTransition.animateFloat(
+                initialValue = 0.88f,
+                targetValue = 1.15f,
+                animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+                label = "univ-pulse",
+            )
+            val universalRadarGlowAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.35f,
+                targetValue = 1.0f,
+                animationSpec = infiniteRepeatable(tween(1000, easing = LinearEasing), RepeatMode.Reverse),
+                label = "univ-glow",
+            )
 
-                // Category Filter Chips with 3D styling
-                androidx.compose.foundation.lazy.LazyRow(
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    items(domains) { domain ->
-                        FilterChip(
-                            selected = selectedDomain == domain,
-                            onClick = { selectedDomain = domain },
-                            label = { Text(domain, fontSize = 11.sp, fontWeight = if (selectedDomain == domain) FontWeight.Black else FontWeight.Normal) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MeetColors.cyberCyan.copy(alpha = 0.25f),
-                                selectedLabelColor = MeetColors.cyberCyan,
-                            )
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text("¿Qué necesitas? Tubos PVC, plomero, cerradura, cables…") },
+                leadingIcon = { Icon(Icons.Default.Search, null, tint = MeetColors.cyberCyan) },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White,
+                    focusedBorderColor = MeetColors.cyberCyan,
+                    unfocusedBorderColor = Color(0xFF6B2D91),
+                ),
+            )
+
+            // Category Filter Chips with 3D styling
+            androidx.compose.foundation.lazy.LazyRow(
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(domains) { domain ->
+                    FilterChip(
+                        selected = selectedDomain == domain,
+                        onClick = { selectedDomain = domain },
+                        label = { Text(domain, fontSize = 11.sp, fontWeight = if (selectedDomain == domain) FontWeight.Black else FontWeight.Normal) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MeetColors.cyberCyan.copy(alpha = 0.25f),
+                            selectedLabelColor = MeetColors.cyberCyan,
+                        )
+                    )
+                }
+            }
+
+            LazyColumn(
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f),
+            ) {
+                // Live 3D Satellite Map (Visible immediately, matching MEET Rides standard)
+                item {
+                    val previewState = remember(gps) {
+                        val pickup = gps?.let { RideGeoPoint(it.latitude, it.longitude, it.accuracy, it.timestamp) }
+                            ?: RideGeoPoint(9.9281, -84.0907, 10f, System.currentTimeMillis())
+                        val lat = pickup.latitude
+                        val lng = pickup.longitude
+                        val dest = RideGeoPoint(lat + 0.007, lng + 0.005, 10f, System.currentTimeMillis())
+                        RideMapStateFactory.create(
+                            pickup = pickup,
+                            destination = dest,
                         )
                     }
-                }
-
-                LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    // Live 3D Satellite Map (Visible immediately, matching MEET Rides standard)
-                    item {
-                        val previewState = remember(gps) {
-                            val pickup = gps?.let { RideGeoPoint(it.latitude, it.longitude, it.accuracy, it.timestamp) }
-                                ?: RideGeoPoint(9.9281, -84.0907, 10f, System.currentTimeMillis())
-                            val lat = pickup.latitude
-                            val lng = pickup.longitude
-                            val dest = RideGeoPoint(lat + 0.007, lng + 0.005, 10f, System.currentTimeMillis())
-                            RideMapStateFactory.create(
-                                pickup = pickup,
-                                destination = dest,
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(210.dp)
+                            .graphicsLayer {
+                                shadowElevation = 16.dp.toPx()
+                                cameraDistance = 16f * density
+                            },
+                        colors = CardDefaults.cardColors(containerColor = Color(0xCC06121F)),
+                        border = BorderStroke(
+                            1.5.dp,
+                            Brush.horizontalGradient(
+                                listOf(MeetColors.cyberCyan, Color(0xFFC85CFF))
                             )
-                        }
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(210.dp)
-                                .graphicsLayer {
-                                    shadowElevation = 16.dp.toPx()
-                                    cameraDistance = 16f * density
-                                },
-                            colors = CardDefaults.cardColors(containerColor = Color(0xCC06121F)),
-                            border = BorderStroke(
-                                1.5.dp,
-                                Brush.horizontalGradient(
-                                    listOf(MeetColors.cyberCyan, Color(0xFFC85CFF))
-                                )
-                            ),
-                            shape = RoundedCornerShape(20.dp),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 14.dp),
-                        ) {
-                            Box(Modifier.fillMaxSize()) {
-                                RideMapPanel(
-                                    state = previewState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    userLocation = gps?.let { RideGeoPoint(it.latitude, it.longitude, it.accuracy, it.timestamp) },
-                                    onRecenterRequested = { viewModel.detectCurrentLocation(context) },
-                                )
-                                Row(
-                                    modifier = Modifier
-                                        .padding(10.dp)
-                                        .align(Alignment.TopStart)
-                                        .clip(RoundedCornerShape(20.dp))
-                                        .background(Color(0xF0081326))
-                                        .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
-                                        .padding(horizontal = 10.dp, vertical = 5.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .graphicsLayer {
-                                                scaleX = universalRadarPulse
-                                                scaleY = universalRadarPulse
-                                                alpha = universalRadarGlowAlpha
-                                            }
-                                            .clip(CircleShape)
-                                            .background(MeetColors.neonGreen),
-                                    )
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = "RADAR ELYSIUM · SERVICIOS Y FERRETERÍAS EN VIVO",
-                                        color = Color.White,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Black,
-                                    )
-                                }
-
+                        ),
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 14.dp),
+                    ) {
+                        Box(Modifier.fillMaxSize()) {
+                            RideMapPanel(
+                                state = previewState,
+                                modifier = Modifier.fillMaxSize(),
+                                userLocation = gps?.let { RideGeoPoint(it.latitude, it.longitude, it.accuracy, it.timestamp) },
+                                onRecenterRequested = { viewModel.detectCurrentLocation(context) },
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .padding(10.dp)
+                                    .align(Alignment.TopStart)
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(Color(0xF0081326))
+                                    .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.7f), RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 Box(
                                     modifier = Modifier
-                                        .padding(10.dp)
-                                        .align(Alignment.BottomStart)
-                                        .clip(RoundedCornerShape(10.dp))
-                                        .background(Color(0xF006121F))
-                                        .border(1.dp, Color(0xFFC85CFF).copy(alpha = 0.6f), RoundedCornerShape(10.dp))
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                ) {
-                                    Text(
-                                        text = "📍 COBERTURA: ${gps?.addressName?.take(22) ?: "Gran Área Metropolitana"}",
-                                        color = MeetColors.cyberCyan,
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                    )
-                                }
+                                        .size(8.dp)
+                                        .graphicsLayer {
+                                            scaleX = universalRadarPulse
+                                            scaleY = universalRadarPulse
+                                            alpha = universalRadarGlowAlpha
+                                        }
+                                        .clip(CircleShape)
+                                        .background(MeetColors.neonGreen),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "RADAR ELYSIUM · SERVICIOS Y FERRETERÍAS EN VIVO",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .padding(10.dp)
+                                    .align(Alignment.BottomStart)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(Color(0xF006121F))
+                                    .border(1.dp, Color(0xFFC85CFF).copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                            ) {
+                                Text(
+                                    text = "📍 COBERTURA: ${gps?.addressName?.take(22) ?: "Gran Área Metropolitana"}",
+                                    color = MeetColors.cyberCyan,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
                             }
                         }
                     }
+                }
 
-                    item {
-                        Text(
-                            "SUBASTA DUAL: FERRETERÍAS VENDEN MATERIALES + PLOMEROS/ELECTRICISTAS OFRECEN COLOCARLOS",
-                            color = Color(0xFFC85CFF),
-                            fontWeight = FontWeight.Black,
-                            fontSize = 10.sp,
-                            lineHeight = 15.sp,
-                        )
-                    }
-                    val filteredServices = UniversalServiceCatalog.search(query).filter {
-                        selectedDomain == "TODOS" || it.domain.equals(selectedDomain, ignoreCase = true)
-                    }
-                    items(filteredServices, key = { it.id }) { service ->
-                        UniversalServiceCard(service) { selected = service }
-                    }
-                    item {
-                        Text("MIS SOLICITUDES", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
-                    }
-                    items(
-                        allRequests.filter { it.vehicleId == "$UNIVERSAL_PREFIX$clientId" },
-                        key = { it.requestId },
-                    ) { request ->
-                        ClientServiceRequestCard(viewModel, request, context)
-                    }
+                item {
+                    Text(
+                        "SUBASTA DUAL: FERRETERÍAS VENDEN MATERIALES + PLOMEROS/ELECTRICISTAS OFRECEN COLOCARLOS",
+                        color = Color(0xFFC85CFF),
+                        fontWeight = FontWeight.Black,
+                        fontSize = 10.sp,
+                        lineHeight = 15.sp,
+                    )
+                }
+                val filteredServices = UniversalServiceCatalog.search(query).filter {
+                    selectedDomain == "TODOS" || it.domain.equals(selectedDomain, ignoreCase = true)
+                }
+                items(filteredServices, key = { it.id }) { service ->
+                    UniversalServiceCard(service) { selected = service }
+                }
+                item {
+                    Text("MIS SOLICITUDES", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
+                }
+                items(
+                    allRequests.filter { it.vehicleId == "$UNIVERSAL_PREFIX$clientId" },
+                    key = { it.requestId },
+                ) { request ->
+                    ClientServiceRequestCard(viewModel, request, context)
                 }
             }
         }

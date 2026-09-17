@@ -530,6 +530,7 @@ fun HomeClassicScreen(
                 add(Triple("🏠", "Properties", MeetColors.neonGreen) to "elysium_properties")
                 add(Triple("⛽", "Fuel Rewards", MeetColors.cyberCyan) to "fuel_rewards")
                 add(Triple("🚕", "MEET Rides", MeetColors.neonGreen) to MeetDestinations.RIDE_HOME)
+                add(Triple("📚", "MEET Aprende", Color(0xFFFFD700)) to MeetDestinations.LEARNING_HUB)
                 add(Triple("🛠️", "Servicios & Oficios", Color(0xFFC85CFF)) to "universal_services")
                 add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
                 add(Triple("⚠️", "DTCs", MeetColors.hotMagenta) to "dtc")
@@ -621,7 +622,7 @@ private fun CommandCenterCard(
         borderColor = state.severityColor.copy(alpha = 0.35f),
         backgroundColor = MeetColors.cardBackground,
         shape = RoundedCornerShape(18.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().holographicShimmer(shimmerAlpha = 0.06f)
     ) {
         Column(modifier = Modifier.padding(18.dp).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -655,7 +656,7 @@ private fun CommandCenterCard(
                 text = state.primaryAction,
                 onClick = onPrimaryAction,
                 color = state.severityColor,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().breathingGlow(color = state.severityColor)
             )
         }
     }
@@ -676,7 +677,8 @@ private fun QuickActionCard(
         backgroundColor = MeetColors.cardBackground,
         shape = RoundedCornerShape(14.dp),
         onClick = onClick,
-        modifier = modifier.height(68.dp)
+        modifier = modifier
+            .height(68.dp)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 14.dp).fillMaxSize(),

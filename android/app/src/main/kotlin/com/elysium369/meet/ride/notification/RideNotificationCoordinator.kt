@@ -81,6 +81,54 @@ class RideNotificationCoordinator(private val context: Context, private val owne
         )
     }
 
+    fun notifyDriverArrived(tripId: String, pickupAddress: String) {
+        val key = "arrived:$tripId"
+        if (ownerUserId.isNullOrBlank()) return
+        if (preferences.getBoolean(key, false)) return
+        if (notify(
+                id = 7_500 + (tripId.hashCode() and 0x3FFF_FFFF),
+                title = "📍 ¡Tu chofer ha llegado!",
+                body = "Tu conductor está esperando en: $pickupAddress. Comparte el PIN de abordaje únicamente con él.",
+                channelId = DISPATCH_CHANNEL_ID,
+                category = NotificationCompat.CATEGORY_EVENT,
+            )
+        ) {
+            preferences.edit { putBoolean(key, true) }
+        }
+    }
+
+    fun notifyTripCompleted(tripId: String, totalFare: String) {
+        val key = "completed:$tripId"
+        if (ownerUserId.isNullOrBlank()) return
+        if (preferences.getBoolean(key, false)) return
+        if (notify(
+                id = 7_600 + (tripId.hashCode() and 0x3FFF_FFFF),
+                title = "🎉 ¡Viaje completado!",
+                body = "Has llegado a tu destino. Total: $totalFare. Califica el servicio desde la app.",
+                channelId = CHANNEL_ID,
+                category = NotificationCompat.CATEGORY_STATUS,
+            )
+        ) {
+            preferences.edit { putBoolean(key, true) }
+        }
+    }
+
+    fun notifyTripCancelled(tripId: String, cancelledBy: String, reason: String) {
+        val key = "cancelled:$tripId"
+        if (ownerUserId.isNullOrBlank()) return
+        if (preferences.getBoolean(key, false)) return
+        if (notify(
+                id = 7_700 + (tripId.hashCode() and 0x3FFF_FFFF),
+                title = "❌ Viaje cancelado",
+                body = "Cancelado por $cancelledBy${if (reason.isNotBlank()) ": $reason" else ""}. Puedes solicitar un nuevo viaje.",
+                channelId = DISPATCH_CHANNEL_ID,
+                category = NotificationCompat.CATEGORY_EVENT,
+            )
+        ) {
+            preferences.edit { putBoolean(key, true) }
+        }
+    }
+
     fun notifyIdleDriver(nowEpochMs: Long = System.currentTimeMillis()) {
         if (ownerUserId.isNullOrBlank()) return
         val last = preferences.getLong(KEY_IDLE_LAST, 0L)
