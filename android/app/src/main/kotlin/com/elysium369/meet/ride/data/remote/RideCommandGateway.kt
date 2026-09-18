@@ -369,6 +369,11 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                         put("p_fare_rate_card_version", rateCardVersion)
                         put("p_allows_in_trip_stops", allowsInTripStops)
                         put("p_idempotency_key", idempotencyKey)
+                        val preferencesJson = payload.detail
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let { runCatching { json.parseToJsonElement(it) }.getOrNull() }
+                            ?: buildJsonObject {}
+                        put("p_preferences", preferencesJson)
                         if (guestName != null && guestPhone != null) {
                             put("p_guest_name", guestName)
                             put("p_guest_phone_e164", guestPhone)

@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ride.domain.RideCommandType
+import com.elysium369.meet.ride.domain.RidePassengerPreferences
 import com.elysium369.meet.ride.driver.DriverTripIntent
 import com.elysium369.meet.ride.driver.DriverTripPhase
 import com.elysium369.meet.ride.driver.DriverTripUiState
@@ -247,6 +248,37 @@ fun DriverTripBottomPanel(
                             tint = MeetColors.textPrimary,
                             modifier = Modifier.size(20.dp),
                         )
+                    }
+                }
+            }
+
+            // Passenger Preferences Badges (if any)
+            if (state.passengerPreferences.hasSpecialPreferences) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    state.passengerPreferences.toBadges().forEach { badge ->
+                        Surface(
+                            color = badge.color.copy(alpha = 0.16f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, badge.color.copy(alpha = 0.5f)),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            ) {
+                                Text(badge.icon, fontSize = 12.sp)
+                                Text(
+                                    badge.label,
+                                    color = badge.color,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
                     }
                 }
             }

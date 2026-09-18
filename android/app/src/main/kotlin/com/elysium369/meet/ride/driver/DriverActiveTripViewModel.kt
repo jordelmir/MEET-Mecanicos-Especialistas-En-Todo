@@ -16,6 +16,7 @@ import com.elysium369.meet.ride.communications.RideVoiceState
 import com.elysium369.meet.ride.data.remote.RideCommandPayload
 import com.elysium369.meet.ride.data.remote.RideQueuedCommand
 import com.elysium369.meet.ride.domain.RideCommandType
+import com.elysium369.meet.ride.domain.RidePassengerPreferences
 import com.elysium369.meet.ride.domain.RideStopSnapshot
 import com.elysium369.meet.ride.map.RerouteDetector
 import com.elysium369.meet.ride.map.ReroutePolicy
@@ -199,6 +200,8 @@ class DriverActiveTripViewModel @Inject constructor(
 
         val computedCommission = (computedFinalFare * 500L / 10000L)
 
+        val parsedPreferences = RidePassengerPreferences.fromJson(entity.fareBreakdownJson)
+
         _state.update { current ->
             current.copy(
                 rideId = entity.requestId,
@@ -206,6 +209,7 @@ class DriverActiveTripViewModel @Inject constructor(
                 serverState = canonicalServerState,
                 phase = newPhase,
                 passengerName = entity.passengerName.takeIf { it.isNotBlank() } ?: "Pasajero",
+                passengerPreferences = parsedPreferences,
                 pickup = pickup,
                 pickupAddress = entity.pickupAddress,
                 destination = destination,

@@ -8404,16 +8404,45 @@ class ObdViewModel @Inject constructor(
     private val _pendingRatingRide = MutableStateFlow<RideRequestEntity?>(null)
     val pendingRatingRide: StateFlow<RideRequestEntity?> = _pendingRatingRide.asStateFlow()
     private val dismissedRatingRideIds = mutableSetOf<String>()
+    private val ratingPrefs by lazy {
+        context.getSharedPreferences("meet_ride_ratings_settled", Context.MODE_PRIVATE)
+    }
+
+    fun isRatingSettled(requestId: String, role: String): Boolean {
+        if (requestId.isBlank()) return false
+        val key = "settled_${requestId}_${role.uppercase()}"
+        return ratingPrefs.getBoolean(key, false) || requestId in dismissedRatingRideIds
+    }
+
+    fun markRatingSettled(requestId: String, role: String) {
+        if (requestId.isBlank()) return
+        dismissedRatingRideIds.add(requestId)
+        ratingPrefs.edit().putBoolean("settled_${requestId}_${role.uppercase()}", true).apply()
+        if (_pendingRatingRide.value?.requestId == requestId) {
+            _pendingRatingRide.value = null
+        }
+    }
 
     fun dismissPendingRating() {
-        _pendingRatingRide.value?.requestId?.let(dismissedRatingRideIds::add)
+        val ride = _pendingRatingRide.value
+        if (ride != null) {
+            val role = if (_rideDriverMode.value) "DRIVER" else "PASSENGER"
+            markRatingSettled(ride.requestId, role)
+        }
         _pendingRatingRide.value = null
     }
 
-    fun isRatingDismissed(requestId: String): Boolean = requestId in dismissedRatingRideIds
+    fun isRatingDismissed(requestId: String): Boolean {
+        val role = if (_rideDriverMode.value) "DRIVER" else "PASSENGER"
+        return isRatingSettled(requestId, role)
+    }
 
     fun promptRideRating(ride: RideRequestEntity) {
-        if (ride.serverVersion > 0L && ride.serverState == "COMPLETED" && ride.requestId !in dismissedRatingRideIds) {
+        val role = if (_rideDriverMode.value) "DRIVER" else "PASSENGER"
+        val existingRating = if (_rideDriverMode.value) ride.driverRating else ride.passengerRating
+        if (ride.serverVersion > 0L && ride.serverState == "COMPLETED" &&
+            existingRating == null && !isRatingSettled(ride.requestId, role)
+        ) {
             _pendingRatingRide.value = ride
         }
     }
@@ -8997,10 +9026,11 @@ class ObdViewModel @Inject constructor(
                         // Room contains command acknowledgements as well as realtime refreshes.
                         // Keep completion visible for receipt and feedback; never freeze a version.
                         _activeRideRequest.value = latest
+                        val role = if (_rideDriverMode.value) "DRIVER" else "PASSENGER"
                         val rating = if (_rideDriverMode.value) latest.driverRating else latest.passengerRating
                         val isCompleted = latest.serverVersion > 0L && latest.serverState == "COMPLETED"
                         if (isCompleted && rating == null &&
-                            latest.requestId !in dismissedRatingRideIds &&
+                            !isRatingSettled(latest.requestId, role) &&
                             canSelectRideForCurrentRole(latest)
                         ) {
                             _pendingRatingRide.value = latest
@@ -10645,7 +10675,8 @@ class ObdViewModel @Inject constructor(
                 },
             )
             result.onSuccess {
-                dismissedRatingRideIds.add(requestId)
+                val role = if (isPassengerRating) "PASSENGER" else "DRIVER"
+                markRatingSettled(requestId, role)
                 _pendingRatingRide.value = null
                 _rideVerificationNotice.emit("¡Calificación enviada! Gracias.")
             }.onFailure { error ->

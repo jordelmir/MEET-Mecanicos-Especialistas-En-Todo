@@ -63,6 +63,8 @@ import com.elysium369.meet.ui.components.ElysiumToastBar
 import com.elysium369.meet.ui.components.ToastType
 import com.elysium369.meet.ui.components.ElysiumAnimatedDialog
 import com.elysium369.meet.ui.screens.ride.RideIncomingDispatchOverlay
+import com.elysium369.meet.ui.screens.ride.RideLostAndFoundDialog
+import androidx.compose.material.icons.filled.Inventory2
 import com.elysium369.meet.ride.wallet.SinpeReceiptParser
 import com.elysium369.meet.ride.wallet.ParsedSinpeReceipt
 import com.elysium369.meet.BuildConfig
@@ -465,8 +467,10 @@ fun RideServiceScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 12.dp)
                     ) {
-                        IconButton(onClick = { onOpenMessages(activeRide?.requestId) }) {
-                            Icon(Icons.Default.Chat, "Mensajes", tint = MeetColors.cyberCyan)
+                        if (!driverMode) {
+                            IconButton(onClick = { onOpenMessages(activeRide?.requestId) }) {
+                                Icon(Icons.Default.Chat, "Mensajes", tint = MeetColors.cyberCyan)
+                            }
                         }
                         IconButton(onClick = {
                             rideVoiceEnabled = !rideVoiceEnabled
@@ -4912,6 +4916,40 @@ fun PassengerRideItem(
                 overflow = TextOverflow.Ellipsis
             )
 
+            val itemPreferences = remember(ride.fareBreakdownJson) {
+                RidePassengerPreferences.fromJson(ride.fareBreakdownJson)
+            }
+            if (itemPreferences.hasSpecialPreferences) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    itemPreferences.toBadges().forEach { badge ->
+                        Surface(
+                            color = badge.color.copy(alpha = 0.16f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, badge.color.copy(alpha = 0.5f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(badge.icon, fontSize = 11.sp)
+                                Text(
+                                    badge.label,
+                                    color = badge.color,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(
@@ -5524,8 +5562,14 @@ fun ActiveRidePanel(
     var showRoadReportDialog by remember { mutableStateOf(false) }
     var showPinDialog by remember { mutableStateOf(false) }
     var showActiveStopsDialog by remember { mutableStateOf(false) }
-    var showCompletedSummary by remember(ride.requestId) {
-        mutableStateOf(ride.status == "COMPLETED")
+    var showLostAndFoundDialog by remember { mutableStateOf(false) }
+    val ratingRole = if (isDriver) "DRIVER" else "PASSENGER"
+    val isRatingAlreadySettled = remember(ride.requestId, isDriver, ride.passengerRating, ride.driverRating) {
+        viewModel.isRatingSettled(ride.requestId, ratingRole) ||
+            (if (isDriver) ride.driverRating != null else ride.passengerRating != null)
+    }
+    var showCompletedSummary by remember(ride.requestId, isRatingAlreadySettled) {
+        mutableStateOf(ride.status == "COMPLETED" && !isRatingAlreadySettled)
     }
 
     // ═══ Haptic feedback on ride state transitions ═══
@@ -6247,6 +6291,39 @@ fun ActiveRidePanel(
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                 )
+                val activeRidePrefs = remember(ride.fareBreakdownJson) {
+                    RidePassengerPreferences.fromJson(ride.fareBreakdownJson)
+                }
+                if (activeRidePrefs.hasSpecialPreferences) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        activeRidePrefs.toBadges().forEach { badge ->
+                            Surface(
+                                color = badge.color.copy(alpha = 0.16f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, badge.color.copy(alpha = 0.5f)),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                ) {
+                                    Text(badge.icon, fontSize = 11.sp)
+                                    Text(
+                                        badge.label,
+                                        color = badge.color,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
                 if (ride.status == "IN_PROGRESS" && ride.fareMode == RideFareMode.METERED_TIME_DISTANCE.name) {
                     Spacer(Modifier.height(6.dp))
                     LiveRideMetrics(
@@ -7202,19 +7279,36 @@ fun ActiveRidePanel(
             }
         }
 
-        // ═══ Support case button (active rides) ═══
-        if (ride.status in listOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS")) {
-            OutlinedButton(
-                onClick = { showCancellationDialog = true },
+        // ═══ Support case & Lost & Found buttons ═══
+        if (ride.status in listOf("ACCEPTED", "DRIVER_EN_ROUTE", "ARRIVED", "PASSENGER_ONBOARD", "IN_PROGRESS", "COMPLETED")) {
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 16.dp, vertical = 4.dp),
-                border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.5f)),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.warning),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.HelpOutline, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("NECESITO AYUDA · SOPORTE", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                if (ride.status != "COMPLETED") {
+                    OutlinedButton(
+                        onClick = { showCancellationDialog = true },
+                        modifier = Modifier.weight(1f),
+                        border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.warning),
+                    ) {
+                        Icon(Icons.Default.HelpOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("SOPORTE", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                    }
+                }
+                OutlinedButton(
+                    onClick = { showLostAndFoundDialog = true },
+                    modifier = Modifier.weight(1f),
+                    border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.6f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
+                ) {
+                    Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("OBJETO OLVIDADO", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                }
             }
         }
 
@@ -7236,6 +7330,25 @@ fun ActiveRidePanel(
                 )
             }
         }
+    }
+
+    if (showLostAndFoundDialog) {
+        val myId = viewModel.currentUserId ?: if (isDriver) ride.assignedDriverId.orEmpty() else ride.passengerId
+        RideLostAndFoundDialog(
+            ride = ride,
+            isDriver = isDriver,
+            onDismiss = { showLostAndFoundDialog = false },
+            onSendMessage = { text ->
+                viewModel.sendRideChatMessage(
+                    requestId = ride.requestId,
+                    senderId = myId,
+                    senderName = if (isDriver) (ride.assignedDriverName ?: "Chofer") else (ride.passengerName ?: "Pasajero"),
+                    role = if (isDriver) "DRIVER" else "PASSENGER",
+                    text = text,
+                )
+            },
+            onOpenChat = onOpenMessages,
+        )
     }
 
     if (showRatingDialog) {
@@ -7301,7 +7414,10 @@ fun ActiveRidePanel(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showRatingDialog = false }) {
+                TextButton(onClick = {
+                    viewModel.markRatingSettled(ride.requestId, ratingRole)
+                    showRatingDialog = false
+                }) {
                     Text("Omitir", color = MeetColors.textMuted)
                 }
             }
@@ -7407,7 +7523,7 @@ fun ActiveRidePanel(
                     HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
 
                     // CTA Buttons
-                    if (ride.passengerRating == null) {
+                    if (!isRatingAlreadySettled && ride.passengerRating == null) {
                         Button(
                             onClick = {
                                 showCompletedSummary = false
@@ -7422,7 +7538,24 @@ fun ActiveRidePanel(
                     }
 
                     OutlinedButton(
-                        onClick = { showCompletedSummary = false },
+                        onClick = {
+                            showCompletedSummary = false
+                            showLostAndFoundDialog = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.6f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
+                    ) {
+                        Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("¿Olvidaste un objeto en el vehículo?", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            viewModel.markRatingSettled(ride.requestId, ratingRole)
+                            showCompletedSummary = false
+                        },
                         modifier = Modifier.fillMaxWidth(),
                         border = BorderStroke(1.dp, MeetColors.borderSubtle),
                     ) {

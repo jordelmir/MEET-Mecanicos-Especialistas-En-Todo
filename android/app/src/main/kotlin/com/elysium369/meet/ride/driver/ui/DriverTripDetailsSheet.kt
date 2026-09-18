@@ -189,6 +189,56 @@ fun DriverTripDetailsSheet(
                 }
             }
 
+            // Passenger Preferences Card
+            if (state.passengerPreferences.hasSpecialPreferences) {
+                Surface(
+                    color = MeetColors.cardBackground,
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Text(
+                            text = "Preferencias del Pasajero",
+                            color = MeetColors.cyberCyan,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            state.passengerPreferences.toBadges().forEach { badge ->
+                                Surface(
+                                    color = badge.color.copy(alpha = 0.16f),
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, badge.color.copy(alpha = 0.5f)),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    ) {
+                                        Text(badge.icon, fontSize = 12.sp)
+                                        Text(
+                                            badge.label,
+                                            color = badge.color,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // LiveKit Voice Link Card (Zero Phone Leakage)
             Surface(
                 color = MeetColors.cardBackground,

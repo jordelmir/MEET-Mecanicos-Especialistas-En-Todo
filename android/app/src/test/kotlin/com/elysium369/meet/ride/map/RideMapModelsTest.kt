@@ -92,7 +92,7 @@ class RideMapModelsTest {
         assertEquals(pickup, state.marker(RideMarkerRole.PICKUP)?.point)
         assertEquals(destination, state.marker(RideMarkerRole.DESTINATION)?.point)
         assertEquals(driver, state.marker(RideMarkerRole.DRIVER)?.point)
-        assertEquals(emptyList<RideGeoPoint>(), state.route)
+        assertEquals(listOf(driver, pickup), state.route)
     }
 
     @Test

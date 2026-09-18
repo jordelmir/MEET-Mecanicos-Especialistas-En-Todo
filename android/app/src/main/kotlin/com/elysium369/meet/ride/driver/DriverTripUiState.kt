@@ -1,6 +1,7 @@
 package com.elysium369.meet.ride.driver
 
 import com.elysium369.meet.ride.domain.RideCommandType
+import com.elysium369.meet.ride.domain.RidePassengerPreferences
 import com.elysium369.meet.ride.map.RideGeoPoint
 import com.elysium369.meet.ride.map.RideRoadRoute
 
@@ -16,6 +17,7 @@ data class DriverTripUiState(
     val phase: DriverTripPhase = DriverTripPhase.Unsupported("UNINITIALIZED"),
     val passengerName: String = "",
     val passengerTripCount: Int? = null,
+    val passengerPreferences: RidePassengerPreferences = RidePassengerPreferences(),
     val pickup: RideGeoPoint? = null,
     val pickupAddress: String = "",
     val destination: RideGeoPoint? = null,

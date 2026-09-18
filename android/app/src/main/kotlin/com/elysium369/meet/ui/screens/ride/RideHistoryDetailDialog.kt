@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Payments
@@ -86,6 +87,16 @@ fun RideHistoryDetailDialog(
     onOpenSupport: ((RideRequestEntity) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    var showLostAndFound by remember { mutableStateOf(false) }
+
+    if (showLostAndFound) {
+        RideLostAndFoundDialog(
+            ride = ride,
+            isDriver = false,
+            onDismiss = { showLostAndFound = false },
+        )
+    }
+
     val locale = remember { Locale.forLanguageTag("es-CR") }
     val dateTimeFormat = remember(locale) {
         DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT, locale)
@@ -524,11 +535,25 @@ fun RideHistoryDetailDialog(
                         }
                     }
 
+                    OutlinedButton(
+                        onClick = { showLostAndFound = true },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
+                    ) {
+                        Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("¿Olvidaste un objeto en el vehículo?", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+
                     // Action buttons
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 6.dp),
+                            .padding(top = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         onOpenSupport?.let { openSupport ->
