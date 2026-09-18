@@ -175,8 +175,10 @@ class DriverActiveTripViewModel @Inject constructor(
             entity.status in setOf("COMPLETED", "CANCELLED")
 
         val pendingResolved = if (
-            (entity.syncState != "COMMAND_PENDING" && entity.serverVersion > _state.value.serverVersion) ||
-            isCompletedOrCancelled
+            (entity.syncState != "PENDING" && entity.serverVersion > _state.value.serverVersion) ||
+            isCompletedOrCancelled ||
+            entity.syncState == "SYNC_FAILED" ||
+            entity.syncState == "LOCAL_CANCELLED"
         ) {
             null
         } else {

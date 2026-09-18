@@ -595,13 +595,13 @@ fun RideServiceScreen(
                         viewModel = viewModel,
                         onRegisterDriver = onOpenDriverRegistration,
                         onOpenRideCenter = onNavigateToRideCenter,
-                        onOpenMessages = onOpenMessages,
+                        onOpenMessages = { showInRideChat = true },
                     )
                 } else {
                     PassengerDashboard(
                         viewModel = viewModel,
                         forceRegistration = firstAccessRole == "PASSENGER",
-                        onOpenMessages = onOpenMessages,
+                        onOpenMessages = { showInRideChat = true },
                     )
                 }
             }
@@ -759,7 +759,8 @@ fun RideServiceScreen(
             }
 
             // ═══ UNIFIED IN-RIDE REALTIME CHAT SHEET ═══
-            if (showInRideChat && effectiveActiveRide != null) {
+            val chatTargetRide = effectiveActiveRide ?: activeRide
+            if (showInRideChat && chatTargetRide != null) {
                 val role = if (driverMode) "DRIVER" else "PASSENGER"
                 val myPassengerId = passengerVerification?.passengerId ?: viewModel.currentUserId
                 val myId = if (driverMode) (myDriverId ?: "driver_me") else (myPassengerId ?: "passenger_me")
@@ -769,7 +770,7 @@ fun RideServiceScreen(
                 val isRecordingAudio by viewModel.isRecordingAudio.collectAsState()
 
                 com.elysium369.meet.ui.screens.ride.RideInRideChatSheet(
-                    rideRequestId = effectiveActiveRide.requestId,
+                    rideRequestId = chatTargetRide.requestId,
                     myId = myId,
                     myName = myName,
                     myRole = role,
@@ -777,14 +778,14 @@ fun RideServiceScreen(
                     chatMessages = chatMessages,
                     onDismiss = { showInRideChat = false },
                     onSendMessage = { text ->
-                        viewModel.sendRideChatMessage(effectiveActiveRide.requestId, myId, myName, role, text)
+                        viewModel.sendRideChatMessage(chatTargetRide.requestId, myId, myName, role, text)
                     },
                     onSendPreset = { preset ->
-                        viewModel.sendRidePresetMessage(effectiveActiveRide.requestId, myId, myName, role, preset)
+                        viewModel.sendRidePresetMessage(chatTargetRide.requestId, myId, myName, role, preset)
                     },
                     onSendVoiceNote = { _, _ -> },
                     onSendImage = { bytes ->
-                        viewModel.sendRideImageBytes(context, effectiveActiveRide.requestId, myId, myName, role, bytes)
+                        viewModel.sendRideImageBytes(context, chatTargetRide.requestId, myId, myName, role, bytes)
                     },
                     playingAudioPath = isPlayingAudio,
                     onPlayAudio = { path -> viewModel.playAudioMessage(path) },
@@ -793,7 +794,7 @@ fun RideServiceScreen(
                         viewModel.startAudioRecording(context)
                     },
                     onStopRecording = {
-                        viewModel.stopAndSendAudioRecording(effectiveActiveRide.requestId, myId, myName, role)
+                        viewModel.stopAndSendAudioRecording(chatTargetRide.requestId, myId, myName, role)
                     },
                 )
             }

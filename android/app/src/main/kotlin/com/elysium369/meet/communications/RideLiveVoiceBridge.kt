@@ -362,10 +362,22 @@ class RideLiveVoiceBridge @Inject constructor(
         val currentRole = myRole
         val channel = realtimeChannel
         val socket = udpSocket
+        val oldScope = callScope
 
-        if (currentRide != null && currentRole != null) {
-            runCatching {
-                callScope?.launch {
+        activeRideId = null
+        myRole = null
+        realtimeChannel = null
+        udpSocket = null
+        callScope = null
+
+        runCatching {
+            _callState.value = LiveCallState.Ended(reason)
+            Log.i(TAG, "Live call ended: $reason")
+        }
+
+        kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+            if (currentRide != null && currentRole != null) {
+                runCatching {
                     channel?.broadcast(
                         event = "signal",
                         message = RideCallSignal(
@@ -374,38 +386,26 @@ class RideLiveVoiceBridge @Inject constructor(
                             senderRole = currentRole,
                         ),
                     )
+                }
+                runCatching {
                     socket?.let { s ->
                         sendUdpPacket(s, TYPE_LEAVE, currentRide, currentRole, 0L, ByteArray(0))
                     }
                 }
             }
-        }
 
-        audioEngine.stop()
-
-        runCatching {
-            callScope?.launch {
-                channel?.unsubscribe()
-            }
-        }
-        realtimeChannel = null
-
-        runCatching { socket?.close() }
-        udpSocket = null
-
-        callScope?.cancel()
-        callScope = null
-
-        activeRideId = null
-        myRole = null
-        synchronized(sequenceLock) { processedSequences.clear() }
-
-        _callState.value = LiveCallState.Ended(reason)
-        Log.i(TAG, "Live call ended: $reason")
-        CoroutineScope(Dispatchers.Main).launch {
-            delay(2500)
-            if (_callState.value is LiveCallState.Ended) {
-                _callState.value = LiveCallState.Idle
+            runCatching { audioEngine.stop() }
+            runCatching { channel?.unsubscribe() }
+            runCatching { socket?.close() }
+            runCatching { oldScope?.cancel() }
+            
+            synchronized(sequenceLock) { processedSequences.clear() }
+            
+            withContext(Dispatchers.Main) {
+                delay(2500)
+                if (_callState.value is LiveCallState.Ended) {
+                    _callState.value = LiveCallState.Idle
+                }
             }
         }
     }

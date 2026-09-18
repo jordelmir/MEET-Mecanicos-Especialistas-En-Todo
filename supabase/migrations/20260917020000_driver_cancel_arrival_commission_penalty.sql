@@ -25,7 +25,7 @@ declare
     v_from_state text;
     v_reservation_found boolean := false;
     v_reservation_released boolean := false;
-    v_driver_cancelling_after_arrival boolean := false;
+    v_driver_cancelling_penalty boolean := false;
     v_penalty_minor bigint := 0;
 begin
     if v_user_id is null then
@@ -137,14 +137,13 @@ begin
      for update;
     v_reservation_found := found;
 
-    -- Check if driver cancelled after arriving at the scene
-    v_driver_cancelling_after_arrival := (
-        v_user_id = v_request.assigned_driver_id and
-        (v_from_state in ('ARRIVED', 'PASSENGER_ONBOARD', 'IN_PROGRESS') or v_request.driver_arrived_at is not null)
+    -- Check if driver is cancelling the trip (penalty applies to all driver cancellations)
+    v_driver_cancelling_penalty := (
+        v_user_id = v_request.assigned_driver_id
     );
 
-    if v_driver_cancelling_after_arrival then
-        -- Driver cancelled after arrival: capture 5% penalty fee
+    if v_driver_cancelling_penalty then
+        -- Driver cancelled: capture 5% penalty fee
         v_penalty_minor := coalesce(
             v_reservation.amount_minor,
             round(coalesce(v_request.final_fare_minor, v_request.offered_fare_minor, 0) * 0.05)::bigint
@@ -173,7 +172,7 @@ begin
             false,
             jsonb_build_object(
                 'commission_policy_version', 'ride-commission-v1',
-                'reason', 'driver_cancellation_after_arrival_penalty_5pct',
+                'reason', 'driver_cancellation_penalty_5pct',
                 'cancellation_reason', v_reason,
                 'from_state', v_from_state
             )
@@ -235,7 +234,7 @@ begin
             'reason_code', v_reason,
             'requires_safety_review', v_safety,
             'automatic_fee_minor', v_penalty_minor,
-            'driver_penalty_applied', v_driver_cancelling_after_arrival,
+            'driver_penalty_applied', v_driver_cancelling_penalty,
             'version', v_request.version
         ),
         p_idempotency_key
