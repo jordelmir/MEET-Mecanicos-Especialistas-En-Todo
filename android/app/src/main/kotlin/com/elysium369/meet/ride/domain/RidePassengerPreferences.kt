@@ -69,10 +69,10 @@ data class RidePassengerPreferences(
         val badges = mutableListOf<RidePreferenceBadge>()
         when (pet) {
             RidePetType.DOG -> badges.add(
-                RidePreferenceBadge("🐶", "Mascota: Perro", Color(0xFFFFB74D))
+                RidePreferenceBadge("🐶", "Perro", Color(0xFFFFB74D))
             )
             RidePetType.CAT -> badges.add(
-                RidePreferenceBadge("🐱", "Mascota: Gato", Color(0xFFFF8A65))
+                RidePreferenceBadge("🐱", "Gato", Color(0xFFFF8A65))
             )
             RidePetType.NONE -> {}
         }
@@ -83,7 +83,7 @@ data class RidePassengerPreferences(
         }
         if (fivePassengers) {
             badges.add(
-                RidePreferenceBadge("👥", "5 Pasajeros (Espacioso)", Color(0xFF81C784))
+                RidePreferenceBadge("👥", "5 Personas", Color(0xFF81C784))
             )
         }
         return badges
@@ -104,8 +104,43 @@ data class RidePassengerPreferences(
             if (rawJson.isNullOrBlank()) return RidePassengerPreferences()
             return runCatching {
                 val element = jsonConfig.parseToJsonElement(rawJson)
-                if (element is kotlinx.serialization.json.JsonObject && element.containsKey("preferences")) {
-                    jsonConfig.decodeFromJsonElement(serializer(), element["preferences"]!!)
+                val targetObj: kotlinx.serialization.json.JsonObject? = when {
+                    element is kotlinx.serialization.json.JsonObject && element.containsKey("preferences") -> {
+                        val p = element["preferences"]
+                        when (p) {
+                            is kotlinx.serialization.json.JsonObject -> p
+                            is kotlinx.serialization.json.JsonPrimitive -> {
+                                runCatching { jsonConfig.parseToJsonElement(p.content) as? kotlinx.serialization.json.JsonObject }.getOrNull()
+                            }
+                            else -> null
+                        }
+                    }
+                    element is kotlinx.serialization.json.JsonObject -> element
+                    else -> null
+                }
+
+                if (targetObj != null) {
+                    val petRaw = (targetObj["pet"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.trim()?.uppercase()
+                    val pet = when (petRaw) {
+                        "DOG", "PERRO" -> RidePetType.DOG
+                        "CAT", "GATO" -> RidePetType.CAT
+                        else -> RidePetType.NONE
+                    }
+                    val kids = (targetObj["kidsCount"] ?: targetObj["kids_count"] ?: targetObj["kids"])?.let {
+                        if (it is kotlinx.serialization.json.JsonPrimitive) {
+                            it.content.toIntOrNull() ?: 0
+                        } else 0
+                    } ?: 0
+                    val five = (targetObj["fivePassengers"] ?: targetObj["five_passengers"] ?: targetObj["five"])?.let {
+                        if (it is kotlinx.serialization.json.JsonPrimitive) {
+                            it.content.toBooleanStrictOrNull() ?: (it.content == "1" || it.content.equals("true", ignoreCase = true))
+                        } else false
+                    } ?: false
+                    RidePassengerPreferences(
+                        pet = pet,
+                        kidsCount = kids.coerceIn(0, 4),
+                        fivePassengers = five,
+                    )
                 } else {
                     jsonConfig.decodeFromString(serializer(), rawJson)
                 }

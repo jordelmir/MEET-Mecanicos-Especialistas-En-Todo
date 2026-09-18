@@ -388,7 +388,13 @@ internal fun RemoteRideRequestProjection.toLocal(
             fareRateCardVersion = fareRateCardVersion,
             allowsInTripStops = allowsInTripStops,
             quoteVersion = quoteVersion,
-            fareBreakdownJson = fareBreakdown.toString(),
+            fareBreakdownJson = if (fareBreakdown.containsKey("preferences")) {
+                fareBreakdown.toString()
+            } else if (existing?.fareBreakdownJson?.contains("preferences") == true) {
+                existing.fareBreakdownJson
+            } else {
+                fareBreakdown.toString()
+            },
             status = resolvedStatus,
             acceptedOfferId = acceptedOfferId
                 ?: ownedExisting?.acceptedOfferId?.takeIf { assignmentUnchanged },

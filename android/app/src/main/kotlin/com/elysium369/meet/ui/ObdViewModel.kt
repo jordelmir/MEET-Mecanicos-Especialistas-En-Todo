@@ -8452,6 +8452,13 @@ class ObdViewModel @Inject constructor(
 
     private val _rideChatMessages = MutableStateFlow<List<RideChatMessageEntity>>(emptyList())
     val rideChatMessages: StateFlow<List<RideChatMessageEntity>> = _rideChatMessages.asStateFlow()
+    val rideLostItemReports = rideDao.getLostItemReportsFlow()
+
+    fun refreshRideLostItemReports(requestIds: List<String>) {
+        viewModelScope.launch(Dispatchers.IO) {
+            requestIds.distinct().forEach { syncRideChat(it) }
+        }
+    }
 
     private val _rideDriverVehicles = MutableStateFlow<List<RideDriverVehicleSummary>>(emptyList())
     val rideDriverVehicles: StateFlow<List<RideDriverVehicleSummary>> = _rideDriverVehicles.asStateFlow()
@@ -8681,6 +8688,7 @@ class ObdViewModel @Inject constructor(
                 Log.d("MeetRides", "Remote ride projection refreshed: ${result.count}")
                 RideObservability.event("projection_refresh", count = result.count, detail = "refreshed")
                 reconcileActiveRideAfterProjection()
+                rideDao.getPendingChatMessages().map { it.rideRequestId }.distinct().forEach { syncRideChat(it) }
             }
             RideProjectionRefreshResult.AuthenticationRequired -> {
                 _rideProjectionConnectionState.value =
@@ -9069,6 +9077,22 @@ class ObdViewModel @Inject constructor(
         }
     }
 
+    fun observeRideChatForRequestId(requestId: String) {
+        jobChatCollection?.cancel()
+        jobChatRemoteSync?.cancel()
+        jobChatCollection = viewModelScope.launch {
+            rideDao.getChatMessagesFlow(requestId).collect {
+                _rideChatMessages.value = it
+            }
+        }
+        jobChatRemoteSync = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                syncRideChat(requestId)
+                delay(3_000)
+            }
+        }
+    }
+
     private fun handleAiAutomationAction(action: com.elysium369.meet.automation.AiAction) {
         when (action) {
             is com.elysium369.meet.automation.AiAction.SwitchRole -> {
@@ -9359,9 +9383,15 @@ class ObdViewModel @Inject constructor(
 
     private suspend fun syncRideChat(requestId: String) {
         val cloudUserId = currentCloudUserId() ?: return
+        val request = rideDao.getRequestById(requestId) ?: return
+        val ownedRoles = buildSet {
+            if (request.passengerId == cloudUserId) add("PASSENGER")
+            if (request.assignedDriverId == cloudUserId) add("DRIVER")
+        }
+        if (ownedRoles.isEmpty()) return
         runCatching {
             rideDao.getPendingChatMessages().filter {
-                it.rideRequestId == requestId && it.senderRole in setOf("PASSENGER", "DRIVER")
+                it.rideRequestId == requestId && it.senderRole in ownedRoles
             }.forEach { local ->
                 var remotePath = local.remoteMediaPath
                 val localMediaPath = local.imageFilePath ?: local.audioFilePath
@@ -10781,9 +10811,11 @@ class ObdViewModel @Inject constructor(
     fun rejectRideOffer(requestId: String, offerId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             rideDao.updateOfferStatus(offerId, "REJECTED")
-            val updatedRequest = rideDao.getRequestById(requestId)
-            withContext(Dispatchers.Main) {
-                _activeRideRequest.value = updatedRequest
+            if (_activeRideRequest.value?.requestId == requestId) {
+                val updatedRequest = rideDao.getRequestById(requestId)
+                withContext(Dispatchers.Main) {
+                    _activeRideRequest.value = updatedRequest
+                }
             }
         }
     }
@@ -10804,6 +10836,7 @@ class ObdViewModel @Inject constructor(
             )
             rideDao.insertChatMessage(msg)
             rideChatBridge?.broadcastMessage(msg)
+            syncRideChat(requestId)
         }
     }
 
