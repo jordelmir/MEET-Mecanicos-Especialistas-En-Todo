@@ -14,7 +14,7 @@ sealed interface DriverTripPhase {
 }
 
 fun String.toDriverTripPhase(): DriverTripPhase = when (this) {
-    "ASSIGNED" -> DriverTripPhase.Assigned
+    "ASSIGNED", "ACCEPTED" -> DriverTripPhase.Assigned
     "DRIVER_EN_ROUTE" -> DriverTripPhase.ToPickup
     "ARRIVED" -> DriverTripPhase.AtPickup
     "PASSENGER_ONBOARD" -> DriverTripPhase.PassengerOnboard

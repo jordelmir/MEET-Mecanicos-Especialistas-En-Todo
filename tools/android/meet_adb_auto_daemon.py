@@ -169,39 +169,37 @@ def main():
     while True:
         try:
             connected = get_connected_wireless_devices()
-            if connected:
-                time.sleep(4)
-                continue
 
-            # If no wireless device connected, let's look for phone via mDNS
+            # Discover all Android devices via mDNS
             instances = discover_adb_mdns()
-            connected_any = False
-
             for inst in instances:
                 host, port = resolve_mdns_instance(inst)
                 if host and port:
+                    endpoint = f"127.0.0.1:{port}"
+                    if endpoint in connected:
+                        continue
                     log(f"[*] Discovered Android Wireless Debugging on {host}:{port}")
                     # Start local bridge on that port
                     start_local_bridge(host, port, port)
                     time.sleep(0.3)
                     
                     # Connect via adb
-                    log(f"[*] Executing adb connect 127.0.0.1:{port}...")
-                    cres = subprocess.run(["adb", "connect", f"127.0.0.1:{port}"], capture_output=True, text=True, timeout=5)
+                    log(f"[*] Executing adb connect {endpoint}...")
+                    cres = subprocess.run(["adb", "connect", endpoint], capture_output=True, text=True, timeout=5)
                     log(f"[*] adb response: {cres.stdout.strip()}")
                     time.sleep(0.5)
 
-                    if f"127.0.0.1:{port}" in get_connected_wireless_devices():
-                        connected_any = True
+                    updated_connected = get_connected_wireless_devices()
+                    if endpoint in updated_connected:
+                        connected.append(endpoint)
                         if last_notified_device != f"{host}:{port}":
                             notify_user("MEET Wireless ADB", f"Dispositivo conectado inalámbricamente: {host}:{port}")
                             last_notified_device = f"{host}:{port}"
-                        break
 
-            # Also check fallback port 5555 on Android-2.local or 192.168.1.15
-            if not connected_any:
-                for candidate_host in ["Android-2.local", "192.168.1.15"]:
-                    if is_port_open(candidate_host, 5555, timeout=0.4):
+            # Also check fallback port 5555 on Android-2.local, Android.local, or 192.168.1.10/15
+            if "127.0.0.1:5555" not in connected:
+                for candidate_host in ["Android.local", "Android-2.local", "192.168.1.10", "192.168.1.15"]:
+                    if is_port_open(candidate_host, 5555, timeout=0.3):
                         log(f"[*] Port 5555 open on {candidate_host}")
                         start_local_bridge(candidate_host, 5555, 5555)
                         time.sleep(0.3)

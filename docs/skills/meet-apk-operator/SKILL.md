@@ -5,15 +5,17 @@ description: >
   Empowers AI agents (Antigravity, Mavis, Codex, Claude) to operate, navigate, inspect,
   test, and debug the APK with 100% proficiency across ALL 5 verticals: Viajes, Grúa, Mecánicos,
   Repuestos, and Servicios Elysium, plus Platform Trust Center and Specialist Wallets.
-  Features: dynamic ADB discovery (Honor Magic V2 / VER-N49 / emulators), 5% global commission verification,
-  ₡15,000 gift balance inspection, SINPE top-up lifecycle, GPS simulation, and full ecosystem test suites.
+  Features: dynamic ADB discovery (Honor Magic V2 / VER-N49, Xiaomi / M2101K6R, and emulators),
+  multi-device wireless bridging, 5% global commission verification, ₡15,000 gift balance inspection,
+  SINPE top-up lifecycle, GPS simulation, and full ecosystem test suites.
   Trigger on: "meet apk", "operate apk", "test meet app", "meet adb", "test ride", "grua", "mecanicos",
-  "repuestos", "servicios elysium", "trust center", "inspect meet", "drive ride flow", "meet mobile".
+  "repuestos", "servicios elysium", "trust center", "inspect meet", "drive ride flow", "meet mobile",
+  "honor magic", "xiaomi", "connect wireless adb".
 ---
 
 # MEET APK Master Autonomous Operator Skill
 
-This skill provides an authoritative, world-class guide and operational toolkit for any AI agent to interact with, navigate, inspect, test, and debug the **MEET (Mecánicos Especialistas En Todo)** Android application on physical devices (such as the Honor Magic V2 / `VER-N49`) or emulators.
+This skill provides an authoritative, world-class guide and operational toolkit for any AI agent to interact with, navigate, inspect, test, and debug the **MEET (Mecánicos Especialistas En Todo)** Android application on physical devices (such as the Honor Magic V2 / `VER-N49` and Xiaomi Redmi Note 10 Pro / `M2101K6R`) or emulators.
 
 ---
 
@@ -28,7 +30,9 @@ This skill provides an authoritative, world-class guide and operational toolkit 
 | **Broadcast Action (Navigation)** | `com.elysium369.meet.AI_NAVIGATE` |
 | **Reactive State Snapshot** | `/data/local/tmp/meet_state.json` (also in app internal storage) |
 | **CLI Operator Tool** | `scripts/meet_operator.py` (auto-detects connected active ADB devices) |
-| **Target Hardware Reference** | Honor Magic V2 (`VER-N49`), Foldable OLED, ADB Wireless / USB |
+| **Wireless Bridge Connector** | `tools/android/wireless_adb.py` / `tools/android/connect-wireless.sh` |
+| **Auto-Connect Daemon** | `com.meet.adb.wireless` LaunchAgent (`meet_adb_auto_daemon.py`) |
+| **Target Hardware References** | **Honor Magic V2** (`VER-N49` / Foldable OLED), **Xiaomi** (`M2101K6R` / `sweet`) |
 
 ---
 
@@ -40,6 +44,7 @@ Every AI agent operating MEET must uphold and verify these non-negotiable platfo
    - Platform commission is strictly **5%** (500 bps / `0.05`).
    - Specialists retain **95%** net of all gross earnings.
    - Verified across Viajes, Grúa, Mecánicos, Repuestos, and all Servicios Elysium.
+   - In Viajes: If a driver arrives at the pickup point and then cancels, a **5% cancellation penalty fee** is automatically deducted from their wallet. If the passenger cancels, the driver is never penalized.
 
 2. **₡15,000 Promotional Starter Gift Balance:**
    - Every specialist account receives an initial gift of **₡15,000 CRC** granted by Jorge David Del Valle Miranda.
@@ -58,97 +63,117 @@ Every AI agent operating MEET must uphold and verify these non-negotiable platfo
 
 ---
 
-## 3. The 5 Ecosystem Verticals & Navigation Routes
+## 3. Fast Device Discovery & Wireless ADB Connection
 
-| Vertical | Semantic Alias | Jetpack Compose Route | Screen Implementation |
-|---|---|---|---|
-| **Viajes** | `ride` / `viajes` | `ride_service` | `RideServiceScreen.kt` |
-| **Grúa y Rescate** | `tow` / `grua` | `tow_truck` / `tow_truck_service` | `TowTruckServiceScreen.kt` |
-| **Mecánicos y Talleres** | `mechanic` / `mecanicos` | `mechanic_service` | `MechanicServiceScreen.kt` |
-| **Repuestos y Catálogo** | `parts` / `repuestos` | `part_request` | `PartRequestScreen.kt` |
-| **Servicios Elysium** | `universal` / `ferreteria` | `universal_services` / `universal_activity/<id>` | `UniversalActivityWorkflowScreen.kt` |
-| **Platform Trust Center** | `trust` / `trust_center` | `trust_center` | `PlatformTrustCenterScreen.kt` |
-| **Scanner & OBD-II** | `scanner` | `scanner` | `LiveScannerScreen.kt` |
-| **Diagnóstico DTC** | `dtc` / `dtcs` | `dtc` | `DtcScreen.kt` |
-| **Garage** | `garage` | `garage` | `GarageScreen.kt` |
-| **Inicio** | `home` | `home` | `HomeScreen.kt` |
+The macOS Sequoia Local Network Privacy bypass operates via an Apple-signed Python bridge on `127.0.0.1:PORT -> Phone_IP:PORT`.
+
+### Auto-Connect Both Devices in 1 Step:
+```bash
+# Auto-detects and connects both Honor Magic V2 and Xiaomi simultaneously
+python3 scripts/meet_operator.py connect
+
+# Or connect specifically:
+python3 scripts/meet_operator.py connect honor   # Honor Magic V2 (VER-N49)
+python3 scripts/meet_operator.py connect xiaomi  # Xiaomi (M2101K6R)
+```
+
+### Inspect Connected Target Devices:
+```bash
+python3 scripts/meet_operator.py devices
+```
+Output example:
+```
+==================== ACTIVE ADB DEVICES ====================
+ • 127.0.0.1:40869      -> XIAOMI REDMI NOTE 10 PRO (M2101K6R)
+ • 127.0.0.1:43049      -> HONOR MAGIC V2 (VER-N49)  <-- [TARGET]
+
+Current active target: 127.0.0.1:43049
+============================================================
+```
+
+### Install APK onto Target Devices in 1 Step:
+```bash
+python3 scripts/meet_operator.py install honor    # Installs to Honor Magic V2
+python3 scripts/meet_operator.py install xiaomi   # Installs to Xiaomi
+python3 scripts/meet_operator.py install all      # Installs to both phones concurrently!
+```
 
 ---
 
-## 4. Fast-Start Master CLI Reference (`meet_operator.py`)
+## 4. Multi-Device Targeting (`--device` flag)
 
-All commands auto-detect the active connected ADB device (no need to manually set serials):
+Any command can target a specific phone using `--device honor` or `--device xiaomi`:
+```bash
+# Inspect Honor Magic screen
+python3 scripts/meet_operator.py --device honor screen
+
+# Inspect Xiaomi screen
+python3 scripts/meet_operator.py --device xiaomi screen
+
+# Navigate Honor to Driver Cockpit, Xiaomi to Passenger Ride Request
+python3 scripts/meet_operator.py --device honor nav ride
+python3 scripts/meet_operator.py --device honor switch-role driver
+python3 scripts/meet_operator.py --device xiaomi nav ride
+python3 scripts/meet_operator.py --device xiaomi switch-role passenger
+```
+
+---
+
+## 5. Master CLI Command Reference (`meet_operator.py`)
 
 ```bash
-# 1. Inspect live screen elements (text, center coordinates, IDs, bounding boxes)
+# 1. Device Management
+python3 scripts/meet_operator.py devices
+python3 scripts/meet_operator.py connect [honor|xiaomi|all]
+python3 scripts/meet_operator.py install [honor|xiaomi|all]
+
+# 2. Live Screen Inspection
 python3 scripts/meet_operator.py screen
 
-# 2. Inspect reactive internal state (JSON)
+# 3. Reactive State Snapshot (JSON)
 python3 scripts/meet_operator.py status
 
-# 3. Semantic navigation to any vertical
-python3 scripts/meet_operator.py nav tow          # Grúa
-python3 scripts/meet_operator.py nav mechanic     # Mecánicos
-python3 scripts/meet_operator.py nav parts        # Repuestos
-python3 scripts/meet_operator.py nav universal hardware_store # Ferretería
-python3 scripts/meet_operator.py nav trust        # Trust Center
-python3 scripts/meet_operator.py nav ride         # Viajes
+# 4. Semantic Navigation
+python3 scripts/meet_operator.py nav ride          # Viajes
+python3 scripts/meet_operator.py nav tow           # Grúa
+python3 scripts/meet_operator.py nav mechanic      # Mecánicos
+python3 scripts/meet_operator.py nav parts         # Repuestos
+python3 scripts/meet_operator.py nav universal     # Ferretería / Servicios
+python3 scripts/meet_operator.py nav trust         # Trust Center
 
-# 4. Universal Specialist Cockpit Toggle
-python3 scripts/meet_operator.py switch-mode specialist   # Cockpit Pro / Conductor
-python3 scripts/meet_operator.py switch-mode client       # Modo Cliente
+# 5. Role & Specialist Cockpit Toggle
+python3 scripts/meet_operator.py switch-role driver
+python3 scripts/meet_operator.py switch-role passenger
+python3 scripts/meet_operator.py switch-mode specialist
+python3 scripts/meet_operator.py switch-mode client
 
-# 5. SINPE Móvil Top-Up Automation
+# 6. SINPE Móvil Top-Up Automation
 python3 scripts/meet_operator.py topup 20000 "SINPE-REF-12345"
+python3 scripts/meet_operator.py approve-topup
+python3 scripts/meet_operator.py reject-topup
 
-# 6. Trust Center 1-Tap Approval / Rejection
-python3 scripts/meet_operator.py approve-topup    # Taps ACREDITAR in Trust Center
-python3 scripts/meet_operator.py reject-topup     # Taps RECHAZAR in Trust Center
-
-# 7. Smart Tap on any visible button or text
-python3 scripts/meet_operator.py tap "COCKPIT GRUISTA (PRO)"
-python3 scripts/meet_operator.py tap "RECARGAR SALDO CON SINPE MÓVIL"
-
-# 8. Type text into active focused field
+# 7. Tap & Text Input
+python3 scripts/meet_operator.py tap "ACEPTAR OFERTA"
 python3 scripts/meet_operator.py type "BAC-COMPROBANTE-7721"
 
-# 9. Realtime GPS Simulation
+# 8. GPS Simulation
 python3 scripts/meet_operator.py gps 9.9333 -84.0833
 
-# 10. High-Resolution Screenshot Capture
-python3 scripts/meet_operator.py screenshot docs/screenshots/my_test.png
+# 9. Screenshot Capture
+python3 scripts/meet_operator.py screenshot docs/screenshots/live_test.png
 
-# 11. Complete Ecosystem Autonomous Verification (All 5 Verticals + Trust Center)
+# 10. Complete Multi-Vertical Test Flow
 python3 scripts/meet_operator.py test-all-verticals
 ```
 
 ---
 
-## 5. Automated Multi-Vertical Verification Protocol
+## 6. End-to-End Mobility Verification Flow (Driver + Passenger Pair)
 
-To verify that the entire MEET ecosystem is working seamlessly:
-
-```bash
-python3 scripts/meet_operator.py test-all-verticals
-```
-
-This automated sequence executes:
-1. Launches `MainActivity` on the connected physical device.
-2. Navigates to **Grúa**, switches to **Cockpit Gruista (PRO)**, validates ₡15k gift balance and 5% commission.
-3. Navigates to **Mecánicos**, switches to **Cockpit Taller (PRO)**, validates catalog and 5% commission.
-4. Navigates to **Repuestos**, switches to **Especialista en Repuestos**, validates graph and 5% commission.
-5. Navigates to **Servicios Elysium**, switches to **Ferretería Afiliada**, validates cockpit and 5% commission.
-6. Submits a test SINPE topup, navigates to **Platform Trust Center**, verifies pending queue, and performs 1-tap `ACREDITAR`.
-7. Navigates back to Grúa and confirms accredited balance increase (`ACREDITADA ✓`).
-8. Saves all timestamped proof screenshots to `docs/screenshots/meet_ecosystem_verification/`.
-
----
-
-## 6. Development & Deployment Protocol
-
-Before committing or releasing any changes:
-1. **Clean compilation**: `./android/gradlew -p android compileDebugKotlin`
-2. **Assemble APK**: `./android/gradlew -p android assembleDebug`
-3. **Install to device**: `adb install -r android/app/build/outputs/apk/debug/app-debug.apk`
-4. **Verify Parity**: `bash tests/parity/ci-verify.sh` (TS ≡ Kotlin match required!)
-5. **Run test flow**: `python3 scripts/meet_operator.py test-all-verticals`
+With both **Honor Magic V2** and **Xiaomi** connected:
+1. `python3 scripts/meet_operator.py --device xiaomi create-ride "Parque Central San José" "Escazú Village" 4500`
+2. `python3 scripts/meet_operator.py --device honor submit-offer <requestId> 4500 8 "En camino en Toyota Corolla"`
+3. `python3 scripts/meet_operator.py --device xiaomi accept-offer <requestId>`
+4. `python3 scripts/meet_operator.py --device honor advance-ride <requestId> ARRIVED`
+5. Validate in-app live audio call and realtime messaging between Honor and Xiaomi.
+6. Verify driver cancellation penalty (5% deducted if cancelled after arrival).

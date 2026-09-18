@@ -38,7 +38,15 @@ class ElmNegotiator(private val transport: TransportInterface) {
         val ecuHeader: String? = null,
         val initCommands: List<String> = emptyList(),
         val recipeId: String? = null,
-        val vin: String? = null
+        val vin: String? = null,
+        val chipFamily: String = if (isSTN) "OBDLINK_STN" else if (isClone) "ELM327_CLONE" else "ELM327_GENUINE",
+        val avgLatencyMs: Long = 0L,
+        val minLatencyMs: Long = 0L,
+        val maxLatencyMs: Long = 0L,
+        val jitterMs: Long = 0L,
+        val supportsCanFd: Boolean = false,
+        val supportsIsoTp: Boolean = isSTN,
+        val handshakeAuditJson: String? = null,
     )
 
     enum class EvidenceType {
@@ -160,12 +168,20 @@ class ElmNegotiator(private val transport: TransportInterface) {
                 isClone = isClone,
                 isSTN = isSTN,
                 detectedProtocol = knownProtocol,
-                baseDelayMs = runtimeBaseDelay(knownProtocol, isClone),
+                baseDelayMs = if (knownProfile.avgLatencyMs > 0) knownProfile.avgLatencyMs.coerceAtLeast(15L) else runtimeBaseDelay(knownProtocol, isClone),
                 maxLineLength = if (isClone) 64 else 512,
                 ecuHeader = knownProfile.ecuHeader,
                 initCommands = knownProfile.initCommands,
                 recipeId = knownProfile.recipeId,
-                vin = knownProfile.vin
+                vin = knownProfile.vin,
+                chipFamily = knownProfile.chipFamily,
+                avgLatencyMs = knownProfile.avgLatencyMs,
+                minLatencyMs = knownProfile.minLatencyMs,
+                maxLatencyMs = knownProfile.maxLatencyMs,
+                jitterMs = knownProfile.jitterMs,
+                supportsCanFd = knownProfile.supportsCanFd,
+                supportsIsoTp = knownProfile.supportsIsoTp,
+                handshakeAuditJson = knownProfile.handshakeAuditJson,
             )
         }.getOrNull()
     }
@@ -293,6 +309,11 @@ class ElmNegotiator(private val transport: TransportInterface) {
 
         Log.i(TAG, "═══ NEGOTIATION SUCCESS ═══ Protocol: ${protocol.displayName}")
         
+        val matrixProfile = com.elysium369.meet.core.obd.model.ObdAdapterMatrix.resolveProfile(
+            chipVersion = chipVersion,
+            stiResponse = stiResponse
+        )
+
         return AdapterProfile(
             chipVersion = chipVersion,
             isClone = isClone,
@@ -302,7 +323,10 @@ class ElmNegotiator(private val transport: TransportInterface) {
             maxLineLength = if (isClone) 64 else 512,
             ecuHeader = recipe?.requestHeader,
             initCommands = recipe?.initCommands ?: emptyList(),
-            recipeId = recipe?.id
+            recipeId = recipe?.id,
+            chipFamily = matrixProfile.family.name,
+            supportsCanFd = matrixProfile.supportsCanFd,
+            supportsIsoTp = matrixProfile.supportsIsoTp,
         )
     }
 

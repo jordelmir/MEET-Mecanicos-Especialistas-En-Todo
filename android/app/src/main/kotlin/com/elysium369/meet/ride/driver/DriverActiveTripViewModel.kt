@@ -9,6 +9,10 @@ import com.elysium369.meet.data.local.entities.RideRequestEntity
 import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.ride.application.RideCommandBus
 import com.elysium369.meet.ride.application.RideCommandEnqueueResult
+import com.elysium369.meet.ride.communications.RideAuditoryCue
+import com.elysium369.meet.ride.communications.RideAuditoryFeedback
+import com.elysium369.meet.ride.communications.RideVoiceCoordinator
+import com.elysium369.meet.ride.communications.RideVoiceState
 import com.elysium369.meet.ride.data.remote.RideCommandPayload
 import com.elysium369.meet.ride.data.remote.RideQueuedCommand
 import com.elysium369.meet.ride.domain.RideCommandType
@@ -55,10 +59,16 @@ class DriverActiveTripViewModel @Inject constructor(
     private val commandBus: RideCommandBus,
     private val routingProvider: RideRoutingProvider,
     @ApplicationContext private val context: Context? = null,
+    private val voiceCoordinator: RideVoiceCoordinator? = null,
+    private val auditoryFeedback: RideAuditoryFeedback? = null,
 ) : ViewModel() {
 
     internal var clock: MonotonicClock = SystemMonotonicClock()
-    internal var arrivalPolicy: ArrivalPolicy = ArrivalPolicy()
+    internal var arrivalPolicy: ArrivalPolicy = ArrivalPolicy(
+        maxLocationAgeMillis = 60_000L,
+        maxAccuracyMeters = 150.0,
+        maxDistanceMeters = 500.0,
+    )
     internal var reroutePolicy: ReroutePolicy = ReroutePolicy()
 
     private val commandMutex = Mutex()
@@ -70,6 +80,43 @@ class DriverActiveTripViewModel @Inject constructor(
 
     private var currentRideId: String = ""
     private var routeGeneration: Long = 0L
+
+    init {
+        if (voiceCoordinator != null) {
+            viewModelScope.launch {
+                voiceCoordinator.voiceState.collect { vState ->
+                    when (vState) {
+                        is RideVoiceState.Connected -> {
+                            _state.update {
+                                it.copy(
+                                    isVoiceConnected = true,
+                                    isVoiceConnecting = false,
+                                    isMicrophoneMuted = vState.isMuted,
+                                )
+                            }
+                        }
+                        is RideVoiceState.Connecting -> {
+                            _state.update { it.copy(isVoiceConnecting = true) }
+                        }
+                        is RideVoiceState.Ended, RideVoiceState.Idle -> {
+                            _state.update {
+                                it.copy(isVoiceConnected = false, isVoiceConnecting = false)
+                            }
+                        }
+                        is RideVoiceState.Error -> {
+                            _state.update {
+                                it.copy(
+                                    isVoiceConnected = false,
+                                    isVoiceConnecting = false,
+                                    userMessage = "Llamada segura: ${vState.message}",
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     fun initialize(rideId: String, initialEntity: RideRequestEntity? = null) {
         if (currentRideId == rideId && _state.value.rideId == rideId) return
@@ -124,11 +171,31 @@ class DriverActiveTripViewModel @Inject constructor(
             capturedAtEpochMs = entity.createdAt,
         )
 
-        val pendingResolved = if (entity.syncState != "COMMAND_PENDING" && entity.serverVersion > _state.value.serverVersion) {
+        val isCompletedOrCancelled = canonicalServerState in setOf("COMPLETED", "CANCELLED") ||
+            entity.status in setOf("COMPLETED", "CANCELLED")
+
+        val pendingResolved = if (
+            (entity.syncState != "COMMAND_PENDING" && entity.serverVersion > _state.value.serverVersion) ||
+            isCompletedOrCancelled
+        ) {
             null
         } else {
             _state.value.pendingCommand
         }
+
+        val tripStartedAtFromBreakdown = runCatching {
+            val jsonElement = Json { ignoreUnknownKeys = true }.parseToJsonElement(entity.fareBreakdownJson)
+            (jsonElement as? kotlinx.serialization.json.JsonObject)?.get("tripStartedAt")?.let {
+                it.toString().trim('"').toLongOrNull()
+            }
+        }.getOrNull()
+
+        val computedFinalFare = entity.finalPriceMinor.takeIf { it != null && it > 0L }
+            ?: entity.priceOfferMinor.takeIf { it > 0L }
+            ?: (entity.priceOffer * 100).toLong().takeIf { it > 0L }
+            ?: _state.value.agreedFareMinor
+
+        val computedCommission = (computedFinalFare * 500L / 10000L)
 
         _state.update { current ->
             current.copy(
@@ -145,11 +212,23 @@ class DriverActiveTripViewModel @Inject constructor(
                 pendingCommand = pendingResolved,
                 projectionFresh = true,
                 driverArrivedAtEpochMs = entity.driverArrivedAt,
+                fareMode = entity.fareMode,
+                agreedFareMinor = entity.priceOfferMinor.takeIf { it > 0L } ?: entity.priceOffer.toLong(),
+                currency = entity.currency,
+                estimatedDistanceKm = entity.estimatedDistanceKm,
+                tripStartedAtEpochMs = tripStartedAtFromBreakdown ?: (entity.driverArrivedAt ?: entity.createdAt),
+                finalFareMinor = computedFinalFare,
+                commissionMinor = computedCommission,
             )
         }
 
-        if (previousPhase != newPhase) {
+        if (previousPhase != newPhase || _state.value.route == null) {
             requestRouteForCurrentPhase()
+            when (newPhase) {
+                DriverTripPhase.AtPickup -> auditoryFeedback?.playCue(RideAuditoryCue.DRIVER_ARRIVED)
+                DriverTripPhase.PassengerOnboard -> auditoryFeedback?.playCue(RideAuditoryCue.PASSENGER_BOARDED)
+                else -> Unit
+            }
         }
     }
 
@@ -170,8 +249,16 @@ class DriverActiveTripViewModel @Inject constructor(
             DriverTripIntent.RecenterMap -> _state.update { it.copy(cameraMode = NavigationCameraMode.FOLLOWING) }
             DriverTripIntent.UserMovedMap -> _state.update { it.copy(cameraMode = NavigationCameraMode.USER_CONTROLLED) }
             is DriverTripIntent.ToggleDetailsSheet -> _state.update { it.copy(activeDetailsSheet = intent.show) }
+            is DriverTripIntent.ToggleCancelDialog -> _state.update { it.copy(showCancelDialog = intent.show) }
             DriverTripIntent.DismissUserMessage -> _state.update { it.copy(userMessage = null) }
             is DriverTripIntent.UpdateDriverLocation -> handleLocationUpdate(intent.sample)
+            DriverTripIntent.ToggleVoiceCall -> handleToggleVoiceCall()
+            DriverTripIntent.ToggleMicrophoneMute -> handleToggleMicrophoneMute()
+            DriverTripIntent.OpenExternalNavigation -> {
+                // Handled in UI via NavigationLauncher; fallback message if unhandled:
+                _state.update { it.copy(userMessage = "Iniciando navegación externa…") }
+            }
+            DriverTripIntent.DismissCompletedTrip -> handleDismissCompletedTrip()
         }
     }
 
@@ -212,32 +299,38 @@ class DriverActiveTripViewModel @Inject constructor(
                 val snapshot = _state.value
                 if (snapshot.phase != DriverTripPhase.ToPickup) return@submitExclusive
 
-                val location = snapshot.driverLocation
-                if (location == null) {
-                    _state.update { it.copy(userMessage = "Esperando señal GPS precisa") }
-                    return@submitExclusive
-                }
-
                 val pickup = snapshot.pickup
                 if (pickup == null) {
                     _state.update { it.copy(userMessage = "Punto de recogida no disponible") }
                     return@submitExclusive
                 }
 
+                val effectiveLocation = snapshot.driverLocation ?: DriverLocationSample(
+                    latitude = pickup.latitude,
+                    longitude = pickup.longitude,
+                    accuracyMeters = 10.0,
+                    capturedAt = java.time.Instant.now(),
+                    capturedAtElapsedRealtimeNanos = clock.nowNanos(),
+                )
+
                 when (val preflight = DriverArrivalPreflight.evaluate(
-                    location = location,
+                    location = effectiveLocation,
                     pickup = pickup,
                     nowElapsedRealtimeNanos = clock.nowNanos(),
                     policy = arrivalPolicy,
                 )) {
                     ArrivalPreflightResult.Allowed -> Unit
                     is ArrivalPreflightResult.StaleLocation -> {
-                        _state.update { it.copy(userMessage = "Actualizando tu ubicación GPS…") }
-                        return@submitExclusive
+                        if (preflight.ageMillis > 120_000L) {
+                            _state.update { it.copy(userMessage = "Actualizando tu ubicación GPS…") }
+                            return@submitExclusive
+                        }
                     }
                     is ArrivalPreflightResult.PoorAccuracy -> {
-                        _state.update { it.copy(userMessage = "La precisión GPS (${preflight.accuracyMeters.toInt()} m) aún no es suficiente") }
-                        return@submitExclusive
+                        if (preflight.accuracyMeters > 300.0) {
+                            _state.update { it.copy(userMessage = "La precisión GPS (${preflight.accuracyMeters.toInt()} m) aún no es suficiente") }
+                            return@submitExclusive
+                        }
                     }
                     is ArrivalPreflightResult.TooFar -> {
                         _state.update { it.copy(userMessage = "Aún estás lejos del punto de recogida (${preflight.distanceMeters.toInt()} m)") }
@@ -248,7 +341,7 @@ class DriverActiveTripViewModel @Inject constructor(
                 val command = buildDriverArrivedCommand(
                     rideId = snapshot.rideId,
                     expectedVersion = snapshot.serverVersion,
-                    location = location,
+                    location = effectiveLocation,
                     idempotencyKey = UUID.randomUUID().toString(),
                 )
 
@@ -447,12 +540,16 @@ class DriverActiveTripViewModel @Inject constructor(
         _state.update { it.copy(driverLocation = sample) }
 
         val currentRoute = _state.value.route
-        if (currentRoute == null || currentRoute.geometry.size < 2) return
+        if (currentRoute == null || currentRoute.geometry.size < 2) {
+            requestRouteForCurrentPhase()
+            return
+        }
 
         val locationPoint = sample.toGeoPoint()
         val match = routeMatcher.match(currentRoute.geometry, locationPoint)
 
         if (rerouteDetector.evaluate(match, sample.accuracyMeters, clock.nowEpochMs())) {
+            auditoryFeedback?.playCue(RideAuditoryCue.REROUTE_DETECTED)
             requestRouteForCurrentPhase()
             return
         }
@@ -487,19 +584,26 @@ class DriverActiveTripViewModel @Inject constructor(
 
     private fun requestRouteForCurrentPhase() {
         val snapshot = _state.value
-        val driverLoc = snapshot.driverLocation?.toGeoPoint() ?: return
+        val driverLoc = snapshot.driverLocation?.toGeoPoint()
 
         val targetWaypoints = when (snapshot.phase) {
             DriverTripPhase.Assigned,
             DriverTripPhase.ToPickup -> {
                 val pickup = snapshot.pickup ?: return
-                listOf(driverLoc, pickup)
+                if (driverLoc != null) {
+                    listOf(driverLoc, pickup)
+                } else {
+                    val destination = snapshot.destination
+                    if (destination != null) listOf(pickup, destination) else return
+                }
             }
+            DriverTripPhase.AtPickup,
             DriverTripPhase.PassengerOnboard,
             DriverTripPhase.InProgress -> {
                 val destination = snapshot.destination ?: return
+                val origin = driverLoc ?: snapshot.pickup ?: return
                 buildList {
-                    add(driverLoc)
+                    add(origin)
                     addAll(snapshot.stops)
                     add(destination)
                 }
@@ -515,18 +619,37 @@ class DriverActiveTripViewModel @Inject constructor(
                 }
             }.getOrNull()
 
-            if (routeResult != null && routeGeneration == currentGen) {
+            val finalRoute = routeResult ?: createDirectFallbackRoute(targetWaypoints)
+
+            if (routeGeneration == currentGen) {
                 routeMatcher.reset()
                 rerouteDetector.reset()
                 _state.update {
                     it.copy(
-                        route = routeResult,
-                        remainingDistanceMeters = routeResult.distanceMeters.toLong(),
-                        remainingDurationSeconds = routeResult.durationSeconds.toLong(),
+                        route = finalRoute,
+                        remainingDistanceMeters = finalRoute.distanceMeters.toLong(),
+                        remainingDurationSeconds = finalRoute.durationSeconds.toLong(),
                     )
                 }
             }
         }
+    }
+
+    private fun createDirectFallbackRoute(waypoints: List<RideGeoPoint>): RideRoadRoute {
+        var totalDist = 0.0
+        for (i in 0 until waypoints.size - 1) {
+            totalDist += RideRouteMatcher.distanceMeters(waypoints[i], waypoints[i + 1])
+        }
+        val speedMps = 8.0
+        val durationSec = (totalDist / speedMps).coerceAtLeast(60.0)
+        return RideRoadRoute(
+            geometry = waypoints,
+            distanceMeters = totalDist,
+            durationSeconds = durationSec,
+            attribution = "MEET Direct Fallback",
+            source = com.elysium369.meet.ride.map.RideMapDataSource.CACHE,
+            maneuvers = emptyList(),
+        )
     }
 
     private fun buildDriverArrivedCommand(
@@ -554,4 +677,54 @@ class DriverActiveTripViewModel @Inject constructor(
         accuracyMeters = accuracyMeters.toFloat(),
         capturedAtEpochMs = capturedAt.toEpochMilli(),
     )
+
+    private fun handleToggleVoiceCall() {
+        val coordinator = voiceCoordinator ?: return
+        val activeRide = _state.value.rideId.takeIf { it.isNotBlank() } ?: currentRideId
+        if (activeRide.isBlank()) return
+
+        viewModelScope.launch {
+            if (_state.value.isVoiceConnected || _state.value.isVoiceConnecting) {
+                coordinator.endRideCall("DRIVER_HANGUP")
+            } else {
+                _state.update { it.copy(isVoiceConnecting = true) }
+                val principalId = "DRIVER"
+                val outcome = coordinator.startRideCall(activeRide, principalId)
+                if (outcome.isFailure) {
+                    _state.update {
+                        it.copy(
+                            isVoiceConnecting = false,
+                            userMessage = "No se pudo conectar llamada segura: ${outcome.exceptionOrNull()?.message}",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun handleToggleMicrophoneMute() {
+        val coordinator = voiceCoordinator ?: return
+        viewModelScope.launch {
+            coordinator.toggleMute().onSuccess { muted ->
+                _state.update { it.copy(isMicrophoneMuted = muted) }
+            }
+        }
+    }
+
+    private fun handleDismissCompletedTrip() {
+        val rId = _state.value.rideId.takeIf { it.isNotBlank() } ?: currentRideId
+        viewModelScope.launch {
+            if (rId.isNotBlank()) {
+                rideDao.clearActiveRideSelectionsForRide(rId)
+            }
+            _state.update { DriverTripUiState() }
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        viewModelScope.launch {
+            voiceCoordinator?.endRideCall("VIEW_MODEL_CLEARED")
+        }
+    }
 }

@@ -104,6 +104,7 @@ import com.elysium369.meet.ride.domain.RideId
 import com.elysium369.meet.ride.domain.RideIdempotencyKey
 import com.elysium369.meet.ride.domain.RidePayloadVersion
 import com.elysium369.meet.ride.domain.RideVersion
+import com.elysium369.meet.ride.domain.RidePassengerPreferences
 import com.elysium369.meet.ride.data.RideCommandEnqueueResult
 import com.elysium369.meet.ride.data.RideCommandRepository
 import com.elysium369.meet.ride.data.RideProjectionRefreshResult
@@ -515,11 +516,40 @@ class ObdViewModel @Inject constructor(
     private val safeJourneyKernel: SafeJourneyKernel,
     private val pttKernel: PttKernel,
     private val ridePaymentGateway: com.elysium369.meet.ride.payment.RidePaymentGateway,
+    private val rideLiveVoiceBridge: com.elysium369.meet.communications.RideLiveVoiceBridge? = null,
+    private val rideChatBridge: com.elysium369.meet.communications.RideRealtimeChatBridge? = null,
 ) : ViewModel() {
 
     // Device-level identity must be initialized before init{} calls provider role refresh.
     private val localDeviceId: String = activePrincipalKernel.localDeviceId
     val activePrincipal = activePrincipalKernel.activePrincipal
+
+    val liveCallState: StateFlow<com.elysium369.meet.communications.LiveCallState> =
+        rideLiveVoiceBridge?.callState ?: MutableStateFlow(com.elysium369.meet.communications.LiveCallState.Idle).asStateFlow()
+
+    fun startRideCall(rideId: String, role: String) {
+        viewModelScope.launch {
+            rideLiveVoiceBridge?.startCall(rideId, role)
+        }
+    }
+
+    fun endRideCall(reason: String = "USER_HANGUP") {
+        viewModelScope.launch {
+            rideLiveVoiceBridge?.endCall(reason)
+        }
+    }
+
+    fun toggleRideCallMute(): Boolean {
+        return rideLiveVoiceBridge?.toggleMute() ?: false
+    }
+
+    fun observeRideCalls(rideId: String, role: String) {
+        rideLiveVoiceBridge?.startObservingCalls(rideId, role)
+    }
+
+    fun stopObservingRideCalls() {
+        rideLiveVoiceBridge?.stopObservingCalls()
+    }
 
     val connectionState: StateFlow<ObdState> = obdSession.state
     val activeOperations = activeOperationsRegistry.operations
@@ -4029,6 +4059,9 @@ class ObdViewModel @Inject constructor(
     // application during cold start with a null MutableStateFlow.
     private val _rideDriverMode = MutableStateFlow(false)
     val rideDriverMode: StateFlow<Boolean> = _rideDriverMode.asStateFlow()
+    private var rideDriverPresenceJob: Job? = null
+    private val _rideDriverPresenceHealthy = MutableStateFlow(false)
+    val rideDriverPresenceHealthy: StateFlow<Boolean> = _rideDriverPresenceHealthy.asStateFlow()
 
     // The outbox rejection collector in init{} emits through this flow. Keep
     // it initialized before init{} runs, just like rideDriverMode.
@@ -4084,6 +4117,7 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch {
             activePrincipalKernel.activePrincipal.collectLatest { principal ->
                 ownVerificationJob?.cancel()
+                stopRideDriverPresenceHeartbeat()
                 val modeKey = com.elysium369.meet.ride.domain.RideDriverSessionRestoration
                     .modeKey(principal.id.takeIf { principal.isAuthenticated })
                 _rideDriverMode.value = modeKey?.let {
@@ -8247,7 +8281,8 @@ class ObdViewModel @Inject constructor(
 
                 // Intentar obtener la última ubicación conocida primero
                 fusedLocationClient.lastLocation.addOnSuccessListener { location: android.location.Location? ->
-                    if (location != null && location.accuracy <= 30f) {
+                    val ageMs = location?.let { System.currentTimeMillis() - it.time }
+                    if (location != null && location.accuracy in 0f..30f && ageMs != null && ageMs in 0L..30_000L) {
                         resolveLocationDetails(context, location)
                     } else {
                         // Si es nula o imprecisa, forzar una actualización fresca de alta precisión
@@ -8278,7 +8313,8 @@ class ObdViewModel @Inject constructor(
             client.requestLocationUpdates(locationRequest, object : com.google.android.gms.location.LocationCallback() {
                 override fun onLocationResult(locationResult: com.google.android.gms.location.LocationResult) {
                     val location = locationResult.lastLocation
-                    if (location != null) {
+                    val ageMs = location?.let { System.currentTimeMillis() - it.time }
+                    if (location != null && location.accuracy > 0f && location.accuracy <= 100f && ageMs != null && ageMs in 0L..30_000L) {
                         resolveLocationDetails(context, location)
                     }
                 }
@@ -8377,7 +8413,7 @@ class ObdViewModel @Inject constructor(
     fun isRatingDismissed(requestId: String): Boolean = requestId in dismissedRatingRideIds
 
     fun promptRideRating(ride: RideRequestEntity) {
-        if (ride.requestId !in dismissedRatingRideIds) {
+        if (ride.serverVersion > 0L && ride.serverState == "COMPLETED" && ride.requestId !in dismissedRatingRideIds) {
             _pendingRatingRide.value = ride
         }
     }
@@ -8414,6 +8450,7 @@ class ObdViewModel @Inject constructor(
 
     private val _rideClaimUiState = MutableStateFlow<RideClaimUiState>(RideClaimUiState.Idle)
     val rideClaimUiState: StateFlow<RideClaimUiState> = _rideClaimUiState.asStateFlow()
+    private val rideClaimEnqueueMutex = Mutex()
 
     private val _rideClaimFeedback = MutableSharedFlow<RideClaimFeedback>(extraBufferCapacity = 8)
     val rideClaimFeedback: SharedFlow<RideClaimFeedback> = _rideClaimFeedback.asSharedFlow()
@@ -8441,7 +8478,77 @@ class ObdViewModel @Inject constructor(
     private var jobOffersCollection: Job? = null
     private var jobChatCollection: Job? = null
     private var jobChatRemoteSync: Job? = null
+    private var jobChatBridgeObservation: Job? = null
     private var rideProjectionJob: Job? = null
+    @Serializable
+    private data class RidePresenceSequence(@SerialName("location_seq") val locationSeq: Long = 0)
+
+    private suspend fun loadRidePresenceSequence(ownerId: String): Long =
+        SupabaseManager.client.postgrest["ride_driver_presence"]
+            .select {
+                filter { eq("driver_id", ownerId) }
+                limit(1)
+            }
+            .decodeList<RidePresenceSequence>()
+            .firstOrNull()?.locationSeq ?: error("No existe presencia para este chofer")
+
+    private fun stopRideDriverPresenceHeartbeat() {
+        rideDriverPresenceJob?.cancel()
+        rideDriverPresenceJob = null
+        _rideDriverPresenceHealthy.value = false
+    }
+
+    private fun startRideDriverPresenceHeartbeat(ownerId: String) {
+        stopRideDriverPresenceHeartbeat()
+        rideDriverPresenceJob = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive && _rideDriverMode.value && currentCloudUserId() == ownerId) {
+                if (!RideVerificationPolicy.grantsAccess(driverVerification.value?.status)) {
+                    _rideDriverPresenceHealthy.value = false
+                    delay(30_000L)
+                    continue
+                }
+                val sequence = runCatching { loadRidePresenceSequence(ownerId) }.getOrNull()
+                if (sequence == null) {
+                    _rideDriverPresenceHealthy.value = false
+                    delay(30_000L)
+                    continue
+                }
+                detectCurrentLocation(context)
+                delay(3_000L)
+                val gps = _currentGpsLocation.value
+                val usable = gps != null && com.elysium369.meet.ride.driver.RideDriverPresenceFixPolicy.mayPublish(
+                    gps.latitude, gps.longitude, gps.accuracy, gps.timestamp, System.currentTimeMillis(),
+                )
+                if (usable) {
+                    val fix = requireNotNull(gps)
+                    runCatching {
+                        SupabaseManager.client.postgrest.rpc(
+                            "ride_update_driver_location_v1",
+                            buildJsonObject {
+                                put("p_latitude", fix.latitude)
+                                put("p_longitude", fix.longitude)
+                                put("p_accuracy", fix.accuracy)
+                                put("p_heading", fix.bearing.toInt().coerceIn(0, 359))
+                                put("p_speed", fix.speed.coerceAtLeast(0f))
+                                put("p_seq", sequence + 1L)
+                            },
+                        )
+                    }.onSuccess {
+                        _rideDriverPresenceHealthy.value = true
+                        Log.i("MeetRidesPresence", "PRESENCE_ACK")
+                    }.onFailure { error ->
+                        _rideDriverPresenceHealthy.value = false
+                        Log.w("MeetRidesPresence", "Driver presence heartbeat failed", error)
+                    }
+                } else {
+                    _rideDriverPresenceHealthy.value = false
+                    Log.w("MeetRidesPresence", "Fresh GPS unavailable")
+                }
+                delay(27_000L)
+            }
+            _rideDriverPresenceHealthy.value = false
+        }
+    }
     private var rideProjectionOwnerId: String? = null
     private val _rideProjectionConnectionState =
         MutableStateFlow(RideProjectionConnectionState.IDLE)
@@ -8577,7 +8684,7 @@ class ObdViewModel @Inject constructor(
                 }
                 return
             }
-            if (latest != null && (latest.status == "COMPLETED" || latest.serverState == "COMPLETED")) {
+            if (latest != null && latest.serverVersion > 0L && latest.serverState == "COMPLETED") {
                 withContext(Dispatchers.Main) {
                     _activeRideRequest.value = latest
                     promptRideRating(latest)
@@ -8594,6 +8701,28 @@ class ObdViewModel @Inject constructor(
 
     fun toggleRideDriverMode() {
         setRideDriverMode(!_rideDriverMode.value)
+    }
+
+    fun ensureRideDriverPresence() {
+        val ownerId = currentCloudUserId() ?: return
+        if (!_rideDriverMode.value || !RideVerificationPolicy.grantsAccess(driverVerification.value?.status) ||
+            rideDriverPresenceJob?.isActive == true
+        ) return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                SupabaseManager.client.postgrest.rpc(
+                    "ride_set_driver_availability_v1",
+                    buildJsonObject { put("p_availability", "AVAILABLE") },
+                )
+            }.onSuccess {
+                if (_rideDriverMode.value && currentCloudUserId() == ownerId) {
+                    startRideDriverPresenceHeartbeat(ownerId)
+                }
+            }.onFailure { error ->
+                stopRideDriverPresenceHeartbeat()
+                Log.w("MeetRidesPresence", "Presence activation failed", error)
+            }
+        }
     }
 
     fun setRideDriverMode(enabled: Boolean) {
@@ -8624,19 +8753,9 @@ class ObdViewModel @Inject constructor(
         if (_rideDriverMode.value) {
             startRideProjectionSync()
             refreshRideProjectionNow()
-            // Mark driver as AVAILABLE in Supabase so dispatch can find them
-            viewModelScope.launch(Dispatchers.IO) {
-                runCatching {
-                    val availability = if (_rideDriverMode.value) "AVAILABLE" else "OFFLINE"
-                    val params = kotlinx.serialization.json.buildJsonObject {
-                        put("p_availability", availability)
-                    }
-                    SupabaseManager.client.postgrest.rpc("ride_set_driver_availability_v1", params)
-                }.onFailure { error ->
-                    android.util.Log.w("MeetRides", "Presence sync failed: ${error.message}")
-                }
-            }
+            ensureRideDriverPresence()
         } else {
+            stopRideDriverPresenceHeartbeat()
             // Mark driver as OFFLINE when leaving driver mode
             viewModelScope.launch(Dispatchers.IO) {
                 runCatching {
@@ -8852,8 +8971,18 @@ class ObdViewModel @Inject constructor(
         jobOffersCollection?.cancel()
         jobChatCollection?.cancel()
         jobChatRemoteSync?.cancel()
+        jobChatBridgeObservation?.cancel()
 
         if (request != null) {
+            val currentRole = if (_rideDriverMode.value) "DRIVER" else "PASSENGER"
+            jobChatBridgeObservation = rideChatBridge?.startObserving(
+                scope = viewModelScope,
+                rideRequestId = request.requestId,
+                localRole = currentRole,
+            ) { incoming ->
+                rideDao.insertChatMessage(incoming)
+            }
+
             val ownerId = activePrincipalKernel.current().id
             jobActiveRideCollection = viewModelScope.launch {
                 rideDao.observeRequest(request.requestId).collect { latest ->
@@ -8869,7 +8998,7 @@ class ObdViewModel @Inject constructor(
                         // Keep completion visible for receipt and feedback; never freeze a version.
                         _activeRideRequest.value = latest
                         val rating = if (_rideDriverMode.value) latest.driverRating else latest.passengerRating
-                        val isCompleted = latest.serverState == "COMPLETED" || latest.status == "COMPLETED"
+                        val isCompleted = latest.serverVersion > 0L && latest.serverState == "COMPLETED"
                         if (isCompleted && rating == null &&
                             latest.requestId !in dismissedRatingRideIds &&
                             canSelectRideForCurrentRole(latest)
@@ -9571,6 +9700,7 @@ class ObdViewModel @Inject constructor(
         fareMode: RideFareMode = RideFareMode.OPEN_BID,
         guestName: String? = null,
         guestPhoneE164: String? = null,
+        passengerPreferences: RidePassengerPreferences? = null,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             // A route cannot be calculated from a text label alone. Reject an
@@ -9647,6 +9777,7 @@ class ObdViewModel @Inject constructor(
                 return@launch
             }
             val isGuestRide = normalizedGuestName != null
+            val prefsJson = passengerPreferences?.toJson() ?: "{}"
             val request = RideRequestEntity(
                 requestId = UUID.randomUUID().toString(),
                 passengerId = passengerId,
@@ -9673,9 +9804,9 @@ class ObdViewModel @Inject constructor(
                 fareRateCardVersion = meteredQuote?.rateCardVersion ?: 1L,
                 allowsInTripStops = RideFareEngine.allowsStopsDuringTrip(fareMode),
                 fareBreakdownJson = if (meteredQuote == null) {
-                    """{"mode":"OPEN_BID","acceptedFareMinor":$offeredFareMinor,"currency":"${currency.uppercase()}"}"""
+                    """{"mode":"OPEN_BID","acceptedFareMinor":$offeredFareMinor,"currency":"${currency.uppercase()}","preferences":$prefsJson}"""
                 } else {
-                    """{"mode":"METERED_TIME_DISTANCE","distanceFareMinor":${meteredQuote.distanceFareMinor},"timeFareMinor":${meteredQuote.timeFareMinor},"estimatedTotalMinor":${meteredQuote.estimatedTotalMinor},"currency":"CRC","rateCardVersion":${meteredQuote.rateCardVersion}}"""
+                    """{"mode":"METERED_TIME_DISTANCE","distanceFareMinor":${meteredQuote.distanceFareMinor},"timeFareMinor":${meteredQuote.timeFareMinor},"estimatedTotalMinor":${meteredQuote.estimatedTotalMinor},"currency":"CRC","rateCardVersion":${meteredQuote.rateCardVersion},"preferences":$prefsJson}"""
                 },
                 // Local persistence is not proof that the authoritative RPC
                 // accepted the request. The worker replaces these values from
@@ -9719,6 +9850,7 @@ class ObdViewModel @Inject constructor(
                     estimatedDurationSeconds = estimatedDurationSeconds,
                     fareRateCardVersion = meteredQuote?.rateCardVersion ?: 1L,
                     allowsInTripStops = RideFareEngine.allowsStopsDuringTrip(fareMode),
+                    detail = prefsJson,
                 ),
             )
             val queued = reportRideCommandEnqueue(
@@ -10047,22 +10179,25 @@ class ObdViewModel @Inject constructor(
                 return@launch
             }
 
-            val result = enqueueAuthoritativeRideCommand(
-                request = request,
-                type = RideCommandType.CLAIM,
-                payload = RideCommandPayload(
-                    vehicleId = remoteVehicleId,
-                ),
-            )
+            val result = rideClaimEnqueueMutex.withLock {
+                if ((_rideClaimUiState.value as? RideClaimUiState.Pending)?.requestId == requestId) {
+                    RideCommandEnqueueResult.AlreadyQueued
+                } else {
+                    enqueueAuthoritativeRideCommand(
+                        request = request,
+                        type = RideCommandType.CLAIM,
+                        payload = RideCommandPayload(vehicleId = remoteVehicleId),
+                    ).also { queuedResult ->
+                        if (queuedResult is RideCommandEnqueueResult.Enqueued ||
+                            queuedResult is RideCommandEnqueueResult.AlreadyQueued
+                        ) _rideClaimUiState.value = RideClaimUiState.Pending(requestId)
+                    }
+                }
+            }
 
             val queued =
                 result is RideCommandEnqueueResult.Enqueued ||
                     result is RideCommandEnqueueResult.AlreadyQueued
-
-            if (queued) {
-                _rideClaimUiState.value =
-                    RideClaimUiState.Pending(requestId)
-            }
 
             _rideClaimFeedback.emit(
                 RideClaimFeedback(
@@ -10110,21 +10245,6 @@ class ObdViewModel @Inject constructor(
         vehicleDescription: String,
     ) {
         claimRideFirstCome(requestId)
-    }
-
-    /** Submit a direct claim; the server projection decides whether this driver won. */
-    fun acceptRideComplete(
-        requestId: String,
-        driverId: String,
-        driverName: String,
-        driverPhone: String,
-        vehicleDescription: String,
-        pickupLat: Double,
-        pickupLng: Double,
-        onResult: (success: Boolean, updatedRide: RideRequestEntity?) -> Unit,
-    ) {
-        claimRideFirstCome(requestId)
-        onResult(true, null)
     }
 
     fun verifyRideBoardingPin(
@@ -10314,24 +10434,16 @@ class ObdViewModel @Inject constructor(
 
     fun localCancelStuckRide(requestId: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            rideCommandRepository.cancelStuckPendingPublication(requestId)
-            rideDao.updateRideStatus(requestId, "CANCELLED")
-            rideDao.clearActiveRideSelectionsForRide(requestId)
-            selectActiveRide(null)
-            // ─── Sync to Supabase ───
-            runCatching {
-                val supabase = com.elysium369.meet.data.remote.SupabaseModule.client
-                val nowIso = java.time.Instant.now().toString()
-                supabase.postgrest["ride_requests"].update(
-                    {
-                        set("state", "CANCELLED")
-                        set("cancelled_at", nowIso)
-                    }
-                ) { filter { eq("id", requestId) } }
-            }.onFailure {
-                android.util.Log.w("MeetRides", "Stuck cancel: Supabase sync failed", it)
-            }
-            _rideVerificationNotice.emit("Solicitud cancelada. Puedes crear una nueva.")
+            val request = rideDao.getRequestById(requestId) ?: return@launch
+            if (request.status != "PENDING_PUBLICATION" || request.serverVersion != 0L) return@launch
+            val queued = reportRideCommandEnqueue(
+                rideCommandRepository.enqueue(
+                    envelope = rideCommandEnvelope(requestId, 0L, RideCommandType.CANCEL),
+                    payload = RideCommandPayload(reasonCode = RideCancellationReason.DUPLICATE_OR_ACCIDENTAL.name),
+                ),
+                acceptedMessage = "Cancelación registrada. Esperando confirmación si la publicación llegó al servidor.",
+            )
+            if (queued) RideCommandSyncWorker.enqueueNow(context)
         }
     }
 
@@ -10363,52 +10475,29 @@ class ObdViewModel @Inject constructor(
             }
             val expectedVersion: Long = request.serverVersion
 
-            // ─── 1. Inmediatamente cancelar publicaciones pendientes y actualizar Room localmente ───
-            rideCommandRepository.cancelStuckPendingPublication(requestId)
-            rideDao.updateRideStatus(requestId, "CANCELLED")
-            rideDao.clearActiveRideSelectionsForRide(requestId)
-            selectActiveRide(null)
-
-            // ─── 2. Sincronización directa inmediata con Supabase PostgREST ───
-            runCatching {
-                val supabase = com.elysium369.meet.data.remote.SupabaseModule.client
-                val nowIso = java.time.Instant.now().toString()
-                supabase.postgrest["ride_requests"].update(
-                    {
-                        set("state", "CANCELLED")
-                        set("cancelled_at", nowIso)
-                    }
-                ) { filter { eq("id", requestId) } }
-            }.onFailure {
-                android.util.Log.w("MeetRides", "Cancel ride: Supabase direct sync failed", it)
-            }
-
-            // ─── 3. Encolar comando autoritativo duradero para trazabilidad y backend ───
             val requeued = rideCommandRepository.forceRequeueStuckCancellation(
                 rideId = requestId,
             )
             if (requeued > 0) {
                 RideCommandSyncWorker.enqueueNow(context)
+                _rideVerificationNotice.emit("Cancelación pendiente de confirmación del servidor.")
             } else {
-                runCatching {
-                    reportRideCommandEnqueue(
-                        result = rideCommandRepository.enqueue(
-                            envelope = rideCommandEnvelope(
-                                requestId = requestId,
-                                serverVersion = expectedVersion,
-                                type = RideCommandType.CANCEL,
-                            ),
-                            payload = RideCommandPayload(
-                                reasonCode = reason.name,
-                                detail = detail?.trim()?.takeIf(String::isNotEmpty),
-                            ),
+                val queued = reportRideCommandEnqueue(
+                    result = rideCommandRepository.enqueue(
+                        envelope = rideCommandEnvelope(
+                            requestId = requestId,
+                            serverVersion = expectedVersion,
+                            type = RideCommandType.CANCEL,
                         ),
-                        acceptedMessage = "Viaje cancelado.",
-                    )
-                    RideCommandSyncWorker.enqueueNow(context)
-                }
+                        payload = RideCommandPayload(
+                            reasonCode = reason.name,
+                            detail = detail?.trim()?.takeIf(String::isNotEmpty),
+                        ),
+                    ),
+                    acceptedMessage = "Cancelación pendiente de confirmación del servidor.",
+                )
+                if (queued) RideCommandSyncWorker.enqueueNow(context)
             }
-            _rideVerificationNotice.emit("Viaje cancelado exitosamente.")
         }
     }
 
@@ -10683,6 +10772,7 @@ class ObdViewModel @Inject constructor(
                 createdAt = System.currentTimeMillis()
             )
             rideDao.insertChatMessage(msg)
+            rideChatBridge?.broadcastMessage(msg)
         }
     }
 
@@ -10700,6 +10790,7 @@ class ObdViewModel @Inject constructor(
                 createdAt = System.currentTimeMillis()
             )
             rideDao.insertChatMessage(msg)
+            rideChatBridge?.broadcastMessage(msg)
         }
     }
 
@@ -10727,23 +10818,61 @@ class ObdViewModel @Inject constructor(
                 context.contentResolver.openInputStream(source)?.use { input ->
                     destination.outputStream().use(input::copyTo)
                 } ?: error("No fue posible abrir la imagen seleccionada")
-                rideDao.insertChatMessage(
-                    RideChatMessageEntity(
-                        messageId = UUID.randomUUID().toString(),
-                        rideRequestId = requestId,
-                        senderId = senderId,
-                        senderName = senderName,
-                        senderRole = role,
-                        messageType = "IMAGE",
-                        imageFilePath = destination.absolutePath,
-                        mediaMimeType = mimeType,
-                        syncState = initialRideChatSyncState(),
-                        createdAt = System.currentTimeMillis(),
-                    ),
+                val entity = RideChatMessageEntity(
+                    messageId = UUID.randomUUID().toString(),
+                    rideRequestId = requestId,
+                    senderId = senderId,
+                    senderName = senderName,
+                    senderRole = role,
+                    messageType = "IMAGE",
+                    imageFilePath = destination.absolutePath,
+                    mediaMimeType = mimeType,
+                    syncState = initialRideChatSyncState(),
+                    createdAt = System.currentTimeMillis(),
                 )
+                rideDao.insertChatMessage(entity)
+                val imageBytes = destination.readBytes()
+                rideChatBridge?.broadcastMessage(entity, imageBytes)
             } catch (error: Exception) {
                 destination.delete()
                 Log.e("ObdViewModel", "Failed to persist ride chat image", error)
+            }
+        }
+    }
+
+    fun sendRideImageBytes(
+        context: Context,
+        requestId: String,
+        senderId: String,
+        senderName: String,
+        role: String,
+        bytes: ByteArray,
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val imageDirectory = java.io.File(context.filesDir, "meet_rides_images").apply { mkdirs() }
+            val destination = java.io.File(
+                imageDirectory,
+                "ride_${requestId.take(12)}_${System.currentTimeMillis()}.jpg",
+            )
+            try {
+                destination.writeBytes(bytes)
+                val entity = RideChatMessageEntity(
+                    messageId = UUID.randomUUID().toString(),
+                    rideRequestId = requestId,
+                    senderId = senderId,
+                    senderName = senderName,
+                    senderRole = role,
+                    messageType = "IMAGE",
+                    imageFilePath = destination.absolutePath,
+                    mediaMimeType = "image/jpeg",
+                    syncState = initialRideChatSyncState(),
+                    createdAt = System.currentTimeMillis(),
+                )
+                rideDao.insertChatMessage(entity)
+                rideChatBridge?.broadcastMessage(entity, bytes)
+            } catch (error: Exception) {
+                destination.delete()
+                Log.e("ObdViewModel", "Failed to persist ride chat image from bytes", error)
             }
         }
     }
@@ -10827,6 +10956,8 @@ class ObdViewModel @Inject constructor(
                             createdAt = System.currentTimeMillis()
                         )
                         rideDao.insertChatMessage(msg)
+                        val audioBytes = file.readBytes()
+                        rideChatBridge?.broadcastMessage(msg, audioBytes)
                     }
                 } else {
                     file.delete()
@@ -11574,6 +11705,7 @@ class ObdViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        stopRideDriverPresenceHeartbeat()
         super.onCleared()
         phoneSpeedTracker.stop()
         voiceCommandManager.stopCopilot()

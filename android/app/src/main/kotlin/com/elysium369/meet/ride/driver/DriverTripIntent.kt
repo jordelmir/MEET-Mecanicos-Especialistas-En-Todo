@@ -16,6 +16,11 @@ sealed interface DriverTripIntent {
     data object RecenterMap : DriverTripIntent
     data object UserMovedMap : DriverTripIntent
     data class ToggleDetailsSheet(val show: Boolean) : DriverTripIntent
+    data class ToggleCancelDialog(val show: Boolean) : DriverTripIntent
     data object DismissUserMessage : DriverTripIntent
     data class UpdateDriverLocation(val sample: DriverLocationSample) : DriverTripIntent
+    data object ToggleVoiceCall : DriverTripIntent
+    data object ToggleMicrophoneMute : DriverTripIntent
+    data object OpenExternalNavigation : DriverTripIntent
+    data object DismissCompletedTrip : DriverTripIntent
 }

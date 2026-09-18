@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Waze body -->
+    <path
+        android:fillColor="#33CCFF"
+        android:pathData="M18.8,11.2c-0.3,-4.6 -4.1,-8.2 -8.8,-8.2c-4.9,0 -8.9,4 -8.9,8.9c0,2.1 0.7,4.1 2,5.6l-1,3.4c-0.2,0.6 0.4,1.2 1,1l3.5,-1c1,0.5 2.2,0.8 3.4,0.8c4.9,0 8.9,-4 8.9,-8.9c0,-0.5 0,-1.1 -0.1,-1.6z"/>
+    <!-- Left Eye -->
+    <path
+        android:fillColor="#1B2B38"
+        android:pathData="M8,11.5a1.2,1.2 0 1,0 2.4,0a1.2,1.2 0 1,0 -2.4,0"/>
+    <!-- Right Eye -->
+    <path
+        android:fillColor="#1B2B38"
+        android:pathData="M13.6,11.5a1.2,1.2 0 1,0 2.4,0a1.2,1.2 0 1,0 -2.4,0"/>
+    <!-- Left Wheel -->
+    <path
+        android:fillColor="#1B2B38"
+        android:pathData="M6.5,19a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0"/>
+    <!-- Right Wheel -->
+    <path
+        android:fillColor="#1B2B38"
+        android:pathData="M14.5,19a2.5,2.5 0 1,0 5,0a2.5,2.5 0 1,0 -5,0"/>
+    <!-- Smile -->
+    <path
+        android:fillColor="#1B2B38"
+        android:pathData="M10,14.2c0.7,0.8 1.4,1.2 2,1.2s1.3,-0.4 2,-1.2c0.2,-0.2 0.5,-0.2 0.7,0s0.2,0.5 0,0.7c-0.9,1.1 -1.8,1.6 -2.7,1.6s-1.8,-0.5 -2.7,-1.6c-0.2,-0.2 -0.2,-0.5 0,-0.7s0.5,-0.2 0.7,0z"/>
+</vector>

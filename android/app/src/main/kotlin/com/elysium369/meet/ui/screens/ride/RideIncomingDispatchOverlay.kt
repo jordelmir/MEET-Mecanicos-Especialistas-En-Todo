@@ -14,8 +14,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
+import com.elysium369.meet.ride.domain.RidePassengerPreferences
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -93,6 +96,19 @@ fun RideIncomingDispatchOverlay(
     val isUrgent = secondsRemaining <= 5
     val badgeColor: Color = if (isUrgent) MeetColors.error else Color.White
     val badgeBgColor: Color = if (isUrgent) MeetColors.error.copy(alpha = 0.25f) else Color(0xFF1B2E4B)
+
+    val passengerFirstName = remember(ride.passengerName) {
+        ride.passengerName.trim().split(Regex("\\s+")).firstOrNull()?.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+        } ?: "Pasajero"
+    }
+    val passengerRatingText = remember(ride.passengerRating) {
+        ride.passengerRating?.let { String.format(Locale.US, "★ %.1f", it) } ?: "★ 4.9"
+    }
+    val preferences = remember(ride.fareBreakdownJson) {
+        RidePassengerPreferences.fromJson(ride.fareBreakdownJson)
+    }
+    val isMetered = ride.fareMode == "METERED_TIME_DISTANCE"
 
     AnimatedVisibility(
         visible = !isDismissed && secondsRemaining > 0,
@@ -198,6 +214,108 @@ fun RideIncomingDispatchOverlay(
                                 tint = MeetColors.textSecondary,
                                 modifier = Modifier.size(18.dp)
                             )
+                        }
+                    }
+                }
+
+                // Passenger Info & Mode Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = CircleShape,
+                            modifier = Modifier.size(26.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    passengerFirstName.take(1).uppercase(),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MeetColors.cyberCyan
+                                )
+                            }
+                        }
+                        Text(
+                            passengerFirstName,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            passengerRatingText,
+                            color = Color(0xFFFFD700),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Surface(
+                            color = if (isMetered) MeetColors.cyberCyan.copy(alpha = 0.18f) else Color(0xFFFFB300).copy(alpha = 0.18f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, if (isMetered) MeetColors.cyberCyan.copy(alpha = 0.5f) else Color(0xFFFFB300).copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = if (isMetered) "🚕 Taxímetro" else "🤝 Pon Tu Precio",
+                                color = if (isMetered) MeetColors.cyberCyan else Color(0xFFFFB300),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Surface(
+                            color = Color(0xFF1E293B),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Text(
+                                text = if (ride.paymentMethod == "CASH") "💵 Efectivo" else "📱 SINPE",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Passenger Preferences Badges Row (if any)
+                if (preferences.hasSpecialPreferences) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        preferences.toBadges().forEach { badge ->
+                            Surface(
+                                color = badge.color.copy(alpha = 0.16f),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, badge.color.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(badge.icon, fontSize = 11.sp)
+                                    Text(
+                                        badge.label,
+                                        color = badge.color,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
                         }
                     }
                 }

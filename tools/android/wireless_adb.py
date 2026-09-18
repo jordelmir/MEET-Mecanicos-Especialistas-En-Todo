@@ -2,7 +2,10 @@
 """
 MEET Wireless ADB Bridge & Connector for macOS
 Bypasses macOS Sequoia Local Network Privacy (Errno 65 / EHOSTUNREACH)
-by routing localhost:5555 -> Phone_WiFi_IP:5555 via Apple-signed Python runtime.
+by routing localhost:PORT -> Phone_WiFi_IP:PORT via Apple-signed Python runtime.
+Supports auto-discovery for:
+- Honor Magic V2 (VER-N49 / Android.local)
+- Xiaomi Redmi Note 10 Pro (M2101K6R / Android-2.local)
 """
 
 import sys
@@ -15,9 +18,7 @@ import subprocess
 import re
 import argparse
 
-CACHE_FILE = os.path.expanduser("~/.meet_wireless_adb_ip")
 DEFAULT_PORT = 5555
-PID_FILE = "/tmp/meet_adb_bridge.pid"
 
 def run_cmd(cmd):
     try:
@@ -26,7 +27,7 @@ def run_cmd(cmd):
     except Exception:
         return ""
 
-def is_port_open(host, port, timeout=1.0):
+def is_port_open(host, port, timeout=0.6):
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.settimeout(timeout)
     try:
@@ -35,73 +36,6 @@ def is_port_open(host, port, timeout=1.0):
         return True
     except Exception:
         return False
-
-def get_cached_ip():
-    if os.path.exists(CACHE_FILE):
-        try:
-            with open(CACHE_FILE, "r") as f:
-                ip = f.read().strip()
-                if ip:
-                    return ip
-        except Exception:
-            pass
-    return "192.168.1.15"
-
-def save_cached_ip(ip):
-    try:
-        with open(CACHE_FILE, "w") as f:
-            f.write(ip.strip())
-    except Exception:
-        pass
-
-def is_wireless_connected():
-    state = run_cmd("adb -s 127.0.0.1:5555 get-state")
-    return state == "device"
-
-def get_usb_serials():
-    output = run_cmd("adb devices -l")
-    serials = []
-    for line in output.splitlines():
-        if "usb:" in line and "device" in line:
-            parts = line.split()
-            if parts:
-                serials.append(parts[0])
-    return serials
-
-def get_ip_from_usb(serial):
-    ip_out = run_cmd(f"adb -s {serial} shell ip -f inet addr show wlan0")
-    match = re.search(r"inet\s+([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+)", ip_out)
-    if match:
-        ip = match.group(1)
-        save_cached_ip(ip)
-        return ip
-    return None
-
-def scan_subnet_for_adb(subnet_prefix="192.168.1.", port=DEFAULT_PORT):
-    print(f"[*] Scanning {subnet_prefix}1-254 for ADB port {port}...")
-    found_ip = None
-    lock = threading.Lock()
-
-    def probe(host):
-        nonlocal found_ip
-        if found_ip:
-            return
-        if is_port_open(host, port, timeout=0.4):
-            with lock:
-                if not found_ip:
-                    found_ip = host
-
-    threads = []
-    for i in range(1, 255):
-        ip = f"{subnet_prefix}{i}"
-        t = threading.Thread(target=probe, args=(ip,))
-        threads.append(t)
-        t.start()
-
-    for t in threads:
-        t.join(timeout=1.0)
-
-    return found_ip
 
 def forward(src, dst):
     try:
@@ -116,14 +50,10 @@ def forward(src, dst):
     except Exception:
         pass
     finally:
-        try:
-            src.close()
-        except:
-            pass
-        try:
-            dst.close()
-        except:
-            pass
+        try: src.close()
+        except: pass
+        try: dst.close()
+        except: pass
 
 def bridge_worker(client_sock, remote_host, remote_port):
     try:
@@ -136,132 +66,173 @@ def bridge_worker(client_sock, remote_host, remote_port):
     except Exception:
         client_sock.close()
 
-def run_bridge_server(remote_host, remote_port, local_port=DEFAULT_PORT):
+def start_local_bridge(remote_host, remote_port, local_port):
+    if is_port_open("127.0.0.1", local_port, timeout=0.2):
+        return
+    
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(("127.0.0.1", local_port))
     server.listen(10)
     print(f"[+] Bridge active: 127.0.0.1:{local_port} -> {remote_host}:{remote_port}")
-    
-    with open(PID_FILE, "w") as f:
-        f.write(str(os.getpid()))
 
-    try:
+    def loop():
         while True:
-            client_sock, _ = server.accept()
-            threading.Thread(target=bridge_worker, args=(client_sock, remote_host, remote_port), daemon=True).start()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.close()
-        if os.path.exists(PID_FILE):
-            os.remove(PID_FILE)
-
-def stop_bridge():
-    if os.path.exists(PID_FILE):
-        try:
-            with open(PID_FILE, "r") as f:
-                pid = int(f.read().strip())
-            os.kill(pid, 9)
-            os.remove(PID_FILE)
-            print(f"[+] Stopped bridge process (PID {pid}).")
-        except Exception as e:
-            print(f"[-] Error stopping PID: {e}")
-    else:
-        # Check lsof
-        pids = run_cmd("lsof -ti :5555").split()
-        for p in pids:
             try:
-                os.kill(int(p), 9)
-            except:
-                pass
-        print("[*] Cleaned up port 5555 listeners.")
+                csock, _ = server.accept()
+                threading.Thread(target=bridge_worker, args=(csock, remote_host, remote_port), daemon=True).start()
+            except Exception:
+                break
+
+    threading.Thread(target=loop, daemon=True).start()
+
+def discover_mdns_instances():
+    try:
+        proc = subprocess.Popen(
+            ["/usr/bin/dns-sd", "-B", "_adb-tls-connect._tcp", "local."],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        time.sleep(1.2)
+        proc.terminate()
+        out, _ = proc.communicate()
+        instances = []
+        for line in out.splitlines():
+            if "Add" in line and "_adb-tls-connect._tcp." in line:
+                parts = line.split()
+                instances.append(parts[-1])
+        return list(set(instances))
+    except Exception:
+        return []
+
+def resolve_instance(instance):
+    try:
+        proc = subprocess.Popen(
+            ["/usr/bin/dns-sd", "-L", instance, "_adb-tls-connect._tcp", "local."],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
+        time.sleep(1.2)
+        proc.terminate()
+        out, _ = proc.communicate()
+        match = re.search(r"can be reached at ([^:]+):([0-9]+)", out)
+        if match:
+            host = match.group(1).rstrip(".")
+            port = int(match.group(2))
+            model_match = re.search(r"name=([^\s]+)", out)
+            model = model_match.group(1) if model_match else "Android"
+            return host, port, model
+    except Exception:
+        pass
+    return None, None, None
+
+def get_connected_devices():
+    output = run_cmd("adb devices -l")
+    devices = []
+    for line in output.splitlines():
+        if "device" in line and "offline" not in line and not line.startswith("List of"):
+            parts = line.split()
+            if parts:
+                devices.append(parts[0])
+    return devices
+
+def print_device_table():
+    output = run_cmd("adb devices -l")
+    print("\n==================== ACTIVE ADB DEVICES ====================")
+    for line in output.splitlines():
+        if not line.strip() or line.startswith("List of"):
+            continue
+        serial = line.split()[0]
+        label = "Android Device"
+        if "VER-N49" in line or "HNVER" in line:
+            label = "HONOR MAGIC V2 (VER-N49) [FOLDABLE OLED]"
+        elif "M2101K6R" in line or "sweet" in line:
+            label = "XIAOMI REDMI NOTE 10 PRO (M2101K6R)"
+        print(f" • {serial:20} -> {label} | {line}")
+    print("============================================================\n")
+
+def connect_all(target_filter="all"):
+    print(f"[*] Discovering Android devices on local Wi-Fi (Filter: {target_filter})...")
+    instances = discover_mdns_instances()
+    connected = get_connected_devices()
+    found_targets = []
+
+    for inst in instances:
+        host, port, model = resolve_instance(inst)
+        if not host or not port:
+            continue
+        
+        is_honor = "VER-N49" in model or "Android.local" in host or "A2VQ" in inst
+        is_xiaomi = "M2101" in model or "sweet" in model or "Android-2.local" in host
+
+        if target_filter == "honor" and not is_honor:
+            continue
+        if target_filter == "xiaomi" and not is_xiaomi:
+            continue
+
+        endpoint = f"127.0.0.1:{port}"
+        found_targets.append({
+            "host": host,
+            "port": port,
+            "model": model,
+            "endpoint": endpoint,
+            "label": "Honor Magic V2" if is_honor else ("Xiaomi" if is_xiaomi else model)
+        })
+
+    if not found_targets:
+        candidates = []
+        if target_filter in ("all", "honor"):
+            candidates.append(("Android.local", 5555, "Honor Magic V2"))
+            candidates.append(("192.168.1.10", 5555, "Honor Magic V2"))
+        if target_filter in ("all", "xiaomi"):
+            candidates.append(("Android-2.local", 5555, "Xiaomi"))
+            candidates.append(("192.168.1.100", 5555, "Xiaomi"))
+            candidates.append(("192.168.1.15", 5555, "Xiaomi"))
+
+        for host, port, label in candidates:
+            if is_port_open(host, port, timeout=0.3):
+                found_targets.append({
+                    "host": host,
+                    "port": port,
+                    "model": label,
+                    "endpoint": f"127.0.0.1:{port}",
+                    "label": label
+                })
+                break
+
+    for target in found_targets:
+        endpoint = target["endpoint"]
+        label = target["label"]
+        if endpoint in connected:
+            print(f"[✓] {label} ({endpoint}) is already connected!")
+            continue
+
+        print(f"[*] Starting bridge for {label} (127.0.0.1:{target['port']} -> {target['host']}:{target['port']})...")
+        start_local_bridge(target["host"], target["port"], target["port"])
+        time.sleep(0.3)
+        res = run_cmd(f"adb connect {endpoint}")
+        print(f"[*] adb response: {res}")
+
+    time.sleep(0.8)
+    print_device_table()
 
 def main():
-    parser = argparse.ArgumentParser(description="MEET Wireless ADB Connector")
-    parser.add_argument("--server", action="store_true", help="Run the bridge server in foreground")
-    parser.add_argument("--ip", type=str, default="", help="Override target phone IP")
-    parser.add_argument("--stop", action="store_true", help="Stop running bridge daemon")
-    parser.add_argument("--restart", action="store_true", help="Restart bridge and reconnect")
+    parser = argparse.ArgumentParser(description="MEET Wireless ADB Bridge & Connector")
+    parser.add_argument("--honor", action="store_true", help="Connect specifically to Honor Magic V2")
+    parser.add_argument("--xiaomi", action="store_true", help="Connect specifically to Xiaomi")
+    parser.add_argument("--all", action="store_true", help="Connect all discovered devices")
+    parser.add_argument("--status", action="store_true", help="Display connected device table")
     args = parser.parse_args()
 
-    if args.stop:
-        stop_bridge()
-        run_cmd("adb disconnect 127.0.0.1:5555")
+    if args.status:
+        print_device_table()
         return
 
-    if args.restart:
-        stop_bridge()
-        run_cmd("adb disconnect 127.0.0.1:5555")
-        time.sleep(0.5)
+    target = "all"
+    if args.honor:
+        target = "honor"
+    elif args.xiaomi:
+        target = "xiaomi"
 
-    # 1. Quick check: Is wireless ADB already functioning perfectly?
-    if not args.restart and is_wireless_connected():
-        print("[+] Wireless ADB is already connected and operational!")
-        devices = run_cmd("adb devices -l")
-        print("\n--- Current ADB Devices ---")
-        print(devices)
-        print("---------------------------\n")
-        return
-
-    # 2. Find target IP
-    target_ip = args.ip
-    usb_serials = get_usb_serials()
-
-    if not target_ip and usb_serials:
-        target_ip = get_ip_from_usb(usb_serials[0])
-        if target_ip:
-            print(f"[+] Phone WiFi IP detected via USB: {target_ip}")
-
-    if not target_ip:
-        cached = get_cached_ip()
-        if is_port_open(cached, DEFAULT_PORT, timeout=0.8):
-            target_ip = cached
-            print(f"[+] Phone listening at cached IP: {target_ip}")
-
-    if not target_ip:
-        target_ip = scan_subnet_for_adb()
-        if target_ip:
-            print(f"[+] Discovered phone IP via scan: {target_ip}")
-            save_cached_ip(target_ip)
-
-    # If port 5555 is not open on phone, but USB is connected, enable it:
-    if target_ip and not is_port_open(target_ip, DEFAULT_PORT, timeout=0.8) and usb_serials:
-        print(f"[*] Port {DEFAULT_PORT} not open on {target_ip}. Enabling tcpip via USB...")
-        run_cmd(f"adb -s {usb_serials[0]} tcpip {DEFAULT_PORT}")
-        time.sleep(1)
-
-    if not target_ip:
-        print("[-] Could not find phone with ADB port 5555 open.")
-        print("[-] Please connect phone via USB once or provide IP with --ip <ip>")
-        sys.exit(1)
-
-    if args.server:
-        run_bridge_server(target_ip, DEFAULT_PORT)
-        return
-
-    # 3. Ensure local bridge daemon is running
-    if not is_port_open("127.0.0.1", DEFAULT_PORT, timeout=0.5):
-        print(f"[*] Starting wireless bridge (127.0.0.1:5555 -> {target_ip}:5555)...")
-        cmd = f"/usr/bin/python3 \"{os.path.abspath(__file__)}\" --server --ip {target_ip} > /tmp/meet_adb_bridge.log 2>&1 &"
-        os.system(cmd)
-        time.sleep(1)
-
-    # 4. Connect ADB to 127.0.0.1:5555
-    print("[*] Connecting adb to 127.0.0.1:5555...")
-    out = run_cmd("adb connect 127.0.0.1:5555")
-    print(out)
-    time.sleep(0.5)
-
-    devices = run_cmd("adb devices -l")
-    print("\n--- Current ADB Devices ---")
-    print(devices)
-    print("---------------------------\n")
-
-    if is_wireless_connected():
-        print(" SUCCESS: Wireless debugging is READY! You can now unplug USB-C.")
-    else:
-        print(" Note: If status is 'offline', try running with --restart")
+    connect_all(target)
 
 if __name__ == "__main__":
     main()

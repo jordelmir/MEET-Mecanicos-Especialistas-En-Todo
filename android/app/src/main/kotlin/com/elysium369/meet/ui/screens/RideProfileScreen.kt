@@ -659,10 +659,13 @@ internal fun RideHistoryPanel(
         contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 80.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (rides.isEmpty()) {
-            item { Text("No hay viajes capturados todavía.", color = MeetColors.textMuted) }
+        item {
+            Text("VIAJES FINALIZADOS", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
         }
-        items(rides.sortedByDescending { it.createdAt }) { ride ->
+        if (rides.isEmpty()) {
+            item { Text("Todavía no hay viajes finalizados confirmados por Supabase.", color = MeetColors.textMuted) }
+        }
+        items(rides.sortedByDescending { it.completedAt ?: it.createdAt }) { ride ->
             Card(
                 onClick = { selectedRideDetail = ride },
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF08141F)),

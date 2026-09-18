@@ -305,8 +305,8 @@ begin
         );
     end if;
 
-    v_response := jsonb_build_object(
-        'success', true,
+    v_response := public.ride_command_success(jsonb_build_object(
+        'status', 'COMPLETED',
         'state', v_request.state,
         'version', v_request.version,
         'trip_id', v_request.id,
@@ -314,7 +314,7 @@ begin
         'customer_total_minor', v_customer_total,
         'commission_minor', v_commission,
         'completed_at', v_request.completed_at
-    );
+    ));
     perform public.ride_command_record(
         v_user_id, p_idempotency_key, v_request_hash, v_response
     );

@@ -26,6 +26,12 @@ sealed interface CallTransportOutcome {
     data class Failed(val safeCode: String) : CallTransportOutcome
 }
 
+interface CallAudioTransport {
+    val state: StateFlow<CallConnectionState>
+    suspend fun connectAudio(conversationId: String, principalId: String): CallTransportOutcome
+    suspend fun end()
+}
+
 /**
  * Real LiveKit audio transport for normal 1-on-1 calls.
  * Delegates to shared LiveKitMediaSession, connecting with microphone enabled.
@@ -33,10 +39,10 @@ sealed interface CallTransportOutcome {
 @Singleton
 class ElysiumCallTransport @Inject constructor(
     private val mediaSession: LiveKitMediaSession,
-) {
-    val state: StateFlow<CallConnectionState> = mediaSession.state
+) : CallAudioTransport {
+    override val state: StateFlow<CallConnectionState> = mediaSession.state
 
-    suspend fun connectAudio(conversationId: String, principalId: String): CallTransportOutcome {
+    override suspend fun connectAudio(conversationId: String, principalId: String): CallTransportOutcome {
         val endpoint = BuildConfig.COMMUNICATION_CALL_TOKEN_URL.trim()
         if (endpoint.isEmpty()) return CallTransportOutcome.NotConfigured
         if (!endpoint.startsWith("https://")) return CallTransportOutcome.RejectedInsecureEndpoint
@@ -82,7 +88,7 @@ class ElysiumCallTransport @Inject constructor(
         }
     }
 
-    suspend fun end() {
+    override suspend fun end() {
         mediaSession.disconnect()
     }
 }

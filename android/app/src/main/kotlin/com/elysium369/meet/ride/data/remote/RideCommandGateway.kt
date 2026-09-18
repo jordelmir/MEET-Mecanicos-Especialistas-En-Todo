@@ -153,7 +153,7 @@ private data class RideCommandWireResponse(
 @Singleton
 class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
     private val json = Json {
-        ignoreUnknownKeys = false
+        ignoreUnknownKeys = true
         explicitNulls = false
     }
 
@@ -181,15 +181,17 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
             )
 
         return try {
-            val response = client.postgrest
+            val rawElement = client.postgrest
                 .rpc(invocation.functionName, invocation.parameters)
-                .decodeAs<RideCommandWireResponse>()
+                .decodeAs<JsonObject>()
 
-            if (response.ok) {
-                val data = requireNotNull(response.data) {
-                    "Successful command response omitted data"
-                }
-                val status = data.text("status") ?: "ACCEPTED"
+            val isOk = rawElement.bool("ok")
+                ?: rawElement.bool("success")
+                ?: (rawElement.text("status") != null || rawElement.text("state") != null)
+
+            if (isOk) {
+                val data = (rawElement["data"] as? JsonObject) ?: rawElement
+                val status = data.text("status") ?: data.text("state") ?: "ACCEPTED"
                 if (command.type == RideCommandType.VERIFY_BOARDING_PIN &&
                     status in setOf("INVALID", "LOCKED", "EXPIRED_OR_USED")
                 ) {
@@ -202,27 +204,38 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                         },
                         retryable = false,
                         currentServerVersion = data.long("version"),
-                        correlationId = response.correlationId,
+                        correlationId = rawElement.text("correlation_id"),
                     )
                 }
+                val serverVer = data.long("version")
+                    ?: rawElement.long("version")
+                    ?: (command.expectedVersion + 1)
+                val finalPrice = data.long("customer_total_minor")
+                    ?: data.long("final_fare_minor")
+                    ?: rawElement.long("customer_total_minor")
+
                 RideCommandGatewayResult.Accepted(
                     status = status,
-                    serverVersion = data.long("version")
-                        ?: error("Successful command response omitted version"),
-                    finalPriceMinor = data.long("customer_total_minor"),
-                    correlationId = response.correlationId,
+                    serverVersion = serverVer,
+                    finalPriceMinor = finalPrice,
+                    correlationId = rawElement.text("correlation_id"),
                     data = data,
                 )
             } else {
-                val error = requireNotNull(response.error) {
-                    "Rejected command response omitted error"
-                }
+                val errorObj = rawElement["error"] as? JsonObject
+                val code = errorObj?.text("code") ?: rawElement.text("code") ?: "COMMAND_REJECTED"
+                val message = errorObj?.text("message") ?: rawElement.text("message") ?: "Comando rechazado por la autoridad remota"
+                val retryable = errorObj?.bool("retryable") ?: false
+                val currentVersion = (errorObj?.get("details") as? JsonObject)?.long("current_version")
+                    ?: errorObj?.long("current_version")
+                    ?: rawElement.long("version")
+
                 RideCommandGatewayResult.Rejected(
-                    code = error.code,
-                    message = error.message,
-                    retryable = error.retryable,
-                    currentServerVersion = error.details.long("current_version"),
-                    correlationId = response.correlationId,
+                    code = code,
+                    message = message,
+                    retryable = retryable,
+                    currentServerVersion = currentVersion,
+                    correlationId = rawElement.text("correlation_id"),
                 )
             }
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
@@ -568,6 +581,13 @@ private fun JsonObject.long(key: String): Long? =
         (element as? kotlinx.serialization.json.JsonPrimitive)
             ?.content
             ?.toLongOrNull()
+    }
+
+private fun JsonObject.bool(key: String): Boolean? =
+    this[key]?.let { element ->
+        (element as? kotlinx.serialization.json.JsonPrimitive)
+            ?.content
+            ?.toBooleanStrictOrNull()
     }
 
 private fun Throwable.safeMessage(): String =

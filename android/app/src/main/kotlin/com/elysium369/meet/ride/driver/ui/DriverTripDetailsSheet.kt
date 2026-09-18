@@ -3,6 +3,7 @@ package com.elysium369.meet.ride.driver.ui
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import com.elysium369.meet.ride.driver.DriverTripPhase
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -23,7 +24,10 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Help
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -180,6 +184,123 @@ fun DriverTripDetailsSheet(
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                        }
+                    }
+                }
+            }
+
+            // LiveKit Voice Link Card (Zero Phone Leakage)
+            Surface(
+                color = MeetColors.cardBackground,
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(
+                    1.dp,
+                    if (state.isVoiceConnected) MeetColors.neonGreen.copy(alpha = 0.6f) else MeetColors.borderBlue
+                ),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .background(
+                                        if (state.isVoiceConnected) MeetColors.neonGreen.copy(alpha = 0.2f)
+                                        else MeetColors.electricBlue.copy(alpha = 0.15f),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    imageVector = if (state.isMicrophoneMuted) Icons.Default.MicOff else Icons.Default.Phone,
+                                    contentDescription = null,
+                                    tint = if (state.isVoiceConnected) MeetColors.neonGreen else MeetColors.electricBlue,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
+                            Column {
+                                Text(
+                                    text = "Enlace de Voz Seguro (LiveKit)",
+                                    color = MeetColors.textPrimary,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    text = when {
+                                        state.isVoiceConnected -> if (state.isMicrophoneMuted) "Conectado • Micrófono silenciado" else "Conectado • Audio bidireccional activo"
+                                        state.isVoiceConnecting -> "Conectando sala segura..."
+                                        else -> "Llamada cifrada directa sin exponer número telefónico"
+                                    },
+                                    color = if (state.isVoiceConnected) MeetColors.neonGreen else MeetColors.textSecondary,
+                                    fontSize = 11.sp,
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Button(
+                            onClick = { onIntent(DriverTripIntent.ToggleVoiceCall) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (state.isVoiceConnected) MeetColors.error.copy(alpha = 0.8f) else MeetColors.neonGreen,
+                                contentColor = if (state.isVoiceConnected) MeetColors.textPrimary else MeetColors.backgroundDark,
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Phone,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = when {
+                                    state.isVoiceConnected -> "Finalizar"
+                                    state.isVoiceConnecting -> "Conectando..."
+                                    else -> "Llamar Pasajero"
+                                },
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp,
+                            )
+                        }
+
+                        if (state.isVoiceConnected) {
+                            Button(
+                                onClick = { onIntent(DriverTripIntent.ToggleMicrophoneMute) },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (state.isMicrophoneMuted) MeetColors.warning.copy(alpha = 0.3f) else MeetColors.backgroundDark,
+                                    contentColor = if (state.isMicrophoneMuted) MeetColors.warning else MeetColors.textPrimary,
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                border = BorderStroke(1.dp, if (state.isMicrophoneMuted) MeetColors.warning else MeetColors.borderBlue),
+                            ) {
+                                Icon(
+                                    imageVector = if (state.isMicrophoneMuted) Icons.Default.MicOff else Icons.Default.Mic,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = if (state.isMicrophoneMuted) "Reactivar" else "Silenciar",
+                                    fontSize = 12.sp,
+                                )
+                            }
                         }
                     }
                 }
@@ -373,45 +494,18 @@ fun DriverTripDetailsSheet(
     }
 
     if (showCancelDialog) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showCancelDialog = false },
-            containerColor = MeetColors.cardBackground,
-            title = {
-                Text(
-                    text = "¿Cancelar este viaje?",
-                    color = MeetColors.textPrimary,
-                    fontWeight = FontWeight.Bold,
-                )
+        DriverCancelTripDialog(
+            onConfirm = { reasonCode, detail ->
+                showCancelDialog = false
+                onIntent(DriverTripIntent.ToggleDetailsSheet(false))
+                onIntent(DriverTripIntent.CancelTrip(reasonCode = reasonCode, detail = detail))
             },
-            text = {
-                Text(
-                    text = "La cancelación operacional quedará registrada bajo la política anti-fraude de MEET.",
-                    color = MeetColors.textSecondary,
-                    fontSize = 13.sp,
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showCancelDialog = false
-                        onIntent(DriverTripIntent.ToggleDetailsSheet(false))
-                        onIntent(
-                            DriverTripIntent.CancelTrip(
-                                reasonCode = "DRIVER_OPERATIONAL_ISSUE",
-                                detail = "Cancelado por el conductor desde el Active Trip Cockpit",
-                            ),
-                        )
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.error),
-                ) {
-                    Text("Confirmar Cancelación", color = Color.White)
-                }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { showCancelDialog = false }) {
-                    Text("Regresar", color = MeetColors.textSecondary)
-                }
-            },
+            onDismiss = { showCancelDialog = false },
+            isAfterArrival = state.phase in setOf(
+                DriverTripPhase.AtPickup,
+                DriverTripPhase.PassengerOnboard,
+                DriverTripPhase.InProgress
+            ),
         )
     }
 }

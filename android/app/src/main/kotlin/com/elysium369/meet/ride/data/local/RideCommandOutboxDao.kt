@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface RideCommandOutboxDao {
+    @Query("SELECT * FROM ride_command_outbox WHERE rideId = :rideId AND actorSessionUserId = :owner AND commandType = 'CLAIM' AND expectedVersion = :version AND status IN ('PENDING', 'IN_FLIGHT', 'RETRYABLE') ORDER BY createdAt DESC LIMIT 1")
+    suspend fun activeClaim(rideId: String, owner: String, version: Long): RideCommandOutboxEntity?
+
     @Query("SELECT * FROM ride_command_outbox WHERE rideId = :requestId AND commandType = 'VERIFY_BOARDING_PIN' ORDER BY createdAt DESC LIMIT 1")
     fun latestBoardingPinVerification(requestId: String): Flow<RideCommandOutboxEntity?>
 

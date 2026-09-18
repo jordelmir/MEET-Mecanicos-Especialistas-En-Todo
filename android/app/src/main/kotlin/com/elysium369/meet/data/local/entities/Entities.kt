@@ -142,7 +142,15 @@ data class AdapterProfileEntity(
     val supportsSTN: Boolean,
     val lastUsedAt: Long,
     val successfulConnections: Int,
-    val failedConnections: Int
+    val failedConnections: Int,
+    @ColumnInfo(defaultValue = "ELM327_CLONE") val chipFamily: String = "ELM327_CLONE",
+    @ColumnInfo(defaultValue = "0") val avgLatencyMs: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val minLatencyMs: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val maxLatencyMs: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val jitterMs: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val supportsCanFd: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val supportsIsoTp: Boolean = false,
+    val handshakeAuditJson: String? = null,
 )
 
 @Entity(

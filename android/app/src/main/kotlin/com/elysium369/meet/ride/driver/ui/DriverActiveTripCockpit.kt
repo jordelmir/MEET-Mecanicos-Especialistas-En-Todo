@@ -16,6 +16,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.FloatingActionButton
@@ -132,6 +137,38 @@ fun DriverActiveTripCockpit(
                     imageVector = Icons.Default.MyLocation,
                     contentDescription = "Recentrar mapa en vehículo",
                     tint = MeetColors.neonGreen,
+                )
+            }
+        }
+
+        // 4.1 Floating Waze Navigation Action Button
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MeetColors.backgroundDark.copy(alpha = 0.92f),
+            border = BorderStroke(1.2.dp, MeetColors.cyberCyan),
+            shadowElevation = 8.dp,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 16.dp, bottom = 80.dp)
+                .clickable { onIntent(DriverTripIntent.OpenExternalNavigation) },
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Icon(
+                    painter = painterResource(id = com.elysium369.meet.R.drawable.ic_waze_logo),
+                    contentDescription = "Navegar con Waze",
+                    tint = Color.Unspecified,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "WAZE",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp,
                 )
             }
         }

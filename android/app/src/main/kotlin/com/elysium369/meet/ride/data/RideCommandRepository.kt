@@ -164,6 +164,13 @@ class RideCommandRepository @Inject constructor(
             createdAt = now,
             updatedAt = now,
         )
+        if (envelope.type == RideCommandType.CLAIM && outboxDao.activeClaim(
+                candidate.rideId, sessionUserId, candidate.expectedVersion,
+            ) != null
+        ) {
+            RideCommandSyncWorker.enqueueNow(context)
+            return RideCommandEnqueueResult.AlreadyQueued
+        }
         if (envelope.type == RideCommandType.CANCEL) {
             // A process/network interruption must not leave cancellation disabled
             // behind an abandoned worker lease. The command remains idempotent and

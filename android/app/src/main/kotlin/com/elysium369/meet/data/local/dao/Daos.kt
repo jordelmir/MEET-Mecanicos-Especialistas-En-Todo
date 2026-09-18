@@ -122,8 +122,17 @@ interface AdapterProfileDao {
     @Query("SELECT * FROM adapter_profiles WHERE deviceAddress = :address")
     suspend fun getProfile(address: String): AdapterProfileEntity?
 
+    @Query("SELECT * FROM adapter_profiles ORDER BY lastUsedAt DESC")
+    suspend fun getAllProfiles(): List<AdapterProfileEntity>
+
+    @Query("SELECT * FROM adapter_profiles WHERE successfulConnections > 0 ORDER BY avgLatencyMs ASC LIMIT 1")
+    suspend fun getFastestAdapter(): AdapterProfileEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertProfile(profile: AdapterProfileEntity)
+
+    @Query("DELETE FROM adapter_profiles WHERE deviceAddress = :address")
+    suspend fun deleteProfile(address: String)
 }
 
 @Dao

@@ -4593,6 +4593,20 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_75_76 = object : Migration(75, 76) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // OBD Adapter latency benchmarks, hardware matrix classification & handshake audit persistence
+            db.execSQL("ALTER TABLE `adapter_profiles` ADD COLUMN `chipFamily` TEXT NOT NULL DEFAULT 'ELM327_CLONE'")
+            db.execSQL("ALTER TABLE `adapter_profiles` ADD COLUMN `avgLatencyMs` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `adapter_profiles` ADD COLUMN `minLatencyMs` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `adapter_profiles` ADD COLUMN `maxLatencyMs` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `adapter_profiles` ADD COLUMN `jitterMs` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `adapter_profiles` ADD COLUMN `supportsCanFd` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `adapter_profiles` ADD COLUMN `supportsIsoTp` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `adapter_profiles` ADD COLUMN `handshakeAuditJson` TEXT DEFAULT NULL")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4655,6 +4669,7 @@ object AppModule {
             MIGRATION_72_73,
             MIGRATION_73_74,
             MIGRATION_74_75,
+            MIGRATION_75_76,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

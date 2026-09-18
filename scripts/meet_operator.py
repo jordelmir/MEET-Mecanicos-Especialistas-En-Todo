@@ -17,29 +17,76 @@ import xml.etree.ElementTree as ET
 
 DEFAULT_SERIAL = "127.0.0.1:5555"
 
-def get_adb_device():
+def parse_device_arg():
     serial = os.environ.get("ANDROID_SERIAL")
-    if serial:
-        return serial
-    
+    device_override = None
+    new_argv = [sys.argv[0]]
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        if arg in ("--device", "-d") and i + 1 < len(sys.argv):
+            device_override = sys.argv[i + 1]
+            i += 2
+        elif arg.startswith("--device="):
+            device_override = arg.split("=", 1)[1]
+            i += 1
+        else:
+            new_argv.append(arg)
+            i += 1
+    sys.argv = new_argv
+    return device_override or serial
+
+def get_known_adb_devices():
     try:
-        out = subprocess.check_output(["adb", "devices"], text=True)
-        lines = [line.strip() for line in out.splitlines() if line.strip() and not line.startswith("List of")]
-        active_devices = []
-        for line in lines:
-            parts = line.split()
-            if len(parts) >= 2 and parts[1] == "device":
-                active_devices.append(parts[0])
-        
-        if DEFAULT_SERIAL in active_devices:
-            return DEFAULT_SERIAL
-        if active_devices:
-            return active_devices[0]
+        out = subprocess.check_output(["adb", "devices", "-l"], text=True)
     except Exception:
-        pass
+        return {}
+    devices = {}
+    for line in out.splitlines():
+        if "device" in line and "offline" not in line and not line.startswith("List of"):
+            parts = line.split()
+            if parts:
+                serial = parts[0]
+                is_honor = "VER-N49" in line or "HNVER" in line
+                is_xiaomi = "M2101K6R" in line or "sweet" in line
+                devices[serial] = {
+                    "serial": serial,
+                    "is_honor": is_honor,
+                    "is_xiaomi": is_xiaomi,
+                    "label": "HONOR MAGIC V2 (VER-N49)" if is_honor else ("XIAOMI REDMI NOTE 10 PRO (M2101K6R)" if is_xiaomi else "Android Device"),
+                    "line": line
+                }
+    return devices
+
+def resolve_device():
+    target = parse_device_arg()
+    known = get_known_adb_devices()
+    if target:
+        t_lower = target.lower()
+        if t_lower in ("honor", "magic", "ver-n49"):
+            for s, d in known.items():
+                if d["is_honor"]:
+                    return s
+        elif t_lower in ("xiaomi", "redmi", "sweet", "m2101k6r"):
+            for s, d in known.items():
+                if d["is_xiaomi"]:
+                    return s
+        if target in known:
+            return target
+        return target
+    
+    # Priority: Honor Magic V2 > Xiaomi > First available
+    for s, d in known.items():
+        if d["is_honor"]:
+            return s
+    for s, d in known.items():
+        if d["is_xiaomi"]:
+            return s
+    if known:
+        return list(known.keys())[0]
     return DEFAULT_SERIAL
 
-DEVICE = get_adb_device()
+DEVICE = resolve_device()
 
 def run_adb(args, capture=True):
     cmd = ["adb", "-s", DEVICE] + args
@@ -434,10 +481,61 @@ def run_test_all_verticals():
     print("\n=== AUDITORÍA MULTI-VERTICAL COMPLETADA CON ÉXITO ABSOLUTO ===")
     print(f"Todas las capturas se guardaron en: {out_dir}/")
 
+def print_known_devices():
+    known = get_known_adb_devices()
+    print("\n==================== ACTIVE ADB DEVICES ====================")
+    if not known:
+        print("  No active ADB devices detected.")
+    for s, d in known.items():
+        active_marker = "  <-- [TARGET]" if s == DEVICE else ""
+        print(f" • {s:20} -> {d['label']}{active_marker}")
+    print(f"\nCurrent active target: {DEVICE}")
+    print("============================================================\n")
+
+def run_wireless_connect(target="all"):
+    script_path = os.path.abspath("tools/android/wireless_adb.py")
+    flag = f"--{target}" if target in ("honor", "xiaomi") else "--all"
+    cmd = f"/usr/bin/python3 \"{script_path}\" {flag}"
+    os.system(cmd)
+
+def run_install(target="current"):
+    apk_path = os.path.abspath("android/app/build/outputs/apk/debug/app-debug.apk")
+    if not os.path.exists(apk_path):
+        print(f"[-] Error: APK not found at {apk_path}. Run ./gradlew assembleDebug first.")
+        return
+    known = get_known_adb_devices()
+    targets = []
+    if target in ("all", "both"):
+        targets = list(known.keys())
+    elif target == "honor":
+        targets = [s for s, d in known.items() if d["is_honor"]]
+    elif target == "xiaomi":
+        targets = [s for s, d in known.items() if d["is_xiaomi"]]
+    else:
+        targets = [DEVICE]
+
+    if not targets:
+        print(f"[-] No target devices found matching '{target}'.")
+        return
+
+    for ser in targets:
+        lbl = known.get(ser, {}).get("label", ser)
+        print(f"[*] Installing APK onto {lbl} ({ser})...")
+        res = subprocess.run(["adb", "-s", ser, "install", "-r", apk_path])
+        if res.returncode == 0:
+            print(f"[✓] Installation succeeded on {lbl} ({ser})!")
+            subprocess.run(["adb", "-s", ser, "shell", "monkey", "-p", "com.elysium369.meet", "-c", "android.intent.category.LAUNCHER", "1"])
+        else:
+            print(f"[-] Installation failed on {ser}")
+
 def main():
     if len(sys.argv) < 2:
         print(__doc__)
         print("Uso:")
+        print("  python3 scripts/meet_operator.py [--device honor|xiaomi|<serial>] <comando>")
+        print("  python3 scripts/meet_operator.py devices")
+        print("  python3 scripts/meet_operator.py connect [honor|xiaomi|all]")
+        print("  python3 scripts/meet_operator.py install [honor|xiaomi|all]")
         print("  python3 scripts/meet_operator.py state / status")
         print("  python3 scripts/meet_operator.py screen / inspect")
         print("  python3 scripts/meet_operator.py tap <label_or_tag> [y_if_coord]")
@@ -462,7 +560,15 @@ def main():
         sys.exit(0)
         
     cmd = sys.argv[1].lower()
-    if cmd in ["state", "status"]:
+    if cmd in ["devices", "device-list"]:
+        print_known_devices()
+    elif cmd == "connect":
+        target = sys.argv[2].lower() if len(sys.argv) > 2 else "all"
+        run_wireless_connect(target)
+    elif cmd == "install":
+        target = sys.argv[2].lower() if len(sys.argv) > 2 else "current"
+        run_install(target)
+    elif cmd in ["state", "status"]:
         print(json.dumps(dump_state(), indent=2))
     elif cmd == "reconnect":
         out, err, code = run_adb(["connect", DEVICE])

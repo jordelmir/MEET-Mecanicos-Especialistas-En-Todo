@@ -91,6 +91,8 @@ import com.elysium369.meet.ride.map.RideMapDataSource
 import com.elysium369.meet.ride.map.resilientRidePlaceSearchProvider
 import com.elysium369.meet.ride.map.resilientRideRoutingProvider
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
+import com.elysium369.meet.ride.domain.RidePassengerPreferences
+import com.elysium369.meet.ride.domain.PassengerPreferencesSelector
 import com.elysium369.meet.ride.domain.RideDriverPresencePolicy
 import com.elysium369.meet.ride.domain.RideDispatchExpiryPolicy
 import com.elysium369.meet.ride.driver.RideDriverFeedPolicy
@@ -197,6 +199,11 @@ fun RideServiceScreen(
     val currentGps by viewModel.currentGpsLocation.collectAsState()
     val myDriverId = viewModel.currentRideActorId.takeIf { it.isNotBlank() }
         ?: viewModel.currentUserId
+    LaunchedEffect(driverMode, driverVerification?.status, myDriverId) {
+        if (driverMode && RideVerificationPolicy.grantsAccess(driverVerification?.status)) {
+            viewModel.ensureRideDriverPresence()
+        }
+    }
     val DRIVER_OPERATIONAL_STATES = remember {
         setOf(
             "ASSIGNED",
@@ -207,11 +214,14 @@ fun RideServiceScreen(
         )
     }
     val effectiveActiveRide = remember(activeRide, driverMode, allRides, myDriverId) {
+        val selectedRide = activeRide
         when {
-            activeRide != null -> activeRide
+            selectedRide != null && selectedRide.serverVersion > 0L &&
+                (selectedRide.serverState in DRIVER_OPERATIONAL_STATES || selectedRide.status in DRIVER_OPERATIONAL_STATES) -> selectedRide
             driverMode && myDriverId != null -> {
                 allRides.firstOrNull { ride ->
                     ride.assignedDriverId == myDriverId &&
+                        ride.serverVersion > 0L &&
                         (ride.serverState in DRIVER_OPERATIONAL_STATES || ride.status in DRIVER_OPERATIONAL_STATES)
                 }
             }
@@ -222,7 +232,12 @@ fun RideServiceScreen(
         if (driverMode && activeRide == null && effectiveActiveRide != null) {
             viewModel.selectActiveRide(effectiveActiveRide)
         }
+        val rId = effectiveActiveRide?.requestId
+        if (rId != null) {
+            viewModel.observeRideCalls(rId, if (driverMode) "DRIVER" else "PASSENGER")
+        }
     }
+    var showInRideChat by rememberSaveable { mutableStateOf(false) }
     val passengerRegistrationMissing = passengerVerification == null
     val driverRegistrationMissing = driverVerification == null
     val voicePreferences = remember(context) {
@@ -316,21 +331,6 @@ fun RideServiceScreen(
 
     if (showLiveness && presenceKey != null) {
         key(presenceOwnerId) {
-        if (BuildConfig.DEBUG && com.elysium369.meet.ride.domain.RidePresenceBypassWrapper.isBypassActive(context)) {
-            RideLivenessBypassDialog(
-                onVerified = { evidenceHash ->
-                    val now = System.currentTimeMillis()
-                    if (viewModel.activePrincipal.value.id != presenceOwnerId) return@RideLivenessBypassDialog
-                    presencePreferences.edit { putLong(presenceKey, now) }
-                    viewModel.recordDriverLiveness(evidenceHash, now)
-                    showLiveness = false
-                },
-                onCancel = {
-                    showLiveness = false
-                    if (driverMode) viewModel.toggleRideDriverMode()
-                },
-            )
-        } else {
             RideLivenessDialog(
                 onVerified = { evidenceHash ->
                     val now = System.currentTimeMillis()
@@ -344,7 +344,6 @@ fun RideServiceScreen(
                     if (driverMode) viewModel.toggleRideDriverMode()
                 },
             )
-        }
         }
     }
 
@@ -576,7 +575,8 @@ fun RideServiceScreen(
                 com.elysium369.meet.ride.driver.ui.DriverActiveTripCockpitRoute(
                     rideId = effectiveActiveRide.requestId,
                     initialProjection = effectiveActiveRide,
-                    onOpenMessages = { onOpenMessages(effectiveActiveRide.requestId) },
+                    onOpenMessages = { showInRideChat = true },
+                    onTripDismissed = { viewModel.selectActiveRide(null) },
                     currentLatitude = currentGps?.latitude,
                     currentLongitude = currentGps?.longitude,
                     currentAccuracy = currentGps?.accuracy,
@@ -587,7 +587,7 @@ fun RideServiceScreen(
                     ride = effectiveActiveRide,
                     isDriver = false,
                     onCloseRide = { viewModel.selectActiveRide(null) },
-                    onOpenMessages = { onOpenMessages(effectiveActiveRide.requestId) },
+                    onOpenMessages = { showInRideChat = true },
                 )
             } else {
                 if (driverMode) {
@@ -757,6 +757,46 @@ fun RideServiceScreen(
                     },
                 )
             }
+
+            // ═══ UNIFIED IN-RIDE REALTIME CHAT SHEET ═══
+            if (showInRideChat && effectiveActiveRide != null) {
+                val role = if (driverMode) "DRIVER" else "PASSENGER"
+                val myPassengerId = passengerVerification?.passengerId ?: viewModel.currentUserId
+                val myId = if (driverMode) (myDriverId ?: "driver_me") else (myPassengerId ?: "passenger_me")
+                val myName = if (driverMode) "Chofer" else (passengerVerification?.fullName ?: "Pasajero")
+                val chatMessages by viewModel.rideChatMessages.collectAsState()
+                val isPlayingAudio by viewModel.isPlayingAudio.collectAsState()
+                val isRecordingAudio by viewModel.isRecordingAudio.collectAsState()
+
+                com.elysium369.meet.ui.screens.ride.RideInRideChatSheet(
+                    rideRequestId = effectiveActiveRide.requestId,
+                    myId = myId,
+                    myName = myName,
+                    myRole = role,
+                    isDriver = driverMode,
+                    chatMessages = chatMessages,
+                    onDismiss = { showInRideChat = false },
+                    onSendMessage = { text ->
+                        viewModel.sendRideChatMessage(effectiveActiveRide.requestId, myId, myName, role, text)
+                    },
+                    onSendPreset = { preset ->
+                        viewModel.sendRidePresetMessage(effectiveActiveRide.requestId, myId, myName, role, preset)
+                    },
+                    onSendVoiceNote = { _, _ -> },
+                    onSendImage = { bytes ->
+                        viewModel.sendRideImageBytes(context, effectiveActiveRide.requestId, myId, myName, role, bytes)
+                    },
+                    playingAudioPath = isPlayingAudio,
+                    onPlayAudio = { path -> viewModel.playAudioMessage(path) },
+                    isRecordingAudio = isRecordingAudio,
+                    onStartRecording = {
+                        viewModel.startAudioRecording(context)
+                    },
+                    onStopRecording = {
+                        viewModel.stopAndSendAudioRecording(effectiveActiveRide.requestId, myId, myName, role)
+                    },
+                )
+            }
         }
     }
 
@@ -780,7 +820,18 @@ private fun DriverWalletCard(
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("BILLETERA DEL CHOFER", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
             Text("Saldo promocional inicial: ${CoreMoney.ofCrc(starter).formatted()}", color = Color.White, fontWeight = FontWeight.Bold)
-            Text("Saldo disponible: ${CoreMoney.ofCrc(balance?.availableMinor ?: 0).formatted()}", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
+            Text(
+                "Saldo disponible: ${balance?.availableMinor?.let { CoreMoney.ofCrc(it).formatted() } ?: "Consultando Supabase…"}",
+                color = MeetColors.neonGreen,
+                fontWeight = FontWeight.Bold,
+            )
+            balance?.let {
+                Text(
+                    "Reservado para viajes: ${CoreMoney.ofCrc(it.reservedMinor).formatted()} · Cobrado al finalizar: 5% de la tarifa aplicable",
+                    color = MeetColors.textSecondary,
+                    fontSize = 11.sp,
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Comisión por viaje: $commission%", color = MeetColors.textSecondary, fontSize = 12.sp)
                 Spacer(Modifier.width(8.dp))
@@ -1076,6 +1127,7 @@ fun PassengerDashboard(
     var requestingForSomeoneElse by rememberSaveable(draftOwner) { mutableStateOf(false) }
     var guestName by rememberSaveable(draftOwner) { mutableStateOf("") }
     var guestPhoneE164 by rememberSaveable(draftOwner) { mutableStateOf("") }
+    var passengerPreferences by remember(draftOwner) { mutableStateOf(RidePassengerPreferences()) }
 
     LaunchedEffect(
         destAddress, destLatitude, destLongitude, destinationPlaceId,
@@ -2416,6 +2468,11 @@ fun PassengerDashboard(
                         textAlign = TextAlign.Center,
                     )
 
+                    Spacer(modifier = Modifier.height(14.dp))
+                    PassengerPreferencesSelector(
+                        preferences = passengerPreferences,
+                        onPreferencesChange = { passengerPreferences = it },
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Button(
@@ -2552,6 +2609,7 @@ fun PassengerDashboard(
                                 fareMode = fareMode,
                                 guestName = guestName.takeIf { requestingForSomeoneElse },
                                 guestPhoneE164 = guestPhoneE164.takeIf { requestingForSomeoneElse },
+                                passengerPreferences = passengerPreferences,
                             )
                             draftPreferences.edit {
                                 putBoolean("passenger_is_waiting_for_drivers", true)
@@ -2680,7 +2738,7 @@ fun PassengerDashboard(
                         }
                     }
                 }
-                2 -> RideHistoryPanel(userRides.filter { it.status == "COMPLETED" || it.serverState == "COMPLETED" })
+                2 -> RideHistoryPanel(userRides.filter { it.serverVersion > 0L && (it.serverState in listOf("COMPLETED", "CANCELLED") || it.status in listOf("COMPLETED", "CANCELLED")) })
             }
         }
     }
@@ -3069,6 +3127,7 @@ fun DriverDashboard(
     val sharingSelections by viewModel.rideSharingSelections.collectAsState()
 
     val driverVer by viewModel.driverVerification.collectAsState()
+    val driverPresenceHealthy by viewModel.rideDriverPresenceHealthy.collectAsState()
     val myDriverId = viewModel.currentUserId ?: driverVer?.driverId
     val driverHomePrincipal by viewModel.activePrincipal.collectAsState()
     val driverHomeOwner = remember(driverHomePrincipal) { viewModel.currentUserId }
@@ -3253,7 +3312,11 @@ fun DriverDashboard(
         }
     }
     val completedDriverRides = remember(allRides, driverIdCandidates) {
-        allRides.filter { (it.status == "COMPLETED" || it.serverState == "COMPLETED") && it.assignedDriverId in driverIdCandidates }
+        allRides.filter {
+            it.serverVersion > 0L &&
+                (it.serverState in listOf("COMPLETED", "CANCELLED") || it.status in listOf("COMPLETED", "CANCELLED")) &&
+                it.assignedDriverId in driverIdCandidates
+        }
     }
     LaunchedEffect(driverHomeOwner, driverVer?.status, completedDriverRides.map { it.requestId to it.serverVersion }) {
         if (driverHomeOwner != null && RideVerificationPolicy.grantsAccess(driverVer?.status)) {
@@ -3274,15 +3337,24 @@ fun DriverDashboard(
             }
         }
     }
-    val rankedOpenRides = remember(openRides, driverIdCandidates, hiddenRideIds, destinationHomeEnabled, homeLatitude, homeLongitude, activeRideForDriver) {
-        val now = System.currentTimeMillis()
-        val eligibleRides = RideDriverFeedPolicy.eligibleRides(
+    var feedClockMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) { feedClockMillis = System.currentTimeMillis(); delay(15_000L) }
+    }
+    val driverFeed = remember(openRides, driverIdCandidates, hiddenRideIds, activeRideForDriver?.requestId, feedClockMillis) {
+        RideDriverFeedPolicy.evaluate(
             rides = openRides,
             actorIds = driverIdCandidates,
             activeRideId = activeRideForDriver?.requestId,
             hiddenRideIds = hiddenRideIds,
-            nowEpochMs = now
+            nowEpochMs = feedClockMillis,
         )
+    }
+    LaunchedEffect(driverFeed) {
+        if (BuildConfig.DEBUG) android.util.Log.i("MeetRideFeed", "DRIVER_FEED roomOpen=${openRides.size} eligible=${driverFeed.eligibleRides.size} own=${driverFeed.ownPassengerRequests.size} hidden=${driverFeed.hiddenRides.size} expired=${driverFeed.expiredCount}")
+    }
+    val rankedOpenRides = remember(driverFeed, destinationHomeEnabled, homeLatitude, homeLongitude) {
+        val eligibleRides = driverFeed.eligibleRides
         if (!destinationHomeEnabled || homeLatitude == null || homeLongitude == null) {
             eligibleRides
         } else {
@@ -3484,6 +3556,14 @@ fun DriverDashboard(
                     }
         item {
             DriverPerformanceCard(driverPerformance)
+        }
+        item {
+            Text(
+                if (driverPresenceHealthy) "Ubicación del chofer confirmada por Supabase"
+                else "Esperando ubicación GPS reciente y confirmación de Supabase",
+                color = if (driverPresenceHealthy) MeetColors.neonGreen else MeetColors.warning,
+                fontSize = 11.sp,
+            )
         }
         item {
             DriverWalletCard(
@@ -3720,7 +3800,14 @@ fun DriverDashboard(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(imageVector = Icons.Default.Search, contentDescription = null, tint = MeetColors.textMuted, modifier = Modifier.size(48.dp))
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("Buscando solicitudes de viaje en tu zona...", color = MeetColors.textMuted, fontSize = 14.sp)
+                            Text(
+                                if (driverFeed.ownPassengerRequests.isNotEmpty())
+                                    "Tu solicitud de pasajero sí está publicada. Esta misma cuenta no puede autoasignársela; usa otra cuenta de conductor para probar el despacho."
+                                else "Buscando solicitudes de viaje en tu zona...",
+                                color = if (driverFeed.ownPassengerRequests.isNotEmpty()) MeetColors.warning else MeetColors.textMuted,
+                                fontSize = 14.sp,
+                                textAlign = TextAlign.Center,
+                            )
                             Spacer(modifier = Modifier.height(12.dp))
                             OutlinedButton(onClick = { viewModel.refreshRideProjectionNow() }) {
                                 Text("ACTUALIZAR SOLICITUDES")
@@ -6906,18 +6993,37 @@ fun ActiveRidePanel(
                         )
                     }
                     Spacer(Modifier.height(10.dp))
-                    OutlinedButton(
-                        onClick = onOpenMessages,
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = .75f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.neonGreen),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Icon(Icons.Default.Chat, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("MENSAJES Y LLAMADA ELYSIUM", fontWeight = FontWeight.Black, fontSize = 11.sp)
+                        OutlinedButton(
+                            onClick = onOpenMessages,
+                            modifier = Modifier.weight(1f),
+                            border = BorderStroke(1.dp, MeetColors.electricBlue.copy(alpha = .75f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.electricBlue),
+                        ) {
+                            Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("CHAT SEGURO", fontWeight = FontWeight.Black, fontSize = 10.sp)
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.startRideCall(ride.requestId, if (isDriver) "DRIVER" else "PASSENGER")
+                            },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MeetColors.neonGreen,
+                                contentColor = Color.Black,
+                            ),
+                        ) {
+                            Icon(Icons.Default.PhoneInTalk, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("LLAMADA EN VIVO", fontWeight = FontWeight.Black, fontSize = 10.sp)
+                        }
                     }
                     Text(
-                        text = "El número permanece privado. Las llamadas externas no se abren desde este flujo.",
+                        text = "Voz en vivo y mensajería encriptada vía Supabase Realtime y Red Mesh Local sin exponer números.",
                         color = MeetColors.textMuted,
                         fontSize = 9.sp,
                         lineHeight = 12.sp,
@@ -7127,258 +7233,6 @@ fun ActiveRidePanel(
                     offers = offers,
                     onCloseRide = onCloseRide,
                 )
-            }
-        }
-
-        // Chat View (Visible if ride is ACCEPTED or later status)
-        if (ride.status != "OPEN") {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(420.dp)
-                    .background(MeetColors.backgroundDark)
-            ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    // Chat messages list
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .padding(horizontal = 16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(chatMessages) { message ->
-                            val isMe = message.senderId == myId
-                            val alignment = if (isMe) Alignment.End else Alignment.Start
-                            val bubbleColor = if (isMe) MeetColors.electricBlue.copy(alpha = 0.25f) else MeetColors.cardBackground
-
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 4.dp),
-                                horizontalAlignment = alignment
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(
-                                            RoundedCornerShape(
-                                                topStart = 12.dp,
-                                                topEnd = 12.dp,
-                                                bottomStart = if (isMe) 12.dp else 0.dp,
-                                                bottomEnd = if (isMe) 0.dp else 12.dp
-                                            )
-                                        )
-                                        .background(bubbleColor)
-                                        .border(
-                                            width = 1.dp,
-                                            color = if (isMe) MeetColors.electricBlue else MeetColors.borderSubtle,
-                                            shape = RoundedCornerShape(
-                                                topStart = 12.dp,
-                                                topEnd = 12.dp,
-                                                bottomStart = if (isMe) 12.dp else 0.dp,
-                                                bottomEnd = if (isMe) 0.dp else 12.dp
-                                            )
-                                        )
-                                        .padding(12.dp)
-                                ) {
-                                    Column {
-                                        if (!isMe) {
-                                            Text(
-                                                text = message.senderName,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp,
-                                                color = MeetColors.cyberCyan
-                                            )
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                        }
-
-                                        when (message.messageType) {
-                                            "TEXT", "PRESET" -> {
-                                                Text(
-                                                    text = message.textContent ?: "",
-                                                    color = Color.White,
-                                                    fontSize = 14.sp
-                                                )
-                                            }
-                                            "AUDIO" -> {
-                                                val isPlaying = playingPath == message.audioFilePath
-                                                Row(
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    modifier = Modifier.clickable {
-                                                        message.audioFilePath?.let { viewModel.playAudioMessage(it) }
-                                                    }
-                                                ) {
-                                                    Icon(
-                                                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                                        contentDescription = if (isPlaying) "Pausar audio" else "Reproducir audio",
-                                                        tint = MeetColors.neonGreen
-                                                    )
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(
-                                                        text = "Mensaje de voz (${(message.audioDurationMs ?: 0L) / 1000}s)",
-                                                        color = Color.White,
-                                                        fontSize = 13.sp
-                                                    )
-                                                }
-                                            }
-                                            "IMAGE" -> {
-                                                val imagePath = message.imageFilePath
-                                                if (imagePath != null) {
-                                                    AsyncImage(
-                                                        model = java.io.File(imagePath),
-                                                        contentDescription = "Imagen enviada en el chat del viaje",
-                                                        modifier = Modifier
-                                                            .widthIn(max = 260.dp)
-                                                            .heightIn(min = 120.dp, max = 240.dp)
-                                                            .clip(RoundedCornerShape(12.dp)),
-                                                    )
-                                                } else {
-                                                    Text(
-                                                        "Imagen pendiente de descarga",
-                                                        color = MeetColors.warning,
-                                                        fontSize = 12.sp,
-                                                    )
-                                                }
-                                            }
-                                        }
-                                        Text(
-                                            text = when (message.syncState) {
-                                                "SYNCED" -> "Entregado"
-                                                "FAILED" -> "No sincronizado · toca para reintentar"
-                                                "LOCAL_ONLY" -> "Guardado en este dispositivo"
-                                                else -> "Pendiente de sincronización"
-                                            },
-                                            color = MeetColors.textMuted,
-                                            fontSize = 8.sp,
-                                            modifier = Modifier.padding(top = 4.dp),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Presets for Quick Messaging (For Driver to click in one-tap)
-                    if (isDriver && ride.status != "COMPLETED") {
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MeetColors.backgroundDeep)
-                        ) {
-                            items(presetMessages) { preset ->
-                                SuggestionChip(
-                                    onClick = {
-                                        viewModel.sendRidePresetMessage(
-                                            requestId = ride.requestId,
-                                            senderId = myId,
-                                            senderName = myName,
-                                            role = myRole,
-                                            presetText = preset
-                                        )
-                                    },
-                                    label = { Text(preset, color = MeetColors.cyberCyan, fontSize = 11.sp) },
-                                    colors = SuggestionChipDefaults.suggestionChipColors(
-                                        containerColor = MeetColors.cardBackground
-                                    )
-                                )
-                            }
-                        }
-                    }
-
-                    // Input chat controls
-                    if (ride.status != "COMPLETED") {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MeetColors.backgroundDeep)
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            IconButton(
-                                onClick = { imagePickerLauncher.launch("image/*") },
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(MeetColors.cardBackground),
-                            ) {
-                                Icon(
-                                    Icons.Default.AddPhotoAlternate,
-                                    contentDescription = "Enviar imagen",
-                                    tint = Color(0xFFC85CFF),
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            // Hold-to-record voice message button
-                            IconButton(
-                                onClick = {
-                                    if (isRecording) {
-                                        viewModel.stopAndSendAudioRecording(ride.requestId, myId, myName, myRole)
-                                    } else if (
-                                        ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.RECORD_AUDIO,
-                                        ) == PackageManager.PERMISSION_GRANTED
-                                    ) {
-                                        viewModel.startAudioRecording(context)
-                                    } else {
-                                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(if (isRecording) MeetColors.error else MeetColors.cardBackground)
-                            ) {
-                                Icon(
-                                    imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                                    contentDescription = if (isRecording) "Detener y enviar audio" else "Grabar audio",
-                                    tint = if (isRecording) Color.White else MeetColors.cyberCyan
-                                )
-                            }
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            OutlinedTextField(
-                                value = chatInputText,
-                                onValueChange = { chatInputText = it },
-                                label = { Text("Escribe un mensaje...", color = MeetColors.textMuted) },
-                                modifier = Modifier.weight(1f),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = MeetColors.cyberCyan,
-                                    unfocusedBorderColor = MeetColors.borderSubtle,
-                                    focusedLabelColor = MeetColors.cyberCyan
-                                )
-                            )
-
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            IconButton(
-                                onClick = {
-                                    if (chatInputText.isNotBlank()) {
-                                        viewModel.sendRideChatMessage(
-                                            ride.requestId,
-                                            myId,
-                                            myName,
-                                            myRole,
-                                            chatInputText
-                                        )
-                                        chatInputText = ""
-                                    }
-                                },
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .background(MeetColors.cyberCyan)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Send,
-                                    contentDescription = "Enviar",
-                                    tint = MeetColors.backgroundDark
-                                )
-                            }
-                        }
-                    }
-                }
             }
         }
     }
@@ -9019,46 +8873,110 @@ fun CaptureGuideOverlay(
 }
 
 @Composable
-private fun LiveRideMetrics(
+fun LiveRideMetrics(
     ride: RideRequestEntity,
     currentSpeed: Float,
     activeRouteMeters: Long?,
+    modifier: Modifier = Modifier,
 ) {
-    val startedAtMs = ride.createdAt
-    val elapsedMs = System.currentTimeMillis() - startedAtMs
-    val elapsedSeconds = (elapsedMs / 1000).toInt().coerceAtLeast(0)
-    val elapsedMinutes = elapsedSeconds / 60
-    val elapsedSecs = elapsedSeconds % 60
+    val isTripActive = ride.status in listOf("IN_PROGRESS", "COMPLETED") ||
+            ride.serverState in listOf("IN_PROGRESS", "COMPLETED")
 
-    val distanceTraveledKm = ride.estimatedDistanceKm.coerceAtLeast(0.0)
+    val isArrivedWaiting = (ride.status == "ARRIVED" || ride.serverState == "ARRIVED") && !isTripActive
 
-    val liveFare = if (ride.fareMode == RideFareMode.METERED_TIME_DISTANCE.name) {
-        val distanceFare = ((distanceTraveledKm.toLong() * 300L + 999L) / 1000L)
-        val timeFare = ((elapsedSeconds.toLong() * 60L + 59L) / 60L)
-        (distanceFare + timeFare).coerceAtLeast(0L)
+    val tripStartedAtFromBreakdown = remember(ride.fareBreakdownJson) {
+        runCatching {
+            val jsonElement = Json.parseToJsonElement(ride.fareBreakdownJson)
+            (jsonElement as? kotlinx.serialization.json.JsonObject)?.get("tripStartedAt")?.let {
+                it.toString().trim('"').toLongOrNull()
+            }
+        }.getOrNull()
+    }
+
+    // El tiempo del viaje del usuario corre ÚNICAMENTE cuando el viaje inicia (IN_PROGRESS), NUNCA antes de iniciar.
+    val startedAtMs = tripStartedAtFromBreakdown ?: (ride.driverArrivedAt ?: ride.createdAt)
+    val elapsedSeconds = if (isTripActive) {
+        ((System.currentTimeMillis() - startedAtMs) / 1000L).coerceAtLeast(0L)
+    } else {
+        0L
+    }
+    val elapsedMinutes = (elapsedSeconds / 60).toInt()
+    val elapsedSecs = (elapsedSeconds % 60).toInt()
+
+    val distanceTraveledKm = if (isTripActive) {
+        ride.estimatedDistanceKm.coerceAtLeast(0.0)
+    } else {
+        0.0
+    }
+
+    val isOpenBid = ride.fareMode == RideFareMode.OPEN_BID.name
+    val meteredQuote = if (!isOpenBid && isTripActive) {
+        RideFareEngine.quoteCostaRica(
+            distanceMeters = (distanceTraveledKm * 1000).toLong(),
+            durationSeconds = elapsedSeconds,
+        )
     } else null
+
+    val liveFareMinor = meteredQuote?.estimatedTotalMinor
 
     Surface(
         color = MeetColors.cyberCyan.copy(alpha = 0.08f),
         border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
-        shape = RoundedCornerShape(10.dp),
-        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        modifier = modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(10.dp)) {
-            Text(
-                "MÉTRICAS EN VIVO",
-                color = MeetColors.cyberCyan,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp,
-            )
-            Spacer(Modifier.height(6.dp))
+        Column(Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "MÉTRICAS EN VIVO · SINCRONIZADO",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.sp,
+                )
+                if (isTripActive) {
+                    Surface(
+                        color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            "EN CURSO 🏁",
+                            color = MeetColors.neonGreen,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                } else if (isArrivedWaiting) {
+                    Surface(
+                        color = MeetColors.warning.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(6.dp),
+                        border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.5f))
+                    ) {
+                        Text(
+                            "EN ESPERA DE INICIO (PIN)",
+                            color = MeetColors.warning,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 MetricPill(
-                    label = "TIEMPO",
+                    label = "TIEMPO VIAJE",
                     value = "%02d:%02d".format(elapsedMinutes, elapsedSecs),
                 )
                 MetricPill(
@@ -9070,21 +8988,107 @@ private fun LiveRideMetrics(
                     value = if (distanceTraveledKm > 0.0) "${"%.1f".format(distanceTraveledKm)} km" else "—",
                 )
             }
-            if (liveFare != null) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Tarifa en vivo: $liveFare ${ride.currency}",
-                    color = MeetColors.neonGreen,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                )
+
+            Spacer(Modifier.height(10.dp))
+
+            if (!isOpenBid) {
+                if (liveFareMinor != null) {
+                    Surface(
+                        color = MeetColors.neonGreen.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(10.dp),
+                        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "Tarifa en tiempo real:",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                "₡ $liveFareMinor ${ride.currency}",
+                                color = MeetColors.neonGreen,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        "El taxímetro comenzará a computar tarifa al iniciar el viaje tras ingresar el PIN.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 11.sp,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                    )
+                }
+            } else {
+                Surface(
+                    color = Color(0xFFFFB300).copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, Color(0xFFFFB300).copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "🤝 Modalidad 'Pon tu precio':",
+                                color = Color(0xFFFFCC80),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "₡ ${ride.priceOffer.toInt()} ${ride.currency}",
+                                color = Color(0xFFFFD54F),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                        Text(
+                            "Tarifa fija acordada — No varía con tiempo ni distancia.",
+                            color = Color(0xFFFFE082),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
+
             if (activeRouteMeters != null && activeRouteMeters > 0) {
                 val remainingKm = ((activeRouteMeters / 1000.0) - distanceTraveledKm).coerceAtLeast(0.0)
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    "Restante: ~${"%.1f".format(remainingKm)} km",
+                    "Restante estimado: ~${"%.1f".format(remainingKm)} km",
                     color = MeetColors.textSecondary,
                     fontSize = 10.sp,
+                )
+            }
+
+            // ── Avisos transparentes y obligatorios
+            Spacer(Modifier.height(8.dp))
+            Divider(color = MeetColors.borderSubtle.copy(alpha = 0.4f), thickness = 0.5.dp)
+            Spacer(Modifier.height(6.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    "⚠️ Los peajes los paga siempre el usuario, no el chofer.",
+                    color = Color(0xFFFFCC80),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "⚠️ No se permite dejar viajes pendientes.",
+                    color = Color(0xFFFFAB91),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         }

@@ -36,6 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ride.domain.RideFareMode
+import com.elysium369.meet.ride.domain.RidePassengerPreferences
+import com.elysium369.meet.ride.domain.PassengerPreferencesSelector
 import com.elysium369.meet.ride.domain.RideState
 import com.elysium369.meet.ride.payment.RidePaymentMethod
 import com.elysium369.meet.ui.ObdViewModel
@@ -71,6 +73,7 @@ fun PassengerRideRequestScreen(
 
     var fareMode by remember { mutableStateOf(RideFareMode.METERED_TIME_DISTANCE) }
     var paymentMethod by remember { mutableStateOf(RidePaymentMethod.UNKNOWN) }
+    var preferences by remember { mutableStateOf(RidePassengerPreferences()) }
     var showFareModeSheet by remember { mutableStateOf(false) }
     var showPaymentSheet by remember { mutableStateOf(false) }
     var showSafetyCenter by remember { mutableStateOf(false) }
@@ -194,6 +197,12 @@ fun PassengerRideRequestScreen(
                 PaymentMethodSelector(
                     selectedMethod = paymentMethod,
                     onClick = { showPaymentSheet = true }
+                )
+
+                // Passenger Preferences (Pets, Kids, 5 Passengers)
+                PassengerPreferencesSelector(
+                    preferences = preferences,
+                    onPreferencesChange = { preferences = it }
                 )
 
                 // Matched Driver Card if matched
@@ -385,7 +394,8 @@ fun PassengerRideRequestScreen(
                                 estDistance = curQuote.estimatedDistanceKm,
                                 estDuration = curQuote.estimatedDurationMin,
                                 paymentMethod = paymentMethod.name,
-                                fareMode = fareMode
+                                fareMode = fareMode,
+                                passengerPreferences = preferences,
                             )
                         }
                     )

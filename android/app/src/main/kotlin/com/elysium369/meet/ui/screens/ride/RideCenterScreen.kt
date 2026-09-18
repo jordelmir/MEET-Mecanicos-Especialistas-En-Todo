@@ -35,10 +35,12 @@ import com.elysium369.meet.data.local.entities.RideRequestEntity
 import com.elysium369.meet.ride.data.remote.RideDispatchGateway
 import com.elysium369.meet.ride.domain.RideDispatchExpiryPolicy
 import com.elysium369.meet.ride.domain.RideFareMode
+import com.elysium369.meet.ride.domain.RidePassengerPreferences
 import com.elysium369.meet.ride.domain.RideStopSnapshot
 import com.elysium369.meet.ui.screens.calculateDistance
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
+import java.util.Locale
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -145,9 +147,9 @@ fun RideCenterScreen(
         }
     }
 
-    val eligibleRides = remember(openRides, myDriverId, hiddenRideIds, clockMillis) {
+    val driverFeed = remember(openRides, myDriverId, hiddenRideIds, clockMillis) {
         val actorIds = setOfNotNull(myDriverId)
-        com.elysium369.meet.ride.driver.RideDriverFeedPolicy.eligibleRides(
+        com.elysium369.meet.ride.driver.RideDriverFeedPolicy.evaluate(
             rides = openRides,
             actorIds = actorIds,
             activeRideId = null,
@@ -155,6 +157,7 @@ fun RideCenterScreen(
             nowEpochMs = clockMillis,
         )
     }
+    val eligibleRides = driverFeed.eligibleRides
 
     val filteredRides = remember(eligibleRides, activeFilter) {
         when (activeFilter) {
@@ -325,14 +328,16 @@ fun RideCenterScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
-                            "No hay viajes disponibles",
+                            if (driverFeed.ownPassengerRequests.isNotEmpty()) "SOLICITUD DE ESTA MISMA CUENTA" else "No hay viajes disponibles",
                             color = MeetColors.textMuted,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "Las solicitudes de pasajeros aparecerán aquí",
+                            if (driverFeed.ownPassengerRequests.isNotEmpty())
+                                "Tu solicitud sí está publicada, pero esta misma cuenta no puede autoasignársela. Usa otra cuenta de conductor para probar el despacho real."
+                            else "Las solicitudes de pasajeros aparecerán aquí",
                             color = MeetColors.textMuted,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center,
@@ -402,6 +407,18 @@ private fun RideCenterCard(
         "CASH" -> "\uD83D\uDCB5"
         "SINPE_MOVIL", "SINPE" -> "\uD83D\uDCF1"
         else -> "\u2753"
+    }
+
+    val passengerFirstName = remember(ride.passengerName) {
+        ride.passengerName.trim().split(Regex("\\s+")).firstOrNull()?.replaceFirstChar {
+            if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString()
+        } ?: "Pasajero"
+    }
+    val passengerRatingText = remember(ride.passengerRating) {
+        ride.passengerRating?.let { String.format(Locale.US, "★ %.1f", it) } ?: "★ 4.9"
+    }
+    val preferences = remember(ride.fareBreakdownJson) {
+        RidePassengerPreferences.fromJson(ride.fareBreakdownJson)
     }
 
     Card(
@@ -490,31 +507,72 @@ private fun RideCenterCard(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ── Row 3: Rating + trips
+            // ── Row 3: Rating + Passenger first name + trips
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Text(
+                    text = passengerFirstName,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                )
+                Spacer(modifier = Modifier.width(6.dp))
                 Icon(
                     Icons.Default.Star,
                     contentDescription = null,
                     tint = Color(0xFFFFD700),
                     modifier = Modifier.size(14.dp),
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(2.dp))
                 Text(
-                    text = "Pasajero verificado",
-                    color = MeetColors.textSecondary,
+                    text = passengerRatingText.removePrefix("★ ").trim(),
+                    color = Color(0xFFFFD700),
+                    fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
                 )
                 if (elapsedMins > 0) {
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "Hace $elapsedMins min",
+                        text = "· Hace $elapsedMins min",
                         color = MeetColors.textMuted,
                         fontSize = 11.sp,
                     )
+                }
+            }
+
+            // ── Preferences Badges (if any)
+            if (preferences.hasSpecialPreferences) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    preferences.toBadges().forEach { badge ->
+                        Surface(
+                            color = badge.color.copy(alpha = 0.16f),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(1.dp, badge.color.copy(alpha = 0.5f)),
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(badge.icon, fontSize = 11.sp)
+                                Text(
+                                    badge.label,
+                                    color = badge.color,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
             }
 

@@ -61,9 +61,15 @@ object RideMapStateFactory {
                 )
             }
         }
+        val fallbackRoute = when {
+            driverGps != null && pickup != null -> listOf(driverGps, pickup)
+            driverGps != null && destination != null -> listOf(driverGps, destination)
+            pickup != null && destination != null -> listOf(pickup, destination)
+            else -> emptyList()
+        }
         val resolvedRoute = when {
             route != null && route.size >= 2 -> route
-            else -> emptyList()
+            else -> fallbackRoute
         }
         return RideMapState(markers = markers, route = resolvedRoute)
     }

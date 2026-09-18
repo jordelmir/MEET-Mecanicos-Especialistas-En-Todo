@@ -150,4 +150,23 @@ class RideDriverFeedPolicyTest {
         assertEquals(1, eligible.size)
         assertEquals("r-fresh", eligible.first().requestId)
     }
+
+    @Test
+    fun `feed explains published own ride while keeping other drivers ride eligible`() {
+        val now = 100_000L
+        val snapshot = RideDriverFeedPolicy.evaluate(
+            rides = listOf(
+                createRide(requestId = "mine", passengerId = "driver-me"),
+                createRide(requestId = "other", passengerId = "passenger-b"),
+                createRide(requestId = "hidden", passengerId = "passenger-c"),
+            ),
+            actorIds = setOf("driver-me"),
+            activeRideId = null,
+            hiddenRideIds = setOf("hidden"),
+            nowEpochMs = now,
+        )
+        assertEquals(listOf("mine"), snapshot.ownPassengerRequests.map { it.requestId })
+        assertEquals(listOf("other"), snapshot.eligibleRides.map { it.requestId })
+        assertEquals(listOf("hidden"), snapshot.hiddenRides.map { it.requestId })
+    }
 }

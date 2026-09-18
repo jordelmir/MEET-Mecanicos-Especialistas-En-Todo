@@ -289,6 +289,43 @@ fun RideHistoryDetailDialog(
                         }
                     }
 
+                    // Cancellation Banner (if cancelled)
+                    if (ride.status.equals("CANCELLED", ignoreCase = true) ||
+                        ride.serverState?.equals("CANCELLED", ignoreCase = true) == true
+                    ) {
+                        Surface(
+                            color = Color(0xFF2C1014),
+                            border = BorderStroke(1.dp, Color(0xFFEF5350)),
+                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("🚫", fontSize = 16.sp)
+                                    Text(
+                                        text = "VIAJE CANCELADO EN CAMINO",
+                                        color = Color(0xFFFF8A80),
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                                Text(
+                                    text = "Registro preservado en viajes finalizados para trazabilidad y auditoría de la plataforma MEET.",
+                                    color = Color(0xFFFFCDD2),
+                                    fontSize = 11.sp,
+                                    lineHeight = 14.sp
+                                )
+                            }
+                        }
+                    }
+
                     // Route Points Card
                     DetailSectionCard(title = "TRAYECTO Y PUNTOS DE CONTROL", icon = Icons.Default.Navigation) {
                         // Origin

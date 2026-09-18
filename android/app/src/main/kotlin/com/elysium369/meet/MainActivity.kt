@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.zIndex
+import com.elysium369.meet.ui.screens.ride.RideLiveCallOverlay
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -1563,17 +1565,13 @@ fun MeetApp(
                         onGeneratePin = {
                             obdViewModel.issueRideBoardingPin(activeRide.rideId)
                         },
-                        onCallDriver = activeRide.driver?.phone?.takeIf { it.isNotBlank() }?.let { phone ->
-                            {
-                                val dialIntent = android.content.Intent(
-                                    android.content.Intent.ACTION_DIAL,
-                                    android.net.Uri.parse("tel:$phone")
-                                )
-                                context.startActivity(dialIntent)
-                            }
+                        onCallDriver = {
+                            obdViewModel.startRideCall(activeRide.rideId, "PASSENGER")
                         },
                         onMessageDriver = {
-                            navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.RIDE_HOME)
+                            navController.navigate(
+                                "messages?serviceVertical=ride&serviceReferenceId=${activeRide.rideId}&serviceTitle=Viaje%20Elysium"
+                            )
                         },
                         onPay = null,
                         onRate = {
@@ -1668,6 +1666,23 @@ fun MeetApp(
                 HealthScoreScreen(navController = navController, viewModel = obdViewModel)
             }
         }
+
+        val liveCallState by obdViewModel.liveCallState.collectAsState()
+        RideLiveCallOverlay(
+            state = liveCallState,
+            onToggleMute = { obdViewModel.toggleRideCallMute() },
+            onHangUp = { obdViewModel.endRideCall() },
+            onAnswer = {
+                val incoming = liveCallState as? com.elysium369.meet.communications.LiveCallState.Incoming
+                if (incoming != null) {
+                    val role = if (incoming.callerRole.equals("DRIVER", ignoreCase = true)) "PASSENGER" else "DRIVER"
+                    obdViewModel.startRideCall(incoming.rideId, role)
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .zIndex(99f),
+        )
         }
         BackHandler(enabled = activeRoute != null && activeRoute != MeetDestinations.HOME) {
             navController.backOrHome()
