@@ -4607,6 +4607,12 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_76_77 = object : Migration(76, 77) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // V9: Rides recovery, call resilience and unified in-ride chat synchronization
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4670,6 +4676,7 @@ object AppModule {
             MIGRATION_73_74,
             MIGRATION_74_75,
             MIGRATION_75_76,
+            MIGRATION_76_77,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
