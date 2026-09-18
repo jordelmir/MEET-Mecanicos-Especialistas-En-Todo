@@ -85,6 +85,9 @@ fun RideHistoryDetailDialog(
     ride: RideRequestEntity,
     onDismiss: () -> Unit,
     onOpenSupport: ((RideRequestEntity) -> Unit)? = null,
+    isDriver: Boolean = false,
+    onSendMessage: ((String) -> Unit)? = null,
+    onOpenChat: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     var showLostAndFound by remember { mutableStateOf(false) }
@@ -92,8 +95,10 @@ fun RideHistoryDetailDialog(
     if (showLostAndFound) {
         RideLostAndFoundDialog(
             ride = ride,
-            isDriver = false,
+            isDriver = isDriver,
             onDismiss = { showLostAndFound = false },
+            onSendMessage = onSendMessage,
+            onOpenChat = onOpenChat,
         )
     }
 
@@ -541,12 +546,21 @@ fun RideHistoryDetailDialog(
                             .fillMaxWidth()
                             .padding(top = 4.dp),
                         shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
-                        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = if (isDriver) MeetColors.neonGreen else MeetColors.cyberCyan
+                        ),
+                        border = BorderStroke(
+                            1.dp,
+                            if (isDriver) MeetColors.neonGreen.copy(alpha = 0.6f) else MeetColors.cyberCyan.copy(alpha = 0.5f)
+                        ),
                     ) {
                         Icon(Icons.Default.Inventory2, contentDescription = null, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("¿Olvidaste un objeto en el vehículo?", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            if (isDriver) "📦 GESTIÓN DE OBJETOS OLVIDADOS (CHOFER)" else "¿Olvidaste un objeto en el vehículo?",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
                     // Action buttons
