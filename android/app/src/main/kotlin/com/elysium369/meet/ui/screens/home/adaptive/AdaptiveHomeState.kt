@@ -50,7 +50,8 @@ enum class HomeSectionCategory(val title: String, val glyph: String) {
     VEHICLE("MI VEHÍCULO & HISTORIAL", "🚗"),
     SERVICES("SERVICIOS & RED DE ASISTENCIA", "🛠️"),
     TOOLS("HERRAMIENTAS AVANZADAS", "🔬"),
-    PROFESSIONAL("VANGUARD PRO & FLOTA", "👑")
+    PROFESSIONAL("VANGUARD PRO & FLOTA", "👑"),
+    SAFETY("SEGURIDAD", "🛡️")
 }
 
 data class HomeModuleItem(

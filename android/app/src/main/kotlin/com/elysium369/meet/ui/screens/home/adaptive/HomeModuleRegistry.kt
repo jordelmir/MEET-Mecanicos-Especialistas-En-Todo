@@ -83,6 +83,19 @@ object HomeModuleRegistry {
         }
         map[HomeSectionCategory.PROFESSIONAL]?.addAll(proList)
 
+        // ── SAFETY ──
+        map[HomeSectionCategory.SAFETY]?.addAll(
+            listOf(
+                HomeModuleItem("safety_hub", "MEET Seguridad", "Evidencia, casos y rendición de cuentas", MeetDestinations.SAFETY_HOME, HomeSectionCategory.SAFETY, "safety", isHighlight = true, badgeText = "NUEVO"),
+                HomeModuleItem("safety_map", "Mapa de Seguridad", "Puntos públicos de seguridad", MeetDestinations.SAFETY_MAP, HomeSectionCategory.SAFETY, "safety_map"),
+                HomeModuleItem("safety_report", "Reportar", "Crear reporte de seguridad", MeetDestinations.SAFETY_REPORT, HomeSectionCategory.SAFETY, "safety_report"),
+                HomeModuleItem("safety_my_reports", "Mis Reportes", "Estado de tus reportes", MeetDestinations.SAFETY_MY_REPORTS, HomeSectionCategory.SAFETY, "safety_my_reports"),
+                HomeModuleItem("safety_cases", "Casos Públicos", "Casos documentados", MeetDestinations.SAFETY_CASES, HomeSectionCategory.SAFETY, "safety_cases"),
+                HomeModuleItem("safety_accountability", "Accountability", "Seguimiento institucional", MeetDestinations.SAFETY_ACCOUNTABILITY, HomeSectionCategory.SAFETY, "safety_accountability"),
+                HomeModuleItem("safety_observatory", "Observatorio", "Métricas y tendencias", MeetDestinations.SAFETY_OBSERVATORY, HomeSectionCategory.SAFETY, "safety_observatory")
+            )
+        )
+
         return map.filterValues { it.isNotEmpty() }
     }
 }
