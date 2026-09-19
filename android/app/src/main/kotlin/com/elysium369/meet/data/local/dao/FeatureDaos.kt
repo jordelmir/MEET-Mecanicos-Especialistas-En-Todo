@@ -1055,6 +1055,9 @@ interface RideDao {
     @Query("SELECT * FROM ride_chat_messages WHERE rideRequestId = :rideRequestId ORDER BY createdAt ASC")
     fun getChatMessagesFlow(rideRequestId: String): Flow<List<RideChatMessageEntity>>
 
+    @Query("SELECT * FROM ride_chat_messages WHERE senderRole = 'PASSENGER' AND textContent LIKE '[OBJETO OLVIDADO]%' ORDER BY createdAt DESC")
+    fun getLostItemReportsFlow(): Flow<List<RideChatMessageEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertChatMessage(message: RideChatMessageEntity)
 

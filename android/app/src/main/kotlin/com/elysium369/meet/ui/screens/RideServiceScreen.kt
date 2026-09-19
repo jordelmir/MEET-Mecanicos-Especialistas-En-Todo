@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -240,6 +241,7 @@ fun RideServiceScreen(
         }
     }
     var showInRideChat by rememberSaveable { mutableStateOf(false) }
+    var selectedChatRideId by rememberSaveable { mutableStateOf<String?>(null) }
     val passengerRegistrationMissing = passengerVerification == null
     val driverRegistrationMissing = driverVerification == null
     val voicePreferences = remember(context) {
@@ -500,6 +502,8 @@ fun RideServiceScreen(
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Black,
                                 maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Text(
                                 text = if (driverMode) "CHOFER" else "PASAJERO",
@@ -507,6 +511,8 @@ fun RideServiceScreen(
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         val activeCanonicalState = effectiveActiveRide?.serverState ?: effectiveActiveRide?.status
@@ -574,6 +580,12 @@ fun RideServiceScreen(
                     isDriver = driverMode,
                     initialTab = profileInitialTab,
                     onBack = { showProfile = false },
+                    onOpenChat = { ride ->
+                        selectedChatRideId = ride.requestId
+                        viewModel.observeRideChatForRequestId(ride.requestId)
+                        showProfile = false
+                        showInRideChat = true
+                    },
                 )
             } else if (driverMode && effectiveActiveRide != null) {
                 com.elysium369.meet.ride.driver.ui.DriverActiveTripCockpitRoute(
@@ -599,13 +611,21 @@ fun RideServiceScreen(
                         viewModel = viewModel,
                         onRegisterDriver = onOpenDriverRegistration,
                         onOpenRideCenter = onNavigateToRideCenter,
-                        onOpenMessages = { showInRideChat = true },
+                        onOpenMessages = { rideId ->
+                            selectedChatRideId = rideId
+                            viewModel.observeRideChatForRequestId(rideId)
+                            showInRideChat = true
+                        },
                     )
                 } else {
                     PassengerDashboard(
                         viewModel = viewModel,
                         forceRegistration = firstAccessRole == "PASSENGER",
-                        onOpenMessages = { showInRideChat = true },
+                        onOpenMessages = { rideId ->
+                            selectedChatRideId = rideId
+                            viewModel.observeRideChatForRequestId(rideId)
+                            showInRideChat = true
+                        },
                     )
                 }
             }
@@ -763,7 +783,11 @@ fun RideServiceScreen(
             }
 
             // ═══ UNIFIED IN-RIDE REALTIME CHAT SHEET ═══
-            val chatTargetRide = effectiveActiveRide ?: activeRide
+            val chatTargetRide = if (selectedChatRideId != null) {
+                allRides.firstOrNull { it.requestId == selectedChatRideId }
+            } else {
+                effectiveActiveRide ?: activeRide
+            }
             if (showInRideChat && chatTargetRide != null) {
                 val role = if (driverMode) "DRIVER" else "PASSENGER"
                 val myPassengerId = passengerVerification?.passengerId ?: viewModel.currentUserId
@@ -780,7 +804,7 @@ fun RideServiceScreen(
                     myRole = role,
                     isDriver = driverMode,
                     chatMessages = chatMessages,
-                    onDismiss = { showInRideChat = false },
+                    onDismiss = { showInRideChat = false; selectedChatRideId = null },
                     onSendMessage = { text ->
                         viewModel.sendRideChatMessage(chatTargetRide.requestId, myId, myName, role, text)
                     },
@@ -2743,7 +2767,13 @@ fun PassengerDashboard(
                         }
                     }
                 }
-                2 -> RideHistoryPanel(userRides.filter { it.serverVersion > 0L && (it.serverState in listOf("COMPLETED", "CANCELLED") || it.status in listOf("COMPLETED", "CANCELLED")) })
+                2 -> RideHistoryPanel(
+                    rides = userRides.filter { it.serverVersion > 0L && (it.serverState in listOf("COMPLETED", "CANCELLED") || it.status in listOf("COMPLETED", "CANCELLED")) },
+                    onSendMessage = { ride, message ->
+                        viewModel.sendRideChatMessage(ride.requestId, viewModel.currentUserId.orEmpty(), ride.passengerName, "PASSENGER", message)
+                    },
+                    onOpenChat = { ride -> onOpenMessages(ride.requestId) },
+                )
             }
         }
     }
@@ -3949,7 +3979,11 @@ fun DriverDashboard(
                     }
                 }
             }
-            2 -> RideHistoryPanel(completedDriverRides)
+            2 -> RideHistoryPanel(
+                rides = completedDriverRides,
+                isDriver = true,
+                onOpenChat = { ride -> onOpenMessages(ride.requestId) },
+            )
             else -> {
                 FleetMogulDashboard(viewModel = viewModel)
             }
@@ -4922,7 +4956,9 @@ fun PassengerRideItem(
             if (itemPreferences.hasSpecialPreferences) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -4942,7 +4978,9 @@ fun PassengerRideItem(
                                     badge.label,
                                     color = badge.color,
                                     fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
                                 )
                             }
                         }
@@ -6297,7 +6335,9 @@ fun ActiveRidePanel(
                 if (activeRidePrefs.hasSpecialPreferences) {
                     Spacer(Modifier.height(6.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -6318,6 +6358,8 @@ fun ActiveRidePanel(
                                         color = badge.color,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false,
                                     )
                                 }
                             }
