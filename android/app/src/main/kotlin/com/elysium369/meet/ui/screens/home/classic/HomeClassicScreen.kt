@@ -525,6 +525,7 @@ fun HomeClassicScreen(
             PhantomSectionHeader("Acciones Rápidas")
 
             val actions = buildList {
+                add(Triple("🛡️", "MEET Seguridad", MeetColors.warning) to MeetDestinations.SAFETY_HOME)
                 add(Triple("💬", "Mensajes", MeetColors.cyberCyan) to "messages")
                 add(Triple("⚖️", "Legal Vanguard", MeetColors.warning) to "legal_vanguard")
                 add(Triple("🏠", "Properties", MeetColors.neonGreen) to "elysium_properties")

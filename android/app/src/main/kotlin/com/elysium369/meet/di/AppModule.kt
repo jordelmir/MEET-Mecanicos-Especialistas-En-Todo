@@ -4613,6 +4613,102 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_77_78 = object : Migration(77, 78) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `safety_local_payloads` (
+                    `payloadId` TEXT NOT NULL,
+                    `ciphertext` BLOB NOT NULL,
+                    `sha256` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `redactedAt` INTEGER,
+                    PRIMARY KEY(`payloadId`)
+                )
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `safety_reports` (
+                    `reportId` TEXT NOT NULL,
+                    `ownerUserId` TEXT NOT NULL,
+                    `category` TEXT NOT NULL,
+                    `payloadId` TEXT NOT NULL,
+                    `occurredAt` INTEGER,
+                    `localState` TEXT NOT NULL,
+                    `serverState` TEXT,
+                    `serverVersion` INTEGER NOT NULL,
+                    `syncState` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`reportId`)
+                )
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_reports_ownerUserId_createdAt`
+                ON `safety_reports` (`ownerUserId`,`createdAt`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_reports_syncState`
+                ON `safety_reports` (`syncState`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `safety_command_outbox` (
+                    `idempotencyKey` TEXT NOT NULL,
+                    `aggregateId` TEXT NOT NULL,
+                    `actorSessionUserId` TEXT NOT NULL,
+                    `commandType` TEXT NOT NULL,
+                    `expectedVersion` INTEGER NOT NULL,
+                    `payloadVersion` INTEGER NOT NULL,
+                    `payloadId` TEXT NOT NULL,
+                    `clientPayloadSha256` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `attemptCount` INTEGER NOT NULL,
+                    `nextAttemptAt` INTEGER NOT NULL,
+                    `leaseStartedAt` INTEGER,
+                    `lastErrorCode` TEXT,
+                    `lastErrorMessage` TEXT,
+                    `correlationId` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`idempotencyKey`)
+                )
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_outbox_status_nextAttemptAt`
+                ON `safety_command_outbox` (`status`,`nextAttemptAt`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_outbox_aggregateId_createdAt`
+                ON `safety_command_outbox` (`aggregateId`,`createdAt`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_outbox_actorSessionUserId_status`
+                ON `safety_command_outbox` (`actorSessionUserId`,`status`)
+                """.trimIndent(),
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4677,6 +4773,7 @@ object AppModule {
             MIGRATION_74_75,
             MIGRATION_75_76,
             MIGRATION_76_77,
+            MIGRATION_77_78,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

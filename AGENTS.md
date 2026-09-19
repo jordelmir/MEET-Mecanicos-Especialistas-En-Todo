@@ -91,6 +91,12 @@ Onboarding → Vehicle → OBD → DTCs → Repair guide → Mechanic
    RPC, and be projected back into Room with `serverVersion > 0` before updating
    the UI state. See `docs/rides/MEET_RIDES_V9_APK_RECOVERY_SPEC.md`.
 
+8. **SAFETY AUTHORITY RULE.** No Safety UI may promote an allegation,
+   delivery, corroboration, publication, institutional response, arrest,
+   charge, judgment or public location unless that state originates from
+   an authoritative Safety projection. Local state represents intent only.
+   Intent is never truth. See `docs/safety/SAFETY_CONSTITUTION.md`.
+
 ---
 
 ## V2 specs (currently in flight, both will ship)

@@ -260,9 +260,10 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
         }
-        
-        // Microphone permission for Voice Copilot
-        permissions.add(android.Manifest.permission.RECORD_AUDIO)
+
+        // NOTE: RECORD_AUDIO is NOT requested at startup.
+        // It is requested on-demand when the user activates Voice Copilot
+        // or attaches audio evidence in Safety reports.
 
         permissionLauncher.launch(permissions.toTypedArray())
     }
@@ -1664,6 +1665,53 @@ fun MeetApp(
             }
             composable("battery_health") {
                 HealthScoreScreen(navController = navController, viewModel = obdViewModel)
+            }
+
+            // SAFETY FOUNDATION V1
+            composable(MeetDestinations.SAFETY_HOME) {
+                com.elysium369.meet.safety.ui.hub.SafetyHubScreen(
+                    onBack = { navController.backOrHome() },
+                    onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
+                    onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
+                    onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
+                    onNavigateToCases = { navController.navigate(MeetDestinations.SAFETY_CASES) },
+                    onNavigateToAccountability = { navController.navigate(MeetDestinations.SAFETY_ACCOUNTABILITY) },
+                    onNavigateToObservatory = { navController.navigate(MeetDestinations.SAFETY_OBSERVATORY) },
+                )
+            }
+            composable(MeetDestinations.SAFETY_MAP) {
+                com.elysium369.meet.safety.ui.map.SafetyMapScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(MeetDestinations.SAFETY_REPORT) {
+                com.elysium369.meet.safety.ui.report.SafetyReportScreen(
+                    onBack = { navController.popBackStack() },
+                    onReportSubmitted = {
+                        navController.popBackStack()
+                        navController.navigate(MeetDestinations.SAFETY_MY_REPORTS)
+                    },
+                )
+            }
+            composable(MeetDestinations.SAFETY_MY_REPORTS) {
+                com.elysium369.meet.safety.ui.report.SafetyMyReportsScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(MeetDestinations.SAFETY_CASES) {
+                com.elysium369.meet.safety.ui.cases.SafetyCasesScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(MeetDestinations.SAFETY_ACCOUNTABILITY) {
+                com.elysium369.meet.safety.ui.accountability.SafetyAccountabilityScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable(MeetDestinations.SAFETY_OBSERVATORY) {
+                com.elysium369.meet.safety.ui.observatory.SafetyObservatoryScreen(
+                    onBack = { navController.popBackStack() },
+                )
             }
         }
 
