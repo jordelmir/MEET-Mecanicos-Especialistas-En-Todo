@@ -12,10 +12,35 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.inject.Inject
 import javax.inject.Singleton
 
+data class AeadBlob(
+    val ciphertext: ByteArray,
+    val nonce: ByteArray,
+) {
+    fun toWire(): ByteArray = ByteBuffer
+        .allocate(4 + nonce.size + ciphertext.size)
+        .putInt(nonce.size)
+        .put(nonce)
+        .put(ciphertext)
+        .array()
+
+    companion object {
+        fun fromWire(data: ByteArray): AeadBlob {
+            val buffer = ByteBuffer.wrap(data)
+            val nonceLen = buffer.int
+            require(nonceLen in 12..32)
+            val nonce = ByteArray(nonceLen)
+            buffer.get(nonce)
+            val ciphertext = ByteArray(buffer.remaining())
+            buffer.get(ciphertext)
+            return AeadBlob(ciphertext = ciphertext, nonce = nonce)
+        }
+    }
+}
+
 @Singleton
 class SafetyPayloadCipher @Inject constructor() {
 
-    private val alias = "meet_safety_payload_v1"
+    private val alias = "meet_safety_payload_v2"
 
     private fun key(): SecretKey {
         val keyStore = KeyStore
@@ -45,41 +70,35 @@ class SafetyPayloadCipher @Inject constructor() {
         return generator.generateKey()
     }
 
-    fun encrypt(plaintext: ByteArray): ByteArray {
+    fun encryptAead(plaintext: ByteArray, associatedData: ByteArray): AeadBlob {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key())
+        cipher.updateAAD(associatedData)
 
-        val iv = cipher.iv
-        val ciphertext = cipher.doFinal(plaintext)
-
-        return ByteBuffer
-            .allocate(4 + iv.size + ciphertext.size)
-            .putInt(iv.size)
-            .put(iv)
-            .put(ciphertext)
-            .array()
+        return AeadBlob(
+            ciphertext = cipher.doFinal(plaintext),
+            nonce = cipher.iv,
+        )
     }
 
-    fun decrypt(blob: ByteArray): ByteArray {
-        val buffer = ByteBuffer.wrap(blob)
-
-        val ivLength = buffer.int
-        require(ivLength in 12..32)
-
-        val iv = ByteArray(ivLength)
-        buffer.get(iv)
-
-        val ciphertext = ByteArray(buffer.remaining())
-        buffer.get(ciphertext)
-
+    fun decryptAead(blob: AeadBlob, associatedData: ByteArray): ByteArray {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(
             Cipher.DECRYPT_MODE,
             key(),
-            GCMParameterSpec(128, iv),
+            GCMParameterSpec(128, blob.nonce),
         )
+        cipher.updateAAD(associatedData)
+        return cipher.doFinal(blob.ciphertext)
+    }
 
-        return cipher.doFinal(ciphertext)
+    fun encrypt(plaintext: ByteArray): ByteArray {
+        val blob = encryptAead(plaintext, byteArrayOf())
+        return blob.toWire()
+    }
+
+    fun decrypt(blob: ByteArray): ByteArray {
+        return decryptAead(AeadBlob.fromWire(blob), byteArrayOf())
     }
 }
 

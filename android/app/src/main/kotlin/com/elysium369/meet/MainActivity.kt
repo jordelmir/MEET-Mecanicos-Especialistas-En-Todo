@@ -444,15 +444,17 @@ fun MeetApp(
         Scaffold(
         containerColor = Color(0xFF060612),
         bottomBar = {
-            // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect
+            // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect/safety/*
             val hideNavRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
-            if (activeRoute !in hideNavRoutes && activeRoute != null) {
+            val isSafetyRoute = activeRoute?.startsWith("safety") == true
+            if (activeRoute !in hideNavRoutes && !isSafetyRoute && activeRoute != null) {
                 MeetBottomNavigation(navController)
             }
         },
         topBar = {
             val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
-            if (activeRoute !in hideBarRoutes && activeRoute != null) {
+            val isSafetyBar = activeRoute?.startsWith("safety") == true
+            if (activeRoute !in hideBarRoutes && !isSafetyBar && activeRoute != null) {
                 Box(modifier = Modifier.statusBarsPadding()) {
                     ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
                 }
@@ -1694,7 +1696,9 @@ fun MeetApp(
                 )
             }
             composable(MeetDestinations.SAFETY_MY_REPORTS) {
+                val viewModel: com.elysium369.meet.safety.ui.report.SafetyMyReportsViewModel = hiltViewModel()
                 com.elysium369.meet.safety.ui.report.SafetyMyReportsScreen(
+                    viewModel = viewModel,
                     onBack = { navController.popBackStack() },
                 )
             }

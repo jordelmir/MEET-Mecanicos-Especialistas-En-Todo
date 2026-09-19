@@ -6,10 +6,10 @@
         android:protectionLevel="signature" />
 
     <application>
-        <!-- Explicitly debug-only: never merged into a release APK. -->
         <receiver
             android:name=".ai.debug.AiTestReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:permission="com.elysium369.meet.permission.AI_AUTOMATION">
             <intent-filter>
                 <action android:name="com.elysium369.meet.AI_TEST" />
             </intent-filter>
@@ -17,7 +17,8 @@
 
         <receiver
             android:name=".automation.AiAutomationReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:permission="com.elysium369.meet.permission.AI_AUTOMATION">
             <intent-filter>
                 <action android:name="com.elysium369.meet.AI_NAVIGATE" />
                 <action android:name="com.elysium369.meet.AI_ACTION" />

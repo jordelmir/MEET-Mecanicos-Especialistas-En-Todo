@@ -9,13 +9,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,20 +25,24 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.elysium369.meet.safety.data.local.SafetyReportEntity
 import com.elysium369.meet.ui.theme.MeetColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SafetyMyReportsScreen(
-    reports: List<SafetyReportEntity> = emptyList(),
+    viewModel: SafetyMyReportsViewModel,
     onBack: () -> Unit = {},
 ) {
+    val state by viewModel.state.collectAsState()
+
     Scaffold(
         containerColor = MeetColors.backgroundDeep,
         topBar = {
@@ -46,7 +50,7 @@ fun SafetyMyReportsScreen(
                 title = {
                     Column {
                         Text("MIS REPORTES", fontWeight = FontWeight.Black, fontSize = 17.sp, color = Color.White)
-                        Text("${reports.size} reporte(s)", fontSize = 11.sp, color = MeetColors.cyberCyan)
+                        Text("${state.totalReports} reporte(s) · ${state.pendingCount} pendiente(s)", fontSize = 11.sp, color = MeetColors.cyberCyan)
                     }
                 },
                 navigationIcon = {
@@ -58,62 +62,105 @@ fun SafetyMyReportsScreen(
             )
         },
     ) { padding ->
-        if (reports.isEmpty()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(32.dp),
-            ) {
-                Text("SIN REPORTES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                Text("Tus reportes de seguridad aparecerán aquí.", fontSize = 14.sp, color = MeetColors.textMuted)
+        when {
+            state.isLoading -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CircularProgressIndicator(color = MeetColors.cyberCyan, modifier = Modifier.size(32.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Cargando reportes…", fontSize = 13.sp, color = MeetColors.textMuted)
+                }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(reports) { report ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-                        border = BorderStroke(1.dp, MeetColors.borderSubtle),
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Text(
-                                    report.category.replace("_", " "),
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = MeetColors.textPrimary,
-                                )
-                                Text(
-                                    report.syncState,
-                                    fontSize = 12.sp,
-                                    color = when (report.syncState) {
-                                        "SYNCED" -> MeetColors.neonGreen
-                                        "FAILED" -> MeetColors.error
-                                        else -> MeetColors.textMuted
-                                    },
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(report.localState, fontSize = 12.sp, color = MeetColors.textSecondary)
-                            if (report.serverVersion > 0) {
-                                Text("v${report.serverVersion}", fontSize = 11.sp, color = MeetColors.textMuted)
-                            }
-                        }
+
+            state.error != null -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(32.dp),
+                ) {
+                    Text("ERROR", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.error, letterSpacing = 1.2.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(state.error!!, fontSize = 14.sp, color = MeetColors.textMuted)
+                }
+            }
+
+            state.reports.isEmpty() -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(32.dp),
+                ) {
+                    Text("SIN REPORTES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text("Tus reportes de seguridad aparecerán aquí.", fontSize = 14.sp, color = MeetColors.textMuted)
+                }
+            }
+
+            else -> {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(padding)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(state.reports) { report ->
+                        Card(
+                            report = report,
+                        )
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun Card(report: com.elysium369.meet.safety.data.local.SafetyReportEntity) {
+    androidx.compose.material3.Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.dp, MeetColors.borderSubtle),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text(
+                    report.category.replace("_", " "),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = MeetColors.textPrimary,
+                )
+                Text(
+                    report.syncState,
+                    fontSize = 12.sp,
+                    color = when (report.syncState) {
+                        "SYNCED" -> MeetColors.neonGreen
+                        "FAILED" -> MeetColors.error
+                        else -> MeetColors.textMuted
+                    },
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(report.localState, fontSize = 12.sp, color = MeetColors.textSecondary)
+            if (report.serverVersion > 0) {
+                Text("v${report.serverVersion}", fontSize = 11.sp, color = MeetColors.textMuted)
+            }
+        }
+    }
+}
+
+private object CardDefaults {
+    @Composable
+    fun cardColors(containerColor: Color) = androidx.compose.material3.CardDefaults.cardColors(containerColor = containerColor)
 }

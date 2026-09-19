@@ -1,11 +1,16 @@
 package com.elysium369.meet.safety.data.local
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 
 @Dao
 interface SafetyCommandOutboxDao {
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertOrThrow(entity: SafetyCommandOutboxEntity)
 
     @Query(
         """
@@ -142,30 +147,4 @@ interface SafetyCommandOutboxDao {
         """
     )
     suspend fun pendingCount(userId: String): Int
-
-    @Query(
-        """
-        INSERT OR IGNORE INTO safety_command_outbox
-        (idempotencyKey, aggregateId, actorSessionUserId, commandType,
-         expectedVersion, payloadVersion, payloadId, clientPayloadSha256,
-         status, attemptCount, nextAttemptAt, leaseStartedAt,
-         lastErrorCode, lastErrorMessage, correlationId, createdAt, updatedAt)
-        VALUES
-        (:idempotencyKey, :aggregateId, :actorUserId, :commandType,
-         :expectedVersion, :payloadVersion, :payloadId, :clientSha256,
-         'PENDING', 0, :now, NULL,
-         NULL, NULL, NULL, :now, :now)
-        """
-    )
-    suspend fun insert(
-        idempotencyKey: String,
-        aggregateId: String,
-        actorUserId: String,
-        commandType: String,
-        expectedVersion: Long,
-        payloadVersion: Int,
-        payloadId: String,
-        clientSha256: String,
-        now: Long,
-    )
 }

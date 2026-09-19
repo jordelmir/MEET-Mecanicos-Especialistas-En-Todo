@@ -1,19 +1,15 @@
 package com.elysium369.meet.safety.data.local
 
 import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 
 @Dao
 interface SafetyPayloadDao {
 
-    @Query(
-        """
-        INSERT OR IGNORE INTO safety_local_payloads
-        (payloadId, ciphertext, sha256, createdAt, redactedAt)
-        VALUES (:payloadId, :ciphertext, :sha256, :now, NULL)
-        """
-    )
-    suspend fun insert(payloadId: String, ciphertext: ByteArray, sha256: String, now: Long)
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertOrThrow(entity: SafetyLocalPayloadEntity)
 
     @Query("SELECT * FROM safety_local_payloads WHERE payloadId = :payloadId")
     suspend fun get(payloadId: String): SafetyLocalPayloadEntity?

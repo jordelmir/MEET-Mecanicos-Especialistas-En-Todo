@@ -42,7 +42,6 @@ object HomeModuleRegistry {
         // ── SERVICES & ASSISTANCE ──
         map[HomeSectionCategory.SERVICES]?.addAll(
             listOf(
-                HomeModuleItem("safety", "MEET Seguridad", "Evidencia, casos y rendición de cuentas", MeetDestinations.SAFETY_HOME, HomeSectionCategory.SERVICES, "safety", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("learning", "MEET Aprende", "Capacidades, misiones y teórico de manejo", MeetDestinations.LEARNING_HUB, HomeSectionCategory.SERVICES, "learning_hub", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("messages", "Mensajes", "Chats y llamadas privadas Elysium", MeetDestinations.MESSAGES, HomeSectionCategory.SERVICES, "messages", isHighlight = true),
                 HomeModuleItem("mechanic", "Servicios Mecánicos", "Red de talleres y cotizaciones", MeetDestinations.MECHANIC_SERVICES, HomeSectionCategory.SERVICES, "mechanic_services", isHighlight = true),
