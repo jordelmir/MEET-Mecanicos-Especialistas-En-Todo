@@ -38,6 +38,11 @@ enum class ProductUniverse(
         title = "Elysium AI",
         subtitle = "Capa Transversal de Inteligencia Automotriz y Copiloto Mecánico",
         icon = "✨"
+    ),
+    SAFETY(
+        title = "Seguridad",
+        subtitle = "Evidencia, prevención, casos y accountability",
+        icon = "🛡️"
     );
 
     companion object {
@@ -85,6 +90,14 @@ enum class ProductUniverse(
                 MeetDestinations.AI,
                 "evair",
                 "elysium_ai" -> ELYSIUM_AI
+
+                MeetDestinations.SAFETY_HOME,
+                MeetDestinations.SAFETY_MAP,
+                MeetDestinations.SAFETY_REPORT,
+                MeetDestinations.SAFETY_MY_REPORTS,
+                MeetDestinations.SAFETY_CASES,
+                MeetDestinations.SAFETY_ACCOUNTABILITY,
+                MeetDestinations.SAFETY_OBSERVATORY -> SAFETY
 
                 else -> MY_VEHICLE
             }
