@@ -232,6 +232,26 @@ using (
 );
 
 -- ============================================================
+-- PUBLIC: safety_source_clusters (must exist before safety_sources FK)
+-- ============================================================
+create table if not exists public.safety_source_clusters (
+    id uuid primary key default gen_random_uuid(),
+
+    methodology_version text not null,
+
+    created_at timestamptz not null default now()
+);
+
+alter table public.safety_source_clusters
+enable row level security;
+
+revoke all on public.safety_source_clusters
+from anon, authenticated;
+
+grant select, insert on public.safety_source_clusters
+to service_role;
+
+-- ============================================================
 -- PUBLIC: safety_sources
 -- ============================================================
 create table if not exists public.safety_sources (
@@ -291,26 +311,6 @@ using (
         where reporter_user_id = auth.uid()
     )
 );
-
--- ============================================================
--- PUBLIC: safety_source_clusters
--- ============================================================
-create table if not exists public.safety_source_clusters (
-    id uuid primary key default gen_random_uuid(),
-
-    methodology_version text not null,
-
-    created_at timestamptz not null default now()
-);
-
-alter table public.safety_source_clusters
-enable row level security;
-
-revoke all on public.safety_source_clusters
-from anon, authenticated;
-
-grant select, insert on public.safety_source_clusters
-to service_role;
 
 -- ============================================================
 -- PUBLIC: safety_claim_sources (claim ↔ source edges)
