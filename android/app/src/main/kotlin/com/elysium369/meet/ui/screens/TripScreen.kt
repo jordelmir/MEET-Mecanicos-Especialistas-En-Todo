@@ -162,7 +162,7 @@ fun TripScreen(
                                 )
                                 Spacer(Modifier.height(8.dp))
                                 Text(
-                                    text = "1. Conecta el adaptador OBD.\n2. Enciende el vehículo.\n3. Conduce con la sesión activa.\n4. Elysium Vanguard guardará el trayecto automáticamente.",
+                                    text = "1. Conecta el adaptador OBD.\n2. Enciende el vehículo.\n3. Conduce con la sesión activa.\n4. Elysium Vanguard AI OS guardará el trayecto automáticamente.",
                                     color = Color.White.copy(alpha = 0.85f),
                                     fontSize = 12.sp,
                                     textAlign = TextAlign.Center,

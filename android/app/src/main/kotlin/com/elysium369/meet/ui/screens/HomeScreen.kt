@@ -8,7 +8,7 @@ import com.elysium369.meet.ui.screens.home.HomeExperienceHost
 
 /**
  * Legacy entry point. Delegates transparently to [HomeExperienceHost]
- * under the MEET Dual Home Experience Architecture (DHEA).
+ * under the Elysium Dual Home Experience Architecture (DHEA).
  * Enforces [PlatformOwnerAccessPolicy] across dynamic experiences.
  */
 @Composable

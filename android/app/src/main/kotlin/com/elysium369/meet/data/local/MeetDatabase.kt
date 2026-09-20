@@ -11,6 +11,13 @@ import com.elysium369.meet.safety.data.local.SafetyCommandOutboxDao
 import com.elysium369.meet.safety.data.local.SafetyCommandOutboxEntity
 import com.elysium369.meet.safety.data.local.SafetyLocalPayloadEntity
 import com.elysium369.meet.safety.data.local.SafetyPayloadDao
+import com.elysium369.meet.safety.data.local.SafetyPublicClaimEntity
+import com.elysium369.meet.safety.data.local.SafetyPublicCaseEntity
+import com.elysium369.meet.safety.evidence.SafetyEvidenceEntity
+import com.elysium369.meet.safety.evidence.SafetyEvidenceDao
+import com.elysium369.meet.safety.data.local.SafetyPublicDao
+import com.elysium369.meet.safety.data.local.SafetyPublicPointEntity
+import com.elysium369.meet.safety.data.local.SafetyPublicTimelineEntity
 import com.elysium369.meet.safety.data.local.SafetyReportDao
 import com.elysium369.meet.safety.data.local.SafetyReportEntity
 
@@ -197,8 +204,15 @@ import com.elysium369.meet.safety.data.local.SafetyReportEntity
         SafetyLocalPayloadEntity::class,
         SafetyReportEntity::class,
         SafetyCommandOutboxEntity::class,
+
+        // SAFETY FOUNDATION V2 — PUBLIC PROJECTIONS
+        SafetyEvidenceEntity::class,
+        SafetyPublicPointEntity::class,
+        SafetyPublicCaseEntity::class,
+        SafetyPublicTimelineEntity::class,
+        SafetyPublicClaimEntity::class,
     ],
-    version = 78,
+    version = 80,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -292,4 +306,8 @@ abstract class MeetDatabase : RoomDatabase() {
         abstract fun safetyPayloadDao(): SafetyPayloadDao
         abstract fun safetyReportDao(): SafetyReportDao
         abstract fun safetyCommandOutboxDao(): SafetyCommandOutboxDao
+
+        // SAFETY FOUNDATION V2 — PUBLIC PROJECTIONS DAO
+        abstract fun safetyPublicDao(): SafetyPublicDao
+        abstract fun safetyEvidenceDao(): SafetyEvidenceDao
 }

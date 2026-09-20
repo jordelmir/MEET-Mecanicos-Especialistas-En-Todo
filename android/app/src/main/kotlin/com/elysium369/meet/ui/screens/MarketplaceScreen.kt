@@ -86,7 +86,7 @@ fun MarketplaceScreen(
         containerColor = MeetColors.backgroundDark,
         topBar = {
             EliteTopAppBar(
-                title = "Elysium Vanguard MARKETPLACE\nServicios Automotrices VIP",
+                title = "Elysium Vanguard AI OS MARKETPLACE\nServicios Automotrices VIP",
                 onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {

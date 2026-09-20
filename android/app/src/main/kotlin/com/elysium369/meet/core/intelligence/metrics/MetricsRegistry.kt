@@ -143,7 +143,7 @@ object MetricsRegistry {
     val PLATFORM_TOTAL_GMV = MetricDefinition(
         key = "platform.total_gmv",
         version = 1,
-        name = "MEET Global GMV",
+        name = "Elysium Global GMV",
         description = "Sum of all transaction volumes across mobility, services, and towing",
         unit = MetricUnit.MONEY,
         ownerDomain = "Platform",
@@ -152,7 +152,7 @@ object MetricsRegistry {
     val PLATFORM_NET_REVENUE = MetricDefinition(
         key = "platform.net_revenue",
         version = 1,
-        name = "Ingresos Netos MEET",
+        name = "Ingresos Netos Elysium",
         description = "platform_fees - refunds - chargebacks",
         unit = MetricUnit.MONEY,
         ownerDomain = "Platform",

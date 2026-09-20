@@ -1065,13 +1065,13 @@ fun getTechnicalGuide(testId: String): String {
         """.trimIndent()
         "INJECTOR_BALANCE" -> """
             1. Conecte el manómetro mecánico al riel y abra switch (Ignición ON).
-            2. Elysium Vanguard pulsará de forma individual cada inyector seleccionado.
+            2. Elysium Vanguard AI OS pulsará de forma individual cada inyector seleccionado.
             3. Registre la caída de presión exacta tras el pulso (ej. de 50 PSI a 36 PSI).
             4. Todas las caídas deben ser similares dentro de ±1.5 PSI. Caídas desiguales sugieren inyector tapado o goteo constante.
         """.trimIndent()
         "EVAP_VENT", "EVAP_PURGE" -> """
             1. Utilice una máquina de humo conectada al puerto de llenado de combustible o puerto EVAP.
-            2. Active el solenoide con Elysium Vanguard para sellar o liberar la línea.
+            2. Active el solenoide con Elysium Vanguard AI OS para sellar o liberar la línea.
             3. Si sella el Vent, verifique con manómetro que el sistema alcance estanqueidad al vacío.
             4. Si abre el Purge, compruebe que succione vacío del múltiple de admisión.
         """.trimIndent()

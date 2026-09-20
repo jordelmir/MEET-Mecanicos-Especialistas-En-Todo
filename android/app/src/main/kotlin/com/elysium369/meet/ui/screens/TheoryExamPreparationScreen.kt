@@ -129,7 +129,7 @@ fun TheoryExamPreparationScreen(
         containerColor = MeetColors.backgroundDark,
         topBar = {
             EliteTopAppBar(
-                title = "ACADEMIA VIAL\nMEET THEORY LAB",
+                title = "ACADEMIA VIAL\nElysium THEORY LAB",
                 onBackClick = backAction,
                 backgroundColor = MeetColors.backgroundDark,
             )
@@ -279,7 +279,7 @@ private fun TheoryHome(
             TheoryActionCard("REPASO INTELIGENTE", "10 preguntas priorizadas por vencimiento y errores", Icons.Default.Psychology, MeetColors.neonGreen, onPractice)
         }
         item {
-            TheoryActionCard("SIMULACRO MEET", "40 preguntas · umbral de preparación 80 · resultado por tema", Icons.Default.Timer, MeetColors.warning, onExam)
+            TheoryActionCard("SIMULACRO Elysium", "40 preguntas · umbral de preparación 80 · resultado por tema", Icons.Default.Timer, MeetColors.warning, onExam)
         }
         item {
             OfficialTruthCard(onSources)
@@ -338,7 +338,7 @@ private fun OfficialTruthCard(onSources: () -> Unit) {
         Column(Modifier.padding(15.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("VERDAD OFICIAL 2026", color = MeetColors.warning, fontSize = 10.sp, fontWeight = FontWeight.Black)
             Text("Desde el 2 de marzo hay pruebas distintas para automóvil y motocicleta.", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            Text("El manual oficial cuesta ₡3.500 y la prueba ₡5.000. MEET no es MOPT/COSEVI, no distribuye el manual pagado y sus preguntas son práctica original.", color = MeetColors.textSecondary, fontSize = 11.sp, lineHeight = 16.sp)
+            Text("El manual oficial cuesta ₡3.500 y la prueba ₡5.000. Elysium no es MOPT/COSEVI, no distribuye el manual pagado y sus preguntas son práctica original.", color = MeetColors.textSecondary, fontSize = 11.sp, lineHeight = 16.sp)
             OutlinedButton(onClick = onSources, border = BorderStroke(1.dp, MeetColors.warning)) {
                 Icon(Icons.Default.Description, null, tint = MeetColors.warning, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.size(8.dp))
@@ -566,7 +566,7 @@ private fun ExamSession(
     val question = questions[index]
     val selected = answers[question.id]
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 12.dp, 16.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { SessionHeader("SIMULACRO MEET · SIN RETROALIMENTACIÓN", index + 1, questions.size, MeetColors.warning) }
+        item { SessionHeader("SIMULACRO Elysium · SIN RETROALIMENTACIÓN", index + 1, questions.size, MeetColors.warning) }
         item { QuestionCard(question, selected, false) { onAnswer(question.id, it) } }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -578,7 +578,7 @@ private fun ExamSession(
                 }
             }
         }
-        item { Text("Respondidas: ${answers.size}/${questions.size}. Este simulacro es una herramienta MEET y no reproduce la interfaz ni el banco oficial.", color = MeetColors.textMuted, fontSize = 9.sp, lineHeight = 13.sp) }
+        item { Text("Respondidas: ${answers.size}/${questions.size}. Este simulacro es una herramienta Elysium y no reproduce la interfaz ni el banco oficial.", color = MeetColors.textMuted, fontSize = 9.sp, lineHeight = 13.sp) }
     }
 }
 
@@ -595,7 +595,7 @@ private fun ExamResultScreen(modifier: Modifier, result: TheoryExamResult, onRet
                 }
             }
         }
-        item { Text(if (result.passed) "UMBRAL MEET ALCANZADO" else "TODAVÍA HAY QUE CONSOLIDAR", color = color, fontSize = 15.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center) }
+        item { Text(if (result.passed) "UMBRAL Elysium ALCANZADO" else "TODAVÍA HAY QUE CONSOLIDAR", color = color, fontSize = 15.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center) }
         item { Text("${result.correct} correctas de ${result.total}. El 80 es el umbral oficial publicado, pero aprobar simulaciones no garantiza el resultado real.", color = MeetColors.textSecondary, fontSize = 12.sp, lineHeight = 17.sp, textAlign = TextAlign.Center) }
         item {
             Surface(shape = RoundedCornerShape(14.dp), color = MeetColors.cardBackground, border = BorderStroke(1.dp, MeetColors.borderSubtle)) {

@@ -935,7 +935,7 @@ class ObdViewModel @Inject constructor(
     private val _terminalSessionLogs = MutableStateFlow<List<TerminalLine>>(
         listOf(
             TerminalLine("╔══════════════════════════════════════════╗", TerminalLineType.SYSTEM),
-            TerminalLine("║  Elysium Vanguard Expert Terminal v3.0               ║", TerminalLineType.SYSTEM),
+            TerminalLine("║  Elysium Vanguard AI OS Expert Terminal v3.0               ║", TerminalLineType.SYSTEM),
             TerminalLine("║  Motor de Diagnóstico Inteligente        ║", TerminalLineType.SYSTEM),
             TerminalLine("╚══════════════════════════════════════════╝", TerminalLineType.SYSTEM),
             TerminalLine("Escribe un comando OBD2 o AT. Cada comando incluye", TerminalLineType.SYSTEM),
@@ -1400,11 +1400,11 @@ class ObdViewModel @Inject constructor(
                 appendLine(WorkshopServiceCatalog.requestSummary(catalogService, dtcCodes))
                 appendLine()
             } else if (serviceCategory?.isNotBlank() == true || serviceMetadata.isNotBlank()) {
-                appendLine("[MEET_SERVICE_CATALOG]")
+                appendLine("[Elysium_SERVICE_CATALOG]")
                 serviceCategory?.takeIf { it.isNotBlank() }?.let { appendLine("service_category=$it") }
                 if (serviceMetadata.isNotBlank()) appendLine(serviceMetadata.trim())
                 if (dtcCodes.isNotEmpty()) appendLine("dtc_codes=${dtcCodes.joinToString()}")
-                appendLine("[/MEET_SERVICE_CATALOG]")
+                appendLine("[/Elysium_SERVICE_CATALOG]")
                 appendLine()
             }
             append(description.trim())
@@ -1444,7 +1444,7 @@ class ObdViewModel @Inject constructor(
     ) {
         val evidence = request.evidence
         val metadata = org.json.JSONObject().apply {
-            put("schema", "MEET_SERVICE_REQUEST_V2")
+            put("schema", "Elysium_SERVICE_REQUEST_V2")
             put("request_id", request.id)
             put("created_at_ms", request.createdAtMs)
             put("urgency", request.urgency.name)
@@ -1512,13 +1512,13 @@ class ObdViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val metadata = dekraConciergeJson.encodeToString(request)
             val description = buildString {
-                appendLine("[MEET_DEKRA_CONCIERGE_V1]")
+                appendLine("[Elysium_DEKRA_CONCIERGE_V1]")
                 appendLine(metadata)
-                appendLine("[/MEET_DEKRA_CONCIERGE_V1]")
+                appendLine("[/Elysium_DEKRA_CONCIERGE_V1]")
                 appendLine()
                 appendLine("Servicio de custodia, prechequeo y traslado a inspección técnica vehicular.")
-                appendLine("El resultado es emitido exclusivamente por DEKRA; MEET no garantiza aprobación.")
-                appendLine("La tarifa oficial DEKRA y la tarifa del servicio MEET se cotizan por separado.")
+                appendLine("El resultado es emitido exclusivamente por DEKRA; Elysium no garantiza aprobación.")
+                appendLine("La tarifa oficial DEKRA y la tarifa del servicio Elysium se cotizan por separado.")
             }.trim()
             val entity = ServiceRequestEntity(
                 requestId = request.id,
@@ -1608,7 +1608,7 @@ class ObdViewModel @Inject constructor(
             try {
                 val bid = marketplaceDao.getBidById(bidId)
                 val requestBeforeAcceptance = marketplaceDao.getRequestById(requestId)
-                if (requestBeforeAcceptance?.description?.contains("[MEET_DEKRA_CONCIERGE_V1]") == true) {
+                if (requestBeforeAcceptance?.description?.contains("[Elysium_DEKRA_CONCIERGE_V1]") == true) {
                     val eligible = bid?.let { candidate -> hasEligibleDekraProvider(candidate.shopId) } == true
                     if (!eligible) {
                         withContext(Dispatchers.Main) {
@@ -1667,7 +1667,7 @@ class ObdViewModel @Inject constructor(
     fun takeMechanicRequest(requestId: String, mechanicId: String, mechanicName: String, mechanicPhone: String, context: android.content.Context? = null) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = marketplaceDao.getRequestById(requestId)
-            if (request?.description?.contains("[MEET_DEKRA_CONCIERGE_V1]") == true) {
+            if (request?.description?.contains("[Elysium_DEKRA_CONCIERGE_V1]") == true) {
                 val eligible = hasEligibleDekraProvider(mechanicId)
                 if (!eligible) {
                     withContext(Dispatchers.Main) {
@@ -1887,14 +1887,14 @@ class ObdViewModel @Inject constructor(
                         .edit().clear().apply()
                 }
 
-                android.util.Log.i("MeetAccount", "Account deleted for userId=$userId")
+                android.util.Log.i("ElysiumAccount", "Account deleted for userId=$userId")
 
                 _accountDeletionState.value = AccountDeletionState.Completed(
                     "Tu cuenta ha sido eliminada exitosamente. La app se reiniciará."
                 )
 
             } catch (e: Exception) {
-                android.util.Log.e("MeetAccount", "Account deletion failed", e)
+                android.util.Log.e("ElysiumAccount", "Account deletion failed", e)
                 _accountDeletionState.value = AccountDeletionState.Failed(
                     "Error al eliminar la cuenta: ${e.message?.take(120) ?: "Error desconocido"}. " +
                     "Contacta privacy@elysiumvanguard.com si el problema persiste."
@@ -1954,11 +1954,11 @@ class ObdViewModel @Inject constructor(
                 UsageProfileSyncResult.AuthenticationRequired ->
                     _usageProfileSyncState.value = "AUTHENTICATION_REQUIRED"
                 is UsageProfileSyncResult.Rejected -> {
-                    Log.w("MeetIdentity", "Usage profile rejected: ${result.code}")
+                    Log.w("ElysiumIdentity", "Usage profile rejected: ${result.code}")
                     _usageProfileSyncState.value = "REJECTED"
                 }
                 is UsageProfileSyncResult.Unavailable -> {
-                    Log.w("MeetIdentity", "Usage profile sync unavailable: ${result.message}")
+                    Log.w("ElysiumIdentity", "Usage profile sync unavailable: ${result.message}")
                     _usageProfileSyncState.value = "RETRY_PENDING"
                 }
             }
@@ -1982,7 +1982,7 @@ class ObdViewModel @Inject constructor(
                     PlatformOwnerAccess.DENIED
                 }
             } catch (error: Exception) {
-                Log.w("MeetTrustCenter", "Owner authority check unavailable", error)
+                Log.w("ElysiumTrustCenter", "Owner authority check unavailable", error)
                 PlatformOwnerAccess.UNAVAILABLE
             }
         }
@@ -2048,7 +2048,7 @@ class ObdViewModel @Inject constructor(
                     }
                 }
                 .onFailure {
-                    Log.w("MeetTrustCenter", "Own verification decision sync unavailable", it)
+                    Log.w("ElysiumTrustCenter", "Own verification decision sync unavailable", it)
                 }
         }
     }
@@ -2098,7 +2098,7 @@ class ObdViewModel @Inject constructor(
                         }
                     }
                     .onFailure {
-                        Log.w("MeetTrustCenter", "Provider review sync unavailable", it)
+                        Log.w("ElysiumTrustCenter", "Provider review sync unavailable", it)
                     }
             }
             providerProfileDao.getProfilesForUser(userId).collect { profiles ->
@@ -3115,7 +3115,7 @@ class ObdViewModel @Inject constructor(
                     "Inspection complete. Vehicle score: ${result.overallScore} out of 100."
                 )
             } catch (e: Exception) {
-                Log.e("Elysium Vanguard", "Pre-purchase inspection failed", e)
+                Log.e("Elysium Vanguard AI OS", "Pre-purchase inspection failed", e)
             } finally {
                 _isInspecting.value = false
             }
@@ -3136,7 +3136,7 @@ class ObdViewModel @Inject constructor(
                 _prePurchaseReportFile.value = file
                 reportGenerator.shareReport(file)
             } catch (e: Exception) {
-                Log.e("Elysium Vanguard", "Failed to generate pre-purchase PDF", e)
+                Log.e("Elysium Vanguard AI OS", "Failed to generate pre-purchase PDF", e)
             }
         }
     }
@@ -3197,7 +3197,7 @@ class ObdViewModel @Inject constructor(
                     if (trained == null) {
                         val missing = (progress.requiredSamples - progress.currentSamples).coerceAtLeast(0)
                         result.copy(
-                            message = "Aun faltan $missing lecturas alineadas para entrenar la firma Elysium Vanguard DNA. Mientras tanto se muestra telemetria provisional."
+                            message = "Aun faltan $missing lecturas alineadas para entrenar la firma Elysium Vanguard AI OS DNA. Mientras tanto se muestra telemetria provisional."
                         )
                     } else {
                         result
@@ -3206,7 +3206,7 @@ class ObdViewModel @Inject constructor(
             } catch (e: Exception) {
                 _dnaResult.value = com.elysium369.meet.core.dna.DnaEvaluationResult(
                     isCalibrated = false,
-                    message = "Elysium Vanguard DNA no pudo calibrar: ${e.message ?: "error interno"}"
+                    message = "Elysium Vanguard AI OS DNA no pudo calibrar: ${e.message ?: "error interno"}"
                 )
             } finally {
                 _isTrainingDna.value = false
@@ -3255,7 +3255,7 @@ class ObdViewModel @Inject constructor(
             }
 
             try {
-            voiceFeedbackManager.speak("Iniciando peritaje clínico Elysium Vanguard Perito.", "Starting Elysium Vanguard Perito clinical vehicle check.")
+            voiceFeedbackManager.speak("Iniciando peritaje clínico Elysium Vanguard AI OS Perito.", "Starting Elysium Vanguard AI OS Perito clinical vehicle check.")
 
             // Step 1: VIN
             _currentPeritoStep.value = 1
@@ -3337,7 +3337,7 @@ class ObdViewModel @Inject constructor(
             addLog("ℹ️ Monitores listos: ${readiness.count { it.value }}/${readiness.size}")
             delay(800)
 
-            addLog("⚡ Compilando diagnóstico y generando reporte clínico Elysium Vanguard Perito...")
+            addLog("⚡ Compilando diagnóstico y generando reporte clínico Elysium Vanguard AI OS Perito...")
             delay(1500)
 
             val inspectionLiveData = _liveData.value.toMutableMap().apply {
@@ -3391,7 +3391,7 @@ class ObdViewModel @Inject constructor(
                 _peritoReportFile.value = file
                 reportGenerator.shareReport(file)
             } catch (e: Exception) {
-                Log.e("Elysium Vanguard", "Failed to generate Perito PDF report", e)
+                Log.e("Elysium Vanguard AI OS", "Failed to generate Perito PDF report", e)
             }
         }
     }
@@ -4133,7 +4133,7 @@ class ObdViewModel @Inject constructor(
                                 true
                             }
                             .collectLatest {
-                                Log.i("MeetTrustCenter", "Own verification changed; syncing from server")
+                                Log.i("ElysiumTrustCenter", "Own verification changed; syncing from server")
                                 refreshOwnTrustDecisions()
                                 refreshProviderRoles()
                             }
@@ -4291,7 +4291,7 @@ class ObdViewModel @Inject constructor(
                         when (state) {
                             ObdState.CONNECTING -> voiceFeedbackManager.speak("Iniciando enlace con el adaptador OBD", "Initiating link with OBD adapter")
                             ObdState.NEGOTIATING -> voiceFeedbackManager.speak("Estableciendo protocolo de comunicación", "Establishing communication protocol")
-                            ObdState.CONNECTED -> voiceFeedbackManager.speak("Conexión establecida. Sistema de telemetría Elysium Vanguard activo.", "Connection established. Elysium Vanguard telemetry system active.")
+                            ObdState.CONNECTED -> voiceFeedbackManager.speak("Conexión establecida. Sistema de telemetría Elysium Vanguard AI OS activo.", "Connection established. Elysium Vanguard AI OS telemetry system active.")
                             ObdState.ERROR -> voiceFeedbackManager.speak("Error de conexión. Por favor, verifique el adaptador.", "Connection error. Please check the adapter.")
                             else -> {}
                         }
@@ -5364,7 +5364,7 @@ class ObdViewModel @Inject constructor(
         val trace = obdSession.healthCoordinator.getTrace().exportRedacted().joinToString("\n")
             .ifBlank { "Sin eventos de conexión registrados." }
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("MEET OBD Connection Trace", trace))
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Elysium OBD Connection Trace", trace))
     }
 
     fun getConnectionTrace(): List<String> {
@@ -6961,7 +6961,7 @@ class ObdViewModel @Inject constructor(
             )
 
             _anomalousPids.value = emptyList()
-            modelUsed = "Elysium Vanguard Local Expert Engine"
+            modelUsed = "Elysium Vanguard AI OS Local Expert Engine"
         }
 
         // 3. Save to offline cache (both successful remote and generated local fallback)
@@ -7569,7 +7569,7 @@ class ObdViewModel @Inject constructor(
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        val chooser = Intent.createChooser(intent, "Compartir Log de Elysium Vanguard").apply {
+        val chooser = Intent.createChooser(intent, "Compartir Log de Elysium Vanguard AI OS").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         context.startActivity(chooser)
@@ -7910,18 +7910,18 @@ class ObdViewModel @Inject constructor(
     private fun speakVehicleDna() {
         val dna = dnaResult.value
         val msgEs = if (!dna.isCalibrated) {
-            "La firma digital Elysium Vanguard DNA aún no está calibrada para este vehículo. Por favor, realice una corrida de calibración en la pantalla DNA."
+            "La firma digital Elysium Vanguard AI OS DNA aún no está calibrada para este vehículo. Por favor, realice una corrida de calibración en la pantalla DNA."
         } else if (dna.isAnomalous) {
             "Alerta preventiva de comportamiento: El score de salud es del ${dna.healthScore} por ciento. Se detecta una desviación estadística anómala en los sensores."
         } else {
-            "Firma digital Elysium Vanguard DNA calibrada al ${dna.confidence.toInt()} por ciento de confianza. El vehículo se comporta de forma normal con un score de salud del ${dna.healthScore} por ciento."
+            "Firma digital Elysium Vanguard AI OS DNA calibrada al ${dna.confidence.toInt()} por ciento de confianza. El vehículo se comporta de forma normal con un score de salud del ${dna.healthScore} por ciento."
         }
         val msgEn = if (!dna.isCalibrated) {
-            "The Elysium Vanguard DNA digital signature is not yet calibrated for this vehicle. Please perform a calibration drive in the DNA section."
+            "The Elysium Vanguard AI OS DNA digital signature is not yet calibrated for this vehicle. Please perform a calibration drive in the DNA section."
         } else if (dna.isAnomalous) {
             "Preventive behavior alert: The health score is ${dna.healthScore} percent. Statistical anomaly detected in sensors."
         } else {
-            "Elysium Vanguard DNA signature calibrated at ${dna.confidence.toInt()} percent confidence. The vehicle behaves normally with a health score of ${dna.healthScore} percent."
+            "Elysium Vanguard AI OS DNA signature calibrated at ${dna.confidence.toInt()} percent confidence. The vehicle behaves normally with a health score of ${dna.healthScore} percent."
         }
         voiceFeedbackManager.speak(msgEs, msgEn)
     }
@@ -7929,14 +7929,14 @@ class ObdViewModel @Inject constructor(
     private fun speakPeritoReport() {
         val report = activePeritoReport.value
         val msgEs = if (report != null) {
-            "El último reporte Elysium Vanguard Perito indica un score clínico de ${report.score0to100} sobre cien, con clasificación ${report.category}."
+            "El último reporte Elysium Vanguard AI OS Perito indica un score clínico de ${report.score0to100} sobre cien, con clasificación ${report.category}."
         } else {
-            "No se ha realizado ningún peritaje clínico Elysium Vanguard Perito para este vehículo en esta sesión."
+            "No se ha realizado ningún peritaje clínico Elysium Vanguard AI OS Perito para este vehículo en esta sesión."
         }
         val msgEn = if (report != null) {
-            "The latest Elysium Vanguard Perito report shows a clinical score of ${report.score0to100} out of one hundred, categorized as ${report.category}."
+            "The latest Elysium Vanguard AI OS Perito report shows a clinical score of ${report.score0to100} out of one hundred, categorized as ${report.category}."
         } else {
-            "No Elysium Vanguard Perito clinical check has been executed for this vehicle in this session."
+            "No Elysium Vanguard AI OS Perito clinical check has been executed for this vehicle in this session."
         }
         voiceFeedbackManager.speak(msgEs, msgEn)
     }
@@ -8571,14 +8571,14 @@ class ObdViewModel @Inject constructor(
                         )
                     }.onSuccess {
                         _rideDriverPresenceHealthy.value = true
-                        Log.i("MeetRidesPresence", "PRESENCE_ACK")
+                        Log.i("ElysiumRidesPresence", "PRESENCE_ACK")
                     }.onFailure { error ->
                         _rideDriverPresenceHealthy.value = false
-                        Log.w("MeetRidesPresence", "Driver presence heartbeat failed", error)
+                        Log.w("ElysiumRidesPresence", "Driver presence heartbeat failed", error)
                     }
                 } else {
                     _rideDriverPresenceHealthy.value = false
-                    Log.w("MeetRidesPresence", "Fresh GPS unavailable")
+                    Log.w("ElysiumRidesPresence", "Fresh GPS unavailable")
                 }
                 delay(27_000L)
             }
@@ -8602,7 +8602,7 @@ class ObdViewModel @Inject constructor(
             rideProjectionOwnerId = null
             _rideProjectionConnectionState.value =
                 RideProjectionConnectionState.AUTHENTICATION_REQUIRED
-            Log.d("MeetRides", "Ride projection deferred until authentication")
+            Log.d("ElysiumRides", "Ride projection deferred until authentication")
             return
         }
         rideProjectionOwnerId = ownerId
@@ -8642,7 +8642,7 @@ class ObdViewModel @Inject constructor(
                             RideProjectionConnectionState.RECOVERING
                         activeOperationsRegistry.heartbeat(operationId, OperationState.RETRYING)
                         Log.w(
-                            "MeetRides",
+                            "ElysiumRides",
                             "Realtime wake-up interrupted; reconnecting in ${delayMs}ms",
                             error,
                         )
@@ -8685,7 +8685,7 @@ class ObdViewModel @Inject constructor(
         RideObservability.event("projection_refresh_started")
         when (val result = rideRemoteProjectionRepository.refreshVisibleRides()) {
             is RideProjectionRefreshResult.Refreshed -> {
-                Log.d("MeetRides", "Remote ride projection refreshed: ${result.count}")
+                Log.d("ElysiumRides", "Remote ride projection refreshed: ${result.count}")
                 RideObservability.event("projection_refresh", count = result.count, detail = "refreshed")
                 reconcileActiveRideAfterProjection()
                 rideDao.getPendingChatMessages().map { it.rideRequestId }.distinct().forEach { syncRideChat(it) }
@@ -8693,11 +8693,11 @@ class ObdViewModel @Inject constructor(
             RideProjectionRefreshResult.AuthenticationRequired -> {
                 _rideProjectionConnectionState.value =
                     RideProjectionConnectionState.AUTHENTICATION_REQUIRED
-                Log.d("MeetRides", "Ride projection waiting for authenticated session")
+                Log.d("ElysiumRides", "Ride projection waiting for authenticated session")
                 RideObservability.event("projection_refresh", outcome = "REJECTED", detail = "authentication_required")
             }
             is RideProjectionRefreshResult.Failed -> {
-                Log.w("MeetRides", "Ride projection refresh failed: ${result.message}")
+                Log.w("ElysiumRides", "Ride projection refresh failed: ${result.message}")
                 RideObservability.event("projection_refresh", outcome = "FAILED", detail = result.message)
             }
         }
@@ -8757,7 +8757,7 @@ class ObdViewModel @Inject constructor(
                 }
             }.onFailure { error ->
                 stopRideDriverPresenceHeartbeat()
-                Log.w("MeetRidesPresence", "Presence activation failed", error)
+                Log.w("ElysiumRidesPresence", "Presence activation failed", error)
             }
         }
     }
@@ -8801,7 +8801,7 @@ class ObdViewModel @Inject constructor(
                     }
                     SupabaseManager.client.postgrest.rpc("ride_set_driver_availability_v1", params)
                 }.onFailure { error ->
-                    android.util.Log.w("MeetRides", "Offline presence sync failed: ${error.message}")
+                    android.util.Log.w("ElysiumRides", "Offline presence sync failed: ${error.message}")
                 }
             }
         }
@@ -8819,7 +8819,7 @@ class ObdViewModel @Inject constructor(
                     },
                 )
             }.onFailure { error ->
-                Log.w("MeetRides", "Liveness evidence pending remote confirmation", error)
+                Log.w("ElysiumRides", "Liveness evidence pending remote confirmation", error)
                 _rideVerificationNotice.emit(
                     "Presencia validada en el dispositivo; la nube la confirmará al recuperar conexión.",
                 )
@@ -8838,7 +8838,7 @@ class ObdViewModel @Inject constructor(
                     .decodeList<RemoteRideDriverVehicleSummary>()
                     .map(RemoteRideDriverVehicleSummary::toDomain)
             }.onSuccess { _rideDriverVehicles.value = it }
-                .onFailure { Log.w("MeetRides", "Vehicle fleet refresh failed", it) }
+                .onFailure { Log.w("ElysiumRides", "Vehicle fleet refresh failed", it) }
         }
     }
 
@@ -8991,10 +8991,10 @@ class ObdViewModel @Inject constructor(
             rideDao.getRequestById(selected.rideRequestId)
         }
         if (request == null) {
-            Log.w("MeetRides", "Active ride unavailable locally; durable pointer retained")
+            Log.w("ElysiumRides", "Active ride unavailable locally; durable pointer retained")
         } else if (!canSelectRide(request, driverMode)) {
             withContext(Dispatchers.IO) { rideDao.clearActiveRideSelection(roleKey) }
-            Log.w("MeetRides", "Rejected active ride pointer outside current actor/role scope")
+            Log.w("ElysiumRides", "Rejected active ride pointer outside current actor/role scope")
             applyActiveRide(null)
         } else if (_rideDriverMode.value == driverMode && (currentCloudUserId() == ownerId || activePrincipalKernel.current().id == ownerId)) {
             applyActiveRide(request)
@@ -9121,7 +9121,7 @@ class ObdViewModel @Inject constructor(
                 }
                 val pVer = passengerVerification.value
                 val phone = pVer?.phone?.takeIf { it.isNotBlank() } ?: "+50663194029"
-                val name = if (_rideDriverMode.value) "Pasajero MEET Test" else (pVer?.fullName ?: "Pasajero MEET")
+                val name = if (_rideDriverMode.value) "Pasajero Elysium Test" else (pVer?.fullName ?: "Pasajero Elysium")
                 val priceMinor = (action.priceOffer * 100).toLong()
                 val entity = RideRequestEntity(
                     requestId = UUID.randomUUID().toString(),
@@ -9298,7 +9298,7 @@ class ObdViewModel @Inject constructor(
                         )
                     }
                     runCatching { RideLocationTrackingService.start(context, ride.requestId) }
-                        .onFailure { Log.w("MeetRides", "Unable to start visible trip tracking", it) }
+                        .onFailure { Log.w("ElysiumRides", "Unable to start visible trip tracking", it) }
                     while (isActive) {
                         detectCurrentLocation(context)
                         delay(2_500)
@@ -9466,7 +9466,7 @@ class ObdViewModel @Inject constructor(
                 )
             }
         }.onFailure { error ->
-            Log.w("MeetRides", "Ride chat sync deferred", error)
+            Log.w("ElysiumRides", "Ride chat sync deferred", error)
         }
     }
 
@@ -10017,7 +10017,7 @@ class ObdViewModel @Inject constructor(
             val offerId = UUID.randomUUID().toString()
 
             val verifiedDriver = driverVerification.value
-            val dName = verifiedDriver?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer MEET"
+            val dName = verifiedDriver?.fullName?.takeIf { it.isNotBlank() } ?: "Chofer Elysium"
             val dPhone = verifiedDriver?.phone.orEmpty()
             val dVeh = "${verifiedDriver?.vehicleMake.orEmpty()} ${verifiedDriver?.vehicleModel.orEmpty()} ${verifiedDriver?.vehicleYear ?: ""}".trim()
 
@@ -11164,12 +11164,12 @@ class ObdViewModel @Inject constructor(
                             updatedAt = now,
                         )
                         android.util.Log.i(
-                            "MeetRides",
+                            "ElysiumRides",
                             "Pending driver verification upgraded to local pilot access",
                         )
                     } else {
                         android.util.Log.w(
-                            "MeetRides",
+                            "ElysiumRides",
                             "Driver pilot access withheld: ${evidence.issues.joinToString()}",
                         )
                         _rideVerificationNotice.emit(
@@ -11217,12 +11217,12 @@ class ObdViewModel @Inject constructor(
                             approvedAt = now,
                         )
                         android.util.Log.i(
-                            "MeetRides",
+                            "ElysiumRides",
                             "Pending passenger verification upgraded to local pilot access",
                         )
                     } else {
                         android.util.Log.w(
-                            "MeetRides",
+                            "ElysiumRides",
                             "Passenger pilot access withheld: ${evidence.issues.joinToString()}",
                         )
                         _rideVerificationNotice.emit(
@@ -11424,7 +11424,7 @@ class ObdViewModel @Inject constructor(
             )
             if (!evidence.isReady) {
                 android.util.Log.w(
-                    "MeetRides",
+                    "ElysiumRides",
                     "Driver verification rejected as incomplete: ${evidence.issues.joinToString()}",
                 )
                 _rideVerificationNotice.emit(
@@ -11466,7 +11466,7 @@ class ObdViewModel @Inject constructor(
             rideDao.insertDriverVerification(entity)
             ensurePassengerRoleForDriver(actorId)?.let { passenger ->
                 submitPassengerTrustApplication(passenger).onFailure {
-                    Log.w("MeetTrustCenter", "Linked passenger role submission unavailable", it)
+                    Log.w("ElysiumTrustCenter", "Linked passenger role submission unavailable", it)
                     _rideVerificationNotice.emit(
                         "El acceso de pasajero quedó ligado localmente; la nube lo sincronizará al recuperar conexión.",
                     )
@@ -11477,7 +11477,7 @@ class ObdViewModel @Inject constructor(
                 "Expediente guardado y enviado a revisión. El modo chofer seguirá bloqueado hasta la aprobación remota.",
             )
             android.util.Log.i(
-                "MeetRides",
+                "ElysiumRides",
                 "Driver verification submitted; status=${verificationDecision.status}",
             )
         }
@@ -11635,7 +11635,7 @@ class ObdViewModel @Inject constructor(
             )
             if (!evidence.isReady) {
                 android.util.Log.w(
-                    "MeetRides",
+                    "ElysiumRides",
                     "Passenger verification rejected as incomplete: ${evidence.issues.joinToString()}",
                 )
                 _rideVerificationNotice.emit(
@@ -11658,14 +11658,14 @@ class ObdViewModel @Inject constructor(
             val cloudUserId = currentCloudUserId()
             if (cloudUserId != null) {
                 submitPassengerTrustApplication(entity).onFailure {
-                    Log.w("MeetTrustCenter", "Passenger review submission unavailable", it)
+                    Log.w("ElysiumTrustCenter", "Passenger review submission unavailable", it)
                     _rideVerificationNotice.emit(
                         "Registro local guardado; la revisión remota está pendiente de sincronización.",
                     )
                 }
             }
             android.util.Log.i(
-                "MeetRides",
+                "ElysiumRides",
                 "Passenger verification submitted; status=${verificationDecision.status}",
             )
         }

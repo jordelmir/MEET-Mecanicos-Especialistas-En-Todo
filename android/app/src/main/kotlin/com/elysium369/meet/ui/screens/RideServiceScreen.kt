@@ -968,7 +968,7 @@ private fun RideFirstAccessGateway(
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    "Antes de mostrar el mapa necesitamos saber cómo usarás Elysium Vanguard. El registro protege viajes, pagos y soporte.",
+                    "Antes de mostrar el mapa necesitamos saber cómo usarás Elysium Vanguard AI OS. El registro protege viajes, pagos y soporte.",
                     color = MeetColors.textSecondary,
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
@@ -1209,7 +1209,7 @@ fun PassengerDashboard(
             )
         }
         if (active.size > 1) {
-            android.util.Log.e("MeetRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for passenger $myPassengerIds — using most recent")
+            android.util.Log.e("ElysiumRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for passenger $myPassengerIds — using most recent")
         }
         active.maxByOrNull { it.createdAt }
     }
@@ -2283,7 +2283,7 @@ fun PassengerDashboard(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Text(
-                            "La solicitud queda a tu nombre; MEET protege los datos y vincula a quien realmente viajará.",
+                            "La solicitud queda a tu nombre; Elysium protege los datos y vincula a quien realmente viajará.",
                             color = MeetColors.textMuted,
                             fontSize = 9.sp,
                         )
@@ -3341,7 +3341,7 @@ fun DriverDashboard(
                     it.assignedDriverId in driverIdCandidates
             }
             if (active.size > 1) {
-                android.util.Log.e("MeetRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for driver $driverIdCandidates — using most recent")
+                android.util.Log.e("ElysiumRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for driver $driverIdCandidates — using most recent")
             }
             active.maxByOrNull { it.createdAt }
         }
@@ -3386,7 +3386,7 @@ fun DriverDashboard(
         )
     }
     LaunchedEffect(driverFeed) {
-        if (BuildConfig.DEBUG) android.util.Log.i("MeetRideFeed", "DRIVER_FEED roomOpen=${openRides.size} eligible=${driverFeed.eligibleRides.size} own=${driverFeed.ownPassengerRequests.size} hidden=${driverFeed.hiddenRides.size} expired=${driverFeed.expiredCount}")
+        if (BuildConfig.DEBUG) android.util.Log.i("ElysiumRideFeed", "DRIVER_FEED roomOpen=${openRides.size} eligible=${driverFeed.eligibleRides.size} own=${driverFeed.ownPassengerRequests.size} hidden=${driverFeed.hiddenRides.size} expired=${driverFeed.expiredCount}")
     }
     val rankedOpenRides = remember(driverFeed, destinationHomeEnabled, homeLatitude, homeLongitude) {
         val eligibleRides = driverFeed.eligibleRides
@@ -4067,7 +4067,7 @@ fun DriverDashboard(
                     ) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text("📱 SINPE Móvil: ${walletPolicy?.sinpePhone ?: "+506 8888-8888"}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("👤 Destinatario: ${walletPolicy?.sinpeRecipientName ?: "Jor Delmir / MEET Vanguard"}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            Text("👤 Destinatario: ${walletPolicy?.sinpeRecipientName ?: "Jor Delmir / Elysium Vanguard AI OS"}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             Text("✉️ Correo vinculado: jordelmir@gmail.com", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         }
                     }
@@ -6402,7 +6402,7 @@ fun ActiveRidePanel(
                         RideEtaEvidenceLevel.COMMUNITY_CORROBORATED -> "tráfico colaborativo"
                     }
                     Text(
-                        text = "ETA MEET: $minutes min · $evidence",
+                        text = "ETA Elysium: $minutes min · $evidence",
                         color = if (estimate.blockingSegmentIds.isEmpty()) {
                             MeetColors.cyberCyan
                         } else {
@@ -6958,14 +6958,14 @@ fun ActiveRidePanel(
                 val session = viewModel.rideLiveSharingEngine.createSession(
                     rideId = ride.requestId,
                     passengerId = ride.passengerId,
-                    passengerName = "Pasajero MEET",
+                    passengerName = "Pasajero Elysium",
                     driverName = ride.assignedDriverId ?: "Conductor Asignado",
                     vehicleDescription = "Vehículo Verificado",
-                    vehiclePlate = "MEET",
+                    vehiclePlate = "Elysium",
                     pickupName = ride.pickupAddress,
                     dropoffName = ride.destAddress,
                 )
-                val shareText = "🚗 Sigue mi viaje en tiempo real con seguridad certificada MEET:\n" +
+                val shareText = "🚗 Sigue mi viaje en tiempo real con seguridad certificada Elysium:\n" +
                     "ID: ${ride.requestId.take(8)}\n" +
                     "Token SHA-256: ${session.shareToken.take(16)}...\n" +
                     "Destino: ${ride.destAddress}"
@@ -9324,7 +9324,7 @@ private fun TipDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Agradecé y dignificá el trabajo del chofer con una propina voluntaria.", color = MeetColors.textSecondary, fontSize = 12.sp)
-                Text("La propina se entrega directamente al chofer. MEET no la suma a ningún saldo.", color = MeetColors.warning, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("La propina se entrega directamente al chofer. Elysium no la suma a ningún saldo.", color = MeetColors.warning, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     presetTips.forEach { amount ->

@@ -13,8 +13,10 @@ import com.elysium369.meet.safety.data.local.SafetyCommandOutboxDao
 import com.elysium369.meet.safety.data.local.SafetyPayloadDao
 import com.elysium369.meet.safety.data.local.SafetyReportDao
 import com.elysium369.meet.safety.data.remote.SafetyCommandGateway
+import com.elysium369.meet.safety.crypto.AeadBlob
+import com.elysium369.meet.safety.crypto.SafetyDigest
+import com.elysium369.meet.safety.crypto.SafetyPayloadAad
 import com.elysium369.meet.safety.crypto.SafetyPayloadCipher
-import com.elysium369.meet.safety.domain.SafetyFailure
 import com.elysium369.meet.safety.domain.SafetyGatewayResult
 import com.elysium369.meet.safety.domain.SafetyRetryPolicy
 import com.elysium369.meet.data.remote.SupabaseModule
@@ -22,7 +24,6 @@ import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.CancellationException
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import java.util.concurrent.TimeUnit
 
 @HiltWorker
 class SafetyCommandSyncWorker @AssistedInject constructor(
@@ -54,55 +55,72 @@ class SafetyCommandSyncWorker @AssistedInject constructor(
             return Result.success()
         }
 
-        val commands = outboxDao.acquireBatch(now = now, limit = BATCH_SIZE)
+        val commands = outboxDao.acquireBatch(now = now, limit = BATCH_SIZE, owner = currentUserId)
 
         for (entity in commands) {
-            if (entity.actorSessionUserId != currentUserId) {
-                outboxDao.deadLetter(
-                    key = entity.idempotencyKey,
-                    code = "AUTH_SESSION_MISMATCH",
-                    message = "Command belongs to another authenticated principal",
-                    correlationId = null,
-                    now = System.currentTimeMillis(),
-                )
+            if (SupabaseModule.client.auth.currentUserOrNull()?.id != entity.actorSessionUserId) {
+                finishRetry(entity.idempotencyKey, entity.attemptCount, "AUTH_SESSION_CHANGED", null, null)
                 continue
             }
+            val isReportCommand = entity.commandType == com.elysium369.meet.safety.domain.SafetyCommandType.CREATE_REPORT.name
+            if (isReportCommand) reportDao.markSyncing(entity.aggregateId, now)
 
             val payloadEntity = payloadDao.get(entity.payloadId)
             if (payloadEntity == null) {
-                outboxDao.deadLetter(
-                    key = entity.idempotencyKey,
+                deadLetter(
+                    entity = entity,
                     code = "PAYLOAD_MISSING",
                     message = "Encrypted command payload not found",
-                    correlationId = null,
-                    now = System.currentTimeMillis(),
                 )
                 continue
             }
 
-            val payloadJson = try {
-                cipher.decrypt(payloadEntity.ciphertext).decodeToString()
+            val plaintext = try {
+                cipher.decryptAead(
+                    blob = AeadBlob.fromWire(
+                        payloadEntity.ciphertext,
+                    ),
+                    associatedData = SafetyPayloadAad.report(
+                        principalId = entity.actorSessionUserId,
+                        reportId = entity.aggregateId,
+                        payloadId = entity.payloadId,
+                    ),
+                )
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                outboxDao.deadLetter(
-                    key = entity.idempotencyKey,
+                deadLetter(
+                    entity = entity,
                     code = "PAYLOAD_DECRYPT_FAILED",
-                    message = error.message?.take(200) ?: "Decryption failed",
-                    correlationId = null,
-                    now = System.currentTimeMillis(),
+                    message = error.message?.take(200) ?: "Authenticated decryption failed",
                 )
                 continue
             }
 
+            if (
+                payloadEntity.sha256 != entity.clientPayloadSha256 ||
+                !SafetyDigest.verify(plaintext, payloadEntity.sha256)
+            ) {
+                deadLetter(
+                    entity = entity,
+                    code = "PAYLOAD_DIGEST_MISMATCH",
+                    message = "Local encrypted payload failed integrity verification",
+                )
+                continue
+            }
+
+            val payloadJson = plaintext.decodeToString()
+
             when (val result = gateway.execute(entity, payloadJson)) {
                 is SafetyGatewayResult.Accepted -> {
-                    reportDao.applyServerAcknowledgement(
-                        reportId = entity.aggregateId,
-                        serverState = result.state,
-                        serverVersion = result.serverVersion,
-                        now = System.currentTimeMillis(),
-                    )
+                    if (isReportCommand) {
+                        reportDao.applyServerAcknowledgement(
+                            reportId = entity.aggregateId,
+                            serverState = result.state,
+                            serverVersion = result.serverVersion,
+                            now = System.currentTimeMillis(),
+                        )
+                    }
 
                     val ackResult = outboxDao.acknowledge(
                         key = entity.idempotencyKey,
@@ -116,37 +134,57 @@ class SafetyCommandSyncWorker @AssistedInject constructor(
 
                 is SafetyGatewayResult.Rejected -> {
                     if (result.retryable && entity.attemptCount < MAX_ATTEMPTS) {
+                        if (isReportCommand) reportDao.markQueued(entity.aggregateId, System.currentTimeMillis())
                         finishRetry(entity.idempotencyKey, entity.attemptCount, result.code, result.message, result.correlationId)
                     } else {
-                        outboxDao.deadLetter(
-                            key = entity.idempotencyKey,
+                                deadLetter(
+                            entity = entity,
                             code = result.code,
                             message = result.message,
                             correlationId = result.correlationId,
-                            now = System.currentTimeMillis(),
                         )
                     }
                 }
 
                 is SafetyGatewayResult.TransportFailure -> {
                     if (entity.attemptCount >= MAX_ATTEMPTS) {
-                        outboxDao.deadLetter(
-                            key = entity.idempotencyKey,
+                                deadLetter(
+                            entity = entity,
                             code = result.code,
                             message = result.message,
-                            correlationId = null,
-                            now = System.currentTimeMillis(),
                         )
                     } else {
+                        if (isReportCommand) reportDao.markQueued(entity.aggregateId, System.currentTimeMillis())
                         finishRetry(entity.idempotencyKey, entity.attemptCount, result.code, result.message, null)
                     }
                 }
             }
         }
 
-        scheduleEarliestRetry()
+        scheduleEarliestRetry(currentUserId)
 
         return Result.success()
+    }
+
+    private suspend fun deadLetter(
+        entity: com.elysium369.meet.safety.data.local.SafetyCommandOutboxEntity,
+        code: String,
+        message: String?,
+        correlationId: String? = null,
+    ) {
+        val now = System.currentTimeMillis()
+
+        outboxDao.deadLetter(
+            key = entity.idempotencyKey,
+            code = code,
+            message = message,
+            correlationId = correlationId,
+            now = now,
+        )
+
+        if (entity.commandType == com.elysium369.meet.safety.domain.SafetyCommandType.CREATE_REPORT.name) {
+            reportDao.markFailed(reportId = entity.aggregateId, now = now)
+        }
     }
 
     private suspend fun finishRetry(
@@ -170,8 +208,8 @@ class SafetyCommandSyncWorker @AssistedInject constructor(
         )
     }
 
-    private suspend fun scheduleEarliestRetry() {
-        val next = outboxDao.earliestRetryAt() ?: return
+    private suspend fun scheduleEarliestRetry(owner: String) {
+        val next = outboxDao.earliestRetryAt(owner) ?: return
         val delayMs = (next - System.currentTimeMillis()).coerceAtLeast(0)
         SafetyCommandScheduler.schedule(applicationContext, delayMs = delayMs)
     }

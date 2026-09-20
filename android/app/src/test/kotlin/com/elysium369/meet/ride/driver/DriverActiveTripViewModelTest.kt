@@ -289,6 +289,7 @@ private class TestFakeRideDao : RideDao {
     override suspend fun clearActiveRideSelection(ownerPrincipalId: String) {}
     override suspend fun clearActiveRideSelectionsForRide(requestId: String) {}
     override fun getAllRequestsFlow(): Flow<List<RideRequestEntity>> = throw NotImplementedError()
+    override fun getLostItemReportsFlow(): Flow<List<RideChatMessageEntity>> = kotlinx.coroutines.flow.flowOf(emptyList())
     override fun getOpenRequestsFlow(): Flow<List<RideRequestEntity>> = throw NotImplementedError()
     override fun getRequestsByPassenger(passengerId: String): Flow<List<RideRequestEntity>> = throw NotImplementedError()
     override fun observeAuthoritativeActiveRidesForDriver(driverId: String): Flow<List<RideRequestEntity>> = throw NotImplementedError()

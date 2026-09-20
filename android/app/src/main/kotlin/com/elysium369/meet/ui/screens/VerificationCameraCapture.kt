@@ -18,7 +18,7 @@ import androidx.core.content.FileProvider
 import java.io.File
 import java.util.Locale
 
-private const val VERIFICATION_CAPTURE_TAG = "MeetVerificationCapture"
+private const val VERIFICATION_CAPTURE_TAG = "ElysiumVerificationCapture"
 
 private fun logVerificationCapture(
     event: String,

@@ -18,7 +18,7 @@ import com.elysium369.meet.ui.screens.home.adaptive.HomeAdaptiveScreen
 import com.elysium369.meet.ui.screens.home.classic.HomeClassicScreen
 
 /**
- * MEET Dual Home Experience Architecture (DHEA) Host.
+ * Elysium Dual Home Experience Architecture (DHEA) Host.
  * Single entry point mounted at route = "home".
  * Seamlessly transitions between Vanguard Classic and Vanguard Command without interrupting OBD session or domain state.
  */

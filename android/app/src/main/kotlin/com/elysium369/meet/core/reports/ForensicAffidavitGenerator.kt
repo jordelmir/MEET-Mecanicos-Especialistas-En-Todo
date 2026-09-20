@@ -177,7 +177,7 @@ object ForensicAffidavitGenerator {
     private fun buildEnglishC1Body(input: AffidavitInput, merkleRoot: String): String = buildString {
         appendLine("# AUTOMOTIVE FORENSIC ENGINEERING AFFIDAVIT & EXPERT OPINION")
         appendLine("**Affidavit Docket**: ${input.affidavitNumber} | **Jurisdiction**: ${input.jurisdiction}")
-        appendLine("**Certified Forensic Examiner**: ${input.inspectorName} (MEET / MEP Credential: ${input.inspectorCredentialNumber})")
+        appendLine("**Certified Forensic Examiner**: ${input.inspectorName} (Elysium / MEP Credential: ${input.inspectorCredentialNumber})")
         appendLine()
         appendLine("---")
         appendLine("## 1. Vehicle Identification & Epistemic Boundary")

@@ -198,15 +198,6 @@ sealed class SafetyGatewayResult {
     ) : SafetyGatewayResult()
 }
 
-object SafetyFeatureFlags {
-    const val FOUNDATION = true
-    const val REPORTING = true
-    const val PUBLIC_MAP = true
-    const val PUBLIC_CASES = true
-    const val GUARDIAN = false
-    const val HELP_MEET = false
-}
-
 object SafetyRetryPolicy {
     private const val BASE_MS = 15_000L
     private const val MAX_MS = 15 * 60_000L

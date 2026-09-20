@@ -236,7 +236,7 @@ fun UniversalServicesScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f),
             ) {
-                // Live 3D Satellite Map (Visible immediately, matching MEET Rides standard)
+                // Live 3D Satellite Map (Visible immediately, matching Elysium Rides standard)
                 item {
                     val previewState = remember(gps) {
                         val pickup = gps?.let { RideGeoPoint(it.latitude, it.longitude, it.accuracy, it.timestamp) }

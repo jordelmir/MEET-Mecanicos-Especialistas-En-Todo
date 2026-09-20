@@ -429,7 +429,7 @@ object WorkshopServiceCatalog {
     private fun service(
         category: ServiceCategory,
         name: String,
-        description: String = "${category.displayName}: $name con evidencia tecnica y trazabilidad MEET.",
+        description: String = "${category.displayName}: $name con evidencia tecnica y trazabilidad Elysium.",
         requiredTools: List<String> = category.defaultTools,
         requiredEvidence: List<EvidenceType> = category.defaultEvidence,
         estimatedDurationMin: Int = category.defaultDurationMin,

@@ -1501,7 +1501,7 @@ object AppModule {
 
     private val MIGRATION_26_27 = object : Migration(26, 27) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("ElysiumDB", "Migration 26→27: Creating Elysium Vanguard Knowledge Engine v4.0 tables")
+            android.util.Log.i("ElysiumDB", "Migration 26→27: Creating Elysium Vanguard AI OS Knowledge Engine v4.0 tables")
             createMechanicalKnowledgeTables(db)
             seedMechanicalKnowledge(db)
         }
@@ -2336,7 +2336,7 @@ object AppModule {
 
     private val MIGRATION_34_35 = object : Migration(34, 35) {
         override fun migrate(db: SupportSQLiteDatabase) {
-            android.util.Log.i("ElysiumDB", "Migration 34→35: Creating Elysium Vanguard telemetry tables")
+            android.util.Log.i("ElysiumDB", "Migration 34→35: Creating Elysium Vanguard AI OS telemetry tables")
             createVanguardTelemetryTables(db)
         }
     }
@@ -4709,6 +4709,149 @@ object AppModule {
         }
     }
 
+    internal val MIGRATION_79_80 = object : Migration(79, 80) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""CREATE TABLE IF NOT EXISTS safety_evidence_local (evidenceId TEXT NOT NULL PRIMARY KEY, reportId TEXT NOT NULL, ownerUserId TEXT NOT NULL, encryptedPath TEXT NOT NULL, contentSha256 TEXT NOT NULL, mimeType TEXT NOT NULL, byteCount INTEGER NOT NULL, stagedAt INTEGER NOT NULL, uploadState TEXT NOT NULL, attemptCount INTEGER NOT NULL, lastErrorCode TEXT, serverReceipt TEXT)""")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_safety_evidence_local_ownerUserId_reportId ON safety_evidence_local(ownerUserId,reportId)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS index_safety_evidence_local_uploadState ON safety_evidence_local(uploadState)")
+        }
+    }
+
+    internal val MIGRATION_78_79 = object : Migration(78, 79) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `safety_public_points_local` (
+                    `publicPointId` TEXT NOT NULL,
+                    `category` TEXT NOT NULL,
+                    `displayLatitude` REAL NOT NULL,
+                    `displayLongitude` REAL NOT NULL,
+                    `geoDisclosure` TEXT NOT NULL,
+                    `locationAccuracyMeters` INTEGER,
+                    `label` TEXT NOT NULL,
+                    `claimState` TEXT NOT NULL,
+                    `independentSourceCount` INTEGER NOT NULL,
+                    `civilSourceCount` INTEGER NOT NULL,
+                    `journalisticSourceCount` INTEGER NOT NULL,
+                    `publicRecordSourceCount` INTEGER NOT NULL,
+                    `documentarySourceCount` INTEGER NOT NULL,
+                    `institutionalSourceCount` INTEGER NOT NULL,
+                    `countryCode` TEXT,
+                    `admin1Code` TEXT,
+                    `admin2Code` TEXT,
+                    `publicH3Cell` TEXT,
+                    `firstDocumentedAt` INTEGER,
+                    `lastReviewedAt` INTEGER NOT NULL,
+                    `publishedAt` INTEGER NOT NULL,
+                    `serverVersion` INTEGER NOT NULL,
+                    `syncedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`publicPointId`)
+                )
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_public_points_local_category`
+                ON `safety_public_points_local` (`category`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_public_points_local_publishedAt`
+                ON `safety_public_points_local` (`publishedAt`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_public_points_local_serverVersion`
+                ON `safety_public_points_local` (`serverVersion`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `safety_public_cases_local` (
+                    `caseId` TEXT NOT NULL,
+                    `caseType` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `publicSummary` TEXT NOT NULL,
+                    `lifecycle` TEXT NOT NULL,
+                    `confidenceScore` REAL NOT NULL,
+                    `eventCount` INTEGER NOT NULL,
+                    `claimCount` INTEGER NOT NULL,
+                    `sourceCount` INTEGER NOT NULL,
+                    `evidenceCount` INTEGER NOT NULL,
+                    `publishedAt` INTEGER NOT NULL,
+                    `lastUpdatedAt` INTEGER NOT NULL,
+                    `serverVersion` INTEGER NOT NULL,
+                    PRIMARY KEY(`caseId`)
+                )
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_public_cases_local_lifecycle`
+                ON `safety_public_cases_local` (`lifecycle`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_public_cases_local_publishedAt`
+                ON `safety_public_cases_local` (`publishedAt`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `safety_public_timeline_local` (
+                    `caseId` TEXT NOT NULL,
+                    `milestoneId` TEXT NOT NULL,
+                    `eventType` TEXT NOT NULL,
+                    `publicSummary` TEXT NOT NULL,
+                    `occurredAt` INTEGER,
+                    `recordedAt` INTEGER NOT NULL,
+                    `sourceCount` INTEGER NOT NULL,
+                    `evidenceCount` INTEGER NOT NULL,
+                    `serverVersion` INTEGER NOT NULL,
+                    PRIMARY KEY(`caseId`, `milestoneId`)
+                )
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE INDEX IF NOT EXISTS `index_safety_public_timeline_local_caseId_occurredAt`
+                ON `safety_public_timeline_local` (`caseId`, `occurredAt`)
+                """.trimIndent(),
+            )
+
+            db.execSQL(
+                """
+                CREATE TABLE IF NOT EXISTS `safety_public_claims_local` (
+                    `caseId` TEXT NOT NULL,
+                    `claimId` TEXT NOT NULL,
+                    `predicate` TEXT NOT NULL,
+                    `claimState` TEXT NOT NULL,
+                    `independentSourceCount` INTEGER NOT NULL,
+                    `evidenceCount` INTEGER NOT NULL,
+                    `civilSourceCount` INTEGER NOT NULL,
+                    `journalisticSourceCount` INTEGER NOT NULL,
+                    `publicRecordSourceCount` INTEGER NOT NULL,
+                    `documentarySourceCount` INTEGER NOT NULL,
+                    `institutionalSourceCount` INTEGER NOT NULL,
+                    `serverVersion` INTEGER NOT NULL,
+                    PRIMARY KEY(`caseId`, `claimId`)
+                )
+                """.trimIndent(),
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4774,6 +4917,8 @@ object AppModule {
             MIGRATION_75_76,
             MIGRATION_76_77,
             MIGRATION_77_78,
+            MIGRATION_78_79,
+            MIGRATION_79_80,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

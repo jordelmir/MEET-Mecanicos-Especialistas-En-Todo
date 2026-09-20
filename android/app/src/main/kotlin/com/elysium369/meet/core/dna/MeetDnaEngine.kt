@@ -338,7 +338,7 @@ class MeetDnaEngine @Inject constructor(
                 isCalibrated = false,
                 healthScore = 0,
                 stage = DnaBusinessStage.ERROR,
-                message = "Elysium Vanguard DNA no pudo evaluar esta lectura: ${e.message ?: "error interno"}",
+                message = "Elysium Vanguard AI OS DNA no pudo evaluar esta lectura: ${e.message ?: "error interno"}",
                 nextAction = "Reintente la lectura y valide que haya telemetria OBD estable."
             )
         }
@@ -362,7 +362,7 @@ class MeetDnaEngine @Inject constructor(
                 message = if (progress.isReady) {
                     "Hay historial suficiente para calibrar, pero la lectura actual requiere conectar el scanner OBD-II."
                 } else {
-                    "Conecta el scanner OBD-II y espera telemetria viva para iniciar la firma Elysium Vanguard DNA."
+                    "Conecta el scanner OBD-II y espera telemetria viva para iniciar la firma Elysium Vanguard AI OS DNA."
                 },
                 nextAction = if (progress.isReady) {
                     "Conecta el adaptador y presiona calibrar para cerrar la firma."
@@ -399,7 +399,7 @@ class MeetDnaEngine @Inject constructor(
                 liveSensorCount = 0,
                 requiredLiveSensors = 5,
                 canTrain = progress.isReady,
-                message = "El enlace OBD esta activo, pero todavia no llegaron PIDs suficientes para Elysium Vanguard DNA.",
+                message = "El enlace OBD esta activo, pero todavia no llegaron PIDs suficientes para Elysium Vanguard AI OS DNA.",
                 nextAction = "Mantenga contacto ON o motor encendido segun el sensor y espere lecturas de RPM, voltaje, temperatura y carga."
             )
         }
@@ -416,9 +416,9 @@ class MeetDnaEngine @Inject constructor(
             isAnomalous = false,
             sensorStates = sensorStates,
             message = if (progress.isReady) {
-                "Elysium Vanguard DNA ya tiene ${progress.currentSamples}/${progress.requiredSamples} muestras alineadas. Puede calibrar la firma real."
+                "Elysium Vanguard AI OS DNA ya tiene ${progress.currentSamples}/${progress.requiredSamples} muestras alineadas. Puede calibrar la firma real."
             } else {
-                "Elysium Vanguard DNA esta recolectando base real: ${progress.currentSamples}/${progress.requiredSamples} muestras y ${sensorStates.size}/${dnaPids.size} sensores vivos."
+                "Elysium Vanguard AI OS DNA esta recolectando base real: ${progress.currentSamples}/${progress.requiredSamples} muestras y ${sensorStates.size}/${dnaPids.size} sensores vivos."
             },
             stage = if (progress.isReady) DnaBusinessStage.READY_TO_TRAIN else DnaBusinessStage.COLLECTING,
             sampleCount = progress.currentSamples,

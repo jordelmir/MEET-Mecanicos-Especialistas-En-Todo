@@ -883,7 +883,7 @@ fun SpecialistWalletCard(
                         }
 
                         Text(
-                            text = "Por Jorge Del Valle / MEET",
+                            text = "Por Jorge Del Valle / Elysium",
                             color = MeetColors.textMuted,
                             fontSize = 8.sp,
                         )
@@ -916,7 +916,7 @@ fun SpecialistWalletCard(
                     border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
                 ) {
                     Column(Modifier.padding(8.dp)) {
-                        Text("COMISIÓN MEET", color = MeetColors.textSecondary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        Text("COMISIÓN Elysium", color = MeetColors.textSecondary, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                         Text("5% fija", color = accentColor, fontSize = 12.sp, fontWeight = FontWeight.Black)
                         Text("Límite constitucional", color = MeetColors.textMuted, fontSize = 8.sp)
                     }

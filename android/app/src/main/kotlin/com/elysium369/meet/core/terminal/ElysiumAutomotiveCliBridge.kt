@@ -79,7 +79,7 @@ object ElysiumAutomotiveCliBridge {
                 }
             }
 
-            Log.i(TAG, "✓ Elysium Vanguard Automotive & Linux CLI tools installed to ${binDir.absolutePath}")
+            Log.i(TAG, "✓ Elysium Vanguard AI OS Automotive & Linux CLI tools installed to ${binDir.absolutePath}")
         } catch (e: Exception) {
             Log.e(TAG, "Error installing CLI tools: ${e.message}", e)
         }
@@ -88,7 +88,7 @@ object ElysiumAutomotiveCliBridge {
     private fun generateMeetCliScript(port: Int, evairPort: Int, tokenFile: String, evairTokenFile: String): String {
         return """
 #!/bin/sh
-# MEET — Elysium Vanguard Proprietary Automotive Shell Client v5.0
+# MEET — Elysium Vanguard AI OS Proprietary Automotive Shell Client v5.0
 set -u
 
 PORT=$port
@@ -137,7 +137,7 @@ eval set -- "${'$'}ARGS"
 
 show_help() {
     printf '%b' "\033[0;36m\033[1m══════════════════════════════════════════════════════════════════\033[0m\n"
-    printf '%b' "\033[0;32m\033[1m  MEET Automotive Terminal Engine — Elysium Vanguard EVAIR v5.0\033[0m\n"
+    printf '%b' "\033[0;32m\033[1m  Elysium Automotive Terminal Engine — Elysium Vanguard AI OS EVAIR v5.0\033[0m\n"
     printf '%b' "\033[0;36m\033[1m══════════════════════════════════════════════════════════════════\033[0m\n"
     printf '%b' "\033[1mUso:\033[0m meet <comando> [opciones]\n\n"
     printf '%b' "\033[1;33mComandos Disponibles:\033[0m\n"
@@ -457,7 +457,7 @@ case "${'$'}subcommand" in
         ;;
 
     status|runtime)
-        printf 'Elysium Vanguard OS v5.0\n'
+        printf 'Elysium Vanguard AI OS OS v5.0\n'
         printf 'Runtime Environment: POSIX / Linux PRoot Architecture\n'
         printf 'PATH=%s\n' "${'$'}PATH"
         exit 0
@@ -502,7 +502,7 @@ esac
     private fun generatePkgWrapperScript(): String {
         return """
 #!/bin/sh
-# Real Package Management Wrapper for Elysium Vanguard
+# Real Package Management Wrapper for Elysium Vanguard AI OS
 set -eu
 
 subcommand="${'$'}{1:-}"
@@ -560,7 +560,7 @@ fi
     private fun generateStartVncScript(): String {
         return """
 #!/bin/sh
-# Real TigerVNC & XFCE4 Desktop Launcher for Elysium Vanguard
+# Real TigerVNC & XFCE4 Desktop Launcher for Elysium Vanguard AI OS
 set -eu
 
 if ! command -v vncserver >/dev/null 2>&1; then

@@ -119,6 +119,41 @@ val CyberpunkColorScheme = darkColorScheme(
     errorContainer = Color(0xFF3D0012)
 )
 
+@Composable
+private fun PlatformOwnerRouteGuard(
+    viewModel: ObdViewModel,
+    onBack: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val access by viewModel.platformOwnerAccess.collectAsState()
+    LaunchedEffect(Unit) { viewModel.refreshPlatformOwnerAccess() }
+    when (access) {
+        com.elysium369.meet.ride.domain.PlatformOwnerAccess.GRANTED -> content()
+        com.elysium369.meet.ride.domain.PlatformOwnerAccess.UNKNOWN -> Box(
+            Modifier.fillMaxSize().background(MeetColors.backgroundDeep),
+            contentAlignment = Alignment.Center,
+        ) { CircularProgressIndicator(color = MeetColors.cyberCyan) }
+        else -> Scaffold(containerColor = MeetColors.backgroundDeep) { padding ->
+            Column(
+                Modifier.fillMaxSize().padding(padding).padding(32.dp),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                Spacer(Modifier.height(16.dp))
+                Text("ACCESO RESTRINGIDO", color = Color.White, fontWeight = FontWeight.Black)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Esta zona requiere la autorización exclusiva de la cuenta propietaria confirmada.",
+                    color = MeetColors.textSecondary,
+                )
+                Spacer(Modifier.height(20.dp))
+                Button(onClick = onBack) { Text("REGRESAR") }
+            }
+        }
+    }
+}
+
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -679,7 +714,7 @@ fun MeetApp(
                             val element = canonicalPart.element
                             val section = canonicalPart.section
                             buildString {
-                                appendLine("FUENTE CANÓNICA MEET · ${canonicalPart.atlasDisplayName}")
+                                appendLine("FUENTE CANÓNICA Elysium · ${canonicalPart.atlasDisplayName}")
                                 appendLine("Atlas: ${canonicalPart.atlasId}")
                                 appendLine("ID: ${element.canonicalId}")
                                 appendLine("Elemento: ${element.nameOriginal}")
@@ -786,7 +821,7 @@ fun MeetApp(
                 )
             }
             composable("elysium_manuals") {
-                com.elysium369.meet.ui.screens.ElysiumManualsScreen(navController)
+                com.elysium369.meet.ui.screens.MeetManualsScreen(navController)
             }
             composable("settings") {
                 SettingsScreen(
@@ -960,7 +995,7 @@ fun MeetApp(
             }
             composable("elysium_ai") {
                 val evairViewModel: com.elysium369.meet.ui.ElysiumAiViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-                ElysiumAiScreen(
+                MeetAiScreen(
                     facade = evairViewModel.facade,
                     gateway = evairViewModel.gateway,
                     stateEngine = evairViewModel.stateEngine,
@@ -971,7 +1006,7 @@ fun MeetApp(
             }
             composable("evair") {
                 val evairViewModel: com.elysium369.meet.ui.ElysiumAiViewModel = androidx.hilt.navigation.compose.hiltViewModel()
-                ElysiumAiScreen(
+                MeetAiScreen(
                     facade = evairViewModel.facade,
                     gateway = evairViewModel.gateway,
                     stateEngine = evairViewModel.stateEngine,
@@ -1076,17 +1111,21 @@ fun MeetApp(
                 )
             }
             composable("platform_trust_center") {
-                PlatformTrustCenterScreen(
-                    viewModel = obdViewModel,
-                    onBack = { navController.backOrHome() },
-                    onNavigateToCommandCenter = { navController.navigate("meet_command_center") },
-                )
+                PlatformOwnerRouteGuard(obdViewModel, { navController.backOrHome() }) {
+                    PlatformTrustCenterScreen(
+                        viewModel = obdViewModel,
+                        onBack = { navController.backOrHome() },
+                        onNavigateToCommandCenter = { navController.navigate("meet_command_center") },
+                    )
+                }
             }
             composable("meet_command_center") {
-                com.elysium369.meet.ui.screens.intelligence.MeetExecutiveCommandCenterScreen(
-                    onNavigateBack = { navController.backOrHome() },
-                    onNavigateToTrustCenter = { _ -> navController.navigate("platform_trust_center") },
-                )
+                PlatformOwnerRouteGuard(obdViewModel, { navController.backOrHome() }) {
+                    com.elysium369.meet.ui.screens.intelligence.MeetExecutiveCommandCenterScreen(
+                        onNavigateBack = { navController.backOrHome() },
+                        onNavigateToTrustCenter = { _ -> navController.navigate("platform_trust_center") },
+                    )
+                }
             }
             composable("driver_command_center") {
                 com.elysium369.meet.ui.screens.intelligence.DriverCommandCenterScreen(
@@ -1103,19 +1142,17 @@ fun MeetApp(
                 )
             }
             composable("trust_center_hub") {
-                com.elysium369.meet.ui.screens.trust.TrustCenterHubScreen(
-                    principalId = obdViewModel.currentUserId ?: "demo-principal",
-                    organizationId = null,
-                    onNavigateBack = { navController.backOrHome() },
-                    onNavigateToCommandCenter = { navController.navigate("meet_command_center") },
-                )
+                PlatformOwnerRouteGuard(obdViewModel, { navController.backOrHome() }) {
+                    com.elysium369.meet.ui.screens.trust.TrustCenterHubScreen(
+                        principalId = obdViewModel.currentUserId.orEmpty(),
+                        organizationId = null,
+                        onNavigateBack = { navController.backOrHome() },
+                        onNavigateToCommandCenter = { navController.navigate("meet_command_center") },
+                    )
+                }
             }
             composable("passenger_activity") {
-                com.elysium369.meet.ui.screens.intelligence.PassengerActivityScreen(
-                    passengerId = obdViewModel.currentUserId ?: "demo-passenger",
-                    onNavigateBack = { navController.backOrHome() },
-                    onNavigateToTrustCenter = { navController.navigate("trust_center_hub") },
-                )
+                com.elysium369.meet.fulfillment.ui.UnifiedActivityScreen(onBack = { navController.backOrHome() })
             }
             composable("mechanic_business") {
                 com.elysium369.meet.ui.screens.intelligence.MechanicBusinessScreen(
@@ -1332,7 +1369,9 @@ fun MeetApp(
                 )
             }
             composable("trust_center") {
-                PlatformTrustCenterScreen(viewModel = obdViewModel, onBack = { navController.backOrHome() })
+                PlatformOwnerRouteGuard(obdViewModel, { navController.backOrHome() }) {
+                    PlatformTrustCenterScreen(viewModel = obdViewModel, onBack = { navController.backOrHome() })
+                }
             }
             composable(MeetDestinations.RIDE_DRIVER_REGISTRATION) {
                 com.elysium369.meet.ui.screens.ProviderRegistrationScreen(
@@ -1638,22 +1677,7 @@ fun MeetApp(
             }
 
             composable("unified_activity") {
-                com.elysium369.meet.fulfillment.ui.UnifiedActivityScreen(
-                    viewModel = obdViewModel,
-                    towRepository = towRepository,
-                    onNavigateToRide = { rideId ->
-                        obdViewModel.rideRequests.value.firstOrNull { it.requestId == rideId }
-                            ?.let(obdViewModel::selectActiveRide)
-                        navController.navigate(MeetDestinations.RIDE_ACTIVE_TRACKING)
-                    },
-                    onNavigateToTow = { towId ->
-                        runCatching { java.util.UUID.fromString(towId) }
-                            .getOrNull()
-                            ?.let(towRepository::selectActiveJob)
-                        navController.navigate("tow_active_tracking")
-                    },
-                    onBack = { navController.backOrHome() }
-                )
+                com.elysium369.meet.fulfillment.ui.UnifiedActivityScreen(onBack = { navController.backOrHome() })
             }
 
             composable("fleet") {
@@ -1677,6 +1701,7 @@ fun MeetApp(
                     onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
                     onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
                     onNavigateToCases = { navController.navigate(MeetDestinations.SAFETY_CASES) },
+                    onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_CASES) },
                     onNavigateToAccountability = { navController.navigate(MeetDestinations.SAFETY_ACCOUNTABILITY) },
                     onNavigateToObservatory = { navController.navigate(MeetDestinations.SAFETY_OBSERVATORY) },
                 )
@@ -1684,6 +1709,9 @@ fun MeetApp(
             composable(MeetDestinations.SAFETY_MAP) {
                 com.elysium369.meet.safety.ui.map.SafetyMapScreen(
                     onBack = { navController.popBackStack() },
+                    onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
+                    onSearchLocation = { navController.navigate("safety/report/location/search") },
+                    onSelectLocationOnMap = { navController.navigate("safety/report/location/map") },
                 )
             }
             composable(MeetDestinations.SAFETY_REPORT) {
@@ -1693,6 +1721,19 @@ fun MeetApp(
                         navController.popBackStack()
                         navController.navigate(MeetDestinations.SAFETY_MY_REPORTS)
                     },
+                )
+            }
+            composable(
+                route = MeetDestinations.SAFETY_REPORT_LOCATION,
+                arguments = listOf(navArgument("mode") { type = NavType.StringType }),
+            ) { entry ->
+                com.elysium369.meet.safety.ui.report.SafetyReportScreen(
+                    onBack = { navController.popBackStack() },
+                    onReportSubmitted = {
+                        navController.popBackStack()
+                        navController.navigate(MeetDestinations.SAFETY_MY_REPORTS)
+                    },
+                    locationEntryMode = entry.arguments?.getString("mode"),
                 )
             }
             composable(MeetDestinations.SAFETY_MY_REPORTS) {
@@ -1705,7 +1746,14 @@ fun MeetApp(
             composable(MeetDestinations.SAFETY_CASES) {
                 com.elysium369.meet.safety.ui.cases.SafetyCasesScreen(
                     onBack = { navController.popBackStack() },
+                    onCaseClick = { caseId -> navController.navigate("safety/case/" + android.net.Uri.encode(caseId)) },
                 )
+            }
+            composable(
+                route = MeetDestinations.SAFETY_CASE_DETAIL,
+                arguments = listOf(androidx.navigation.navArgument("caseId") { type = androidx.navigation.NavType.StringType }),
+            ) {
+                com.elysium369.meet.safety.ui.cases.SafetyCaseDetailScreen(onBack = { navController.popBackStack() })
             }
             composable(MeetDestinations.SAFETY_ACCOUNTABILITY) {
                 com.elysium369.meet.safety.ui.accountability.SafetyAccountabilityScreen(

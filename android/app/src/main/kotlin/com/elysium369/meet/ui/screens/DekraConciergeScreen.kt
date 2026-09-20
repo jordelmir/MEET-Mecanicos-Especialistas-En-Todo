@@ -77,7 +77,7 @@ fun DekraConciergeScreen(
         containerColor = MeetColors.backgroundDark,
         topBar = {
             EliteTopAppBar(
-                title = "MEET → DEKRA\nConcierge de Inspección",
+                title = "Elysium → DEKRA\nConcierge de Inspección",
                 onBackClick = onBack,
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
@@ -404,7 +404,7 @@ private fun ServicePromiseCard(onOpenBooking: () -> Unit, onOpenPolicy: () -> Un
             ).forEach { (number, text) -> NumberedPromise(number, text) }
             HorizontalDivider(color = MeetColors.borderSubtle)
             Text(
-                "MEET no es DEKRA y no puede influir ni garantizar el resultado. El servicio es de preparación, custodia y traslado.",
+                "Elysium no es DEKRA y no puede influir ni garantizar el resultado. El servicio es de preparación, custodia y traslado.",
                 color = MeetColors.warning,
                 fontSize = 12.sp,
                 lineHeight = 17.sp,
@@ -479,7 +479,7 @@ private fun AppointmentAndPickupCard(
             )
             if (appointmentMode == DekraAppointmentMode.NEEDS_COORDINATION) {
                 Text(
-                    "MEET puede ayudarte a preparar los datos, pero la cita se confirma únicamente por los canales oficiales de DEKRA.",
+                    "Elysium puede ayudarte a preparar los datos, pero la cita se confirma únicamente por los canales oficiales de DEKRA.",
                     color = MeetColors.warning,
                     fontSize = 11.sp,
                     lineHeight = 15.sp,
@@ -568,7 +568,7 @@ private fun DekraTextField(value: String, onValue: (String) -> Unit, label: Stri
 private fun InspectionEducationCard(onOpenManual: () -> Unit, onOpenFaq: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         ChecklistCard(
-            eyebrow = "ANTES DE LA CITA · MEET",
+            eyebrow = "ANTES DE LA CITA · Elysium",
             title = "Prechequeo técnico documentado",
             intro = "Se realiza antes de ir a DEKRA. Detecta riesgos visibles y puntos que merecen atención; no sustituye la inspección oficial ni garantiza aprobación.",
             sections = DekraInspectionKnowledge.precheckSections,
@@ -598,7 +598,7 @@ private fun InspectionEducationCard(onOpenManual: () -> Unit, onOpenFaq: () -> U
                     Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("SI EL VEHÍCULO NO APRUEBA", color = MeetColors.warning, fontWeight = FontWeight.Black, fontSize = 10.sp)
                         Text(
-                            "Con un único defecto grave, DEKRA indica reinspección del defecto dentro de un mes. Con más de un defecto grave corresponde inspección completa. MEET conserva el resultado, explica prioridades y puede enlazar reparación + nueva cita.",
+                            "Con un único defecto grave, DEKRA indica reinspección del defecto dentro de un mes. Con más de un defecto grave corresponde inspección completa. Elysium conserva el resultado, explica prioridades y puede enlazar reparación + nueva cita.",
                             color = MeetColors.textSecondary,
                             fontSize = 11.sp,
                             lineHeight = 15.sp,
@@ -701,8 +701,8 @@ private fun AuthorizationCard(
             }
             ConsentRow(precheckAuthorized, onPrecheckAuthorized, "Autorizo el prechequeo técnico previo a la cita y su evidencia. Entiendo que cualquier reparación requiere una autorización separada.")
             ConsentRow(custodyAuthorized, onCustodyAuthorized, "Autorizo la recepción de llaves, custodia y traslado conforme al plan seguro confirmado; entregaré el vehículo sin armas, mascotas, menores ni carga restringida.")
-            ConsentRow(independentResultAcknowledged, onIndependentResultAcknowledged, "Entiendo que DEKRA es independiente y que MEET no promete, negocia ni garantiza un resultado favorable.")
-            ConsentRow(officialFeeAcknowledged, onOfficialFeeAcknowledged, "Entiendo que la tarifa oficial DEKRA se paga por separado en la estación y que el precio del concierge se acepta únicamente mediante una oferta MEET.")
+            ConsentRow(independentResultAcknowledged, onIndependentResultAcknowledged, "Entiendo que DEKRA es independiente y que Elysium no promete, negocia ni garantiza un resultado favorable.")
+            ConsentRow(officialFeeAcknowledged, onOfficialFeeAcknowledged, "Entiendo que la tarifa oficial DEKRA se paga por separado en la estación y que el precio del concierge se acepta únicamente mediante una oferta Elysium.")
             ConsentRow(stationRulesAcknowledged, onStationRulesAcknowledged, "Confirmo que habrá licencia vigente para el tipo de vehículo y que acepto las reglas oficiales de ingreso y comportamiento.")
             OutlinedButton(onClick = onOpenFees, border = BorderStroke(1.dp, MeetColors.cyberCyan)) {
                 Icon(Icons.AutoMirrored.Filled.OpenInNew, null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))

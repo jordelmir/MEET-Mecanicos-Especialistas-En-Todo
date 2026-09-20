@@ -4,7 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 
 /**
- * MEET Centralized Destinations Contract.
+ * Elysium Centralized Destinations Contract.
  * Guarantees that both Vanguard Classic and Vanguard Command navigate to identical targets.
  */
 object MeetDestinations {
@@ -63,6 +63,7 @@ object MeetDestinations {
     const val SAFETY_HOME = "safety"
     const val SAFETY_MAP = "safety/map"
     const val SAFETY_REPORT = "safety/report"
+    const val SAFETY_REPORT_LOCATION = "safety/report/location/{mode}"
     const val SAFETY_MY_REPORTS = "safety/my-reports"
     const val SAFETY_CASES = "safety/cases"
     const val SAFETY_CASE_DETAIL = "safety/case/{caseId}"

@@ -135,7 +135,7 @@ private val mockThreads = listOf(
         id = "7", title = "ELM327 no conecta con protocolo ISO 9141 — VW Golf 2003",
         author = "OBD_Beginner", authorLevel = "aprendiz", vehicle = "VW Golf 2003 L4",
         dtcTags = emptyList(), category = "📡 OBD-II",
-        description = "Mi ELM327 Bluetooth no logra inicializar con el Golf 2003. Probé con Torque y con Elysium Vanguard app. ¿Es incompatible o necesito configuración especial?",
+        description = "Mi ELM327 Bluetooth no logra inicializar con el Golf 2003. Probé con Torque y con Elysium Vanguard AI OS app. ¿Es incompatible o necesito configuración especial?",
         views = 534, answers = 8, votes = 22, timeAgo = "hace 2d", isSolved = true,
         bestAnswer = "Los VW de esa era usan KWP2000 (protocolo 4 o 5 en el ELM327). Envía 'ATSP5' manualmente antes de conectar. Si aún falla, verifica que tu ELM327 no sea un clon barato — los clones no soportan protocolos lentos como ISO 9141/KWP2000.",
         answersList = listOf(
@@ -211,7 +211,7 @@ fun TechnicalForumScreen(navController: NavController) {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Foro Técnico Elysium Vanguard", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                    Text("Foro Técnico Elysium Vanguard AI OS", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                     Text("Comunidad de mecánicos expertos", color = MeetColors.textSecondary, fontSize = 12.sp)
                 }
                 Box(

@@ -434,7 +434,7 @@ private fun formatPidValue(value: Float, unit: String): String {
 
 private data class GenericDiagnosticGuideline(
     val guidance: String,
-    val sourceId: String = "MEET_GENERIC_WORKSHOP_GUIDELINE_V1",
+    val sourceId: String = "Elysium_GENERIC_WORKSHOP_GUIDELINE_V1",
     val authority: String = "REVIEW_REQUIRED",
 ) {
     val displayText: String
@@ -1219,9 +1219,9 @@ object DtcRepairDatabase {
     fun getRequiredTools(code: String): List<String> {
         val u = code.uppercase()
         return when {
-            u.startsWith("P030") || u == "P0300" -> listOf("Llave de Bujías 5/8\"", "Multímetro Digital", "Bobina de Repuesto", "Escáner OBD2 Elysium Vanguard")
-            u == "P0171" || u == "P0174" -> listOf("Limpiador de Sensor MAF", "Manómetro de Combustible", "Destornillador Plano/Fórmula", "Escáner OBD2 Elysium Vanguard")
-            else -> listOf("Multímetro Digital", "Limpiador de Contactos Eléctricos", "Juego de Destornilladores y Llaves", "Escáner OBD2 Elysium Vanguard")
+            u.startsWith("P030") || u == "P0300" -> listOf("Llave de Bujías 5/8\"", "Multímetro Digital", "Bobina de Repuesto", "Escáner OBD2 Elysium Vanguard AI OS")
+            u == "P0171" || u == "P0174" -> listOf("Limpiador de Sensor MAF", "Manómetro de Combustible", "Destornillador Plano/Fórmula", "Escáner OBD2 Elysium Vanguard AI OS")
+            else -> listOf("Multímetro Digital", "Limpiador de Contactos Eléctricos", "Juego de Destornilladores y Llaves", "Escáner OBD2 Elysium Vanguard AI OS")
         }
     }
 }

@@ -127,7 +127,7 @@ fun SafetyCenterOverlay(
 
                     SafetyActionItem(
                         icon = Icons.Default.Security,
-                        title = "Protección Guardian MEET",
+                        title = "Protección Guardian Elysium",
                         subtitle = "Monitoreo activo de desviación de ruta y paradas no planeadas",
                         tint = MeetColors.electricBlue,
                         onClick = onGuardian

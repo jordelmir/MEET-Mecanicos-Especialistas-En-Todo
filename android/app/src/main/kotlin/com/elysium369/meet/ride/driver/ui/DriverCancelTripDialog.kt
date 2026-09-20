@@ -97,7 +97,7 @@ val DRIVER_CANCELLATION_OPTIONS = listOf(
     DriverCancellationOption(
         code = "OTHER",
         title = "Otro motivo justificado",
-        description = "Indica la razón específica para la auditoría operacional de MEET.",
+        description = "Indica la razón específica para la auditoría operacional de Elysium.",
         icon = Icons.Default.Edit,
         requiresDetail = true,
     ),
@@ -273,7 +273,7 @@ fun DriverCancelTripDialog(
                 }
 
                 Text(
-                    text = "La cancelación se registra en la auditoría inmutable de MEET. Si el motivo es de seguridad, se activan protocolos preventivos.",
+                    text = "La cancelación se registra en la auditoría inmutable de Elysium. Si el motivo es de seguridad, se activan protocolos preventivos.",
                     color = MeetColors.textMuted,
                     fontSize = 10.sp,
                     lineHeight = 13.sp,

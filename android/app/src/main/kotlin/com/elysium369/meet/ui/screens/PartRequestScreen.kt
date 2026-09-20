@@ -579,7 +579,7 @@ private fun ClientWorkspaceView(
     var customerNotes by rememberSaveable(atlasElement) {
         mutableStateOf(
             atlasElement?.let {
-                "Referencia canónica MEET: ${it.canonicalId}. " +
+                "Referencia canónica Elysium: ${it.canonicalId}. " +
                     "Atlas: ${canonicalPart?.atlasDisplayName}. " +
                     "Reconstrucción 3D no dimensional; confirmar VIN, OEM, foto, conector y medidas."
             }.orEmpty(),
@@ -738,7 +738,7 @@ private fun ClientWorkspaceView(
             }
         }
 
-        // Live 3D Satellite Map (Visible immediately, matching MEET Rides standard)
+        // Live 3D Satellite Map (Visible immediately, matching Elysium Rides standard)
         item {
             val previewState = remember(deliveryPoint) {
                 RideMapStateFactory.create(
@@ -1323,7 +1323,7 @@ private fun ClientWorkspaceView(
                             Spacer(Modifier.width(8.dp))
                             Column {
                                 Text(
-                                    text = "GARANTÍA FORENSE VIN & OEM · MEET",
+                                    text = "GARANTÍA FORENSE VIN & OEM · Elysium",
                                     color = PartColors.greenAccent,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Black
@@ -1624,7 +1624,7 @@ private fun buildPartRequestNotes(
     compatibilityResult: CompatibilityResult?,
     dtcCodes: List<String>
 ): String = buildString {
-    appendLine("[MEET_PART_MARKETPLACE]")
+    appendLine("[Elysium_PART_MARKETPLACE]")
     appendLine("source_context=$sourceContext")
     if (category.isNotBlank()) appendLine("category=$category")
     if (dtcCodes.isNotEmpty()) appendLine("dtc_codes=${dtcCodes.joinToString()}")
@@ -1633,7 +1633,7 @@ private fun buildPartRequestNotes(
         result.requiredConfirmations.take(3).forEach { appendLine("required_confirmation=$it") }
         result.warnings.take(3).forEach { appendLine("warning=${it.severity}:${it.code}:${it.message}") }
     }
-    appendLine("[/MEET_PART_MARKETPLACE]")
+    appendLine("[/Elysium_PART_MARKETPLACE]")
     if (notes.isNotBlank()) {
         appendLine()
         append(notes.trim())

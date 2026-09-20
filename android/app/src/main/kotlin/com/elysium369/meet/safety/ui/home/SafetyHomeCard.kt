@@ -39,7 +39,7 @@ fun SafetyHomeCard(
                 .padding(16.dp),
         ) {
             Text(
-                "🛡 MEET Seguridad",
+                "🛡 Elysium Seguridad",
                 fontWeight = FontWeight.Bold,
                 fontSize = 16.sp,
             )

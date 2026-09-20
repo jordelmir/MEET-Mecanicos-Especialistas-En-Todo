@@ -60,7 +60,7 @@ fun PremiumScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
             Text(
-                text = "ELYSIUM VANGUARD",
+                text = "ELYSIUM VANGUARD AI OS",
                 color = MeetColors.cyberCyan,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,

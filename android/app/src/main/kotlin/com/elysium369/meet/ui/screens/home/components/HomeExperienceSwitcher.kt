@@ -74,14 +74,14 @@ fun HomeExperienceSelectionDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(
-                    "Personaliza cómo deseas acceder y visualizar MEET:",
+                    "Personaliza cómo deseas acceder y visualizar Elysium:",
                     color = MeetColors.textMuted,
                     fontSize = 12.sp
                 )
 
                 // Classic Option
                 ExperienceOptionCard(
-                    title = "Vanguard Classic",
+                    title = "Elysium Vanguard AI OS Classic",
                     subtitle = "Cuadrícula completa de módulos siempre visibles. Ideal para control directo y usuarios avanzados.",
                     isSelected = currentExperience == HomeExperience.CLASSIC,
                     onClick = {
@@ -92,7 +92,7 @@ fun HomeExperienceSelectionDialog(
 
                 // Adaptive Option
                 ExperienceOptionCard(
-                    title = "Vanguard Command",
+                    title = "Elysium Vanguard AI OS Command",
                     subtitle = "Inicio inteligente y contextual. Prioriza vehículo activo, diagnósticos, acciones pendientes y mantenimiento.",
                     isSelected = currentExperience == HomeExperience.ADAPTIVE,
                     onClick = {

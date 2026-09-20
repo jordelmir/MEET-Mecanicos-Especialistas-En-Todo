@@ -76,7 +76,7 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ElysiumAiScreen(
+fun MeetAiScreen(
     facade: VehicleToolFacade,
     gateway: AutomotiveAgentGateway,
     stateEngine: VehicleStateEngine,

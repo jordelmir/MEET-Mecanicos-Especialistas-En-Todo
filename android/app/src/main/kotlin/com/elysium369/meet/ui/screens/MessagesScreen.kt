@@ -67,7 +67,7 @@ fun MessagesScreen(
             type = "text/plain"
             putExtra(
                 Intent.EXTRA_TEXT,
-                "Únete a Elysium Vanguard para conversar y llamar de forma privada. Descarga oficial: ${BuildConfig.ELYSIUM_DOWNLOAD_URL}",
+                "Únete a Elysium Vanguard AI OS para conversar y llamar de forma privada. Descarga oficial: ${BuildConfig.ELYSIUM_DOWNLOAD_URL}",
             )
         }
         context.startActivity(Intent.createChooser(send, "Invitar a Elysium"))

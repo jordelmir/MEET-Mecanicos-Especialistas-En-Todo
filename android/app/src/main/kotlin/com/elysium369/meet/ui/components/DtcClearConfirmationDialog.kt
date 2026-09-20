@@ -32,7 +32,7 @@ fun DtcClearConfirmationDialog(
         blockedMessage != null -> blockedMessage
         requiresConfirmation ->
             "La ECU no entregó VIN. Confirma que el vehículo conectado es ${vehicleLabel ?: "el vehículo seleccionado"}. " +
-                "MEET vinculará únicamente esta sesión física, repetirá el pre-scan y construirá el plan desde evidencia nueva.\n\n" +
+                "Elysium vinculará únicamente esta sesión física, repetirá el pre-scan y construirá el plan desde evidencia nueva.\n\n" +
                 destructiveClearWarning()
         else -> destructiveClearWarning()
     }

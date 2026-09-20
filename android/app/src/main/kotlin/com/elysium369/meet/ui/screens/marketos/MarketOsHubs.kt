@@ -230,7 +230,7 @@ fun FuelRewardsHub(
         OutlinedTextField(purchaseAmount, { purchaseAmount = it.take(16) }, label = { Text("Monto CRC") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(purchaseLiters, { purchaseLiters = it.take(12) }, label = { Text("Litros") }, modifier = Modifier.fillMaxWidth())
         OutlinedTextField(stationId, { stationId = it.take(120) }, label = { Text("Estación (opcional)") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(odometerKm, { odometerKm = it.take(16) }, label = { Text("Kilometraje (opcional)") }, supportingText = { Text("Sin dos lecturas válidas, MEET no inventa consumo real.") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(odometerKm, { odometerKm = it.take(16) }, label = { Text("Kilometraje (opcional)") }, supportingText = { Text("Sin dos lecturas válidas, Elysium no inventa consumo real.") }, modifier = Modifier.fillMaxWidth())
         PrimaryAction("GUARDAR COMPRA DECLARADA", Icons.Default.LocalGasStation, purchaseAmount.isNotBlank() && purchaseLiters.isNotBlank(), FuelPalette) {
             viewModel.recordFuelPurchase(purchaseAmount, purchaseLiters, stationId, odometerKm)
             purchaseAmount = ""

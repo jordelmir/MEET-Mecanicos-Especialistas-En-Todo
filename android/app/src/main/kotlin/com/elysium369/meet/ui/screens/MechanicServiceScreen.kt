@@ -425,7 +425,7 @@ private fun ClientWorkspaceView(
             }
         }
 
-        // Live 3D Satellite Map (Visible immediately, matching MEET Rides standard)
+        // Live 3D Satellite Map (Visible immediately, matching Elysium Rides standard)
         item {
             val previewState = remember(mechanicPoint) {
                 RideMapStateFactory.create(

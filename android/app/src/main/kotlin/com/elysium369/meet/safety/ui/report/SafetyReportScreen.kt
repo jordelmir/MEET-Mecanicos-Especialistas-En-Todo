@@ -1,5 +1,8 @@
 package com.elysium369.meet.safety.ui.report
 
+import android.Manifest
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -38,6 +41,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -52,15 +58,25 @@ import com.elysium369.meet.safety.domain.SafetyReportCategory
 import com.elysium369.meet.safety.domain.SourceRelation
 import com.elysium369.meet.safety.domain.label
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.core.geo.CommonMapState
+import com.elysium369.meet.core.geo.GeoMarker
+import com.elysium369.meet.core.geo.GeoMarkerRole
+import com.elysium369.meet.core.geo.GeoPoint
+import com.elysium369.meet.core.geo.MapCameraIntent
+import com.elysium369.meet.core.geo.runtime.CommonMapPanel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SafetyReportScreen(
     onBack: () -> Unit = {},
     onReportSubmitted: (String) -> Unit = {},
+    locationEntryMode: String? = null,
     viewModel: SafetyReportViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    androidx.compose.runtime.LaunchedEffect(locationEntryMode) {
+        if (locationEntryMode == "search" || locationEntryMode == "map") viewModel.goToStep(0)
+    }
 
     if (state.createdReportId != null) {
         SafetyReportReceiptScreen(
@@ -117,11 +133,13 @@ fun SafetyReportScreen(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 when (state.step) {
-                    0 -> StepCategory(state, viewModel)
-                    1 -> StepSourceRelation(state, viewModel)
-                    2 -> StepNarrative(state, viewModel)
-                    3 -> StepWhen(state, viewModel)
-                    4 -> StepWhere(state, viewModel)
+                    0 -> StepWhere(state, viewModel, locationEntryMode == "map")
+                    1 -> StepCategory(state, viewModel)
+                    2 -> StepSourceRelation(state, viewModel)
+                    3 -> StepNarrative(state, viewModel)
+                    4 -> StepWhen(state, viewModel)
+                    5 -> StepEvidence(state, viewModel)
+                    6 -> StepReview(state)
                 }
             }
 
@@ -141,11 +159,13 @@ fun SafetyReportScreen(
                 modifier = Modifier.fillMaxWidth().height(52.dp).padding(bottom = 16.dp),
                 shape = RoundedCornerShape(14.dp),
                 enabled = when (state.step) {
-                    0 -> state.category != null
-                    1 -> state.sourceRelation != null
-                    2 -> state.narrative.trim().length >= 10
-                    3 -> true
+                    0 -> true
+                    1 -> state.category != null
+                    2 -> state.sourceRelation != null
+                    3 -> state.narrative.trim().length >= 10
                     4 -> true
+                    5 -> !state.staging
+                    6 -> true
                     else -> true
                 } && !state.submitting,
                 colors = ButtonDefaults.buttonColors(
@@ -242,14 +262,14 @@ private fun StepNarrative(state: SafetyReportUiState, viewModel: SafetyReportVie
             Text(
                 "${state.narrative.trim().length} / 10,000 caracteres",
                 fontSize = 11.sp,
-                color = if (state.narrative.trim().length >= 10) MeetColors.neonGreen else MeetColors.textMuted,
+                color = if (state.narrative.trim().length >= 10) MeetColors.neonGreen else MeetColors.textSecondary,
             )
             Spacer(modifier = Modifier.height(8.dp))
             OutlinedTextField(
                 value = state.narrative,
                 onValueChange = { viewModel.updateNarrative(it) },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Mínimo 10 caracteres...", color = MeetColors.textMuted) },
+                placeholder = { Text("Mínimo 10 caracteres...", color = MeetColors.textSecondary) },
                 minLines = 4,
                 maxLines = 10,
                 colors = OutlinedTextFieldDefaults.colors(
@@ -275,7 +295,7 @@ private fun StepWhen(state: SafetyReportUiState, viewModel: SafetyReportViewMode
         Column(modifier = Modifier.padding(16.dp)) {
             Text("¿Cuándo ocurrió?", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Opcional", fontSize = 11.sp, color = MeetColors.textMuted)
+            Text("Opcional", fontSize = 11.sp, color = MeetColors.textSecondary)
             Spacer(modifier = Modifier.height(8.dp))
 
             Row(
@@ -295,8 +315,7 @@ private fun StepWhen(state: SafetyReportUiState, viewModel: SafetyReportViewMode
                 FilterChip(
                     selected = state.occurredAtIso != null,
                     onClick = {
-                        val now = java.time.Instant.now().toString().substring(0, 19)
-                        viewModel.updateOccurredAt(now)
+                        viewModel.updateOccurredAt(java.time.Instant.now().toString())
                     },
                     label = { Text("Ahora") },
                     modifier = Modifier.weight(1f),
@@ -313,7 +332,7 @@ private fun StepWhen(state: SafetyReportUiState, viewModel: SafetyReportViewMode
                 onValueChange = { viewModel.updateOccurredAt(it.ifBlank { null }) },
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text("Fecha/hora (ISO)", color = MeetColors.textSecondary) },
-                placeholder = { Text("Ej: 2026-09-18T14:30:00", color = MeetColors.textMuted) },
+                placeholder = { Text("Ej: 2026-09-18T14:30:00", color = MeetColors.textSecondary) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MeetColors.neonGreen,
@@ -328,7 +347,13 @@ private fun StepWhen(state: SafetyReportUiState, viewModel: SafetyReportViewMode
 }
 
 @Composable
-private fun StepWhere(state: SafetyReportUiState, viewModel: SafetyReportViewModel) {
+private fun StepWhere(state: SafetyReportUiState, viewModel: SafetyReportViewModel, openMapInitially: Boolean = false) {
+    var showMap by remember(openMapInitially) { mutableStateOf(openMapInitially) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { result ->
+        if (result.values.any { it }) viewModel.requestLocation() else viewModel.locationPermissionError()
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -338,7 +363,26 @@ private fun StepWhere(state: SafetyReportUiState, viewModel: SafetyReportViewMod
         Column(modifier = Modifier.padding(16.dp)) {
             Text("¿Dónde?", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
             Spacer(modifier = Modifier.height(4.dp))
-            Text("Opcional. La ubicación exacta nunca se publica.", fontSize = 11.sp, color = MeetColors.textMuted)
+            Text("Opcional. La ubicación exacta nunca se publica.", fontSize = 11.sp, color = MeetColors.textSecondary)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            OutlinedTextField(
+                value = state.locationQuery,
+                onValueChange = viewModel::updateLocationQuery,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Buscar lugar, dirección o referencia") },
+                placeholder = { Text("Ej: Escuela Los Pinos, San José") },
+                singleLine = true,
+            )
+            if (state.searchingLocation) LinearProgressIndicator(Modifier.fillMaxWidth())
+            state.locationSuggestions.forEach { place ->
+                androidx.compose.material3.TextButton(onClick = { viewModel.selectPlace(place); showMap = true }, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.fillMaxWidth()) {
+                        Text(place.primaryLabel, color = MeetColors.textPrimary, fontWeight = FontWeight.Bold)
+                        Text(place.secondaryLabel, color = MeetColors.textSecondary, fontSize = 11.sp)
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
 
             if (state.location != null) {
@@ -372,13 +416,8 @@ private fun StepWhere(state: SafetyReportUiState, viewModel: SafetyReportViewMod
             } else {
                 Button(
                     onClick = {
-                        viewModel.updateLocation(
-                            SafetyDraftLocation(
-                                latitude = 0.0,
-                                longitude = 0.0,
-                                accuracyMeters = 0f,
-                                source = LocationSource.DEVICE,
-                            ),
+                        permissionLauncher.launch(
+                            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -388,20 +427,95 @@ private fun StepWhere(state: SafetyReportUiState, viewModel: SafetyReportViewMod
                         contentColor = Color.Black,
                     ),
                 ) {
-                    Icon(Icons.Filled.LocationOn, contentDescription = null)
+                    if (state.locating) CircularProgressIndicator(Modifier.height(20.dp).width(20.dp), strokeWidth = 2.dp)
+                    else Icon(Icons.Filled.LocationOn, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Usar mi ubicación")
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    "GPS no es verdad absoluta. La ubicación es±18m.",
+                    "Se solicita una lectura reciente solo cuando pulsas el botón. Puedes continuar sin ubicación.",
                     fontSize = 11.sp,
-                    color = MeetColors.textMuted,
+                    color = MeetColors.textSecondary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
+            Spacer(modifier = Modifier.height(8.dp))
+            androidx.compose.material3.OutlinedButton(onClick = { showMap = !showMap }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.LocationOn, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(if (showMap) "OCULTAR MAPA" else "FIJAR UBICACIÓN EN EL MAPA")
+            }
+            if (showMap) {
+                Spacer(Modifier.height(8.dp))
+                Text("Mantén presionado el punto exacto del incidente.", color = MeetColors.cyberCyan, fontSize = 12.sp)
+                val selected = state.location?.let { GeoPoint(it.latitude, it.longitude, it.accuracyMeters) }
+                val mapState = CommonMapState(
+                    markers = selected?.let { listOf(GeoMarker("safety-draft", GeoMarkerRole.PRIVATE_INCIDENT_PIN, it, "Ubicación del reporte", "Selección privada")) } ?: emptyList(),
+                    cameraIntent = selected?.let { MapCameraIntent.CenterOn(it, 16.0) } ?: MapCameraIntent.FollowUser,
+                    showRecenterButton = true,
+                )
+                Card(Modifier.fillMaxWidth().height(320.dp), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, MeetColors.cyberCyan)) {
+                    CommonMapPanel(
+                        state = mapState,
+                        modifier = Modifier.fillMaxSize(),
+                        userLocation = selected,
+                        onMapLongClick = { point -> viewModel.selectMapPoint(point.latitude, point.longitude) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepEvidence(state: SafetyReportUiState, viewModel: SafetyReportViewModel) {
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri?.let(viewModel::attachEvidence)
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.dp, MeetColors.borderSubtle),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Evidencia opcional", fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
+            Text("El original queda cifrado localmente y solo se entrega al almacenamiento privado.", color = MeetColors.textSecondary)
+            state.evidence.forEach { item ->
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("${item.mimeType} · ${item.byteCount / 1024} KB", Modifier.weight(1f), color = MeetColors.textPrimary)
+                    Button(onClick = { viewModel.removeEvidence(item.evidenceId) }, enabled = !state.staging) { Text("Quitar") }
+                }
+            }
+            Button(
+                onClick = { picker.launch(arrayOf("image/*", "video/*", "audio/*", "application/pdf")) },
+                enabled = !state.staging && state.evidence.size < 5,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text(if (state.staging) "Protegiendo archivo…" else "Adjuntar archivo") }
+        }
+    }
+}
+
+@Composable
+private fun StepReview(state: SafetyReportUiState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.dp, MeetColors.borderSubtle),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Revisar y guardar", fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
+            Text("Categoría: ${state.category?.label() ?: "Pendiente"}", color = MeetColors.textPrimary)
+            Text("Relación con la fuente: ${state.sourceRelation?.label() ?: "Pendiente"}", color = MeetColors.textPrimary)
+            Text("Fecha: ${state.occurredAtIso ?: "Dato no capturado"}", color = MeetColors.textSecondary)
+            Text(
+                if (state.location == null) "Ubicación: Dato no capturado" else "Ubicación privada capturada · precisión ±${state.location.accuracyMeters?.toInt()} m",
+                color = MeetColors.textSecondary,
+            )
+            Text("Evidencias cifradas: ${state.evidence.size}", color = MeetColors.textSecondary)
+            Text("Al guardar, el estado inicial es local. La entrega, revisión y publicación requieren confirmación del servidor.", color = MeetColors.textSecondary)
         }
     }
 }
@@ -461,13 +575,13 @@ private fun SafetyReportReceiptScreen(
                 border = BorderStroke(1.dp, MeetColors.borderSubtle),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("REPORTE ID", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textMuted, letterSpacing = 1.2.sp)
+                    Text("REPORTE ID", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
                     Text(reportId.take(8) + "...", fontSize = 14.sp, color = MeetColors.textPrimary)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("ESTADO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textMuted, letterSpacing = 1.2.sp)
+                    Text("ESTADO", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
                     Text("LOCAL_ONLY", fontSize = 14.sp, color = MeetColors.warning)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("CUANDO RED VUELVA", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textMuted, letterSpacing = 1.2.sp)
+                    Text("CUANDO RED VUELVA", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
                     Text("Worker enviará al servidor", fontSize = 14.sp, color = MeetColors.textSecondary)
                 }
             }

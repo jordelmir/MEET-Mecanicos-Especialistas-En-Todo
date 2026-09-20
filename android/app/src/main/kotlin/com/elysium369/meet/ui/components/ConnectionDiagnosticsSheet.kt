@@ -284,7 +284,7 @@ fun ConnectionDiagnosticsSheet(
                 onClick = {
                     val fullTraceText = rawTrace.joinToString("\n")
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                    val clip = ClipData.newPlainText("MEET OBD Trace", fullTraceText)
+                    val clip = ClipData.newPlainText("Elysium OBD Trace", fullTraceText)
                     clipboard?.setPrimaryClip(clip)
                     Toast.makeText(context, "Traza de enlace copiada al portapapeles", Toast.LENGTH_SHORT).show()
                 },

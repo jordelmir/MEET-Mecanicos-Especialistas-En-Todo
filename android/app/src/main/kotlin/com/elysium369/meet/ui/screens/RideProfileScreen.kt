@@ -263,7 +263,7 @@ private fun RideMapAvatarPanel(isDriver: Boolean) {
                         fontWeight = FontWeight.Black,
                     )
                     Text(
-                        "Se usa en el mapa activo de Elysium Vanguard y no cambia datos de seguridad ni ubicación.",
+                        "Se usa en el mapa activo de Elysium Vanguard AI OS y no cambia datos de seguridad ni ubicación.",
                         color = MeetColors.textSecondary,
                         fontSize = 10.sp,
                     )
@@ -314,7 +314,7 @@ private fun RideMapAvatarPanel(isDriver: Boolean) {
         }
         item {
             Text(
-                "Todos los diseños son originales de Elysium Vanguard. El catálogo queda preparado para añadir nuevas colecciones sin alterar el motor del mapa.",
+                "Todos los diseños son originales de Elysium Vanguard AI OS. El catálogo queda preparado para añadir nuevas colecciones sin alterar el motor del mapa.",
                 color = MeetColors.textMuted,
                 fontSize = 10.sp,
             )

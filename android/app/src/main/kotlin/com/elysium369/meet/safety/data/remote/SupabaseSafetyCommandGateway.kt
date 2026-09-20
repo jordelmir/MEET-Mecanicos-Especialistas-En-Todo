@@ -10,6 +10,7 @@ import io.github.jan.supabase.postgrest.rpc
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -34,19 +35,10 @@ class SupabaseSafetyCommandGateway @Inject constructor() : SafetyCommandGateway 
     ): SafetyGatewayResult {
         val client = SupabaseModule.client
 
-        if (client.auth.currentUserOrNull() == null) {
+        if (client.auth.currentUserOrNull()?.id != command.actorSessionUserId) {
             return SafetyGatewayResult.Rejected(
                 code = "UNAUTHENTICATED",
                 message = "Autenticación requerida",
-                correlationId = null,
-                retryable = false,
-            )
-        }
-
-        if (command.commandType != SafetyCommandType.CREATE_REPORT.name) {
-            return SafetyGatewayResult.Rejected(
-                code = "UNSUPPORTED_COMMAND",
-                message = "Comando no soportado",
                 correlationId = null,
                 retryable = false,
             )
@@ -65,8 +57,23 @@ class SupabaseSafetyCommandGateway @Inject constructor() : SafetyCommandGateway 
             )
         }
 
-        return try {
-            val response = client.postgrest
+        return when (command.commandType) {
+            SafetyCommandType.CREATE_REPORT.name -> executeCreateReport(command, payload)
+            SafetyCommandType.SUBMIT_COUNTERCLAIM.name -> executeCounterclaim(command, payload)
+            else -> SafetyGatewayResult.Rejected(
+                code = "UNSUPPORTED_COMMAND",
+                message = "Comando no soportado",
+                correlationId = null,
+                retryable = false,
+            )
+        }
+    }
+
+    private suspend fun executeCreateReport(
+        command: SafetyCommandOutboxEntity,
+        payload: JsonObject,
+    ): SafetyGatewayResult = try {
+            val response = SupabaseModule.client.postgrest
                 .rpc(
                     "safety_create_report_v2",
                     buildJsonObject {
@@ -75,18 +82,10 @@ class SupabaseSafetyCommandGateway @Inject constructor() : SafetyCommandGateway 
                         put("p_category", payload["category"]?.jsonPrimitive?.contentOrNull ?: "OTHER")
                         put("p_narrative", payload["narrative"]?.jsonPrimitive?.contentOrNull ?: "")
                         put("p_source_relation", payload["sourceRelation"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN")
-                        payload["occurredAtIso"]?.jsonPrimitive?.contentOrNull?.let {
-                            put("p_occurred_at", it)
-                        }
-                        payload["latitude"]?.jsonPrimitive?.contentOrNull?.let {
-                            put("p_latitude", it.toDoubleOrNull())
-                        }
-                        payload["longitude"]?.jsonPrimitive?.contentOrNull?.let {
-                            put("p_longitude", it.toDoubleOrNull())
-                        }
-                        payload["accuracyMeters"]?.jsonPrimitive?.contentOrNull?.let {
-                            put("p_accuracy_meters", it.toFloatOrNull())
-                        }
+                        put("p_occurred_at", payload["occurredAtIso"] ?: JsonNull)
+                        put("p_latitude", payload["latitude"] ?: JsonNull)
+                        put("p_longitude", payload["longitude"] ?: JsonNull)
+                        put("p_accuracy_meters", payload["accuracyMeters"] ?: JsonNull)
                         put("p_client_payload_sha256", command.clientPayloadSha256)
                     },
                 )
@@ -98,7 +97,7 @@ class SupabaseSafetyCommandGateway @Inject constructor() : SafetyCommandGateway 
             val serverVersion = response["server_version"]?.jsonPrimitive?.longOrNull
             val correlationId = response["correlation_id"]?.jsonPrimitive?.contentOrNull
 
-            if (reportId == null || state == null) {
+            if (reportId != command.aggregateId || state == null || serverVersion == null || serverVersion <= 0) {
                 // Error case: check for error object
                 val error = response["error"]?.jsonObject
                 return SafetyGatewayResult.Rejected(
@@ -111,7 +110,7 @@ class SupabaseSafetyCommandGateway @Inject constructor() : SafetyCommandGateway 
 
             SafetyGatewayResult.Accepted(
                 state = state,
-                serverVersion = serverVersion ?: 1L,
+                serverVersion = serverVersion,
                 correlationId = correlationId,
             )
         } catch (cancelled: CancellationException) {
@@ -122,5 +121,34 @@ class SupabaseSafetyCommandGateway @Inject constructor() : SafetyCommandGateway 
                 message = error.message?.take(200) ?: "Transport error",
             )
         }
+
+    private suspend fun executeCounterclaim(
+        command: SafetyCommandOutboxEntity,
+        payload: JsonObject,
+    ): SafetyGatewayResult = try {
+        val response = SupabaseModule.client.postgrest.rpc(
+            "safety_submit_counterclaim_v1",
+            buildJsonObject {
+                put("p_idempotency_key", command.idempotencyKey)
+                put("p_case_id", command.aggregateId)
+                put("p_claim_id", payload["claimId"] ?: JsonNull)
+                put("p_kind", payload["kind"]?.jsonPrimitive?.contentOrNull ?: "REPORT_ERROR")
+                put("p_narrative", payload["narrative"]?.jsonPrimitive?.contentOrNull ?: "")
+                put("p_source_url", payload["sourceUrl"] ?: JsonNull)
+                put("p_client_payload_sha256", command.clientPayloadSha256)
+            },
+        ).decodeAs<JsonObject>()
+        val receiptId = response["counterclaim_id"]?.jsonPrimitive?.contentOrNull
+        val state = response["state"]?.jsonPrimitive?.contentOrNull
+        val version = response["server_version"]?.jsonPrimitive?.longOrNull
+        if (receiptId == null || state == null || version == null || version <= 0) {
+            SafetyGatewayResult.Rejected("INVALID_COUNTERCLAIM_RECEIPT", "Respuesta inválida del servidor", null, false)
+        } else {
+            SafetyGatewayResult.Accepted(state, version, response["correlation_id"]?.jsonPrimitive?.contentOrNull)
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (error: Exception) {
+        SafetyGatewayResult.TransportFailure("REMOTE_TRANSPORT_FAILURE", error.message?.take(200))
     }
 }

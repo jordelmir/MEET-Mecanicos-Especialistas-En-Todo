@@ -25,7 +25,7 @@ enum class ServiceVertical(val code: String, val displayName: String) {
     RIDE("ride", "Movilidad y Viajes"),
     INSPECTION("inspection", "Inspección Pre-Compra Forense"),
     VEHICLE_ACCESS("vehicle_access", "Acceso Vehicular, Llaves & IMMO"),
-    UNIVERSAL("universal", "Elysium Vanguard Universal"),
+    UNIVERSAL("universal", "Elysium Vanguard AI OS Universal"),
     UNKNOWN("unknown", "Vertical Desconocido");
 
     companion object {

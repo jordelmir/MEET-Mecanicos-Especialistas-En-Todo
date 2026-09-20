@@ -35,7 +35,7 @@ import kotlin.math.sin
 // ═══════════════════════════════════════════════════════════════
 // ELYSIUM MOTION KIT V1 — Cinematic UI Animations
 // ═══════════════════════════════════════════════════════════════
-// Premium animation toolkit for the MEET / Elysium Vanguard app.
+// Premium animation toolkit for the Elysium / Elysium Vanguard app.
 // Every composable here brings cinema-grade motion to the cyberpunk UI.
 // ═══════════════════════════════════════════════════════════════
 

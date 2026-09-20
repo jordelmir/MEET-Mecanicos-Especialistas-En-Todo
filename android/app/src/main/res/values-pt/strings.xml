@@ -1,21 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">MEET — Diagnóstico Automotivo e Mobilidade</string>
-    <string name="hce_service_desc">MEET Chave Digital de Acesso Veicular</string>
+    <string name="app_name">Elysium Vanguard AI OS</string>
+    <string name="hce_service_desc">Elysium Chave Digital de Acesso Veicular</string>
 
     <!-- Play Store: Location Permission Disclosure -->
     <string name="location_disclosure_title">Permissão de Localização</string>
-    <string name="location_disclosure_message">O MEET coleta sua localização em tempo real para exibir sua posição ao passageiro/motorista durante viagens ativas e missões de socorro mecânico. Os dados de localização são usados estritamente para serviços de transporte e assistência na estrada e nunca são compartilhados com terceiros para fins publicitários.</string>
+    <string name="location_disclosure_message">O Elysium coleta sua localização em tempo real para exibir sua posição ao passageiro/motorista durante viagens ativas e missões de socorro mecânico. Os dados de localização são usados estritamente para serviços de transporte e assistência na estrada e nunca são compartilhados com terceiros para fins publicitários.</string>
     <string name="location_disclosure_accept">Aceitar e Continuar</string>
     <string name="location_disclosure_decline">Recusar</string>
 
     <!-- Play Store: Background Location Disclosure -->
     <string name="background_location_disclosure_title">Acesso à Localização em Segundo Plano</string>
-    <string name="background_location_disclosure_message">O MEET requer acesso à localização em segundo plano para continuar rastreando sua rota durante viagens ativas e atendimentos de resgate quando o aplicativo estiver em segundo plano ou a tela estiver bloqueada. Isso garante a segurança do passageiro e a cobrança precisa da tarifa. O rastreamento em segundo plano é interrompido automaticamente assim que a viagem termina.</string>
+    <string name="background_location_disclosure_message">O Elysium requer acesso à localização em segundo plano para continuar rastreando sua rota durante viagens ativas e atendimentos de resgate quando o aplicativo estiver em segundo plano ou a tela estiver bloqueada. Isso garante a segurança do passageiro e a cobrança precisa da tarifa. O rastreamento em segundo plano é interrompido automaticamente assim que a viagem termina.</string>
 
     <!-- Play Store: UGC Moderation -->
     <string name="ugc_terms_of_use_title">Termos de Uso — Conteúdo Gerado pelo Usuário</string>
-    <string name="ugc_terms_of_use_message">Ao usar o chat, avaliações ou qualquer recurso de conteúdo gerado pelo usuário no MEET, você concorda com nossos Termos de Uso. Conteúdo ofensivo, spam, assédio, fraude ou material ilegal é estritamente proibido e sujeito a moderação imediata e suspensão da conta.</string>
+    <string name="ugc_terms_of_use_message">Ao usar o chat, avaliações ou qualquer recurso de conteúdo gerado pelo usuário no Elysium, você concorda com nossos Termos de Uso. Conteúdo ofensivo, spam, assédio, fraude ou material ilegal é estritamente proibido e sujeito a moderação imediata e suspensão da conta.</string>
 
     <!-- Play Store: Account Deletion -->
     <string name="account_deletion_info">Você pode excluir sua conta em Configurações → Excluir Conta ou acessando https://elysium-vanguard.app/delete-account em qualquer navegador da web.</string>

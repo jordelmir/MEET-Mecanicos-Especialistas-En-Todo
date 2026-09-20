@@ -88,7 +88,7 @@ fun MeetDnaScreen(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        "Elysium Vanguard DNA",
+                        "Elysium Vanguard AI OS DNA",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
@@ -118,7 +118,7 @@ fun MeetDnaScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Necesitas seleccionar un vehículo de tu Garage para ver su firma digital Elysium Vanguard DNA.",
+                            "Necesitas seleccionar un vehículo de tu Garage para ver su firma digital Elysium Vanguard AI OS DNA.",
                             color = MeetColors.textMuted,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center
@@ -741,7 +741,7 @@ private fun DnaBusinessStateCard(
             DnaProgressLine("Sensores vivos", liveSensorCount, requiredLiveSensors, sensorProgress, accent)
             Spacer(Modifier.height(12.dp))
             Text(
-                message.ifBlank { "Elysium Vanguard DNA esta esperando datos reales del vehiculo." },
+                message.ifBlank { "Elysium Vanguard AI OS DNA esta esperando datos reales del vehiculo." },
                 color = Color.White.copy(alpha = 0.88f),
                 fontSize = 12.sp,
                 lineHeight = 16.sp

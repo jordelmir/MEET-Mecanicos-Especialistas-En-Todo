@@ -6,16 +6,18 @@ import com.elysium369.meet.core.geo.GeoMarker
 import com.elysium369.meet.core.geo.GeoMarkerRole
 import com.elysium369.meet.core.geo.GeoPoint
 import com.elysium369.meet.core.geo.MapCameraIntent
+import com.elysium369.meet.safety.data.SafetyPrivateMapPoint
 
 object SafetyMapAdapter {
 
     fun build(
         points: List<SafetyPublicPoint>,
+        privatePoints: List<SafetyPrivateMapPoint> = emptyList(),
     ): CommonMapState {
-        val markers = points.map { point ->
+        val publicMarkers = points.map { point ->
             GeoMarker(
                 id = point.publicPointId,
-                role = GeoMarkerRole.INCIDENT_PIN,
+                role = if (point.category == "HOMICIDE") GeoMarkerRole.HOMICIDE_PIN else GeoMarkerRole.INCIDENT_PIN,
                 point = GeoPoint(
                     latitude = point.displayLatitude,
                     longitude = point.displayLongitude,
@@ -31,6 +33,17 @@ object SafetyMapAdapter {
                 },
             )
         }
+        val privateMarkers = privatePoints.map { point ->
+            GeoMarker(
+                id = point.markerId,
+                role = GeoMarkerRole.PRIVATE_INCIDENT_PIN,
+                point = GeoPoint(point.latitude, point.longitude, point.accuracyMeters, point.occurredAt),
+                label = "Mi reporte",
+                subtitle = point.serverState ?: point.syncState,
+                isHighlighted = point.syncState != "SYNCED",
+            )
+        }
+        val markers = publicMarkers + privateMarkers
 
         val bounds = GeoBounds.fromPoints(markers.map { it.point })
 
@@ -56,4 +69,5 @@ data class SafetyPublicPoint(
     val label: String,
     val claimState: String,
     val independentSourceCount: Int,
+    val category: String,
 )

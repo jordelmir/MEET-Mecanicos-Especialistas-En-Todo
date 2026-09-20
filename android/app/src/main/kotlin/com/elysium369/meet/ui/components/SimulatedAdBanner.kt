@@ -51,7 +51,7 @@ fun SimulatedAdBanner(viewModel: ObdViewModel) {
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Consigue repuestos originales al mejor precio en MEET Marketplace.",
+                    text = "Consigue repuestos originales al mejor precio en Elysium Marketplace.",
                     color = Color.White,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium

@@ -333,7 +333,7 @@ fun RideHistoryDetailDialog(
                                     )
                                 }
                                 Text(
-                                    text = "Registro preservado en viajes finalizados para trazabilidad y auditoría de la plataforma MEET.",
+                                    text = "Registro preservado en viajes finalizados para trazabilidad y auditoría de la plataforma Elysium.",
                                     color = Color(0xFFFFCDD2),
                                     fontSize = 11.sp,
                                     lineHeight = 14.sp

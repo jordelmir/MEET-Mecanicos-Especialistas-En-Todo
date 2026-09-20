@@ -135,7 +135,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
             ),
             ProFeature(
                 "meet_dna",
-                "Firma Elysium Vanguard DNA", "Elysium Vanguard DNA Signature",
+                "Firma Elysium Vanguard AI OS DNA", "Elysium Vanguard AI OS DNA Signature",
                 "Firma matemática y anomalías de comportamiento", "Mathematical vehicle signature and anomaly tracking",
                 "🧬", MeetColors.cyberCyan, "meet_dna"
             ),
@@ -190,7 +190,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 EliteTopAppBar(
                     title = buildAnnotatedString {
                         withStyle(SpanStyle(color = MeetColors.neonGreen)) {
-                            append("ELYSIUM VANGUARD ")
+                            append("ELYSIUM VANGUARD AI OS ")
                         }
                         withStyle(SpanStyle(color = MeetColors.electricBlue)) {
                             append("PRO")
@@ -214,7 +214,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 // ELITE LOGO with pulsating neon glow
                 Image(
                     painter = painterResource(id = R.drawable.meet_elite_logo),
-                    contentDescription = "Elysium Vanguard Logo",
+                    contentDescription = "Elysium Vanguard AI OS Logo",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(110.dp)
@@ -251,7 +251,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            ElysiumSectionIcon(
+                            MeetSectionIcon(
                                 key = "warning",
                                 contentDescription = if (isSpanish) "Advertencia" else "Warning",
                                 tint = MeetColors.warning,
@@ -294,7 +294,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            ElysiumSectionIcon(
+                            MeetSectionIcon(
                                 key = "shield",
                                 contentDescription = if (isSpanish) "Adaptador validado" else "Validated adapter",
                                 tint = MeetColors.neonGreen,
@@ -413,7 +413,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                                             horizontalAlignment = Alignment.CenterHorizontally,
                                             verticalArrangement = Arrangement.Center
                                         ) {
-                                            ElysiumSectionIcon(
+                                            MeetSectionIcon(
                                                 key = feature.id,
                                                 contentDescription = if (isSpanish) feature.titleEs else feature.titleEn,
                                                 tint = feature.color,

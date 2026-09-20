@@ -433,7 +433,7 @@ private fun ClientWorkspaceView(
             }
         }
 
-        // Live 3D Satellite Map (Visible Immediately, matching MEET Rides)
+        // Live 3D Satellite Map (Visible Immediately, matching Elysium Rides)
         item {
             val previewState = remember(pickupPoint, destPoint, previewRoadRoute) {
                 RideMapStateFactory.create(
@@ -995,7 +995,7 @@ private fun DriverWorkspaceView(
     }
 
     var driverName by remember(myProfile) {
-        mutableStateOf(myProfile?.businessName ?: "Elysium Vanguard Auxilio")
+        mutableStateOf(myProfile?.businessName ?: "Elysium Vanguard AI OS Auxilio")
     }
     var driverPhone by remember(myProfile) {
         mutableStateOf(myProfile?.phone ?: "+506 7281-2570")

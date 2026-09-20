@@ -1,7 +1,7 @@
 package com.elysium369.meet.ui.navigation
 
 /**
- * MEET Product Topology — Reorganizes the entire platform around 5 primary universes
+ * Elysium Product Topology — Reorganizes the entire platform around 5 primary universes
  * with Elysium AI operating as a transversal intelligence layer across all capabilities.
  */
 enum class ProductUniverse(

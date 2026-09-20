@@ -812,7 +812,7 @@ private fun DriverContextualAction(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text("Comisión MEET (5%)", color = MeetColors.textSecondary, fontSize = 13.sp)
+                                Text("Comisión Elysium (5%)", color = MeetColors.textSecondary, fontSize = 13.sp)
                                 Text("-₡%,d".format(commission), color = MeetColors.error, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
                             Divider(color = MeetColors.borderSubtle, thickness = 1.dp)

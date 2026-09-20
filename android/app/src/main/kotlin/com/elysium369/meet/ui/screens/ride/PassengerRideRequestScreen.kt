@@ -143,7 +143,7 @@ fun PassengerRideRequestScreen(
                 }
 
                 Text(
-                    "Solicitar Viaje MEET",
+                    "Solicitar Viaje Elysium",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MeetColors.textPrimary

@@ -142,7 +142,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                     DocumentPreviewCard(
                         theme = selectedTheme,
                         scanMode = scanMode,
-                        workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "Elysium Vanguard CLINIC",
+                        workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "Elysium Vanguard AI OS CLINIC",
                         healthScore = healthScore,
                         includeGraphs = includeGraphs,
                         includePredictive = includePredictive,
@@ -436,7 +436,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
 
                         Spacer(modifier = Modifier.height(32.dp))
                         Text(
-                            text = "COMPILANDO TELEMETRÍA Elysium Vanguard ELITE",
+                            text = "COMPILANDO TELEMETRÍA Elysium Vanguard AI OS ELITE",
                             color = Color.White,
                             fontWeight = FontWeight.Black,
                             style = MaterialTheme.typography.titleMedium
@@ -517,7 +517,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                         fontWeight = FontWeight.Black
                     )
                     Text(
-                        text = "Documento firmado digitalmente por Elysium Vanguard AI y listo para enviar.",
+                        text = "Documento firmado digitalmente por Elysium Vanguard AI OS y listo para enviar.",
                         color = MeetColors.textSecondary,
                         style = MaterialTheme.typography.bodySmall,
                         textAlign = TextAlign.Center,
@@ -595,7 +595,7 @@ fun ReportScreen(navController: NavController, viewModel: ObdViewModel) {
                                                         }
                                                         
                                                         val printData = com.elysium369.meet.core.print.PrintReportData(
-                                                            workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "Elysium Vanguard CLINIC",
+                                                            workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "Elysium Vanguard AI OS CLINIC",
                                                             workshopAddress = workshopAddress,
                                                             workshopPhone = workshopPhone,
                                                             workshopEmail = workshopEmail,

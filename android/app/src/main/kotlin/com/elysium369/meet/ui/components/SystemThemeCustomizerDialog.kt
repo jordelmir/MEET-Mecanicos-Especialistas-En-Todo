@@ -162,7 +162,7 @@ fun SystemThemeCustomizerDialog(
                 }
 
                 Text(
-                    "Personaliza los colores primarios, secundarios y acentos del sistema Elysium Vanguard.",
+                    "Personaliza los colores primarios, secundarios y acentos del sistema Elysium Vanguard AI OS.",
                     color = Color.White.copy(alpha = 0.45f),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Medium,

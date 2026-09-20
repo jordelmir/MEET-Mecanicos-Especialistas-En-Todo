@@ -142,7 +142,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                                     if (isConnected) {
                                         "Se mostrarán solo ECUs que respondan por CAN/UDS."
                                     } else {
-                                        "Elysium Vanguard no dibuja módulos simulados sin enlace físico."
+                                        "Elysium Vanguard AI OS no dibuja módulos simulados sin enlace físico."
                                     },
                                     color = MeetColors.textMuted,
                                     style = MaterialTheme.typography.labelSmall,
@@ -265,7 +265,7 @@ fun TopologyScreen(navController: NavController, viewModel: ObdViewModel) {
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            "Conecta BT clásico, BLE, WiFi ELM o DoIP; pon ignición en ON; luego Elysium Vanguard sondea ECUs físicas y solo dibuja módulos que contestan.",
+                            "Conecta BT clásico, BLE, WiFi ELM o DoIP; pon ignición en ON; luego Elysium Vanguard AI OS sondea ECUs físicas y solo dibuja módulos que contestan.",
                             color = MeetColors.textSecondary,
                             fontSize = 12.sp,
                             lineHeight = 16.sp
@@ -779,7 +779,7 @@ fun ObdPinoutConnector(
                 "Línea K activa: Pin 7 (ISO 9141-2 / K-Line) para diagnóstico directo."
             }
             NetworkType.ETHERNET -> {
-                "Gateway DoIP/Ethernet detectado: la ruta física depende del gateway y del OEM. Elysium Vanguard valida el servidor UDS real, no un nodo CAN simulado."
+                "Gateway DoIP/Ethernet detectado: la ruta física depende del gateway y del OEM. Elysium Vanguard AI OS valida el servidor UDS real, no un nodo CAN simulado."
             }
             else -> {
                 "Toque un módulo o bus para ver la asignación de pines físicos en el puerto OBD-II."

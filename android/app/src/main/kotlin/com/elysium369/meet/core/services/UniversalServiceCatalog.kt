@@ -221,7 +221,7 @@ object UniversalServiceCatalog {
             commonTasks = listOf("Viaje local", "Viaje al aeropuerto", "Viaje interurbano", "Viaje con paradas múltiples", "Viaje de encomienda"),
             defaultEstimatedPriceCrc = 5000.0,
             requiresDestination = true,
-            adminRoleName = "Conductor / Chofer MEET",
+            adminRoleName = "Conductor / Chofer Elysium",
             adminDescription = "Despacho de viajes con tarifa justa, subasta en tiempo real y protección de seguridad.",
         ),
         UniversalServiceDefinition(

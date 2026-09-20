@@ -183,7 +183,7 @@ fun RepairNetworkScreen(
         containerColor = MeetColors.backgroundDark,
         topBar = {
             EliteTopAppBar(
-                title = "Elysium Vanguard REPAIR NETWORK\nStackOverflow Mecánico",
+                title = "Elysium Vanguard AI OS REPAIR NETWORK\nStackOverflow Mecánico",
                 onBackClick = { navController.backOrHome() },
                 backgroundColor = MeetColors.backgroundDark,
                 actions = {
@@ -1824,7 +1824,7 @@ private fun RepairKnowledgePanel(bundle: MechanicalKnowledgeBundle) {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                "INTELIGENCIA OFFLINE Elysium Vanguard",
+                "INTELIGENCIA OFFLINE Elysium Vanguard AI OS",
                 color = MeetColors.cyberCyan,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp

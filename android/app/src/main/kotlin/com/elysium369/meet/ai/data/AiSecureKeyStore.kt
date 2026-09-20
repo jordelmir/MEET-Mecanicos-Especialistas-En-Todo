@@ -27,7 +27,7 @@ class AiSecureKeyStoreImpl @Inject constructor(
 ) : AiSecureKeyStore {
 
     private val sharedPrefs = context.getSharedPreferences("meet_ai_secure_prefs", Context.MODE_PRIVATE)
-    private val keyStoreAlias = "MeetAiMasterKeyAlias"
+    private val keyStoreAlias = "ElysiumAiMasterKeyAlias"
     private val keyStoreType = "AndroidKeyStore"
 
     init {

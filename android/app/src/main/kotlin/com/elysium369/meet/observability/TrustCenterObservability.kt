@@ -31,7 +31,7 @@ data class TrustLogEvent(
 
 /** Structured, low-cardinality Trust Center signals. No PII or evidence payloads. */
 object TrustCenterObservability {
-    private const val TAG = "MeetTrustEvent"
+    private const val TAG = "ElysiumTrustEvent"
     private val json = Json { encodeDefaults = false; explicitNulls = false }
     private val controlled = Regex("[A-Z0-9_]{1,80}")
 

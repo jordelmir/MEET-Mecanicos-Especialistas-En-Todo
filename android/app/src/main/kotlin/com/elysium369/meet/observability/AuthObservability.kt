@@ -42,7 +42,7 @@ data class AuthAttempt(
 )
 
 object AuthObservability {
-    private const val TAG = "MeetAuthEvent"
+    private const val TAG = "ElysiumAuthEvent"
     private val controlledCode = Regex("[A-Z0-9_]{1,80}")
     private val json = Json {
         encodeDefaults = false

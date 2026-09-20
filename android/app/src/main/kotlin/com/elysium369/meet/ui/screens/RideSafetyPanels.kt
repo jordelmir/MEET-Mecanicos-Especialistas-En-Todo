@@ -92,7 +92,7 @@ fun RideWalletStatusCard(
                 fontSize = 12.sp,
             )
             Text(
-                text = "MEET reserva el 5% al aceptar y solo lo debita cuando el viaje se completa. Cancelar no genera cobro automático durante el piloto.",
+                text = "Elysium reserva el 5% al aceptar y solo lo debita cuando el viaje se completa. Cancelar no genera cobro automático durante el piloto.",
                 color = MeetColors.textSecondary,
                 fontSize = 12.sp,
                 lineHeight = 17.sp,

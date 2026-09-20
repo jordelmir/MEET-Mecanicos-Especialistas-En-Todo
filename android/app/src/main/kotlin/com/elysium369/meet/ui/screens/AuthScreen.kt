@@ -27,7 +27,7 @@ import com.elysium369.meet.observability.AuthOperation
 import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.EliteTextButton
-import com.elysium369.meet.ui.components.ElysiumSectionIcon
+import com.elysium369.meet.ui.components.MeetSectionIcon
 import com.elysium369.meet.ui.components.HolographicBackgroundShared
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.providers.builtin.Email
@@ -59,7 +59,7 @@ fun AuthScreen(
         val normalizedEmail = AuthFormPolicy.normalizeEmail(email)
         feedback = when {
             !isConfigured ->
-                "Servicio de cuenta no configurado. La autenticación es necesaria para entrar a MEET."
+                "Servicio de cuenta no configurado. La autenticación es necesaria para entrar a Elysium."
             operationMode != AuthFlowMode.PASSWORD_UPDATE -> AuthFormPolicy.validateEmail(normalizedEmail)
             !recoverySessionReady ->
                 "El enlace no es válido o expiró. Solicita uno nuevo."
@@ -167,7 +167,7 @@ fun AuthScreen(
                 }
             } catch (error: Exception) {
                 if (outcomeRecorded) {
-                    feedback = "La cuenta respondió correctamente, pero la sincronización local no terminó. Reabre MEET."
+                    feedback = "La cuenta respondió correctamente, pero la sincronización local no terminó. Reabre Elysium."
                 } else {
                     val authenticatedUser = SupabaseModule.client.auth.currentUserOrNull()
                     val requestedSessionEstablished =
@@ -199,8 +199,8 @@ fun AuthScreen(
     }
 
     val title = when (mode) {
-        AuthFlowMode.LOGIN -> "Cuenta MEET"
-        AuthFlowMode.SIGN_UP -> "Crear cuenta MEET"
+        AuthFlowMode.LOGIN -> "Cuenta Elysium"
+        AuthFlowMode.SIGN_UP -> "Crear cuenta Elysium"
         AuthFlowMode.RECOVERY_REQUEST -> "Recuperar acceso"
         AuthFlowMode.PASSWORD_UPDATE -> "Nueva contraseña"
     }
@@ -210,7 +210,7 @@ fun AuthScreen(
         AuthFlowMode.SIGN_UP ->
             "Toda persona inicia como usuario normal. Después puede solicitar capacidades profesionales, siempre sujetas a verificación."
         AuthFlowMode.RECOVERY_REQUEST ->
-            "Te enviaremos un enlace de un solo uso. Por seguridad, MEET no revela si el correo está registrado."
+            "Te enviaremos un enlace de un solo uso. Por seguridad, Elysium no revela si el correo está registrado."
         AuthFlowMode.PASSWORD_UPDATE ->
             if (recoverySessionReady) {
                 "El enlace fue validado. Define una contraseña nueva para recuperar tu cuenta."
@@ -270,7 +270,7 @@ fun AuthScreen(
                             .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.32f), CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
-                        ElysiumSectionIcon(
+                        MeetSectionIcon(
                             key = "scanner",
                             contentDescription = "Elysium",
                             tint = MeetColors.neonGreen,

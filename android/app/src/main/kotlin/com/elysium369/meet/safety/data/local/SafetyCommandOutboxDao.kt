@@ -31,12 +31,13 @@ interface SafetyCommandOutboxDao {
         """
         SELECT * FROM safety_command_outbox
         WHERE status IN ('PENDING','RETRYABLE')
+          AND actorSessionUserId = :owner
           AND nextAttemptAt <= :now
         ORDER BY createdAt
         LIMIT :limit
         """
     )
-    suspend fun ready(now: Long, limit: Int): List<SafetyCommandOutboxEntity>
+    suspend fun ready(now: Long, limit: Int, owner: String): List<SafetyCommandOutboxEntity>
 
     @Query(
         """
@@ -53,9 +54,9 @@ interface SafetyCommandOutboxDao {
     suspend fun acquire(key: String, now: Long): Int
 
     @Transaction
-    suspend fun acquireBatch(now: Long, limit: Int): List<SafetyCommandOutboxEntity> {
+    suspend fun acquireBatch(now: Long, limit: Int, owner: String): List<SafetyCommandOutboxEntity> {
         val result = mutableListOf<SafetyCommandOutboxEntity>()
-        for (candidate in ready(now, limit)) {
+        for (candidate in ready(now, limit, owner)) {
             if (acquire(candidate.idempotencyKey, now) == 1) {
                 get(candidate.idempotencyKey)?.let(result::add)
             }
@@ -134,10 +135,10 @@ interface SafetyCommandOutboxDao {
         """
         SELECT MIN(nextAttemptAt)
         FROM safety_command_outbox
-        WHERE status='RETRYABLE'
+        WHERE status IN ('PENDING','RETRYABLE') AND actorSessionUserId = :owner
         """
     )
-    suspend fun earliestRetryAt(): Long?
+    suspend fun earliestRetryAt(owner: String): Long?
 
     @Query(
         """
@@ -147,4 +148,21 @@ interface SafetyCommandOutboxDao {
         """
     )
     suspend fun pendingCount(userId: String): Int
+
+    @Query(
+        """
+        UPDATE safety_command_outbox
+        SET status='DEAD_LETTER',
+            leaseStartedAt=NULL,
+            nextAttemptAt=9223372036854775807,
+            lastErrorCode='REPORT_WITHDRAWN_BY_OWNER',
+            lastErrorMessage='Owner removed the local report before publication',
+            updatedAt=:now
+        WHERE aggregateId=:reportId
+          AND actorSessionUserId=:ownerUserId
+          AND commandType='CREATE_REPORT'
+          AND status != 'ACKNOWLEDGED'
+        """
+    )
+    suspend fun cancelPendingReport(reportId: String, ownerUserId: String, now: Long): Int
 }

@@ -53,7 +53,7 @@ fun ExplainClaimBottomSheet(
                 Text(claim.nature.badgeGlyph, fontSize = 22.sp)
                 Column {
                     Text(
-                        "¿POR QUÉ MEET DICE ESTO?",
+                        "¿POR QUÉ Elysium DICE ESTO?",
                         color = MeetColors.neonGreen,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black,

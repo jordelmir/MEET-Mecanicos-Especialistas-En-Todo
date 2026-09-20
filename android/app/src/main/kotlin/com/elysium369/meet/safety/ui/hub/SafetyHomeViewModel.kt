@@ -2,6 +2,7 @@ package com.elysium369.meet.safety.ui.hub
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elysium369.meet.safety.data.SafetyRuntimeFeatureGates
 import com.elysium369.meet.safety.data.SafetyRepository
 import com.elysium369.meet.safety.domain.RemoteAvailability
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -14,6 +15,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class SafetyHomeUiState(
+    val featureGates: Map<String, Boolean> = emptyMap(),
     val pendingLocalReports: Int = 0,
     val totalReportCount: Int = 0,
     val publishedCaseCount: Int = 0,
@@ -27,12 +29,17 @@ data class SafetyHomeUiState(
 @HiltViewModel
 class SafetyHomeViewModel @Inject constructor(
     private val safetyRepository: SafetyRepository,
+    private val gates: SafetyRuntimeFeatureGates,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SafetyHomeUiState())
     val uiState: StateFlow<SafetyHomeUiState> = _uiState.asStateFlow()
 
     init {
+        safetyRepository.resumePendingUploads()
+        viewModelScope.launch {
+            gates.state.collect { features -> _uiState.update { it.copy(featureGates = features) } }
+        }
         loadHomeState()
     }
 
@@ -41,21 +48,19 @@ class SafetyHomeViewModel @Inject constructor(
             _uiState.update { it.copy(isLoading = true, error = null) }
 
             try {
+                val features = gates.refresh()
                 val pending = safetyRepository.pendingCount()
                 val total = safetyRepository.totalReportCount()
-                val remote = when {
-                    total == 0 -> RemoteAvailability.UNKNOWN
-                    pending > 0 -> RemoteAvailability.DEGRADED
-                    else -> RemoteAvailability.ONLINE
-                }
+                val remote = RemoteAvailability.UNKNOWN
 
                 _uiState.update {
                     it.copy(
                         isLoading = false,
+                        featureGates = features,
                         pendingLocalReports = pending,
                         totalReportCount = total,
                         remoteAvailability = remote,
-                        lastConfirmedRemoteAt = if (pending == 0 && total > 0) System.currentTimeMillis() else null,
+                        lastConfirmedRemoteAt = null,
                     )
                 }
             } catch (cancelled: CancellationException) {

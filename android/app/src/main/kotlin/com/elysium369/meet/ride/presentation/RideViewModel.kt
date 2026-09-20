@@ -346,9 +346,9 @@ class RideViewModel @Inject constructor(
                             approvedAt = now,
                             updatedAt = now,
                         )
-                        Log.i("MeetRides", "Pending driver verification upgraded to local pilot access")
+                        Log.i("ElysiumRides", "Pending driver verification upgraded to local pilot access")
                     } else {
-                        Log.w("MeetRides", "Driver pilot access withheld: ${evidence.issues.joinToString()}")
+                        Log.w("ElysiumRides", "Driver pilot access withheld: ${evidence.issues.joinToString()}")
                         _rideVerificationNotice.emit(
                             "Completa nuevamente las evidencias del chofer; una o más fotos no están disponibles.",
                         )
@@ -384,9 +384,9 @@ class RideViewModel @Inject constructor(
                             status = RideVerificationPolicy.PILOT_APPROVED,
                             approvedAt = now,
                         )
-                        Log.i("MeetRides", "Pending passenger verification upgraded to local pilot access")
+                        Log.i("ElysiumRides", "Pending passenger verification upgraded to local pilot access")
                     } else {
-                        Log.w("MeetRides", "Passenger pilot access withheld: ${evidence.issues.joinToString()}")
+                        Log.w("ElysiumRides", "Passenger pilot access withheld: ${evidence.issues.joinToString()}")
                         _rideVerificationNotice.emit(
                             "Completa nuevamente las fotos de identidad; una o más evidencias no están disponibles.",
                         )
@@ -413,7 +413,7 @@ class RideViewModel @Inject constructor(
             rideProjectionOwnerId = null
             _rideProjectionConnectionState.value =
                 RideProjectionConnectionState.AUTHENTICATION_REQUIRED
-            Log.d("MeetRides", "Ride projection deferred until authentication")
+            Log.d("ElysiumRides", "Ride projection deferred until authentication")
             return
         }
         rideProjectionOwnerId = ownerId
@@ -435,7 +435,7 @@ class RideViewModel @Inject constructor(
                         val delayMs = RideProjectionSyncPolicy.reconnectDelayMs(attempt)
                         _rideProjectionConnectionState.value =
                             RideProjectionConnectionState.RECOVERING
-                        Log.w("MeetRides", "Realtime wake-up interrupted; reconnecting in ${delayMs}ms", error)
+                        Log.w("ElysiumRides", "Realtime wake-up interrupted; reconnecting in ${delayMs}ms", error)
                         delay(delayMs)
                         _rideProjectionConnectionState.value =
                             RideProjectionConnectionState.CONNECTING
@@ -473,15 +473,15 @@ class RideViewModel @Inject constructor(
     private suspend fun refreshRideProjection() {
         when (val result = rideRemoteProjectionRepository.refreshVisibleRides()) {
             is RideProjectionRefreshResult.Refreshed -> {
-                Log.d("MeetRides", "Remote ride projection refreshed: ${result.count}")
+                Log.d("ElysiumRides", "Remote ride projection refreshed: ${result.count}")
             }
             RideProjectionRefreshResult.AuthenticationRequired -> {
                 _rideProjectionConnectionState.value =
                     RideProjectionConnectionState.AUTHENTICATION_REQUIRED
-                Log.d("MeetRides", "Ride projection waiting for authenticated session")
+                Log.d("ElysiumRides", "Ride projection waiting for authenticated session")
             }
             is RideProjectionRefreshResult.Failed -> {
-                Log.w("MeetRides", "Ride projection refresh failed: ${result.message}")
+                Log.w("ElysiumRides", "Ride projection refresh failed: ${result.message}")
             }
         }
     }
@@ -506,7 +506,7 @@ class RideViewModel @Inject constructor(
                     },
                 )
             }.onFailure { error ->
-                Log.w("MeetRides", "Liveness evidence pending remote confirmation", error)
+                Log.w("ElysiumRides", "Liveness evidence pending remote confirmation", error)
                 _rideVerificationNotice.emit(
                     "Presencia validada en el dispositivo; la nube la confirmará al recuperar conexión.",
                 )
@@ -525,7 +525,7 @@ class RideViewModel @Inject constructor(
                     .decodeList<RemoteRideDriverVehicleSummary>()
                     .map(RemoteRideDriverVehicleSummary::toDomain)
             }.onSuccess { _rideDriverVehicles.value = it }
-                .onFailure { Log.w("MeetRides", "Vehicle fleet refresh failed", it) }
+                .onFailure { Log.w("ElysiumRides", "Vehicle fleet refresh failed", it) }
         }
     }
 
@@ -698,7 +698,7 @@ class RideViewModel @Inject constructor(
                 )
             }
         }.onFailure { error ->
-            Log.w("MeetRides", "Ride chat sync deferred", error)
+            Log.w("ElysiumRides", "Ride chat sync deferred", error)
         }
     }
 
@@ -2027,7 +2027,7 @@ class RideViewModel @Inject constructor(
                 nowEpochMs = now,
             )
             if (!evidence.isReady) {
-                Log.w("MeetRides", "Driver verification rejected as incomplete: ${evidence.issues.joinToString()}")
+                Log.w("ElysiumRides", "Driver verification rejected as incomplete: ${evidence.issues.joinToString()}")
                 _rideVerificationNotice.emit(
                     "No se pudo habilitar el acceso: verifica los datos y vuelve a capturar cualquier foto faltante.",
                 )
@@ -2069,7 +2069,7 @@ class RideViewModel @Inject constructor(
             _rideVerificationNotice.emit(
                 "Expediente guardado y enviado a revisión. El modo chofer seguirá bloqueado hasta la aprobación remota.",
             )
-            Log.i("MeetRides", "Driver verification submitted; status=${verificationDecision.status}")
+            Log.i("ElysiumRides", "Driver verification submitted; status=${verificationDecision.status}")
         }
     }
 
@@ -2218,7 +2218,7 @@ class RideViewModel @Inject constructor(
                 nowEpochMs = now,
             )
             if (!evidence.isReady) {
-                Log.w("MeetRides", "Passenger verification rejected as incomplete: ${evidence.issues.joinToString()}")
+                Log.w("ElysiumRides", "Passenger verification rejected as incomplete: ${evidence.issues.joinToString()}")
                 _rideVerificationNotice.emit(
                     "No se pudo habilitar el acceso: verifica tus datos y vuelve a capturar las tres fotos.",
                 )
@@ -2259,13 +2259,13 @@ class RideViewModel @Inject constructor(
                         ),
                     )
                 }.onFailure {
-                    Log.w("MeetTrustCenter", "Passenger review submission unavailable", it)
+                    Log.w("ElysiumTrustCenter", "Passenger review submission unavailable", it)
                     _rideVerificationNotice.emit(
                         "Registro local guardado; la revisión remota está pendiente de sincronización.",
                     )
                 }
             }
-            Log.i("MeetRides", "Passenger verification submitted; status=${verificationDecision.status}")
+            Log.i("ElysiumRides", "Passenger verification submitted; status=${verificationDecision.status}")
         }
     }
 

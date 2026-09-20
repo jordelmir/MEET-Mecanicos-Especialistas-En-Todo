@@ -249,7 +249,7 @@ class ObdForegroundService : Service() {
             }, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Elysium Vanguard")
+            .setContentTitle("Elysium Vanguard AI OS")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentIntent(pendingIntent)

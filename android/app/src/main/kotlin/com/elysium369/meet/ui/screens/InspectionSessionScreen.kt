@@ -611,7 +611,7 @@ private fun SignedReportPanel(
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                     type = "application/pdf"
                                     putExtra(Intent.EXTRA_STREAM, uri)
-                                    putExtra(Intent.EXTRA_SUBJECT, "Reporte Certificado MEET - $reportId")
+                                    putExtra(Intent.EXTRA_SUBJECT, "Reporte Certificado Elysium - $reportId")
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
                                 context.startActivity(Intent.createChooser(shareIntent, "Compartir Reporte PDF"))

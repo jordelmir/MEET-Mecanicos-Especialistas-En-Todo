@@ -460,7 +460,7 @@ fun DriverTripDetailsSheet(
                         IconButton(
                             onClick = {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                val clip = ClipData.newPlainText("MEET Safety Link", state.safetyShareUrl)
+                                val clip = ClipData.newPlainText("Elysium Safety Link", state.safetyShareUrl)
                                 clipboard.setPrimaryClip(clip)
                             },
                         ) {

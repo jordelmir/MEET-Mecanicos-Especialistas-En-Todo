@@ -42,14 +42,13 @@ object HomeModuleRegistry {
         // ── SERVICES & ASSISTANCE ──
         map[HomeSectionCategory.SERVICES]?.addAll(
             listOf(
-                HomeModuleItem("learning", "MEET Aprende", "Capacidades, misiones y teórico de manejo", MeetDestinations.LEARNING_HUB, HomeSectionCategory.SERVICES, "learning_hub", isHighlight = true, badgeText = "NUEVO"),
+                HomeModuleItem("learning", "Elysium Aprende", "Capacidades, misiones y teórico de manejo", MeetDestinations.LEARNING_HUB, HomeSectionCategory.SERVICES, "learning_hub", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("messages", "Mensajes", "Chats y llamadas privadas Elysium", MeetDestinations.MESSAGES, HomeSectionCategory.SERVICES, "messages", isHighlight = true),
                 HomeModuleItem("mechanic", "Servicios Mecánicos", "Red de talleres y cotizaciones", MeetDestinations.MECHANIC_SERVICES, HomeSectionCategory.SERVICES, "mechanic_services", isHighlight = true),
                 HomeModuleItem("parts", "Repuestos & Piezas", "Compatibilidad técnica VIN-DTC", MeetDestinations.PARTS_STORE, HomeSectionCategory.SERVICES, "parts_store"),
                 HomeModuleItem("tow_truck", "Asistencia & Grúa", "Auxilio vial geolocalizado", MeetDestinations.TOW_TRUCK, HomeSectionCategory.SERVICES, "tow_truck"),
                 HomeModuleItem("live_link", "Live Link PRO", "Sesión remota perito/mecánico", MeetDestinations.LIVE_STREAM, HomeSectionCategory.SERVICES, "live_stream"),
-                HomeModuleItem("trust_center", "Trust Center", "Garantías y pagos protegidos", MeetDestinations.TRUST_CENTER, HomeSectionCategory.SERVICES, "trust_center"),
-                HomeModuleItem("ride", "MEET Rides", "Transporte inteligente y conductor", MeetDestinations.RIDE_HOME, HomeSectionCategory.SERVICES, "ride_home"),
+                HomeModuleItem("ride", "Elysium Rides", "Transporte inteligente y conductor", MeetDestinations.RIDE_HOME, HomeSectionCategory.SERVICES, "ride_home"),
                 HomeModuleItem("legal_vanguard", "Legal Vanguard", "Abogados, bufetes y expediente protegido", MeetDestinations.LEGAL_VANGUARD, HomeSectionCategory.SERVICES, "legal_vanguard", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("elysium_properties", "Elysium Properties", "Property Passport, venta y alquiler", MeetDestinations.PROPERTIES, HomeSectionCategory.SERVICES, "elysium_properties", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("fuel_rewards", "Fuel Rewards", "Wallet, campañas y Station OS", MeetDestinations.FUEL_REWARDS, HomeSectionCategory.SERVICES, "fuel_rewards", isHighlight = true, badgeText = "NUEVO")
@@ -76,6 +75,8 @@ object HomeModuleRegistry {
         if (isPlatformOwner) {
             proList.addAll(
                 listOf(
+                    HomeModuleItem("trust_center", "Centro de Confianza", "Revisión privada de la plataforma", MeetDestinations.TRUST_CENTER, HomeSectionCategory.PROFESSIONAL, "trust_center"),
+                    HomeModuleItem("command_center", "Command Center", "Inteligencia ejecutiva privada", "meet_command_center", HomeSectionCategory.PROFESSIONAL, "command_center"),
                     HomeModuleItem("owner_cockpit", "Owner Control", "Cockpit global de plataforma", "platform_owner_cockpit", HomeSectionCategory.PROFESSIONAL, "platform_owner_cockpit"),
                     HomeModuleItem("system_health", "System Health", "Estado del clúster y nodos", "system_health_dashboard", HomeSectionCategory.PROFESSIONAL, "system_health_dashboard")
                 )
@@ -86,7 +87,7 @@ object HomeModuleRegistry {
         // ── SAFETY ──
         map[HomeSectionCategory.SAFETY]?.addAll(
             listOf(
-                HomeModuleItem("safety_hub", "MEET Seguridad", "Evidencia, casos y rendición de cuentas", MeetDestinations.SAFETY_HOME, HomeSectionCategory.SAFETY, "safety", isHighlight = true, badgeText = "NUEVO"),
+                HomeModuleItem("safety_hub", "Elysium Seguridad", "Evidencia, casos y rendición de cuentas", MeetDestinations.SAFETY_HOME, HomeSectionCategory.SAFETY, "safety", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("safety_map", "Mapa de Seguridad", "Puntos públicos de seguridad", MeetDestinations.SAFETY_MAP, HomeSectionCategory.SAFETY, "safety_map"),
                 HomeModuleItem("safety_report", "Reportar", "Crear reporte de seguridad", MeetDestinations.SAFETY_REPORT, HomeSectionCategory.SAFETY, "safety_report"),
                 HomeModuleItem("safety_my_reports", "Mis Reportes", "Estado de tus reportes", MeetDestinations.SAFETY_MY_REPORTS, HomeSectionCategory.SAFETY, "safety_my_reports"),

@@ -129,7 +129,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
                     val now = System.currentTimeMillis()
                     if (BuildConfig.DEBUG) {
                         Log.i(
-                            "MeetRides",
+                            "ElysiumRides",
                             buildString {
                                 append("COMMAND_ACK")
                                 append(" type=")
@@ -239,7 +239,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
                 is RideCommandGatewayResult.Rejected -> {
                     if (BuildConfig.DEBUG) {
                         Log.w(
-                            "MeetRides",
+                            "ElysiumRides",
                             buildString {
                                 append("COMMAND_REJECTED")
                                 append(" type=")
