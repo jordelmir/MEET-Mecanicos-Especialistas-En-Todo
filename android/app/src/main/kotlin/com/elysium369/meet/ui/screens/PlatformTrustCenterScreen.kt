@@ -60,7 +60,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.core.share.QrCodeImage
-import com.elysium369.meet.core.wallet.SpecialistWalletStore
 import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.observability.TrustCenterObservability
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
@@ -160,10 +159,9 @@ fun PlatformTrustCenterScreen(
                 }
                 .onFailure { error ->
                     message = "Sincronización temporalmente interrumpida; se conserva la última cola y el reintento es automático. Código: ${TrustCenterObservability.failureCode(error)}."
-                }
+            }
             val remoteTopups = runCatching { PlatformTrustCenterGateway.loadWalletTopupQueue("PENDING_REVIEW").items }.getOrDefault(emptyList())
-            val localPending = SpecialistWalletStore.mapToRideWalletTopups(SpecialistWalletStore.getPendingGlobalTopups(context))
-            walletTopups = (remoteTopups + localPending).distinctBy { it.id }
+            walletTopups = remoteTopups
             loading = false
         }
     }
@@ -412,12 +410,6 @@ fun PlatformTrustCenterScreen(
                                 } else {
                                     scope.launch {
                                         loading = true
-                                        SpecialistWalletStore.decideTopup(
-                                            context = context,
-                                            topupId = topup.id,
-                                            approved = decision == "APPROVED",
-                                            decisionReason = if (decision == "APPROVED") "Ingreso SINPE verificado por el propietario" else "Comprobante no verificado"
-                                        )
                                         runCatching { PlatformTrustCenterGateway.decideWalletTopup(topup.id, decision, if (decision == "APPROVED") "Ingreso SINPE verificado por el propietario" else "Comprobante no verificado") }
                                             .onSuccess { receipt ->
                                                 message = if (receipt.status == "APPROVED") {
@@ -427,7 +419,7 @@ fun PlatformTrustCenterScreen(
                                                 }
                                             }
                                             .onFailure {
-                                                message = if (decision == "APPROVED") "Recarga acreditada localmente y registrada en Trust Center." else "Recarga rechazada."
+                                                message = "No se pudo registrar la decisión en el servidor. El saldo no cambió; inténtalo de nuevo."
                                             }
                                         reloadNow()
                                     }
