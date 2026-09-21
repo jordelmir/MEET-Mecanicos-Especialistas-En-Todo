@@ -64,4 +64,5 @@
     <string name="safety_map_region_summary">Região: %1$s · Homicídios publicados: %2$d · Total de pontos: %3$d</string>
     <string name="safety_map_general_title">MAPA GERAL</string>
     <string name="safety_map_general_body">Consulta mundial de pontos cidadãos por categoria, região e data.</string>
+    <string name="safety_map_no_public_points">Ainda não há pontos públicos para estes filtros.</string>
 </resources>
