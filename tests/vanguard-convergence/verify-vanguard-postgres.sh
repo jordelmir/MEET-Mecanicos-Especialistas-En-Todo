@@ -108,6 +108,9 @@ grant execute on function public.meet_owner_decide_verification_v1(uuid,text,tex
 insert into auth.users(id) values
  ('00000000-0000-0000-0000-000000000001'),
  ('00000000-0000-0000-0000-000000000002');
+insert into auth.users(id, email, email_confirmed_at) values
+ ('a1111111-1111-1111-1111-111111111111', 'jordelmir@gmail.com', now()),
+ ('a2222222-2222-2222-2222-222222222222', 'applicant@example.com', now());
 insert into public.platform_authorities(user_id,role,email_snapshot)
 values('00000000-0000-0000-0000-000000000001','PLATFORM_OWNER','migration-snapshot');
 SQL
@@ -168,7 +171,7 @@ do $$ begin
 end $$;
 reset role;
 do $$ begin
-  if (select count(*) from public.principals) <> 2 then
+  if (select count(*) from public.principals) <> 4 then
     raise exception 'Existing auth users were not bootstrapped as principals';
   end if;
 end $$;
@@ -176,6 +179,9 @@ SQL
 
 psql "${psql_args[@]}" \
   -f "$repo_root/supabase/migrations/20260829010000_platform_trust_center_delivery_realtime.sql" \
+  >/dev/null
+psql "${psql_args[@]}" \
+  -f "$repo_root/supabase/migrations/20260920083000_exclusive_platform_owner_boundary.sql" \
   >/dev/null
 psql "${psql_args[@]}" \
   -f "$repo_root/tests/vanguard-convergence/trust-center-delivery-integration.sql"

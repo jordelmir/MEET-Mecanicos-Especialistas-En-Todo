@@ -46,10 +46,10 @@ begin
 end;
 $test$;
 
-select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+select set_config('request.jwt.claim.sub','a1111111-1111-1111-1111-111111111111',false);
 select set_config(
   'request.jwt.claims',
-  '{"sub":"00000000-0000-0000-0000-000000000001","aal":"aal1"}',
+  '{"sub":"a1111111-1111-1111-1111-111111111111","aal":"aal1"}',
   false
 );
 
@@ -90,7 +90,7 @@ $test$;
 
 select set_config(
   'request.jwt.claims',
-  '{"sub":"00000000-0000-0000-0000-000000000001","aal":"aal2"}',
+  '{"sub":"a1111111-1111-1111-1111-111111111111","aal":"aal2"}',
   false
 );
 
