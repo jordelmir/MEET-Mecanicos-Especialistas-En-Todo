@@ -15,9 +15,9 @@
 
 MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
 
-## Versión de código: 4.26.0 (`versionCode 59`)
+## Versión de código: 4.26.1 (`versionCode 60`)
 
-La versión 4.26.0 introduce el **Módulo de Objetos Olvidados**, visibilidad bilateral de preferencias de pasajero (mascotas, niños y 5 pasajeros), y calificación idempotente sin bucles de repetición:
+La versión 4.26.1 incorpora la corrección de autoridad y auditoría de Viajes, además de mantener el **Módulo de Objetos Olvidados**, visibilidad bilateral de preferencias de pasajero (mascotas, niños y 5 pasajeros), y calificación idempotente sin bucles de repetición:
 
 - **Módulo de Objetos Olvidados (Lost & Found):** El pasajero describe el objeto en un viaje confirmado y el mensaje queda asociado al chat de ese viaje. El chofer dispone de un centro para abrir los chats históricos y llamar si existe un teléfono capturado. La interfaz informa las tarifas de entrega definidas para el producto; este flujo no calcula distancias ni ejecuta el cobro automáticamente. Accesible desde el viaje activo, el resumen de viaje finalizado y el detalle del historial.
 - **Visibilidad Bilateral de Preferencias:** Selección de mascotas (Gato/Perro), cantidad de niños y capacidad para 5 pasajeros persistidas en Supabase (`fare_breakdown -> 'preferences'`) y renderizadas mediante badges visuales de alto contraste en las interfaces de conductor y pasajero (feed, negociación, viaje activo y detalles).

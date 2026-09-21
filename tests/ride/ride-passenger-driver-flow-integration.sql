@@ -246,6 +246,11 @@ begin
     then
         raise exception 'complete assertion failed: %', v_complete;
     end if;
+    if public.ride_complete_trip_v2(
+        '84444444-4444-4444-4444-444444444444', 8, 'complete:vertical:01'
+    ) <> v_complete then
+        raise exception 'completeTripProducesExactlyOneStateTransitionEventReceiptAndCommissionCapture: replay changed receipt';
+    end if;
 
     perform set_config(
         'request.jwt.claim.sub',
@@ -287,6 +292,7 @@ declare
     v_events bigint;
     v_reservation_state text;
     v_unbalanced bigint;
+    v_completed_events bigint;
 begin
     select count(*)
       into v_stops
@@ -300,6 +306,11 @@ begin
       into v_events
       from public.ride_trip_events
      where trip_id = '84444444-4444-4444-4444-444444444444';
+    select count(*)
+      into v_completed_events
+      from public.ride_trip_events
+     where trip_id = '84444444-4444-4444-4444-444444444444'
+       and event_type = 'TRIP_COMPLETED';
     select state
       into v_reservation_state
       from public.ride_commission_reservations
@@ -318,12 +329,12 @@ begin
       ) unbalanced;
 
     if v_stops <> 2 or v_receipts <> 10 or v_events <> 9 or
-       v_reservation_state <> 'CAPTURED' or v_unbalanced <> 0
+       v_completed_events <> 1 or v_reservation_state <> 'CAPTURED' or v_unbalanced <> 0
     then
         raise exception using
             message = format(
-                'vertical invariants failed: stops=%s receipts=%s events=%s reservation=%s unbalanced=%s',
-                v_stops, v_receipts, v_events, v_reservation_state,
+                'vertical invariants failed: stops=%s receipts=%s events=%s completed_events=%s reservation=%s unbalanced=%s',
+                v_stops, v_receipts, v_events, v_completed_events, v_reservation_state,
                 v_unbalanced
             );
     end if;

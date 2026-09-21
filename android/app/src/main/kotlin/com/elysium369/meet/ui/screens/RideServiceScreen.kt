@@ -839,8 +839,10 @@ private fun DriverWalletCard(
     message: String?,
     onRecharge: () -> Unit,
 ) {
-    val starter = policy?.starterCreditMinor ?: 15_000L
-    val commission = (policy?.commissionBasisPoints ?: 500) / 100
+    val starter = policy?.starterCreditMinor
+    val commission = policy?.commissionBasisPoints?.toDouble()?.div(100)
+    val paymentPolicyAvailable = policy?.sinpePhone?.isNotBlank() == true &&
+        policy.sinpeRecipientName.isNotBlank()
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF07131E)),
         border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.65f)),
@@ -848,7 +850,12 @@ private fun DriverWalletCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("BILLETERA DEL CHOFER", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
-            Text("Saldo promocional inicial: ${CoreMoney.ofCrc(starter).formatted()}", color = Color.White, fontWeight = FontWeight.Bold)
+            Text(
+                starter?.let { "Saldo promocional inicial: ${CoreMoney.ofCrc(it).formatted()}" }
+                    ?: "Saldo promocional inicial: política no disponible",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+            )
             Text(
                 "Saldo disponible: ${balance?.availableMinor?.let { CoreMoney.ofCrc(it).formatted() } ?: "Consultando Supabase…"}",
                 color = MeetColors.neonGreen,
@@ -856,32 +863,31 @@ private fun DriverWalletCard(
             )
             balance?.let {
                 Text(
-                    "Reservado para viajes: ${CoreMoney.ofCrc(it.reservedMinor).formatted()} · Cobrado al finalizar: 5% de la tarifa aplicable",
+                    "Reservado para viajes: ${CoreMoney.ofCrc(it.reservedMinor).formatted()} · Comisión según política vigente",
                     color = MeetColors.textSecondary,
                     fontSize = 11.sp,
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Comisión por viaje: $commission%", color = MeetColors.textSecondary, fontSize = 12.sp)
-                Spacer(Modifier.width(8.dp))
-                Surface(
-                    color = MeetColors.neonGreen.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        "LÍMITE CONSTITUCIONAL 5% MAX",
-                        color = MeetColors.neonGreen,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
+                Text(
+                    commission?.let { "Comisión por viaje: ${"%.2f".format(java.util.Locale.US, it)}%" }
+                        ?: "Comisión por viaje: política no disponible",
+                    color = MeetColors.textSecondary,
+                    fontSize = 12.sp,
+                )
             }
             Text("Recarga por SINPE Móvil", color = MeetColors.textSecondary, fontSize = 12.sp)
-            Text("${policy?.sinpePhone ?: "63194029"} · ${policy?.sinpeRecipientName ?: "Jorge David Del Valle Miranda"}", color = Color.White, fontWeight = FontWeight.Bold)
-            Text("El propietario valida el ingreso real en su cuenta antes de liberar el saldo.", color = MeetColors.warning, fontSize = 11.sp)
-            Button(onClick = onRecharge, modifier = Modifier.fillMaxWidth()) { Text("ENVIAR COMPROBANTE DE RECARGA") }
+            if (paymentPolicyAvailable) {
+                Text("${policy?.sinpePhone} · ${policy?.sinpeRecipientName}", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("El comprobante se valida por el flujo autorizado antes de liberar saldo.", color = MeetColors.warning, fontSize = 11.sp)
+            } else {
+                Text("Datos de recarga no disponibles. Actualiza antes de transferir.", color = MeetColors.warning, fontSize = 11.sp)
+            }
+            Button(
+                onClick = onRecharge,
+                enabled = paymentPolicyAvailable,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("ENVIAR COMPROBANTE DE RECARGA") }
             topups.take(3).forEach { topup ->
                 val status = when (topup.status) {
                     "PENDING_REVIEW" -> "PENDIENTE DE REVISIÓN"
@@ -4066,9 +4072,12 @@ fun DriverDashboard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("📱 SINPE Móvil: ${walletPolicy?.sinpePhone ?: "+506 8888-8888"}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("👤 Destinatario: ${walletPolicy?.sinpeRecipientName ?: "Jor Delmir / Elysium Vanguard AI OS"}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("✉️ Correo vinculado: jordelmir@gmail.com", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            if (walletPolicy?.sinpePhone?.isNotBlank() == true && walletPolicy.sinpeRecipientName.isNotBlank()) {
+                                Text("📱 SINPE Móvil: ${walletPolicy.sinpePhone}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("👤 Destinatario: ${walletPolicy.sinpeRecipientName}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            } else {
+                                Text("Los datos de recarga no están disponibles. Cierra este diálogo y actualiza antes de transferir.", color = MeetColors.warning, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
                         }
                     }
 
@@ -4137,7 +4146,7 @@ fun DriverDashboard(
                         showTopupDialog = false
                         pendingTopupAmount = topupAmount.toLong()
                         proofPicker.launch(arrayOf("image/jpeg", "image/png", "application/pdf"))
-                        Toast.makeText(context, "Verificando comprobante con jordelmir@gmail.com...", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Comprobante enviado para validación autorizada.", Toast.LENGTH_LONG).show()
                     },
                     enabled = topupAmount > 0 && walletPolicy != null && driverHomeOwner != null,
                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black)

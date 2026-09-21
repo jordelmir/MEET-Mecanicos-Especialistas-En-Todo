@@ -59,9 +59,9 @@ data class TrustEvidenceFile(val kind: String, val localPath: String)
 
 @Serializable
 data class RideWalletPolicy(
-    val currency: String = "CRC",
+    val currency: String = "",
     @SerialName("starter_credit_minor") val starterCreditMinor: Long = 0,
-    @SerialName("commission_basis_points") val commissionBasisPoints: Int = 500,
+    @SerialName("commission_basis_points") val commissionBasisPoints: Int = 0,
     @SerialName("sinpe_phone") val sinpePhone: String = "",
     @SerialName("sinpe_recipient_name") val sinpeRecipientName: String = "",
 )

@@ -1,7 +1,5 @@
 package com.elysium369.meet.ui.screens.ride
 
-import android.content.Intent
-import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -25,13 +23,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -54,7 +50,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -67,10 +62,9 @@ import com.elysium369.meet.data.local.entities.RideChatMessageEntity
 import com.elysium369.meet.ui.theme.MeetColors
 
 /**
- * RideLostAndFoundDialog — Dedicated module allowing passengers and drivers to coordinate
- * the return of forgotten items with explicit, dignity-preserving driver compensation rules:
- * - ₡3,500 CRC within 10 km (from driver location at the requested time).
- * - ₡7,000 CRC for distances exceeding 10 km from driver location.
+ * RideLostAndFoundDialog coordinates return of forgotten items through the
+ * protected in-trip chat. Compensation and payment require an authoritative
+ * platform policy and an explicit agreement in the recorded conversation.
  */
 @Composable
 fun RideLostAndFoundDialog(
@@ -80,7 +74,6 @@ fun RideLostAndFoundDialog(
     onSendMessage: ((message: String) -> Unit)? = null,
     onOpenChat: (() -> Unit)? = null,
 ) {
-    val context = LocalContext.current
     var itemDescription by remember { mutableStateOf("") }
     var reportSubmitted by remember { mutableStateOf(false) }
 
@@ -140,7 +133,7 @@ fun RideLostAndFoundDialog(
                                 overflow = TextOverflow.Ellipsis,
                             )
                             Text(
-                                text = if (isDriver) "Canal de entrega y atención al chofer" else "Conexión directa con tu chofer",
+                                text = if (isDriver) "Canal de entrega y atención al chofer" else "Canal protegido con tu chofer",
                                 color = MeetColors.textMuted,
                                 fontSize = 11.sp,
                                 maxLines = 1,
@@ -156,76 +149,19 @@ fun RideLostAndFoundDialog(
 
                 HorizontalDivider(color = MeetColors.borderSubtle)
 
-                // MANDATORY COMPENSATION POLICY NOTICE
+                // Local UI does not invent payment instructions or compensation.
                 Surface(
                     shape = RoundedCornerShape(14.dp),
-                    color = Color(0xFF241A06),
-                    border = BorderStroke(1.5.dp, Color(0xFFFFB74D)),
+                    color = Color(0xFF132235),
+                    border = BorderStroke(1.5.dp, MeetColors.cyberCyan.copy(alpha = 0.65f)),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = Color(0xFFFFB74D),
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Text(
-                                text = if (isDriver) "TARIFAS OFICIALES EN TU FAVOR" else "TARIFA DE COMPENSACIÓN AL CHOFER",
-                                color = Color(0xFFFFB74D),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Black,
-                                letterSpacing = 0.4.sp,
-                                maxLines = 1,
-                                softWrap = false,
-                            )
+                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Warning, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(20.dp))
+                            Text("COORDINACIÓN Y COMPENSACIÓN PROTEGIDAS", color = MeetColors.cyberCyan, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 0.4.sp)
                         }
-                        Text(
-                            text = if (isDriver) {
-                                "Para dignificar tu trabajo, combustible y disponibilidad, el pasajero debe abonar obligatoriamente las siguientes tarifas al coordinar la devolución del artículo:"
-                            } else {
-                                "Para dignificar el trabajo, combustible y tiempo del chofer al coordinar y entregar un artículo olvidado, aplican las siguientes tarifas oficiales obligatorias en su favor:"
-                            },
-                            color = Color(0xFFFFF3E0),
-                            fontSize = 11.sp,
-                            lineHeight = 15.sp,
-                        )
-
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = Color(0xFF161004),
-                            border = BorderStroke(1.dp, Color(0xFFFFB74D).copy(alpha = 0.4f)),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(10.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                            ) {
-                                Column(modifier = Modifier.fillMaxWidth()) {
-                                    Text("📍 Hasta 10 km (desde ubicación del chofer):", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    Text("₡3,500", color = MeetColors.neonGreen, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                                }
-                                HorizontalDivider(color = Color(0xFFFFB74D).copy(alpha = 0.2f))
-                                Column(modifier = Modifier.fillMaxWidth()) {
-                                    Text("🚗 Más de 10 km (desde ubicación del chofer):", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    Text("₡7,000", color = MeetColors.neonGreen, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                                }
-                            }
-                        }
-
-                        Text(
-                            text = "ℹ️ La distancia se calcula partiendo del punto donde se encuentre el chofer al momento requerido. Pago en efectivo o SINPE directamente al chofer al recibir el objeto.",
-                            color = Color(0xFFFFCC80),
-                            fontSize = 10.sp,
-                            lineHeight = 14.sp,
-                        )
+                        Text("Coordina la entrega dentro del chat del viaje. Cualquier compensación, método de pago o información de contacto requiere una política autorizada por la plataforma y acuerdo explícito de ambas partes.", color = MeetColors.textSecondary, fontSize = 11.sp, lineHeight = 15.sp)
                     }
                 }
 
@@ -248,17 +184,13 @@ fun RideLostAndFoundDialog(
                         )
                         if (isDriver) {
                             Text("👤 Pasajero: ${ride.passengerName}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            if (ride.passengerPhone.isNotBlank()) {
-                                Text("📱 Teléfono: ${ride.passengerPhone}", color = MeetColors.neonGreen, fontSize = 11.sp)
-                            }
+
                         } else {
                             Text("🚗 Chofer: ${ride.assignedDriverName ?: "Chofer asignado"}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             if (!ride.assignedDriverVehicle.isNullOrBlank()) {
                                 Text("🚘 Vehículo: ${ride.assignedDriverVehicle}", color = MeetColors.textSecondary, fontSize = 11.sp)
                             }
-                            if (!ride.assignedDriverPhone.isNullOrBlank()) {
-                                Text("📱 Teléfono: ${ride.assignedDriverPhone}", color = MeetColors.neonGreen, fontSize = 11.sp)
-                            }
+
                         }
                         Text(
                             text = "📍 Ruta: ${ride.pickupAddress.take(30)}... → ${ride.destAddress.take(30)}...",
@@ -339,7 +271,7 @@ fun RideLostAndFoundDialog(
                                     Toast.makeText(context, "Por favor describe el artículo olvidado", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
-                                val message = "[OBJETO OLVIDADO]: Hola, olvidé en tu vehículo el siguiente artículo: '$item'. Entiendo y acepto la tarifa oficial de compensación al chofer por entrega (₡3,500 <=10km / ₡7,000 >10km)."
+                                val message = "[OBJETO OLVIDADO]: Hola, olvidé en tu vehículo el siguiente artículo: '$item'. Solicito coordinar la entrega mediante este chat protegido. Cualquier compensación debe acordarse aquí y seguir la política autorizada de la plataforma."
                                 if (onSendMessage == null || ride.serverVersion <= 0L || ride.assignedDriverId.isNullOrBlank()) {
                                     Toast.makeText(context, "Este viaje aún no permite contactar al chofer", Toast.LENGTH_LONG).show()
                                     return@Button
@@ -404,28 +336,7 @@ fun RideLostAndFoundDialog(
                             Text("ABRIR CHAT DIRECTO CON EL CHOFER", fontWeight = FontWeight.Black, fontSize = 12.sp)
                         }
 
-                        if (!ride.assignedDriverPhone.isNullOrBlank()) {
-                            OutlinedButton(
-                                onClick = {
-                                    runCatching {
-                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${ride.assignedDriverPhone}"))
-                                        context.startActivity(intent)
-                                    }.onFailure {
-                                        Toast.makeText(context, "No se pudo abrir el marcador telefónico", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(46.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.6f)),
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.neonGreen),
-                            ) {
-                                Icon(Icons.Default.Phone, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("LLAMAR AL CHOFER DIRECTAMENTE", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            }
-                        }
+
                     }
                 } else {
                     // DRIVER EXPERIENCE
@@ -452,7 +363,7 @@ fun RideLostAndFoundDialog(
                                 )
                             }
                             Text(
-                                text = "Aquí puedes coordinar con el pasajero de este viaje. Cuando el pasajero envíe su reporte o te escriba, los mensajes se sincronizan en el chat del viaje. Recuerda cobrar la tarifa obligatoria (₡3.500 o ₡7.000) por tu tiempo y combustible.",
+                                text = "Aquí puedes coordinar con el pasajero de este viaje. Cuando el pasajero envíe su reporte o te escriba, los mensajes se sincronizan en el chat del viaje. La compensación solo puede acordarse mediante una política autorizada por la plataforma.",
                                 color = MeetColors.textSecondary,
                                 fontSize = 11.sp,
                                 lineHeight = 15.sp,
@@ -479,28 +390,7 @@ fun RideLostAndFoundDialog(
                         Text("ABRIR CHAT CON EL PASAJERO", fontWeight = FontWeight.Black, fontSize = 12.sp)
                     }
 
-                    if (ride.passengerPhone.isNotBlank()) {
-                        OutlinedButton(
-                            onClick = {
-                                runCatching {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${ride.passengerPhone}"))
-                                    context.startActivity(intent)
-                                }.onFailure {
-                                    Toast.makeText(context, "No se pudo abrir el marcador telefónico", Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(46.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
-                        ) {
-                            Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("LLAMAR AL PASAJERO", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        }
-                    }
+
                 }
 
                 OutlinedButton(
@@ -517,10 +407,8 @@ fun RideLostAndFoundDialog(
 }
 
 /**
- * DriverLostAndFoundHubDialog — Central de Objetos Olvidados para el Conductor.
- * Permite ver todos los viajes completados, consultar los reportes de pasajeros,
- * abrir chat directo con cada pasajero y llamarlo, con recordatorio explícito
- * de tarifas de entrega garantizadas (₡3,500 <=10km / ₡7,000 >10km).
+ * DriverLostAndFoundHubDialog keeps completed-ride recovery coordination in
+ * the protected trip chat and does not expose direct phone contacts.
  */
 @Composable
 fun DriverLostAndFoundHubDialog(
@@ -529,7 +417,6 @@ fun DriverLostAndFoundHubDialog(
     onDismiss: () -> Unit,
     onOpenChat: (RideRequestEntity) -> Unit,
 ) {
-    val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedRideForDetail by remember { mutableStateOf<RideRequestEntity?>(null) }
 
@@ -752,24 +639,7 @@ fun DriverLostAndFoundHubDialog(
                                             Text("Abrir Chat", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                         }
 
-                                        if (ride.passengerPhone.isNotBlank()) {
-                                            OutlinedButton(
-                                                onClick = {
-                                                    runCatching {
-                                                        val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${ride.passengerPhone}"))
-                                                        context.startActivity(intent)
-                                                    }
-                                                },
-                                                modifier = Modifier.fillMaxWidth().height(42.dp),
-                                                shape = RoundedCornerShape(8.dp),
-                                                border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.6f)),
-                                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.neonGreen),
-                                            ) {
-                                                Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(14.dp))
-                                                Spacer(Modifier.width(4.dp))
-                                                Text("Llamar", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                                            }
-                                        }
+
 
                                         OutlinedButton(
                                             onClick = { selectedRideForDetail = ride },

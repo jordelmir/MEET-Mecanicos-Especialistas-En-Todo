@@ -105,6 +105,8 @@ migrations=(
   "$repo_root/supabase/migrations/20260730060000_ride_support_cases.sql"
   "$repo_root/supabase/migrations/20260730070000_ride_tenant_boundary.sql"
   "$repo_root/supabase/migrations/20260816010000_authenticated_usage_roles.sql"
+  "$repo_root/supabase/migrations/20260918010000_fix_ride_complete_trip_receipt_function.sql"
+  "$repo_root/supabase/migrations/20260920110000_ride_authority_and_completion_audit.sql"
 )
 
 for migration in "${migrations[@]}"; do

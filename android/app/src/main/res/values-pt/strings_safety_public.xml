@@ -59,4 +59,9 @@
     <string name="safety_map_empty_title">Seu mapa de segurança começa aqui</string>
     <string name="safety_map_empty_body">Crie um relato com localização para manter um marcador privado e datado. A publicação pública exige revisão autoritativa.</string>
     <string name="safety_map_create_report">CRIAR RELATO COM LOCALIZAÇÃO</string>
+    <string name="safety_map_search_location">BUSCAR LOCAL POR NOME</string>
+    <string name="safety_map_select_on_map">SELECIONAR LOCAL NO MAPA</string>
+    <string name="safety_map_region_summary">Região: %1$s · Homicídios publicados: %2$d · Total de pontos: %3$d</string>
+    <string name="safety_map_general_title">MAPA GERAL</string>
+    <string name="safety_map_general_body">Consulta mundial de pontos cidadãos por categoria, região e data.</string>
 </resources>
