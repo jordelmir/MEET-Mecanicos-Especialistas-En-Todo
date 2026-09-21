@@ -25,6 +25,9 @@ class PlatformTrustCenterDeliveryContractTest {
         val screen = projectFile(
             "src/main/kotlin/com/elysium369/meet/ui/screens/PlatformTrustCenterScreen.kt",
         ).readText()
+        val specialistWallet = projectFile(
+            "src/main/kotlin/com/elysium369/meet/core/wallet/SpecialistWalletStore.kt",
+        ).readText()
         val viewModel = projectFile(
             "src/main/kotlin/com/elysium369/meet/ui/ObdViewModel.kt",
         ).readText()
@@ -51,6 +54,12 @@ class PlatformTrustCenterDeliveryContractTest {
         assertTrue(screen.contains("TRUST_QUEUE_HEARTBEAT_MS"))
         assertTrue(screen.contains("createChallengeAndVerify"))
         assertTrue(screen.contains("FactorType.TOTP"))
+        assertTrue(screen.contains("PlatformTrustCenterGateway.decideWalletTopup"))
+        assertFalse(screen.contains("SpecialistWalletStore.decideTopup"))
+        assertFalse(screen.contains("localPending"))
+        assertTrue(specialistWallet.contains("The server ledger is the sole"))
+        assertFalse(specialistWallet.contains("balanceCrc = WELCOME_GIFT_CRC"))
+        assertFalse(specialistWallet.contains("balanceCrc = newBalance"))
         assertTrue(viewModel.contains("syncPendingTrustApplications"))
         assertTrue(fleetViewModel.contains("FLEET_OPERATOR"))
         assertTrue(fleetViewModel.contains("syncPendingFleetOperatorApplications"))
