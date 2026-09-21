@@ -4072,9 +4072,10 @@ fun DriverDashboard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            if (walletPolicy?.sinpePhone?.isNotBlank() == true && walletPolicy.sinpeRecipientName.isNotBlank()) {
-                                Text("📱 SINPE Móvil: ${walletPolicy.sinpePhone}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                Text("👤 Destinatario: ${walletPolicy.sinpeRecipientName}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            val currentWalletPolicy = walletPolicy
+                            if (currentWalletPolicy?.sinpePhone?.isNotBlank() == true && currentWalletPolicy.sinpeRecipientName.isNotBlank()) {
+                                Text("📱 SINPE Móvil: ${currentWalletPolicy.sinpePhone}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("👤 Destinatario: ${currentWalletPolicy.sinpeRecipientName}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             } else {
                                 Text("Los datos de recarga no están disponibles. Cierra este diálogo y actualiza antes de transferir.", color = MeetColors.warning, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
