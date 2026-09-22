@@ -471,7 +471,7 @@ class FleetChatViewModel @Inject constructor(
                         )
                     }
             }.onFailure {
-                Log.w("MeetTrustCenter", "Fleet operator review sync unavailable", it)
+                Log.w("ElysiumTrustCenter", "Fleet operator review sync unavailable", it)
             }
         }
     }

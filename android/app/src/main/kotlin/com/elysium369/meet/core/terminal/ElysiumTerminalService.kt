@@ -109,7 +109,7 @@ class ElysiumTerminalService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Elysium Vanguard Terminal Daemon")
+            .setContentTitle("Elysium Vanguard AI OS Terminal Daemon")
             .setContentText("Sesión interactiva Linux y motor Antigravity activos")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentIntent(pendingIntent)

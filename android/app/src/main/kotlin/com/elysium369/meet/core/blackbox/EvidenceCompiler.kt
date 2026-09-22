@@ -155,7 +155,7 @@ object EvidenceCompiler {
         paint.textSize = 10f
         paint.isFakeBoldText = false
         paint.color = Color.parseColor("#94A3B8")
-        canvas.drawText("Elysium Vanguard BLACK BOX AUTOMOTIVE LEGAL TELEMETRY", 40f, 65f, paint)
+        canvas.drawText("Elysium Vanguard AI OS BLACK BOX AUTOMOTIVE LEGAL TELEMETRY", 40f, 65f, paint)
 
         // Incident Metadata
         paint.color = Color.BLACK

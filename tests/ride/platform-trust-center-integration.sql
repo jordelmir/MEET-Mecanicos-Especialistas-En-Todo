@@ -2,7 +2,10 @@
 
 insert into auth.users(id, email, email_confirmed_at) values
     ('a1111111-1111-1111-1111-111111111111', 'jordelmir@gmail.com', now()),
-    ('a2222222-2222-2222-2222-222222222222', 'applicant@example.com', now());
+    ('a2222222-2222-2222-2222-222222222222', 'applicant@example.com', now())
+on conflict (id) do update
+set email = excluded.email,
+    email_confirmed_at = excluded.email_confirmed_at;
 
 select set_config(
     'request.jwt.claim.sub',

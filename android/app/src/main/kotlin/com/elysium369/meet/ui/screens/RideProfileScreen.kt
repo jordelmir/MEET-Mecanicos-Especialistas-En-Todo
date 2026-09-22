@@ -17,12 +17,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.SupportAgent
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import com.elysium369.meet.ui.screens.ride.RideHistoryDetailDialog
+import com.elysium369.meet.ui.screens.ride.DriverLostAndFoundHubDialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -60,9 +62,11 @@ fun RideProfileScreen(
     isDriver: Boolean,
     initialTab: Int = 0,
     onBack: () -> Unit,
+    onOpenChat: (RideRequestEntity) -> Unit = {},
 ) {
     val context = LocalContext.current
     val rides by viewModel.rideRequests.collectAsState()
+    val lostItemReports by viewModel.rideLostItemReports.collectAsState(initial = emptyList())
     val driver by viewModel.driverVerification.collectAsState()
     val passenger by viewModel.passengerVerification.collectAsState()
     val fleetVehicles by viewModel.rideDriverVehicles.collectAsState()
@@ -95,6 +99,22 @@ fun RideProfileScreen(
     var tab by remember(initialTab) { mutableIntStateOf(initialTab.coerceIn(0, 2)) }
     var supportRide by remember { mutableStateOf<RideRequestEntity?>(null) }
     var showAddVehicle by remember { mutableStateOf(false) }
+    var showLostItems by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showLostItems, roleRides) {
+        if (showLostItems && isDriver) {
+            viewModel.refreshRideLostItemReports(roleRides.filter { it.status == "COMPLETED" }.map { it.requestId })
+        }
+    }
+
+    if (showLostItems && isDriver) {
+        DriverLostAndFoundHubDialog(
+            completedRides = roleRides.filter { it.status == "COMPLETED" && it.serverVersion > 0L },
+            reportsByRide = lostItemReports.groupBy { it.rideRequestId },
+            onDismiss = { showLostItems = false },
+            onOpenChat = onOpenChat,
+        )
+    }
 
     LaunchedEffect(isDriver) {
         if (isDriver) viewModel.refreshRideDriverVehicles()
@@ -174,6 +194,8 @@ fun RideProfileScreen(
                     summary = summary,
                     rides = roleRides,
                     onOpenCase = { supportRide = it },
+                    isDriver = isDriver,
+                    onOpenLostItems = { showLostItems = true },
                 )
                 else -> RideMapAvatarPanel(isDriver = isDriver)
             }
@@ -241,7 +263,7 @@ private fun RideMapAvatarPanel(isDriver: Boolean) {
                         fontWeight = FontWeight.Black,
                     )
                     Text(
-                        "Se usa en el mapa activo de Elysium Vanguard y no cambia datos de seguridad ni ubicación.",
+                        "Se usa en el mapa activo de Elysium Vanguard AI OS y no cambia datos de seguridad ni ubicación.",
                         color = MeetColors.textSecondary,
                         fontSize = 10.sp,
                     )
@@ -292,7 +314,7 @@ private fun RideMapAvatarPanel(isDriver: Boolean) {
         }
         item {
             Text(
-                "Todos los diseños son originales de Elysium Vanguard. El catálogo queda preparado para añadir nuevas colecciones sin alterar el motor del mapa.",
+                "Todos los diseños son originales de Elysium Vanguard AI OS. El catálogo queda preparado para añadir nuevas colecciones sin alterar el motor del mapa.",
                 color = MeetColors.textMuted,
                 fontSize = 10.sp,
             )
@@ -640,6 +662,9 @@ private fun RatingDistribution(data: RideProfileSummary) {
 internal fun RideHistoryPanel(
     rides: List<RideRequestEntity>,
     onOpenSupport: ((RideRequestEntity) -> Unit)? = null,
+    isDriver: Boolean = false,
+    onSendMessage: ((RideRequestEntity, String) -> Unit)? = null,
+    onOpenChat: ((RideRequestEntity) -> Unit)? = null,
 ) {
     val currentLocale = rememberRideJavaLocale()
     val dateTimeFormat = remember(currentLocale) {
@@ -652,6 +677,9 @@ internal fun RideHistoryPanel(
             ride = ride,
             onDismiss = { selectedRideDetail = null },
             onOpenSupport = onOpenSupport,
+            isDriver = isDriver,
+            onSendMessage = onSendMessage?.let { sendFn -> { msg -> sendFn(ride, msg) } },
+            onOpenChat = onOpenChat?.let { chatFn -> { chatFn(ride) } },
         )
     }
 
@@ -660,7 +688,11 @@ internal fun RideHistoryPanel(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         item {
-            Text("VIAJES FINALIZADOS", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
+            Text(
+                if (isDriver) "HISTORIAL DE VIAJES Y ENTREGAS (CHOFER)" else "VIAJES FINALIZADOS",
+                color = if (isDriver) MeetColors.neonGreen else MeetColors.cyberCyan,
+                fontWeight = FontWeight.Black,
+            )
         }
         if (rides.isEmpty()) {
             item { Text("Todavía no hay viajes finalizados confirmados por Supabase.", color = MeetColors.textMuted) }
@@ -669,7 +701,7 @@ internal fun RideHistoryPanel(
             Card(
                 onClick = { selectedRideDetail = ride },
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF08141F)),
-                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
+                border = BorderStroke(1.dp, if (isDriver) MeetColors.neonGreen.copy(alpha = 0.35f) else MeetColors.cyberCyan.copy(alpha = 0.35f)),
                 shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -707,6 +739,37 @@ internal fun RideHistoryPanel(
                             )
                         }
                     }
+
+                    // Lost and Found shortcut on each card
+                    Spacer(Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isDriver) Color(0xFF0F2B1D) else Color(0xFF0C1B2A),
+                        border = BorderStroke(1.dp, if (isDriver) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.cyberCyan.copy(alpha = 0.4f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { selectedRideDetail = ride },
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    Icons.Default.Inventory2,
+                                    contentDescription = null,
+                                    tint = if (isDriver) MeetColors.neonGreen else MeetColors.cyberCyan,
+                                    modifier = Modifier.size(13.dp),
+                                )
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    if (isDriver) "Objetos Olvidados · Contactar pasajero" else "¿Olvidaste algo? Reportar al chofer",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -718,6 +781,8 @@ private fun RideSupportPanel(
     summary: RideProfileSummary?,
     rides: List<RideRequestEntity>,
     onOpenCase: (RideRequestEntity) -> Unit,
+    isDriver: Boolean,
+    onOpenLostItems: () -> Unit,
 ) {
     val context = LocalContext.current
     val currentLocale = rememberRideJavaLocale()
@@ -737,6 +802,11 @@ private fun RideSupportPanel(
         }
         item {
             ProfileSection("ACCIONES RÁPIDAS") {
+                if (isDriver) {
+                    OutlinedButton(onClick = onOpenLostItems, modifier = Modifier.fillMaxWidth()) {
+                        Text("OBJETOS OLVIDADOS · MENSAJES Y LLAMADAS")
+                    }
+                }
                 Button(
                     onClick = {
                         runCatching {

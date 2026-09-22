@@ -44,7 +44,7 @@ fun LearningHubScreen(
                 title = {
                     Column {
                         Text(
-                            text = "MEET APRENDE",
+                            text = "Elysium APRENDE",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 1.sp,

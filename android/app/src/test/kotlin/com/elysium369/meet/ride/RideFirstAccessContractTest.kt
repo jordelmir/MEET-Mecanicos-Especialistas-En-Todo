@@ -43,7 +43,7 @@ class RideFirstAccessContractTest {
             "src/main/kotlin/com/elysium369/meet/ui/screens/home/classic/HomeClassicScreen.kt",
         ).readText()
 
-        assertTrue(classicHome.contains("\"MEET Rides\""))
+        assertTrue(classicHome.contains("\"Elysium Rides\""))
         assertTrue(
             classicHome.contains("MeetDestinations.RIDE_HOME") ||
                 classicHome.contains("\"ride_service\"")

@@ -30,7 +30,7 @@ data class RideTelemetryEvent(
 
 /** Low-cardinality ride diagnostics. Never logs names, phones, coordinates, or tokens. */
 object RideObservability {
-    private const val TAG = "MeetRidesEvent"
+    private const val TAG = "ElysiumRidesEvent"
     private val json = Json { encodeDefaults = false; explicitNulls = false }
 
     fun event(name: String, outcome: String = "INFO", requestId: String? = null, count: Int? = null, detail: String? = null) {

@@ -1141,7 +1141,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         "meet battery" to "🔋 meet battery",
                         "meet garage" to "🏎️ meet garage",
                         "termux-battery-status" to "🔋 battery",
-                        "termux-toast 'Elysium Vanguard'" to "🍞 toast",
+                        "termux-toast 'Elysium Vanguard AI OS'" to "🍞 toast",
                         "termux-vibrate -d 300" to "📳 vibrate",
                         "termux-tts-speak 'Motor Antigravity Activo'" to "🗣️ tts",
                         "termux-torch on" to "🔦 torch-on",
@@ -1534,7 +1534,7 @@ private fun copyTerminalLogsToClipboard(context: Context, logs: List<TerminalLin
         "[${line.timestamp}] ${if (line.type == TerminalLineType.COMMAND) "❯" else if (line.type == TerminalLineType.RESPONSE) "←" else " "} ${line.text}"
     }
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText("Elysium Vanguard Terminal Logs", text)
+    val clip = ClipData.newPlainText("Elysium Vanguard AI OS Terminal Logs", text)
     clipboard.setPrimaryClip(clip)
     Toast.makeText(context, "Copiado al portapapeles", Toast.LENGTH_SHORT).show()
 }
@@ -1549,7 +1549,7 @@ private fun shareTerminalLogs(context: Context, logs: List<TerminalLine>) {
         putExtra(Intent.EXTRA_TEXT, text)
         type = "text/plain"
     }
-    val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal Elysium Vanguard")
+    val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal Elysium Vanguard AI OS")
     context.startActivity(shareIntent)
 }
 
@@ -1557,7 +1557,7 @@ private fun copyLocalShellLogsToClipboard(context: Context, logs: List<String>) 
     if (logs.isEmpty()) return
     val text = logs.joinToString("\n")
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    val clip = ClipData.newPlainText("Elysium Vanguard Local Terminal Logs", text)
+    val clip = ClipData.newPlainText("Elysium Vanguard AI OS Local Terminal Logs", text)
     clipboard.setPrimaryClip(clip)
     Toast.makeText(context, "Copiado al portapapeles", Toast.LENGTH_SHORT).show()
 }
@@ -1570,7 +1570,7 @@ private fun shareLocalShellLogs(context: Context, logs: List<String>) {
         putExtra(Intent.EXTRA_TEXT, text)
         type = "text/plain"
     }
-    val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal Elysium Vanguard Android")
+    val shareIntent = Intent.createChooser(sendIntent, "Exportar Terminal Elysium Vanguard AI OS Android")
     context.startActivity(shareIntent)
 }
 

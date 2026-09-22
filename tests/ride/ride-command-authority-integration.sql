@@ -70,6 +70,29 @@ values
         4600, 'CRC', 'SEARCHING', 1
     );
 
+-- Server-side defense: a passenger cannot claim their own request even when
+-- a client bypasses its UI eligibility checks.
+select set_config(
+    'request.jwt.claim.sub',
+    '11111111-1111-1111-1111-111111111111',
+    false
+);
+do $test$
+declare
+    v_self_claim jsonb;
+begin
+    v_self_claim := public.ride_claim_request_v2(
+        '44444444-4444-4444-4444-444444444444',
+        '33333333-3333-3333-3333-333333333333',
+        1,
+        'claim:self:rejected:01'
+    );
+    if v_self_claim #>> '{error,code}' <> 'SELF_CLAIM_FORBIDDEN' then
+        raise exception 'selfClaimIsRejectedAtServerEvenWhenClientIsBypassed: %', v_self_claim;
+    end if;
+end;
+$test$;
+
 select set_config(
     'request.jwt.claim.sub',
     '22222222-2222-2222-2222-222222222222',

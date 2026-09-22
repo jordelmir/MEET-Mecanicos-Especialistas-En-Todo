@@ -652,7 +652,7 @@ class DriverActiveTripViewModel @Inject constructor(
             geometry = waypoints,
             distanceMeters = totalDist,
             durationSeconds = durationSec,
-            attribution = "MEET Direct Fallback",
+            attribution = "Elysium Direct Fallback",
             source = com.elysium369.meet.ride.map.RideMapDataSource.CACHE,
             maneuvers = emptyList(),
         )

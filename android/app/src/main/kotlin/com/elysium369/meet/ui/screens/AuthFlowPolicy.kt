@@ -104,7 +104,7 @@ object AuthFailureTranslator {
             AuthFailureCode.EMAIL_NOT_CONFIRMED ->
                 "Confirma tu correo electrónico antes de iniciar sesión."
             AuthFailureCode.WEAK_PASSWORD ->
-                "La contraseña no cumple la política de seguridad de MEET."
+                "La contraseña no cumple la política de seguridad de Elysium."
             AuthFailureCode.RATE_LIMITED ->
                 "Espera unos minutos antes de volver a intentarlo."
             AuthFailureCode.NETWORK ->

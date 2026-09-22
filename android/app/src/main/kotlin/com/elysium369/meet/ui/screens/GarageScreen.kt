@@ -3,7 +3,7 @@ package com.elysium369.meet.ui.screens
 import com.elysium369.meet.ui.navigation.backOrHome
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
-import com.elysium369.meet.ui.components.ElysiumSectionIcon
+import com.elysium369.meet.ui.components.MeetSectionIcon
 
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -92,7 +92,7 @@ fun GarageScreen(
                 // Empty State
                 Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        ElysiumSectionIcon(
+                        MeetSectionIcon(
                             key = "garage",
                             contentDescription = "Garage",
                             tint = MeetColors.cyberCyan,

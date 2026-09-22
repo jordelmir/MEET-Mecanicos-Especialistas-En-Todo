@@ -10,7 +10,7 @@ enum class SourceAuthority(val displayName: String) {
     REGULATORY("Normativa y Homologación Gubernamental / Ambiental"),
     SERVICE_PROVIDER("Taller Mecánico Certificado / Perito"),
     USER("Propietario / Conductor Registrado"),
-    MEET_DERIVED("Motor Algorítmico MEET Vanguard"),
-    MEET_PREDICTION("Modelo Predictivo y Machine Learning MEET"),
+    MEET_DERIVED("Motor Algorítmico Elysium Vanguard AI OS"),
+    MEET_PREDICTION("Modelo Predictivo y Machine Learning Elysium"),
     THIRD_PARTY("Base de Datos Técnica Homologada (NHTSA, Mitchell, Autodata)")
 }

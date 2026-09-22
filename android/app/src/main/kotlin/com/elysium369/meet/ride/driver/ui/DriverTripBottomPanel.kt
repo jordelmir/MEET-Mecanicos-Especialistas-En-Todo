@@ -4,10 +4,12 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -255,7 +257,9 @@ fun DriverTripBottomPanel(
             // Passenger Preferences Badges (if any)
             if (state.passengerPreferences.hasSpecialPreferences) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -276,6 +280,8 @@ fun DriverTripBottomPanel(
                                     color = badge.color,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
                                 )
                             }
                         }
@@ -806,7 +812,7 @@ private fun DriverContextualAction(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                             ) {
-                                Text("Comisión MEET (5%)", color = MeetColors.textSecondary, fontSize = 13.sp)
+                                Text("Comisión Elysium (5%)", color = MeetColors.textSecondary, fontSize = 13.sp)
                                 Text("-₡%,d".format(commission), color = MeetColors.error, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
                             Divider(color = MeetColors.borderSubtle, thickness = 1.dp)

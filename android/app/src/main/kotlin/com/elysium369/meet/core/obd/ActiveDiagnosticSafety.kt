@@ -271,7 +271,7 @@ object ActiveDiagnosticCapabilityRegistry {
             return denied("Rollback/replay de trust manifest rechazado.")
         }
         if (nowMs !in manifest.issuedAt until manifest.expiresAt) return denied("Trust manifest fuera de vigencia.")
-        if (compareVersions(appVersion, manifest.minimumAppVersion) < 0) return denied("Versión de MEET inferior al mínimo del trust manifest.")
+        if (compareVersions(appVersion, manifest.minimumAppVersion) < 0) return denied("Versión de Elysium inferior al mínimo del trust manifest.")
         if (MessageDigest.getInstance("SHA-256").digest(offlineRootPublicKey).toHex() != manifest.rootKeyId.lowercase()) {
             return denied("La root pública no coincide con rootKeyId.")
         }

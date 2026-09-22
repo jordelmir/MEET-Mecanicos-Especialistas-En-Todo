@@ -120,7 +120,7 @@ class DataLogger @Inject constructor() {
             val file = File(dir, "ElysiumVanguard_DTC_${vinLabel}_$timestamp.txt")
 
             FileWriter(file).use { writer ->
-                writer.write("OBD2 Elysium Vanguard Professional DTC Scan\n")
+                writer.write("OBD2 Elysium Vanguard AI OS Professional DTC Scan\n")
                 writer.write("Started: ${Date(report.startedAtMs)}\n")
                 writer.write("Ended: ${Date(report.endedAtMs)}\n")
                 writer.write("Protocol: ${report.protocol}\n")

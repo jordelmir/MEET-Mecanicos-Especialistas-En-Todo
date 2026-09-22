@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.elysium369.meet.data.local.entities.ProviderProfileEntity
 import com.elysium369.meet.ride.domain.RideVerificationPolicy
 import com.elysium369.meet.ui.ObdViewModel
-import com.elysium369.meet.ui.components.ElysiumSectionIcon
+import com.elysium369.meet.ui.components.MeetSectionIcon
 import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.components.HolographicBackgroundShared
 import com.elysium369.meet.ui.theme.MeetColors
@@ -102,7 +102,7 @@ private val providerTypes = listOf(
         type = "RIDE_DRIVER",
         icon = "🚗",
         label = "Chofer de Viajes",
-        subtitle = "Ofrece servicios de transporte con la red Elysium Vanguard",
+        subtitle = "Ofrece servicios de transporte con la red Elysium Vanguard AI OS",
         accentColor = MeetColors.electricBlue,
         specialtiesPlaceholder = "Ej: Sedán, SUV, Van, Premium…"
     )
@@ -381,7 +381,7 @@ private fun ProviderRegistrationHeroCard(
                         .background(MeetColors.neonGreen.copy(alpha = 0.13f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    ElysiumSectionIcon(
+                    MeetSectionIcon(
                         key = "provider_registration",
                         contentDescription = "Registro proveedor",
                         tint = MeetColors.neonGreen,

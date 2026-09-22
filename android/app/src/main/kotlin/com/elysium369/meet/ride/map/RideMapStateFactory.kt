@@ -8,6 +8,7 @@ object RideMapStateFactory {
         destination: RideGeoPoint? = null,
         driverGps: RideGeoPoint? = null,
         route: List<RideGeoPoint>? = null,
+        allowStraightLineFallback: Boolean = true,
     ): RideMapState {
         val markers = buildList {
             passengerGps?.let {
@@ -69,6 +70,7 @@ object RideMapStateFactory {
         }
         val resolvedRoute = when {
             route != null && route.size >= 2 -> route
+            !allowStraightLineFallback -> emptyList()
             else -> fallbackRoute
         }
         return RideMapState(markers = markers, route = resolvedRoute)

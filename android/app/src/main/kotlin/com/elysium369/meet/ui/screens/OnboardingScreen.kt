@@ -252,7 +252,7 @@ private fun OnboardingStep2(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            "¿CÓMO USARÁS ELYSIUM VANGUARD?",
+            "¿CÓMO USARÁS ELYSIUM VANGUARD AI OS?",
             style = MaterialTheme.typography.headlineMedium,
             color = Color.White,
             fontWeight = FontWeight.Black,
@@ -296,7 +296,7 @@ private fun OnboardingStep3(selectedAdapter: String, onSelect: (String) -> Unit)
             letterSpacing = 1.sp
         )
         Text(
-            "Elysium Vanguard buscará por todos, pero prioriza tu opción",
+            "Elysium Vanguard AI OS buscará por todos, pero prioriza tu opción",
             color = MeetColors.textSecondary,
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyMedium

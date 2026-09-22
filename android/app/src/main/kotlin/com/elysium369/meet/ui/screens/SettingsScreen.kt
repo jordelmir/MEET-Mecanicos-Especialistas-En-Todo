@@ -955,7 +955,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                "Elige cómo deseas visualizar y navegar en la pantalla de inicio de MEET:",
+                                "Elige cómo deseas visualizar y navegar en la pantalla de inicio de Elysium:",
                                 color = MeetColors.textSecondary,
                                 fontSize = 12.sp
                             )
@@ -977,7 +977,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column {
-                                    Text("Vanguard Classic", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("Elysium Vanguard AI OS Classic", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                     Text("Todos los módulos y accesos directos visibles en cuadrícula.", color = MeetColors.textMuted, fontSize = 11.sp)
                                 }
                             }
@@ -1023,7 +1023,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                "Personaliza los colores acentuados, textos, iconos y bordes de todo el sistema Elysium Vanguard.",
+                                "Personaliza los colores acentuados, textos, iconos y bordes de todo el sistema Elysium Vanguard AI OS.",
                                 color = MeetColors.textSecondary,
                                 fontSize = 12.sp
                             )
@@ -1081,7 +1081,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             SettingsRow(
                                 label = "Versión del Sistema (App)",
-                                value = "MEET v${com.elysium369.meet.BuildConfig.VERSION_NAME} (Build ${com.elysium369.meet.BuildConfig.VERSION_CODE})",
+                                value = "Elysium v${com.elysium369.meet.BuildConfig.VERSION_NAME} (Build ${com.elysium369.meet.BuildConfig.VERSION_CODE})",
                                 valueColor = MeetColors.cyberCyan
                             )
                             SettingsRow(
@@ -1107,7 +1107,7 @@ fun SettingsScreen(navController: NavController, viewModel: ObdViewModel) {
             // Bottom spacer
             item {
                 Column {
-                    PhantomSectionHeader(label = "CUENTA MEET", accentColor = MeetColors.warning)
+                    PhantomSectionHeader(label = "CUENTA Elysium", accentColor = MeetColors.warning)
                     Spacer(modifier = Modifier.height(8.dp))
                     EliteCard(
                         modifier = Modifier.fillMaxWidth(),

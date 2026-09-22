@@ -2,7 +2,7 @@ package com.elysium369.meet.core.domain
 
 /**
  * MEET Vehicle Life OS — Proof-Carrying Claim Interface.
- * Answers the fundamental user question: "¿POR QUÉ MEET DICE ESTO?".
+ * Answers the fundamental user question: "¿POR QUÉ Elysium DICE ESTO?".
  * Every health score deduction, repair recommendation, maintenance prediction, and fitment assertion
  * must implement this contract.
  */

@@ -1,7 +1,7 @@
 package com.elysium369.meet.ui.home
 
 /**
- * MEET Dual Home Experience Architecture (DHEA)
+ * Elysium Dual Home Experience Architecture (DHEA)
  * Defines the two official coexistence home experiences.
  */
 enum class HomeExperience {
@@ -10,14 +10,14 @@ enum class HomeExperience {
 
     val displayName: String
         get() = when (this) {
-            CLASSIC -> "Vanguard Classic"
-            ADAPTIVE -> "Vanguard Command"
+            CLASSIC -> "Elysium Vanguard AI OS Classic"
+            ADAPTIVE -> "Elysium Vanguard AI OS Command"
         }
 
     val description: String
         get() = when (this) {
             CLASSIC -> "Todos tus módulos y herramientas siempre visibles."
-            ADAPTIVE -> "MEET prioriza automáticamente lo que necesitas en tiempo real."
+            ADAPTIVE -> "Elysium prioriza automáticamente lo que necesitas en tiempo real."
         }
 }
 

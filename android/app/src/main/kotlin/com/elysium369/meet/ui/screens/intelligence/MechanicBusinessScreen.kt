@@ -278,7 +278,7 @@ fun MechanicBusinessScreen(
                         Icon(Icons.Default.MilitaryTech, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(24.dp))
                         Spacer(Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("PERFIL CERTIFICADO DE TÉCNICO MEET", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("PERFIL CERTIFICADO DE TÉCNICO Elysium", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             Text("Credenciales, pólizas de responsabilidad civil y especialidades validadas.", color = MeetColors.textMuted, fontSize = 11.sp)
                         }
                         Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MeetColors.textMuted)

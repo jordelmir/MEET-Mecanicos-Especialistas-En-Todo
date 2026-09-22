@@ -91,8 +91,8 @@ class LocalShellManager(
 
     private val _terminalLines = MutableStateFlow<List<String>>(
         listOf(
-            "⚡ Elysium Vanguard Expert Terminal v3.0",
-            "MEET Runtime local",
+            "⚡ Elysium Vanguard AI OS Expert Terminal v3.0",
+            "Elysium Runtime local",
             "Estado PTY/TTY: pendiente de verificación por el proceso de shell",
             "Consola inicializando.",
             ""
@@ -387,7 +387,7 @@ class LocalShellManager(
         _terminalLines.update {
             listOf(
                 "⚡ Entorno reiniciado: $capName",
-                "MEET Runtime local",
+                "Elysium Runtime local",
                 "PTY/TTY no confirmado: el proceso anterior terminó",
                 "✓ Consola lista para recibir comandos.",
                 ""
@@ -406,11 +406,11 @@ class LocalShellManager(
         lastRestartTime = now
         
         if (restartCount > 3) {
-            appendOutput("[Elysium Vanguard-Termux] Reinicios automáticos deshabilitados para evitar bucle infinito.")
+            appendOutput("[Elysium Vanguard AI OS-Termux] Reinicios automáticos deshabilitados para evitar bucle infinito.")
             return
         }
         
-        appendOutput("[Elysium Vanguard-Termux] Reintentando iniciar la consola en 2 segundos...")
+        appendOutput("[Elysium Vanguard AI OS-Termux] Reintentando iniciar la consola en 2 segundos...")
         scope.launch {
             delay(2000)
             if (currentSessionId == sessionId) {
@@ -451,7 +451,7 @@ class LocalShellManager(
         _terminalLines.update {
             listOf(
                 "⚡ Entorno activo: $capName",
-                "MEET Runtime local",
+                "Elysium Runtime local",
                 "Estado PTY/TTY: pendiente de verificación por el proceso de shell",
                 "Entorno seleccionado; el primer comando confirmará disponibilidad.",
                 ""
@@ -466,7 +466,7 @@ class LocalShellManager(
             "ubuntu" -> "Ubuntu Linux"
             else -> "Linux"
         }
-        appendOutput("[Elysium Vanguard-Termux] Iniciando instalación de $capName...")
+        appendOutput("[Elysium Vanguard AI OS-Termux] Iniciando instalación de $capName...")
         
         val downloadUrl = when (targetDistro) {
             "alpine" -> "https://dl-cdn.alpinelinux.org/alpine/v3.19/releases/aarch64/alpine-minirootfs-3.19.1-aarch64.tar.gz"
@@ -481,7 +481,7 @@ class LocalShellManager(
             else -> null
         }
         if (downloadUrl.isBlank() || expectedSha256 == null) {
-            appendOutput("[Elysium Vanguard-Termux] Distribución no autorizada: $targetDistro")
+            appendOutput("[Elysium Vanguard AI OS-Termux] Distribución no autorizada: $targetDistro")
             return
         }
         
@@ -500,7 +500,7 @@ class LocalShellManager(
         
         installingDistro.value = targetDistro
         installProgress.value = "Conectando al repositorio ($sizeStr)..."
-        appendOutput("[Elysium Vanguard-Termux] Descargando $capName rootfs ($sizeStr)...")
+        appendOutput("[Elysium Vanguard AI OS-Termux] Descargando $capName rootfs ($sizeStr)...")
         
         scope.launch(Dispatchers.IO) {
             try {
@@ -511,7 +511,7 @@ class LocalShellManager(
                 
                 downloadBinaryWithProgress(downloadUrl, distroArchive) { progressStr ->
                     installProgress.value = progressStr
-                    appendOutput("[Elysium Vanguard-Termux] $progressStr")
+                    appendOutput("[Elysium Vanguard AI OS-Termux] $progressStr")
                 }
 
                 // Verify SHA-256 digest before untarring
@@ -525,7 +525,7 @@ class LocalShellManager(
                 Log.i("LocalShellManager", "Downloaded $archiveName matched pinned SHA-256")
                 
                 installProgress.value = "Extrayendo rootfs de $capName..."
-                appendOutput("[Elysium Vanguard-Termux] Integridad SHA-256 verificada contra manifiesto fijado. Extrayendo rootfs...")
+                appendOutput("[Elysium Vanguard AI OS-Termux] Integridad SHA-256 verificada contra manifiesto fijado. Extrayendo rootfs...")
                 
                 if (distroDir.exists()) {
                     distroDir.deleteRecursively()
@@ -612,9 +612,9 @@ class LocalShellManager(
                 installProgress.value = "¡Instalación de $capName completada con éxito!"
                 installingDistro.value = null
                 
-                appendOutput("[Elysium Vanguard-Termux] ¡$capName instalado con éxito!")
-                appendOutput("[Elysium Vanguard-Termux] Google Antigravity CLI integrado en /$targetDistro/usr/local/bin/antigravity")
-                appendOutput("[Elysium Vanguard-Termux] Escribe 'antigravity --help' o 'agy status' para comenzar.")
+                appendOutput("[Elysium Vanguard AI OS-Termux] ¡$capName instalado con éxito!")
+                appendOutput("[Elysium Vanguard AI OS-Termux] Google Antigravity CLI integrado en /$targetDistro/usr/local/bin/antigravity")
+                appendOutput("[Elysium Vanguard AI OS-Termux] Escribe 'antigravity --help' o 'agy status' para comenzar.")
                 
                 if (_activeDistro.value == targetDistro) {
                     startShellInternal()
@@ -623,7 +623,7 @@ class LocalShellManager(
                 File(appContext.filesDir, ".$targetDistro.installing").deleteRecursively()
                 installProgress.value = "Error: ${e.message}"
                 installingDistro.value = null
-                appendOutput("[Elysium Vanguard-Termux] Error al instalar $capName: ${e.message}")
+                appendOutput("[Elysium Vanguard AI OS-Termux] Error al instalar $capName: ${e.message}")
             }
         }
     }
@@ -643,7 +643,7 @@ class LocalShellManager(
                     echo "  scan           Ejecuta escaneo forense de los subsistemas del vehiculo"
                     echo "  dtc [code]     Consulta diagnostico, causas y solucion verificada"
                     echo "  telemetry      Muestra flujo de sensores OBD-II en tiempo real"
-                    echo "  db <sql>       Ejecuta consulta SQL en la base de datos de MEET"
+                    echo "  db <sql>       Ejecuta consulta SQL en la base de datos de Elysium"
                     echo "  ai <prompt>    Razonamiento de diagnostico autonomo con Gemini Pro"
                     echo "  skills         Informa disponibilidad del registro local de capacidades"
                     echo "  fly            Modulo clasico de vuelo antigravitatorio"
@@ -651,7 +651,7 @@ class LocalShellManager(
                     exit 0
                 fi
                 if [ "$1" = "--version" ] || [ "$1" = "-v" ] || [ "$1" = "version" ] || [ "$1" = "-version" ]; then
-                    echo "🛸 Google Antigravity CLI v2.0.4-meet [Elysium Vanguard Multi-Agent Runtime]"
+                    echo "🛸 Google Antigravity CLI v2.0.4-meet [Elysium Vanguard AI OS Multi-Agent Runtime]"
                     echo "• Engine: Google DeepMind Antigravity Multi-Agent Core (aarch64)"
                     echo "• Subsystem: Linux PRoot Container (POSIX Isolated Environment)"
                     echo "• Telemetry Server: http://127.0.0.1:8082 [ONLINE]"
@@ -725,7 +725,7 @@ class LocalShellManager(
             termuxVibrate.setExecutable(true, false)
 
             val termuxToast = File(usrBin, "termux-toast")
-            termuxToast.writeText("#!/bin/sh\nMSG=\"\$*\"\nif [ -z \"\$MSG\" ]; then MSG=\"Elysium Vanguard\"; fi\nif command -v curl >/dev/null 2>&1; then curl -s -X POST -d \"\$MSG\" http://127.0.0.1:8082/api/termux/toast; else wget -qO- --post-data=\"\$MSG\" http://127.0.0.1:8082/api/termux/toast; fi\n")
+            termuxToast.writeText("#!/bin/sh\nMSG=\"\$*\"\nif [ -z \"\$MSG\" ]; then MSG=\"Elysium Vanguard AI OS\"; fi\nif command -v curl >/dev/null 2>&1; then curl -s -X POST -d \"\$MSG\" http://127.0.0.1:8082/api/termux/toast; else wget -qO- --post-data=\"\$MSG\" http://127.0.0.1:8082/api/termux/toast; fi\n")
             termuxToast.setExecutable(true, false)
 
             val termuxClipGet = File(usrBin, "termux-clipboard-get")
@@ -753,7 +753,7 @@ class LocalShellManager(
             termuxLoc.setExecutable(true, false)
 
             val termuxNotif = File(usrBin, "termux-notification")
-            termuxNotif.writeText("#!/bin/sh\nTITLE=\"MEET Terminal\"\nCONTENT=\"\$*\"\nwhile [ $# -gt 0 ]; do case \"\$1\" in --title|-t) TITLE=\"\$2\"; shift 2;; --content|-c) CONTENT=\"\$2\"; shift 2;; *) CONTENT=\"\$1\"; shift;; esac; done\nBODY=\"{\\\"title\\\":\\\"\$TITLE\\\",\\\"content\\\":\\\"\$CONTENT\\\"}\"\nif command -v curl >/dev/null 2>&1; then curl -s -X POST -d \"\$BODY\" http://127.0.0.1:8082/api/termux/notification; else wget -qO- --post-data=\"\$BODY\" http://127.0.0.1:8082/api/termux/notification; fi\n")
+            termuxNotif.writeText("#!/bin/sh\nTITLE=\"Elysium Terminal\"\nCONTENT=\"\$*\"\nwhile [ $# -gt 0 ]; do case \"\$1\" in --title|-t) TITLE=\"\$2\"; shift 2;; --content|-c) CONTENT=\"\$2\"; shift 2;; *) CONTENT=\"\$1\"; shift;; esac; done\nBODY=\"{\\\"title\\\":\\\"\$TITLE\\\",\\\"content\\\":\\\"\$CONTENT\\\"}\"\nif command -v curl >/dev/null 2>&1; then curl -s -X POST -d \"\$BODY\" http://127.0.0.1:8082/api/termux/notification; else wget -qO- --post-data=\"\$BODY\" http://127.0.0.1:8082/api/termux/notification; fi\n")
             termuxNotif.setExecutable(true, false)
 
             val termuxVol = File(usrBin, "termux-volume")
@@ -844,7 +844,7 @@ class LocalShellManager(
             val meetReport = File(usrBin, "meet-report")
             meetReport.writeText("""
                 #!/bin/sh
-                echo "🛡️  [MEET Certified Cryptographic Forensic Report]"
+                echo "🛡️  [Elysium Certified Cryptographic Forensic Report]"
                 REPORT_ID="REP-${'$'}(date +%Y%m%d%H%M%S)"
                 echo "• ID de Reporte: ${'$'}REPORT_ID"
                 HASH=${'$'}(echo "${'$'}REPORT_ID-${'$'}(date)" | sha256sum | awk '{print ${'$'}1}')
@@ -856,7 +856,7 @@ class LocalShellManager(
             val meetCan = File(usrBin, "meet-can-dump")
             meetCan.writeText("""
                 #!/bin/sh
-                echo "🚗 [MEET CAN-Bus / OBD Real-time Telemetry Monitor]"
+                echo "🚗 [Elysium CAN-Bus / OBD Real-time Telemetry Monitor]"
                 echo "Presione Ctrl+C para salir."
                 while true; do
                     if command -v curl >/dev/null 2>&1; then
@@ -1020,12 +1020,12 @@ class LocalShellManager(
             val nativeLibBusybox = File(appContext.applicationInfo.nativeLibraryDir, "libbusybox.so")
             
             if (!nativeLibBusybox.exists()) {
-                appendOutput("[Elysium Vanguard-Termux] Error: No se encontró libbusybox.so en las librerías nativas.")
-                appendOutput("[Elysium Vanguard-Termux] Se utilizará la consola base del sistema.")
+                appendOutput("[Elysium Vanguard AI OS-Termux] Error: No se encontró libbusybox.so en las librerías nativas.")
+                appendOutput("[Elysium Vanguard AI OS-Termux] Se utilizará la consola base del sistema.")
                 return@launch
             }
             
-            appendOutput("[Elysium Vanguard-Termux] Inicializando entorno de comandos de Android...")
+            appendOutput("[Elysium Vanguard AI OS-Termux] Inicializando entorno de comandos de Android...")
             try {
                 if (binDir.exists()) {
                     binDir.listFiles()?.forEach { it.delete() }
@@ -1040,7 +1040,7 @@ class LocalShellManager(
                     Log.e("LocalShellManager", "Failed to create symlink for busybox: ${e.message}")
                 }
 
-                appendOutput("[Elysium Vanguard-Termux] Instalando enlaces simbólicos de utilidades en bin/...")
+                appendOutput("[Elysium Vanguard AI OS-Termux] Instalando enlaces simbólicos de utilidades en bin/...")
                 val proc = ProcessBuilder(nativeLibBusybox.absolutePath, "--install", "-s", binDir.absolutePath)
                     .directory(binDir)
                     .start()
@@ -1049,13 +1049,13 @@ class LocalShellManager(
                 createCliScripts(binDir)
                 updateInstalledDistros()
                 if (exitCode == 0) {
-                    appendOutput("[Elysium Vanguard-Termux] ¡BusyBox y comandos personalizados inicializados con éxito!")
+                    appendOutput("[Elysium Vanguard AI OS-Termux] ¡BusyBox y comandos personalizados inicializados con éxito!")
                 } else {
-                    appendOutput("[Elysium Vanguard-Termux] Advertencia: BusyBox retornó código de salida $exitCode.")
+                    appendOutput("[Elysium Vanguard AI OS-Termux] Advertencia: BusyBox retornó código de salida $exitCode.")
                 }
             } catch (e: Exception) {
-                appendOutput("[Elysium Vanguard-Termux] Error al inicializar BusyBox: ${e.message}")
-                appendOutput("[Elysium Vanguard-Termux] Se utilizará la consola base del sistema.")
+                appendOutput("[Elysium Vanguard AI OS-Termux] Error al inicializar BusyBox: ${e.message}")
+                appendOutput("[Elysium Vanguard AI OS-Termux] Se utilizará la consola base del sistema.")
             }
         }
     }
@@ -1200,7 +1200,7 @@ class LocalShellManager(
                     echo "  scan           Ejecuta escaneo forense de los subsistemas del vehiculo"
                     echo "  dtc [code]     Consulta diagnostico, causas y solucion verificada"
                     echo "  telemetry      Muestra flujo de sensores OBD-II en tiempo real"
-                    echo "  db <sql>       Ejecuta consulta SQL en la base de datos de MEET"
+                    echo "  db <sql>       Ejecuta consulta SQL en la base de datos de Elysium"
                     echo "  ai <prompt>    Razonamiento de diagnostico autonomo con Gemini Pro"
                     echo "  skills         Informa disponibilidad del registro local de capacidades"
                     echo "  fly            Modulo clasico de vuelo antigravitatorio"
@@ -1208,7 +1208,7 @@ class LocalShellManager(
                     exit 0
                 fi
                 if [ "$1" = "--version" ] || [ "$1" = "-v" ] || [ "$1" = "version" ] || [ "$1" = "-version" ]; then
-                    echo "🛸 Google Antigravity CLI v2.0.4-meet [Elysium Vanguard Multi-Agent Runtime]"
+                    echo "🛸 Google Antigravity CLI v2.0.4-meet [Elysium Vanguard AI OS Multi-Agent Runtime]"
                     echo "• Engine: Google DeepMind Antigravity Multi-Agent Core (aarch64)"
                     echo "• Subsystem: Android Native Sandbox + Linux PRoot Core"
                     echo "• Telemetry Server: http://127.0.0.1:8082 [ONLINE]"
@@ -1269,7 +1269,7 @@ class LocalShellManager(
                     curl -s -X POST -d "$*" http://127.0.0.1:8082/api/ai
                     exit 0
                 fi
-                echo "Ejecutando Antigravity MEET: $*"
+                echo "Ejecutando Antigravity Elysium: $*"
             """.trimIndent().trim()
             
             val agyMeetFile = File(binDir, "agy-meet")
@@ -1297,7 +1297,7 @@ class LocalShellManager(
             Runtime.getRuntime().exec("chmod 755 ${hostTermuxVibrate.absolutePath}").waitFor()
 
             val hostTermuxToast = File(binDir, "termux-toast")
-            hostTermuxToast.writeText("#!/bin/sh\nMSG=\"\$*\"\nif [ -z \"\$MSG\" ]; then MSG=\"Elysium Vanguard\"; fi\nif command -v curl >/dev/null 2>&1; then curl -s -X POST -d \"\$MSG\" http://127.0.0.1:8082/api/termux/toast; else wget -qO- --post-data=\"\$MSG\" http://127.0.0.1:8082/api/termux/toast; fi\n")
+            hostTermuxToast.writeText("#!/bin/sh\nMSG=\"\$*\"\nif [ -z \"\$MSG\" ]; then MSG=\"Elysium Vanguard AI OS\"; fi\nif command -v curl >/dev/null 2>&1; then curl -s -X POST -d \"\$MSG\" http://127.0.0.1:8082/api/termux/toast; else wget -qO- --post-data=\"\$MSG\" http://127.0.0.1:8082/api/termux/toast; fi\n")
             Runtime.getRuntime().exec("chmod 755 ${hostTermuxToast.absolutePath}").waitFor()
 
             val hostTermuxClipGet = File(binDir, "termux-clipboard-get")
@@ -1325,7 +1325,7 @@ class LocalShellManager(
             Runtime.getRuntime().exec("chmod 755 ${hostTermuxLoc.absolutePath}").waitFor()
 
             val hostTermuxNotif = File(binDir, "termux-notification")
-            hostTermuxNotif.writeText("#!/bin/sh\nTITLE=\"MEET Terminal\"\nCONTENT=\"\$*\"\nwhile [ $# -gt 0 ]; do case \"\$1\" in --title|-t) TITLE=\"\$2\"; shift 2;; --content|-c) CONTENT=\"\$2\"; shift 2;; *) CONTENT=\"\$1\"; shift;; esac; done\nBODY=\"{\\\"title\\\":\\\"\$TITLE\\\",\\\"content\\\":\\\"\$CONTENT\\\"}\"\nif command -v curl >/dev/null 2>&1; then curl -s -X POST -d \"\$BODY\" http://127.0.0.1:8082/api/termux/notification; else wget -qO- --post-data=\"\$BODY\" http://127.0.0.1:8082/api/termux/notification; fi\n")
+            hostTermuxNotif.writeText("#!/bin/sh\nTITLE=\"Elysium Terminal\"\nCONTENT=\"\$*\"\nwhile [ $# -gt 0 ]; do case \"\$1\" in --title|-t) TITLE=\"\$2\"; shift 2;; --content|-c) CONTENT=\"\$2\"; shift 2;; *) CONTENT=\"\$1\"; shift;; esac; done\nBODY=\"{\\\"title\\\":\\\"\$TITLE\\\",\\\"content\\\":\\\"\$CONTENT\\\"}\"\nif command -v curl >/dev/null 2>&1; then curl -s -X POST -d \"\$BODY\" http://127.0.0.1:8082/api/termux/notification; else wget -qO- --post-data=\"\$BODY\" http://127.0.0.1:8082/api/termux/notification; fi\n")
             Runtime.getRuntime().exec("chmod 755 ${hostTermuxNotif.absolutePath}").waitFor()
 
             val hostTermuxVol = File(binDir, "termux-volume")
@@ -1446,7 +1446,7 @@ class LocalShellManager(
                     val capName = if (distro == "alpine") "Alpine" else if (distro == "debian") "Debian" else "Ubuntu"
                     bootFile.writeText("""
                         #!/system/bin/sh
-                        echo "[Elysium Vanguard-Termux] $capName no está instalado."
+                        echo "[Elysium Vanguard AI OS-Termux] $capName no está instalado."
                         echo "Ejecute el comando: pkg install $distro"
                     """.trimIndent().trim())
                     Runtime.getRuntime().exec("chmod 755 ${bootFile.absolutePath}").waitFor()
@@ -1464,7 +1464,7 @@ class LocalShellManager(
             } else {
                 linuxBootFile.writeText("""
                     #!/system/bin/sh
-                    echo "[Elysium Vanguard-Termux] Ninguna distribución de Linux está instalada."
+                    echo "[Elysium Vanguard AI OS-Termux] Ninguna distribución de Linux está instalada."
                     echo "Ejecute el comando: pkg install alpine (o debian, o ubuntu)"
                 """.trimIndent().trim())
             }
@@ -1540,7 +1540,7 @@ class LocalShellManager(
                 appendOutput("AGY: Analizando con Gemini Pro + Contexto de Telemetría...")
                 val chatMsg = com.elysium369.meet.core.ai.ChatMessage("user", enrichedPrompt)
                 val result = try {
-                    val res = geminiDiagnostic.chat(listOf(chatMsg), "Elysium Vanguard Console Environment", emptyMap())
+                    val res = geminiDiagnostic.chat(listOf(chatMsg), "Elysium Vanguard AI OS Console Environment", emptyMap())
                     if (res.contains("error al procesar") || res.isBlank()) null else res
                 } catch (e: Exception) {
                     null
@@ -1610,7 +1610,7 @@ class LocalShellManager(
         }
 
         if (subCmd == "--version" || subCmd == "-v" || subCmd == "version" || subCmd == "-version") {
-            appendOutput("🛸 Google Antigravity CLI v2.0.4-meet [Elysium Vanguard Multi-Agent Runtime]")
+            appendOutput("🛸 Google Antigravity CLI v2.0.4-meet [Elysium Vanguard AI OS Multi-Agent Runtime]")
             appendOutput("• Architecture: aarch64 (ARMv8.2-A / Android 13/14 Sandbox & PRoot Subsystem)")
             appendOutput("• Engine: Google DeepMind Antigravity Core v2.0-meet")
             appendOutput("• Local Control Bridge: http://127.0.0.1:8082 [ONLINE]")
@@ -1635,7 +1635,7 @@ class LocalShellManager(
         }
 
         if (subCmd == "--help" || subCmd == "-h" || subCmd == "help" || subCmd == "/help") {
-            appendOutput("🛸 GOOGLE ANTIGRAVITY CLI v2.0 (Elysium Vanguard Multi-Agent Core)")
+            appendOutput("🛸 GOOGLE ANTIGRAVITY CLI v2.0 (Elysium Vanguard AI OS Multi-Agent Core)")
             appendOutput("Uso: antigravity <comando | prompt> [argumentos]   (o alias 'agy')")
             appendOutput("")
             appendOutput("Comandos disponibles:")
@@ -1644,7 +1644,7 @@ class LocalShellManager(
             appendOutput("  dtc [code]     Consulta diagnostico, causas y solucion verificada")
             appendOutput("  diff           Muestra visor de diffs de código y parches de diagnóstico")
             appendOutput("  telemetry      Muestra flujo de sensores OBD-II en tiempo real")
-            appendOutput("  db <sql>       Ejecuta consulta SQL en la base de datos de MEET")
+            appendOutput("  db <sql>       Ejecuta consulta SQL en la base de datos de Elysium")
             appendOutput("  skills         Muestra las 47 habilidades autonomas de ingenieria")
             appendOutput("  fly            Modulo clasico de vuelo antigravitatorio")
             appendOutput("  --version      Muestra la version del motor Antigravity")
@@ -2026,7 +2026,7 @@ class LocalControlServer(
                             }
                             
                             val chatMsg = com.elysium369.meet.core.ai.ChatMessage("user", enrichedPrompt)
-                            val result = geminiDiagnostic.chat(listOf(chatMsg), "Elysium Vanguard Console Environment", emptyMap())
+                            val result = geminiDiagnostic.chat(listOf(chatMsg), "Elysium Vanguard AI OS Console Environment", emptyMap())
                             val response = JSONObject().apply {
                                 put("response", result)
                             }.toString()
@@ -2316,7 +2316,7 @@ class LocalControlServer(
                         try {
                             val text = call.receiveText().trim()
                             Handler(Looper.getMainLooper()).post {
-                                Toast.makeText(appContext, text.ifEmpty { "Elysium Vanguard" }, Toast.LENGTH_SHORT).show()
+                                Toast.makeText(appContext, text.ifEmpty { "Elysium Vanguard AI OS" }, Toast.LENGTH_SHORT).show()
                             }
                             call.respondText("{\"success\":true,\"message\":\"$text\"}", ContentType.Application.Json)
                         } catch (e: Exception) {
@@ -2445,7 +2445,7 @@ class LocalControlServer(
                         try {
                             val raw = call.receiveText().trim()
                             val jsonInput = runCatching { JSONObject(raw) }.getOrNull()
-                            val title = jsonInput?.optString("title") ?: "MEET Elysium Terminal"
+                            val title = jsonInput?.optString("title") ?: "Elysium Elysium Terminal"
                             val content = jsonInput?.optString("content") ?: raw
                             
                             val nm = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
@@ -2509,7 +2509,7 @@ class LocalControlServer(
                         try {
                             val rt = Runtime.getRuntime()
                             val json = JSONObject().apply {
-                                put("app", "MEET Mecánicos Especialistas En Todo / Elysium Vanguard")
+                                put("app", "Elysium Mecánicos Especialistas En Todo / Elysium Vanguard AI OS")
                                 put("device", "${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE})")
                                 put("android_sdk", Build.VERSION.SDK_INT)
                                 put("android_release", Build.VERSION.RELEASE)

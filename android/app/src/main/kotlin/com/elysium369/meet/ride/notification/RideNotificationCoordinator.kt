@@ -35,7 +35,7 @@ class RideNotificationCoordinator(private val context: Context, private val owne
         notificationManager?.createNotificationChannel(
             NotificationChannel(
                 DISPATCH_CHANNEL_ID,
-                "MEET Despacho y Alertas Prioritarias",
+                "Elysium Despacho y Alertas Prioritarias",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
                 description = "Notificaciones urgentes de solicitudes, ofertas y viajes en curso"
@@ -60,7 +60,7 @@ class RideNotificationCoordinator(private val context: Context, private val owne
 
     fun notifyOfferAccepted(tripId: String, passengerName: String, priceCrc: Double) {
         val title = "🎉 ¡OFERTA ACEPTADA! 🚕"
-        val body = "$passengerName aceptó tu tarifa de ₡${priceCrc.toInt()} CRC. Abre MEET para iniciar la ruta."
+        val body = "$passengerName aceptó tu tarifa de ₡${priceCrc.toInt()} CRC. Abre Elysium para iniciar la ruta."
         notify(
             id = 7_300 + (tripId.hashCode() and 0x3FFF_FFFF),
             title = title,

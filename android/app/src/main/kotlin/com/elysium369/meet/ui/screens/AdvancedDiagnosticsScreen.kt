@@ -1188,7 +1188,7 @@ private fun ManufacturerModesTab(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Elysium Vanguard no barre servicios OEM ni permite comandos manuales que puedan activar, codificar o reprogramar un módulo equivocado.",
+                        "Elysium Vanguard AI OS no barre servicios OEM ni permite comandos manuales que puedan activar, codificar o reprogramar un módulo equivocado.",
                         color = MeetColors.textPrimary,
                         fontSize = 13.sp,
                     )

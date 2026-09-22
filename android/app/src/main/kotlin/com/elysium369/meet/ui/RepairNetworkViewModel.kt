@@ -201,7 +201,7 @@ class RepairNetworkViewModel(
                 id = java.util.UUID.randomUUID().toString(),
                 case_id = caseId,
                 user_id = com.elysium369.meet.data.supabase.SupabaseManager.client.auth.currentUserOrNull()?.id ?: "anonymous_user",
-                author_name = authorName.ifBlank { "Mecánico Elysium Vanguard" },
+                author_name = authorName.ifBlank { "Mecánico Elysium Vanguard AI OS" },
                 author_reputation = reputation,
                 comment_body = body,
                 created_at = System.currentTimeMillis().toString()

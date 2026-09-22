@@ -60,6 +60,8 @@ enum class GeoMarkerRole {
     TOW_TRUCK,
     STORE_LOCATION,
     INCIDENT_PIN,
+    HOMICIDE_PIN,
+    PRIVATE_INCIDENT_PIN,
     GENERIC_SERVICE,
 }
 

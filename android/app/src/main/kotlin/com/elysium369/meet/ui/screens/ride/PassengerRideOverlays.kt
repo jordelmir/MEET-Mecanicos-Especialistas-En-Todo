@@ -227,7 +227,7 @@ fun PaymentMethodBottomSheet(
                                                 RidePaymentMethod.CASH -> "Pago en efectivo al finalizar el viaje"
                                                 RidePaymentMethod.SINPE_MOVIL -> "Transferencia instantánea SINPE Móvil"
                                                 RidePaymentMethod.CARD -> "Tarjeta de crédito / débito"
-                                                RidePaymentMethod.WALLET -> "Saldo digital prepagado MEET"
+                                                RidePaymentMethod.WALLET -> "Saldo digital prepagado Elysium"
                                             },
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MeetColors.textSecondary,

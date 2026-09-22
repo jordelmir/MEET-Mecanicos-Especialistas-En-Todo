@@ -1,0 +1,26 @@
+<es-419>
+Novedades de la versión 4.26.0:
+• Elysium Vanguard AI OS: nuevo nombre visible en toda la experiencia Android.
+• Elysium Seguridad: reportes ciudadanos con ubicación, evidencia con custodia, retiro del reporte y mapa público basado en proyecciones verificables.
+• Mapa histórico: búsqueda por fecha, categoría y región; los puntos públicos preservan el anonimato del reportante.
+• Mi actividad: ingresos, gastos, recargas y saldo ordenados por actividad y periodo.
+• Mayor protección de autoridad: el estado público, financiero e institucional proviene del servidor; la app conserva solo intención local hasta su confirmación.
+</es-419>
+
+<en-US>
+What's new in version 4.26.0:
+• Elysium Vanguard AI OS is now the visible Android product name.
+• Elysium Safety adds citizen reports with location, custody-aware evidence, withdrawal, and a public map driven by verifiable projections.
+• Historical map search by date, category and region keeps reporters anonymous.
+• My activity organizes income, expenses, top-ups and balance by activity and time period.
+• Stronger authority boundaries: public, financial and institutional state comes from the server; the app retains local intent until confirmed.
+</en-US>
+
+<pt-BR>
+Novidades da versão 4.26.0:
+• Elysium Vanguard AI OS é o novo nome visível do produto Android.
+• Elysium Segurança adiciona relatos cidadãos com localização, evidência com custódia, retirada e mapa público baseado em projeções verificáveis.
+• Pesquisa histórica no mapa por data, categoria e região preserva o anonimato de quem relata.
+• Minha atividade organiza ganhos, gastos, recargas e saldo por atividade e período.
+• Limites de autoridade reforçados: estados públicos, financeiros e institucionais vêm do servidor; o app mantém intenção local até confirmação.
+</pt-BR>

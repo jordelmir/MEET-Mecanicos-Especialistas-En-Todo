@@ -195,8 +195,8 @@ fun VehicleFormScreen(
                             fontWeight = FontWeight.Black
                         )
                         Text(
-                            t("Cada detalle permite a la IA Elysium Vanguard ajustar los algoritmos de diagnóstico para tu motor específico.",
-                              "Every detail allows Elysium Vanguard AI to tune diagnostic algorithms for your specific engine."),
+                            t("Cada detalle permite a la IA Elysium Vanguard AI OS ajustar los algoritmos de diagnóstico para tu motor específico.",
+                              "Every detail allows Elysium Vanguard AI OS to tune diagnostic algorithms for your specific engine."),
                             color = com.elysium369.meet.ui.theme.MeetColors.textSecondary,
                             style = MaterialTheme.typography.bodySmall
                         )

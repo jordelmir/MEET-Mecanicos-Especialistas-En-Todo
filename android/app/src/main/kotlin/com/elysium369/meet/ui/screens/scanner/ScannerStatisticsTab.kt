@@ -217,7 +217,7 @@ fun ScannerStatisticsTab(
             ) {
                 Column {
                     Text(
-                        if (isSpanish) "Telemetría Elysium Vanguard" else "Elysium Vanguard Telemetry",
+                        if (isSpanish) "Telemetría Elysium Vanguard AI OS" else "Elysium Vanguard AI OS Telemetry",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
@@ -1015,7 +1015,7 @@ fun ScannerStatisticsTab(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = if (isSpanish) "ECO COACHING Elysium Vanguard" else "Elysium Vanguard ECO COACHING",
+                            text = if (isSpanish) "ECO COACHING Elysium Vanguard AI OS" else "Elysium Vanguard AI OS ECO COACHING",
                             color = MeetColors.electricBlue,
                             fontWeight = FontWeight.Black,
                             fontFamily = FontFamily.Monospace,

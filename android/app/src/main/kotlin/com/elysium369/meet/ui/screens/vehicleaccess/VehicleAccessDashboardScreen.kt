@@ -236,7 +236,7 @@ fun VehicleAccessDashboardScreen(
                                 onClick = {
                                     accessManager.markKeyLost(cred.credentialId)
                                     coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Llave marcada como extraviada en MEET. El inmovilizador no fue reprogramado.")
+                                        snackbarHostState.showSnackbar("Llave marcada como extraviada en Elysium. El inmovilizador no fue reprogramado.")
                                     }
                                 },
                                 color = MeetColors.error,
@@ -295,7 +295,7 @@ fun VehicleAccessDashboardScreen(
                                 Spacer(Modifier.width(10.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(grant.recipientName, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                    Text("Rol: ${grant.recipientRole} · ${if (grant.isVehicleEnforced) "Enforced by OEM" else "MEET Policy"}", color = MeetColors.textSecondary, fontSize = 11.sp)
+                                    Text("Rol: ${grant.recipientRole} · ${if (grant.isVehicleEnforced) "Enforced by OEM" else "Elysium Policy"}", color = MeetColors.textSecondary, fontSize = 11.sp)
                                 }
                                 if (grant.status != CredentialStatus.REVOKED) {
                                     EliteTextButton(
@@ -303,7 +303,7 @@ fun VehicleAccessDashboardScreen(
                                         onClick = {
                                             accessManager.revokeGrant(grant.grantId, "Revocado por propietario")
                                             coroutineScope.launch {
-                                                snackbarHostState.showSnackbar("Acceso revocado en MEET; confirma aparte la revocación OEM si aplica.")
+                                                snackbarHostState.showSnackbar("Acceso revocado en Elysium; confirma aparte la revocación OEM si aplica.")
                                             }
                                         },
                                         color = MeetColors.error

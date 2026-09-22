@@ -58,7 +58,7 @@ jobs:
 
   release-gates:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     env:
       ORG_GRADLE_PROJECT_ELYSIUM_SUPABASE_URL: ${{ secrets.ELYSIUM_SUPABASE_URL }}
       ORG_GRADLE_PROJECT_ELYSIUM_SUPABASE_KEY: ${{ secrets.ELYSIUM_SUPABASE_KEY }}

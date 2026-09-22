@@ -59,7 +59,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun ElysiumManualsScreen(navController: NavController) {
+fun MeetManualsScreen(navController: NavController) {
     val context = LocalContext.current
     val repository = remember(context) { ProprietaryPartsCatalogRepository(context) }
     var manifest by remember { mutableStateOf<ProprietaryCatalogManifest?>(null) }

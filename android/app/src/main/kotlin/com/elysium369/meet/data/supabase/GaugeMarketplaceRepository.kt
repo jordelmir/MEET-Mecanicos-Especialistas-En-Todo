@@ -148,7 +148,7 @@ class GaugeMarketplaceRepository @Inject constructor(
 
         return context.getSharedPreferences("meet_gauge_marketplace", Context.MODE_PRIVATE)
             .getString("local_creator_name", null)
-            ?: "MEET Creator"
+            ?: "Elysium Creator"
     }
 
     // ── PUBLISH ──
@@ -173,7 +173,7 @@ class GaugeMarketplaceRepository @Inject constructor(
         }
         val userId = currentCreatorId()
         val userName = currentCreatorName()
-        val normalizedName = name.trim().ifBlank { config.name.ifBlank { "Gauge MEET" } }
+        val normalizedName = name.trim().ifBlank { config.name.ifBlank { "Gauge Elysium" } }
         val normalizedDescription = description.trim()
         require(normalizedName.length >= 3) { "El nombre del gauge debe tener al menos 3 caracteres." }
         require(normalizedDescription.length >= 3) { "Agrega una descripción útil para el comprador." }

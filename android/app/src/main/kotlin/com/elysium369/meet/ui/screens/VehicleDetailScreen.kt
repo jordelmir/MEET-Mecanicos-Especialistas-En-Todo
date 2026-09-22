@@ -282,7 +282,7 @@ fun VehicleDetailScreen(
 
                                 VehicleDocumentPreviewCard(
                                     theme = selectedTheme,
-                                    workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "Elysium Vanguard Clinic",
+                                    workshopName = if (includeBranding && workshopName.isNotBlank()) workshopName else "Elysium Vanguard AI OS Clinic",
                                     make = make,
                                     model = model,
                                     includeMaint = includeMaint,

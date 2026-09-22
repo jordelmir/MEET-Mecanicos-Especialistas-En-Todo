@@ -18,7 +18,7 @@ enum class DekraVehicleCondition(val displayName: String) {
 
 @Serializable
 enum class DekraTransportPlan(val displayName: String) {
-    DRIVE_AFTER_PRECHECK("Conducir únicamente si aprueba el prechequeo MEET"),
+    DRIVE_AFTER_PRECHECK("Conducir únicamente si aprueba el prechequeo Elysium"),
     TOW_ONLY("Traslado en grúa; no conducir"),
 }
 

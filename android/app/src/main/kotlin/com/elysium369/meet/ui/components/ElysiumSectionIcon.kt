@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
 
 @Composable
-fun ElysiumSectionIcon(
+fun MeetSectionIcon(
     key: String,
     contentDescription: String?,
     tint: Color = MeetColors.cyberCyan,

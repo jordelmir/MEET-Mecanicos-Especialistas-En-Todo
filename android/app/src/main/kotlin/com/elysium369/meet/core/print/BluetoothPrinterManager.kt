@@ -72,7 +72,7 @@ class BluetoothPrinterManager(private val context: Context) {
             // Header (Branding)
             escPos.alignCenter()
             escPos.setTextSizeDouble()
-            escPos.printLine(data.workshopName.ifBlank { "Elysium Vanguard DIAGNOSTIC" })
+            escPos.printLine(data.workshopName.ifBlank { "Elysium Vanguard AI OS DIAGNOSTIC" })
             escPos.setTextSizeNormal()
             
             if (data.workshopAddress.isNotBlank()) escPos.printLine(data.workshopAddress)
@@ -148,7 +148,7 @@ class BluetoothPrinterManager(private val context: Context) {
             escPos.boldOn()
             escPos.printLine("GRACIAS POR SU PREFERENCIA")
             escPos.boldOff()
-            escPos.printLine("Certificado por Elysium Vanguard AI")
+            escPos.printLine("Certificado por Elysium Vanguard AI OS")
             
             escPos.feed(5)
             

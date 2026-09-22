@@ -494,7 +494,7 @@ fun GaugeCustomizerDialog(
                         var pendingQrImport by remember { mutableStateOf<GaugeQrImport?>(null) }
                         var qrImportActionInProgress by remember { mutableStateOf(false) }
                         var qrText by remember { mutableStateOf("") }
-                        var qrShareTitle by remember { mutableStateOf("MEET Gauge") }
+                        var qrShareTitle by remember { mutableStateOf("Elysium Gauge") }
                         var qrExportWarnings by remember { mutableStateOf<List<String>>(emptyList()) }
                         var isSavingGauge by remember { mutableStateOf(false) }
                         var deletingGaugeIds by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -1614,7 +1614,7 @@ fun GaugeCustomizerDialog(
                                         )
                                         Spacer(Modifier.height(12.dp))
                                         Text(
-                                            "Escanea este código con otro dispositivo Elysium Vanguard para copiar el diseño al instante.",
+                                            "Escanea este código con otro dispositivo Elysium Vanguard AI OS para copiar el diseño al instante.",
                                             color = Color.White.copy(alpha = 0.6f),
                                             fontSize = 11.sp,
                                             textAlign = TextAlign.Center,
@@ -2440,7 +2440,7 @@ private fun GaugeQrImportDialog(
 
                 Spacer(Modifier.height(10.dp))
                 QrBusinessNote(
-                    text = "Huella ${import.fingerprint.take(12)} · ${if (import.importedFromLegacyFormat) "Legacy" else "MEET v1"}",
+                    text = "Huella ${import.fingerprint.take(12)} · ${if (import.importedFromLegacyFormat) "Legacy" else "Elysium v1"}",
                     color = Color(0xFF00B0FF),
                 )
                 duplicateGaugeName?.let { name ->

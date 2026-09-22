@@ -90,7 +90,7 @@ fun MeetPeritoScreen(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        "Elysium Vanguard PERITO",
+                        "Elysium Vanguard AI OS PERITO",
                         color = Color.White,
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Black,
@@ -120,7 +120,7 @@ fun MeetPeritoScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Necesitas seleccionar un vehículo de tu Garage para iniciar el peritaje clínico Elysium Vanguard Perito.",
+                            "Necesitas seleccionar un vehículo de tu Garage para iniciar el peritaje clínico Elysium Vanguard AI OS Perito.",
                             color = MeetColors.textMuted,
                             fontSize = 13.sp,
                             textAlign = TextAlign.Center
@@ -470,7 +470,7 @@ fun MeetPeritoScreen(
                                             modifier = Modifier.size(18.dp),
                                         )
                                         Text(
-                                            "CERTIFICACIÓN Elysium Vanguard PERITO HABILITADA",
+                                            "CERTIFICACIÓN Elysium Vanguard AI OS PERITO HABILITADA",
                                             color = MeetColors.electricBlue,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold,

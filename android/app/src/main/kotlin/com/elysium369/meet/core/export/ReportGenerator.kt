@@ -504,7 +504,7 @@ class ReportGenerator(private val context: Context) {
         doc.finishPage(oldPage)
         val info = PdfDocument.PageInfo.Builder(595, 842, num).create()
         val newPage = doc.startPage(info)
-        newPage.canvas.drawText("Página $num | Elysium Vanguard Diagnostic Report", 250f, 820f, footerPaint)
+        newPage.canvas.drawText("Página $num | Elysium Vanguard AI OS Diagnostic Report", 250f, 820f, footerPaint)
         return newPage
     }
 
@@ -660,7 +660,7 @@ class ReportGenerator(private val context: Context) {
     fun shareReport(pdfFile: File) {
         val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", pdfFile)
         val shareMessage = buildString {
-            append("🚗 *Reporte Certificado MEET / Elysium Vanguard*\n")
+            append("🚗 *Reporte Certificado Elysium / Elysium Vanguard AI OS*\n")
             append("Documento: ${pdfFile.nameWithoutExtension}\n\n")
             append("✅ Inspección técnica con sellado forense e integridad criptográfica SHA-256.\n")
             append("🔍 Puedes validar la autenticidad del reporte escaneando su código QR o en:\n")
@@ -671,7 +671,7 @@ class ReportGenerator(private val context: Context) {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "application/pdf"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Reporte Certificado MEET — ${pdfFile.nameWithoutExtension}")
+            putExtra(Intent.EXTRA_SUBJECT, "Reporte Certificado Elysium — ${pdfFile.nameWithoutExtension}")
             putExtra(Intent.EXTRA_TEXT, shareMessage)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
@@ -795,7 +795,7 @@ class ReportGenerator(private val context: Context) {
             canvas.drawText("POWERED BY ELYSIUM VANGUARD", 335f, 25f, paint)
         } else {
             titlePaint.color = accentColor
-            canvas.drawText("Elysium Vanguard CLINIC", x, y, titlePaint)
+            canvas.drawText("Elysium Vanguard AI OS CLINIC", x, y, titlePaint)
             titlePaint.textSize = 12f
             titlePaint.color = headerTextColor
             canvas.drawText("HISTORIAL DE SALUD VEHICULAR", x + 165f, y - 4f, titlePaint)
@@ -1166,7 +1166,7 @@ class ReportGenerator(private val context: Context) {
             canvas.drawText("POWERED BY ELYSIUM VANGUARD", 335f, 25f, paint)
         } else {
             titlePaint.color = accentColor
-            canvas.drawText("Elysium Vanguard CLINIC", x, y, titlePaint)
+            canvas.drawText("Elysium Vanguard AI OS CLINIC", x, y, titlePaint)
             titlePaint.textSize = 12f
             titlePaint.color = headerTextColor
             canvas.drawText("REPORTE DE INSPECCIÓN PRE-COMPRA", x + 165f, y - 4f, titlePaint)
@@ -1427,7 +1427,7 @@ class ReportGenerator(private val context: Context) {
         paint.color = Color.WHITE
         paint.textSize = 20f
         paint.isFakeBoldText = true
-        canvas.drawText("Elysium Vanguard INSPECCIÓN DIARIA DVIR", 30f, 50f, paint)
+        canvas.drawText("Elysium Vanguard AI OS INSPECCIÓN DIARIA DVIR", 30f, 50f, paint)
         
         paint.textSize = 10f
         paint.isFakeBoldText = false
@@ -1580,7 +1580,7 @@ class ReportGenerator(private val context: Context) {
         paint.color = Color.DKGRAY
         paint.textSize = 8.5f
         paint.isFakeBoldText = false
-        canvas.drawText("Certificado Elysium Vanguard Pre-Trip Checklist. Válido por 24 horas.", x, y + sigBoxHeight + 20f, paint)
+        canvas.drawText("Certificado Elysium Vanguard AI OS Pre-Trip Checklist. Válido por 24 horas.", x, y + sigBoxHeight + 20f, paint)
 
         // Page footer
         val footerPaint = Paint().apply {

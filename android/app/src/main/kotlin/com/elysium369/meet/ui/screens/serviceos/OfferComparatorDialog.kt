@@ -102,7 +102,7 @@ fun OfferComparatorDialog(
                                             border = androidx.compose.foundation.BorderStroke(0.5.dp, MeetColors.neonGreen)
                                         ) {
                                             Text(
-                                                "⭐ RECOMENDACIÓN TÉCNICA MEET",
+                                                "⭐ RECOMENDACIÓN TÉCNICA Elysium",
                                                 color = MeetColors.neonGreen,
                                                 fontSize = 10.sp,
                                                 fontWeight = FontWeight.Black,

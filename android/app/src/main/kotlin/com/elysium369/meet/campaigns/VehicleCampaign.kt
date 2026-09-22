@@ -6,7 +6,7 @@ enum class CampaignType(val displayName: String, val glyph: String) {
     SAFETY_RECALL("Campaña de Retiro por Seguridad (Recall)", "🚨"),
     SERVICE_CAMPAIGN("Campaña de Servicio / Actualización OEM", "🔧"),
     TECHNICAL_SERVICE_BULLETIN_TSB("Boletín Técnico de Servicio (TSB)", "📋"),
-    MEET_ADVISORY("Aviso Técnico Preventivo MEET", "💡")
+    MEET_ADVISORY("Aviso Técnico Preventivo Elysium", "💡")
 }
 
 enum class CampaignRemedyStatus(val label: String) {

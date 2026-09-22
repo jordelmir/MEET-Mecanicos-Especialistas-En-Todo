@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.core.content.edit
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
 import com.elysium369.meet.ride.data.remote.RideWalletTopup
-import com.elysium369.meet.ride.wallet.SinpeReceiptParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,10 +23,8 @@ import java.util.UUID
  * Viajes, Grúa, Mecánicos, Repuestos, and Servicios Elysium.
  *
  * Core Guarantees:
- * 1. Fixed 5% (500 bps) Global Platform Commission.
- * 2. ₡15,000 Welcome Starter Credit automatically granted to every specialist account.
- * 3. Unified SINPE Móvil topup submission (parsed via SinpeReceiptParser).
- * 4. Full integration with the Platform Trust Center for owner review and accreditation.
+ * Wallet amounts are a cached projection only. The server ledger is the sole
+ * authority for credit, commission and completed-job balances.
  */
 
 @Serializable
@@ -48,9 +45,9 @@ data class SpecialistTopup(
 data class SpecialistWalletState(
     val specialistId: String,
     val serviceVertical: String,
-    val balanceCrc: Double = 15_000.0, // ₡15,000 Welcome Gift from Jorge Del Valle / MEET
-    val starterGiftCrc: Double = 15_000.0,
-    val commissionPercent: Double = 5.0, // Constitutional 5% max
+    val balanceCrc: Double = 0.0,
+    val starterGiftCrc: Double = 0.0,
+    val commissionPercent: Double = 0.0,
     val totalEarningsCrc: Double = 0.0,
     val totalCommissionsPaidCrc: Double = 0.0,
     val completedJobsCount: Int = 0,
@@ -59,14 +56,12 @@ data class SpecialistWalletState(
 
 data class JobCommissionSplit(
     val grossCrc: Double,
-    val commissionRate: Double = 0.05,
-    val platformFeeCrc: Double = grossCrc * 0.05,
-    val specialistNetCrc: Double = grossCrc * 0.95,
+    val commissionRate: Double = 0.0,
+    val platformFeeCrc: Double = grossCrc * commissionRate,
+    val specialistNetCrc: Double = grossCrc - platformFeeCrc,
 )
 
 object SpecialistWalletStore {
-    const val GLOBAL_COMMISSION_PERCENT = 5.0 // 5% platform commission
-    const val WELCOME_GIFT_CRC = 15_000.0 // ₡15,000 starter credit
     const val SINPE_PHONE = "63194029"
     const val SINPE_RECIPIENT_NAME = "Jorge David Del Valle Miranda"
     const val SINPE_EMAIL = "jordelmir@gmail.com"
@@ -93,21 +88,17 @@ object SpecialistWalletStore {
     }
 
     /**
-     * Synchronize wallet with Supabase if online, preserving the ₡15,000 starter credit guarantee.
+     * Synchronize the local projection with the authoritative Supabase ledger.
      */
     fun syncWithTrustCenter(context: Context, specialistId: String, serviceVertical: String = "ALL") {
         scope.launch {
             runCatching {
-                // Ensure starter credit on remote ledger
                 PlatformTrustCenterGateway.ensureStarterCredit()
                 val remoteBal = PlatformTrustCenterGateway.walletBalance()
                 val remoteTopups = PlatformTrustCenterGateway.loadOwnWalletTopups()
 
                 val current = getWalletFlow(context, specialistId, serviceVertical).value
-                val combinedBalance = maxOf(
-                    current.balanceCrc,
-                    remoteBal.availableMinor.toDouble().coerceAtLeast(WELCOME_GIFT_CRC)
-                )
+                val combinedBalance = remoteBal.availableMinor.toDouble()
 
                 val mappedRemoteTopups = remoteTopups.map { rt ->
                     SpecialistTopup(
@@ -186,8 +177,8 @@ object SpecialistWalletStore {
     }
 
     /**
-     * Records a completed service job, deducting the exact 5% platform commission
-     * and adding 95% net profit to specialist earnings.
+     * Returns a display-only split. It never changes a wallet balance; the
+     * authoritative service ledger must project the completed job first.
      */
     fun recordCompletedJob(
         context: Context,
@@ -196,21 +187,6 @@ object SpecialistWalletStore {
         grossCrc: Double,
     ): JobCommissionSplit {
         val split = JobCommissionSplit(grossCrc = grossCrc)
-        val current = getWalletFlow(context, specialistId, serviceVertical).value
-
-        // Deduct 5% commission from operational wallet, add net earnings
-        val newBalance = (current.balanceCrc - split.platformFeeCrc).coerceAtLeast(0.0)
-        val newEarnings = current.totalEarningsCrc + split.specialistNetCrc
-        val newCommissions = current.totalCommissionsPaidCrc + split.platformFeeCrc
-        val newJobsCount = current.completedJobsCount + 1
-
-        val updated = current.copy(
-            balanceCrc = newBalance,
-            totalEarningsCrc = newEarnings,
-            totalCommissionsPaidCrc = newCommissions,
-            completedJobsCount = newJobsCount,
-        )
-        updateState(context, updated)
         return split
     }
 
@@ -239,12 +215,9 @@ object SpecialistWalletStore {
         // Update in specific specialist wallet
         val specWallet = getWalletFlow(context, target.specialistId, target.serviceVertical).value
         val updatedTopups = specWallet.topups.map { if (it.id == topupId) updatedTarget else it }
-        val newBalance = if (approved) specWallet.balanceCrc + target.amountCrc else specWallet.balanceCrc
-
         updateState(
             context,
             specWallet.copy(
-                balanceCrc = newBalance,
                 topups = updatedTopups,
             )
         )
@@ -286,21 +259,13 @@ object SpecialistWalletStore {
         if (raw != null) {
             val parsed = runCatching { json.decodeFromString<SpecialistWalletState>(raw) }.getOrNull()
             if (parsed != null) {
-                // Guarantee at least WELCOME_GIFT_CRC on every account
-                return parsed.copy(
-                    balanceCrc = maxOf(parsed.balanceCrc, WELCOME_GIFT_CRC),
-                    starterGiftCrc = WELCOME_GIFT_CRC,
-                    commissionPercent = GLOBAL_COMMISSION_PERCENT,
-                )
+                return parsed
             }
         }
-        // Default brand new wallet: exactly ₡15,000 gifted balance and 5% commission
+        // A new local cache has no money until the authoritative ledger arrives.
         return SpecialistWalletState(
             specialistId = specialistId,
             serviceVertical = serviceVertical,
-            balanceCrc = WELCOME_GIFT_CRC,
-            starterGiftCrc = WELCOME_GIFT_CRC,
-            commissionPercent = GLOBAL_COMMISSION_PERCENT,
         )
     }
 

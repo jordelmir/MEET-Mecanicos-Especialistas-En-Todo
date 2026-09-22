@@ -29,6 +29,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,12 +72,19 @@ fun CommonMapPanel(
     userLocation: GeoPoint? = null,
     onMapReady: ((MapLibreMap) -> Unit)? = null,
     onRecenterRequested: (() -> Unit)? = null,
+    onMarkerClick: ((String) -> Unit)? = null,
+    onMapLongClick: ((GeoPoint) -> Unit)? = null,
 ) {
+    val latestMarkerClick by rememberUpdatedState(onMarkerClick)
+    val latestMapLongClick by rememberUpdatedState(onMapLongClick)
+    val latestState by rememberUpdatedState(state)
+    val markerIds = remember { mutableMapOf<Long, String>() }
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
     var mapInstance by remember { mutableStateOf<MapLibreMap?>(null) }
     var mapViewInstance by remember { mutableStateOf<MapView?>(null) }
+    var lastRenderedState by remember { mutableStateOf<CommonMapState?>(null) }
 
     DisposableEffect(lifecycle, mapViewInstance) {
         val mapView = mapViewInstance ?: return@DisposableEffect onDispose {}
@@ -105,8 +113,23 @@ fun CommonMapPanel(
                     mapViewInstance = this
                     getMapAsync { map ->
                         mapInstance = map
+                        map.uiSettings.isScrollGesturesEnabled = true
+                        map.uiSettings.isZoomGesturesEnabled = true
+                        map.uiSettings.isRotateGesturesEnabled = true
+                        map.uiSettings.isTiltGesturesEnabled = true
+                        map.addOnMapLongClickListener { latLng ->
+                            latestMapLongClick?.invoke(GeoPoint(latLng.latitude, latLng.longitude))
+                            latestMapLongClick != null
+                        }
+                        map.setOnMarkerClickListener { marker ->
+                            val id = markerIds[marker.id]
+                            val callback = latestMarkerClick
+                            if (id != null && callback != null) { callback(id); true } else false
+                        }
                         map.setStyle(styleUrl) {
-                            renderCommonMap(ctx, map, state)
+                            val current = latestState
+                            renderCommonMap(ctx, map, current, markerIds)
+                            lastRenderedState = current
                             onMapReady?.invoke(map)
                         }
                     }
@@ -114,8 +137,9 @@ fun CommonMapPanel(
             },
             update = {
                 mapInstance?.let { map ->
-                    if (map.style != null) {
-                        renderCommonMap(context, map, state)
+                    if (map.style != null && lastRenderedState != state) {
+                        renderCommonMap(context, map, state, markerIds)
+                        lastRenderedState = state
                     }
                 }
             }
@@ -206,7 +230,9 @@ private fun renderCommonMap(
     context: Context,
     map: MapLibreMap,
     state: CommonMapState,
+    markerIds: MutableMap<Long, String>,
 ) {
+    markerIds.clear()
     map.clear()
     val iconFactory = IconFactory.getInstance(context)
 
@@ -237,13 +263,14 @@ private fun renderCommonMap(
     state.markers.forEach { marker ->
         val icon = createCommonMarkerIcon(context, iconFactory, marker.role, marker.isHighlighted)
         val accuracyText = marker.point.accuracyMeters?.let { "±${it.toInt()}m" } ?: ""
-        map.addMarker(
+        val renderedMarker = map.addMarker(
             MarkerOptions()
                 .position(LatLng(marker.point.latitude, marker.point.longitude))
                 .title(marker.label)
                 .snippet(listOfNotNull(marker.subtitle, accuracyText.ifBlank { null }).joinToString(" · "))
                 .icon(icon)
         )
+        markerIds[renderedMarker.id] = marker.id
     }
 
     // Camera Positioning
@@ -310,6 +337,8 @@ private fun createCommonMarkerIcon(
         GeoMarkerRole.TOW_TRUCK -> Color.rgb(255, 109, 0) // Tow Orange
         GeoMarkerRole.STORE_LOCATION -> Color.rgb(255, 64, 129) // Pink Accent
         GeoMarkerRole.INCIDENT_PIN -> Color.rgb(255, 23, 68) // Danger Red
+        GeoMarkerRole.HOMICIDE_PIN -> Color.rgb(210, 18, 48) // Verified public homicide category
+        GeoMarkerRole.PRIVATE_INCIDENT_PIN -> Color.rgb(255, 171, 0) // Owner-only pending report
         GeoMarkerRole.GENERIC_SERVICE -> Color.rgb(0, 229, 255)
     }
 
@@ -327,6 +356,22 @@ private fun createCommonMarkerIcon(
     // Solid Inner Core
     paint.color = baseColor
     canvas.drawCircle(center, center, radius, paint)
+
+    if (role == GeoMarkerRole.HOMICIDE_PIN) {
+        // Original generic skull glyph: clear mortality symbol without third-party branding.
+        paint.color = Color.WHITE
+        canvas.drawCircle(center, center - 3f, radius * .48f, paint)
+        paint.color = Color.BLACK
+        canvas.drawCircle(center - radius * .18f, center - 5f, radius * .11f, paint)
+        canvas.drawCircle(center + radius * .18f, center - 5f, radius * .11f, paint)
+        canvas.drawRect(center - 2f, center + 1f, center + 2f, center + 7f, paint)
+        paint.color = Color.WHITE
+        canvas.drawRect(center - radius * .34f, center + radius * .28f, center + radius * .34f, center + radius * .56f, paint)
+        paint.color = Color.BLACK
+        paint.strokeWidth = 2f
+        for (offset in listOf(-5f, 0f, 5f)) canvas.drawLine(center + offset, center + radius * .28f, center + offset, center + radius * .56f, paint)
+        return iconFactory.fromBitmap(bitmap)
+    }
 
     // White Center Dot
     paint.color = Color.WHITE

@@ -461,7 +461,7 @@ fun DriverAppScreen(
                     onShareTrip = {
                         val sendIntent = android.content.Intent().apply {
                             action = android.content.Intent.ACTION_SEND
-                            putExtra(android.content.Intent.EXTRA_TEXT, "Conductor MEET en servicio activo.")
+                            putExtra(android.content.Intent.EXTRA_TEXT, "Conductor Elysium en servicio activo.")
                             type = "text/plain"
                         }
                         context.startActivity(android.content.Intent.createChooser(sendIntent, "Compartir estado"))

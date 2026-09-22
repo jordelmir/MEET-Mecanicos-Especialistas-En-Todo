@@ -31,7 +31,7 @@ import com.elysium369.meet.ui.theme.MeetColors
  * ══════════════════════════════════════════════════════════════════════
  *  M E E T   E X E C U T I V E   C O M M A N D   C E N T E R
  *  ──────────────────────────────────────────────────────────────
- *  Answers: "¿Qué está ocurriendo económica y operacionalmente en MEET?"
+ *  Answers: "¿Qué está ocurriendo económica y operacionalmente en Elysium?"
  *  Exclusive to platform owner and executive administrators.
  *  - GMV ≠ Revenue ≠ Profit strictly displayed.
  *  - Operational anomalies prioritized over vanity statistics.
@@ -61,7 +61,7 @@ fun MeetExecutiveCommandCenterScreen(
                 title = {
                     Column {
                         Text(
-                            "MEET COMMAND CENTER",
+                            "Elysium COMMAND CENTER",
                             fontWeight = FontWeight.Black,
                             fontSize = 18.sp,
                             color = Color.White,

@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -53,6 +54,7 @@ fun HomeClassicScreen(
     onCancelPreview: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val compactHeader = LocalConfiguration.current.screenWidthDp < 420
     val prefs = remember { context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE) }
     val userProfile = remember { prefs.getString("user_profile", "owner").orEmpty() }
     val activeVehicle by viewModel.selectedVehicle.collectAsState()
@@ -153,14 +155,15 @@ fun HomeClassicScreen(
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = buildAnnotatedString {
-                                    withStyle(SpanStyle(color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 28.sp)) {
-                                        append("ELYSIUM")
+                                    withStyle(SpanStyle(color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = if (compactHeader) 20.sp else 28.sp)) {
+                                        append(if (compactHeader) "ELYSIUM\n" else "ELYSIUM ")
                                     }
-                                    append(" ")
-                                    withStyle(SpanStyle(color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, fontSize = 20.sp)) {
-                                        append("VANGUARD")
+                                    withStyle(SpanStyle(color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, fontSize = if (compactHeader) 15.sp else 20.sp)) {
+                                        append("VANGUARD AI OS")
                                     }
-                                }
+                                },
+                                softWrap = true,
+                                maxLines = 2,
                             )
                             // Role badge
                             val roleLabel = when (userProfile) {
@@ -209,7 +212,7 @@ fun HomeClassicScreen(
                                     .then(Modifier.pulseOnHover()),
                                 contentAlignment = Alignment.Center
                             ) {
-                                ElysiumSectionIcon(
+                                MeetSectionIcon(
                                     key = "theme",
                                     contentDescription = "Personalizar tema",
                                     tint = MeetColors.neonGreen,
@@ -227,7 +230,7 @@ fun HomeClassicScreen(
                                     .then(Modifier.pulseOnHover()),
                                 contentAlignment = Alignment.Center
                             ) {
-                                ElysiumSectionIcon(
+                                MeetSectionIcon(
                                     key = "settings",
                                     contentDescription = "Ajustes",
                                     tint = MeetColors.electricBlue,
@@ -525,12 +528,13 @@ fun HomeClassicScreen(
             PhantomSectionHeader("Acciones Rápidas")
 
             val actions = buildList {
+                add(Triple("🛡️", "Elysium Seguridad", MeetColors.warning) to MeetDestinations.SAFETY_HOME)
                 add(Triple("💬", "Mensajes", MeetColors.cyberCyan) to "messages")
                 add(Triple("⚖️", "Legal Vanguard", MeetColors.warning) to "legal_vanguard")
                 add(Triple("🏠", "Properties", MeetColors.neonGreen) to "elysium_properties")
                 add(Triple("⛽", "Fuel Rewards", MeetColors.cyberCyan) to "fuel_rewards")
-                add(Triple("🚕", "MEET Rides", MeetColors.neonGreen) to MeetDestinations.RIDE_HOME)
-                add(Triple("📚", "MEET Aprende", Color(0xFFFFD700)) to MeetDestinations.LEARNING_HUB)
+                add(Triple("🚕", "Elysium Rides", MeetColors.neonGreen) to MeetDestinations.RIDE_HOME)
+                add(Triple("📚", "Elysium Aprende", Color(0xFFFFD700)) to MeetDestinations.LEARNING_HUB)
                 add(Triple("🛠️", "Servicios & Oficios", Color(0xFFC85CFF)) to "universal_services")
                 add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
                 add(Triple("⚠️", "DTCs", MeetColors.hotMagenta) to "dtc")
@@ -560,7 +564,7 @@ fun HomeClassicScreen(
                     add(Triple("🛡️", "Centro de Confianza", MeetColors.neonGreen) to "platform_trust_center")
                     add(Triple("⚡", "Command Center", MeetColors.cyberCyan) to "meet_command_center")
                 }
-                add(Triple("🌱", "Mi Actividad", MeetColors.neonGreen) to "passenger_activity")
+                add(Triple("🌱", "Mi Actividad", MeetColors.neonGreen) to "unified_activity")
                 add(Triple("📊", "Driver Center", MeetColors.neonGreen) to "driver_command_center")
                 add(Triple("🔧", "Técnico BI", Color(0xFF00E5FF)) to "mechanic_business")
                 add(Triple("🏭", "Taller B2B", Color(0xFFFFB300)) to "workshop_command_center")
@@ -685,7 +689,7 @@ private fun QuickActionCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            ElysiumSectionIcon(
+            MeetSectionIcon(
                 key = iconKey,
                 contentDescription = label,
                 tint = accentColor,
@@ -736,7 +740,7 @@ private fun buildHomeCommandState(
         )
         obdState != ObdState.CONNECTED -> HomeCommandState(
             title = "Conecta el adaptador OBD",
-            recommendation = "Enciende el switch, conecta el adaptador y deja que Elysium Vanguard detecte protocolo, latencia y capacidades antes del escaneo.",
+            recommendation = "Enciende el switch, conecta el adaptador y deja que Elysium Vanguard AI OS detecte protocolo, latencia y capacidades antes del escaneo.",
             primaryAction = "CONECTAR ADAPTADOR",
             primaryRoute = "connect",
             severityColor = MeetColors.cyberCyan,
@@ -760,8 +764,8 @@ private fun buildHomeCommandState(
         )
         healthScore < 80 -> HomeCommandState(
             title = "Salud del vehículo requiere revisión",
-            recommendation = "El score bajó por telemetría o anomalías. Revisa Elysium Vanguard DNA para ver tendencia, sistema afectado y próxima prueba recomendada.",
-            primaryAction = "VER Elysium Vanguard DNA",
+            recommendation = "El score bajó por telemetría o anomalías. Revisa Elysium Vanguard AI OS DNA para ver tendencia, sistema afectado y próxima prueba recomendada.",
+            primaryAction = "VER Elysium Vanguard AI OS DNA",
             primaryRoute = "meet_dna",
             severityColor = MeetColors.warning,
             statusLine = "Score: $healthScore/100"

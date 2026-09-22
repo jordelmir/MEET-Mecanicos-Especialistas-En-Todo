@@ -207,7 +207,7 @@ fun HomeAdaptiveScreen(
                             .then(Modifier.pulseOnHover()),
                         contentAlignment = Alignment.Center
                     ) {
-                        ElysiumSectionIcon(
+                        MeetSectionIcon(
                             key = "theme",
                             contentDescription = "Personalizar tema",
                             tint = MeetColors.neonGreen,
@@ -225,7 +225,7 @@ fun HomeAdaptiveScreen(
                             .then(Modifier.pulseOnHover()),
                         contentAlignment = Alignment.Center
                     ) {
-                        ElysiumSectionIcon(
+                        MeetSectionIcon(
                             key = "settings",
                             contentDescription = "Ajustes",
                             tint = MeetColors.electricBlue,
@@ -339,7 +339,7 @@ fun HomeAdaptiveScreen(
                                 border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f))
                             ) {
                                 Text(
-                                    text = "MEET RIDES",
+                                    text = "Elysium RIDES",
                                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                     color = MeetColors.neonGreen,
                                     fontWeight = FontWeight.Bold,
@@ -412,7 +412,7 @@ fun HomeAdaptiveScreen(
                                         fontSize = 16.sp
                                     )
                                     Text(
-                                        "Turno y despacho inteligente MEET",
+                                        "Turno y despacho inteligente Elysium",
                                         color = MeetColors.textSecondary,
                                         fontSize = 11.sp
                                     )
@@ -765,7 +765,7 @@ private fun AdaptiveModuleTile(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ElysiumSectionIcon(
+            MeetSectionIcon(
                 key = module.glyph,
                 contentDescription = module.title,
                 tint = if (module.isHighlight) MeetColors.neonGreen else MeetColors.cyberCyan,

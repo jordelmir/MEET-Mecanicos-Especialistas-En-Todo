@@ -776,7 +776,7 @@ fun AdapterSearchSheet(
                 borderColor = MeetColors.neonGreen.copy(alpha = 0.25f),
                 glowColor = MeetColors.neonGreen,
                 onClick = {
-                    onConnect("Simulador Virtual MEET (Demo)", "SIMULATOR")
+                    onConnect("Simulador Virtual Elysium (Demo)", "SIMULATOR")
                     onDismiss()
                 },
                 modifier = Modifier.fillMaxWidth()

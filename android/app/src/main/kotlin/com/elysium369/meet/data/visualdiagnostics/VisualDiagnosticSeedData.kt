@@ -45,7 +45,7 @@ object VisualDiagnosticSeedData {
             workshopTests = listOf(
                 ComponentTest("Alimentación", "Medir VBATT y masas en pines del conector ECU con diagrama OEM.", "12V+ en pines de poder, <0.1V en masas.", "Multímetro"),
                 ComponentTest("Bus CAN", "Verificar resistencia entre CAN-H y CAN-L (desconectado) = ~60Ω.", "60Ω entre terminadores. Sin cortocircuito.", "Multímetro"),
-                ComponentTest("Comunicación", "Intentar comunicación por OBD-II con protocolo auto-detect.", "Responde a 0100 con PIDs soportados.", "Escáner Elysium Vanguard")
+                ComponentTest("Comunicación", "Intentar comunicación por OBD-II con protocolo auto-detect.", "Responde a 0100 con PIDs soportados.", "Escáner Elysium Vanguard AI OS")
             ),
             repairFlow = listOf(
                 RepairStep(1, "Verificar fusibles ECM (BATT y IGN) y relé principal.", "Alimentación confirmada."),

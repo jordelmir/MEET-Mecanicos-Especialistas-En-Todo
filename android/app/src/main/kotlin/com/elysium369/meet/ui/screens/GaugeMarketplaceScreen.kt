@@ -608,9 +608,9 @@ private fun GaugePublishDialog(
 ) {
     val categories = listOf("performance", "luxury", "racing", "diagnostic", "weather", "custom")
     var name by remember(sourceGauge?.id, draftConfig.name) {
-        mutableStateOf(sourceGauge?.name ?: draftConfig.name.ifBlank { "Gauge MEET" })
+        mutableStateOf(sourceGauge?.name ?: draftConfig.name.ifBlank { "Gauge Elysium" })
     }
-    var description by remember(sourceGauge?.id) { mutableStateOf("Diseño de gauge personalizado creado con MEET DIY Editor.") }
+    var description by remember(sourceGauge?.id) { mutableStateOf("Diseño de gauge personalizado creado con Elysium DIY Editor.") }
     var priceTier by remember(sourceGauge?.id) { mutableIntStateOf(1) }
     var category by remember(sourceGauge?.id) { mutableStateOf(if (sourceGauge != null) "custom" else "performance") }
     var tags by remember(sourceGauge?.id) { mutableStateOf("") }

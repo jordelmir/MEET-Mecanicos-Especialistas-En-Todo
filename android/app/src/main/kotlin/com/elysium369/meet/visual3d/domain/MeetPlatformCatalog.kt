@@ -19,22 +19,22 @@ object MeetPlatformCatalog {
     val profiles = listOf(
         MeetPlatformProfile(
             id = "origin",
-            displayName = "MEET Origin",
+            displayName = "Elysium Origin",
             category = "Vehiculo base permanente",
             assetPath = "models/vehicle_twin/reference_vehicle.glb",
             permanent = true,
             originalMeetDesign = false,
             visualMaturity = PlatformVisualMaturity.REALISTIC_REFERENCE
         ),
-        MeetPlatformProfile("titan_forge", "MEET Titan Forge", "4x4 pesado original", "models/meet_platforms/titan_forge.glb"),
-        MeetPlatformProfile("backhoe_hx", "MEET Backhoe HX", "Retroexcavadora original", "models/meet_platforms/backhoe_hx.glb"),
-        MeetPlatformProfile("terra_loader", "MEET Terra Loader", "Cargador frontal original", "models/meet_platforms/terra_loader.glb"),
-        MeetPlatformProfile("chronos_flux", "MEET Chronos Flux", "Movilidad futura original", "models/meet_platforms/chronos_flux.glb"),
-        MeetPlatformProfile("ion_vector", "MEET Ion Vector", "Electrico original", "models/meet_platforms/ion_vector.glb"),
-        MeetPlatformProfile("apex_r", "MEET Apex R", "Superdeportivo original", "models/meet_platforms/apex_r.glb"),
-        MeetPlatformProfile("aero_v1", "MEET Aero V1", "Aeronave original", "models/meet_platforms/aero_v1.glb"),
-        MeetPlatformProfile("asterion", "MEET Asterion", "Cohete original", "models/meet_platforms/asterion.glb"),
-        MeetPlatformProfile("abyss_one", "MEET Abyss One", "Submarino original", "models/meet_platforms/abyss_one.glb")
+        MeetPlatformProfile("titan_forge", "Elysium Titan Forge", "4x4 pesado original", "models/meet_platforms/titan_forge.glb"),
+        MeetPlatformProfile("backhoe_hx", "Elysium Backhoe HX", "Retroexcavadora original", "models/meet_platforms/backhoe_hx.glb"),
+        MeetPlatformProfile("terra_loader", "Elysium Terra Loader", "Cargador frontal original", "models/meet_platforms/terra_loader.glb"),
+        MeetPlatformProfile("chronos_flux", "Elysium Chronos Flux", "Movilidad futura original", "models/meet_platforms/chronos_flux.glb"),
+        MeetPlatformProfile("ion_vector", "Elysium Ion Vector", "Electrico original", "models/meet_platforms/ion_vector.glb"),
+        MeetPlatformProfile("apex_r", "Elysium Apex R", "Superdeportivo original", "models/meet_platforms/apex_r.glb"),
+        MeetPlatformProfile("aero_v1", "Elysium Aero V1", "Aeronave original", "models/meet_platforms/aero_v1.glb"),
+        MeetPlatformProfile("asterion", "Elysium Asterion", "Cohete original", "models/meet_platforms/asterion.glb"),
+        MeetPlatformProfile("abyss_one", "Elysium Abyss One", "Submarino original", "models/meet_platforms/abyss_one.glb")
     )
 
     val default = profiles.first()
@@ -48,5 +48,5 @@ object MeetPlatformCatalog {
     }
 
     fun requireById(id: String): MeetPlatformProfile =
-        profiles.firstOrNull { it.id == id } ?: error("Unknown MEET platform: $id")
+        profiles.firstOrNull { it.id == id } ?: error("Unknown Elysium platform: $id")
 }

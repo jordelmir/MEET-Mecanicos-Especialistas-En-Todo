@@ -63,7 +63,7 @@ class PeritoReportGenerator(private val context: Context) {
         paint.color = Color.WHITE
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         paint.textSize = 22f
-        canvas.drawText("Elysium Vanguard PERITO", 35f, 45f, paint)
+        canvas.drawText("Elysium Vanguard AI OS PERITO", 35f, 45f, paint)
 
         paint.textSize = 10f
         paint.color = accentNeonGreen
@@ -316,7 +316,7 @@ class PeritoReportGenerator(private val context: Context) {
         paint.color = Color.WHITE
         paint.textSize = 8f
         paint.typeface = Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
-        canvas.drawText("Elysium Vanguard ELITE PERITO VEHICLE REPORT CERTIFICATION SYSTEM", 35f, 831f, paint)
+        canvas.drawText("Elysium Vanguard AI OS ELITE PERITO VEHICLE REPORT CERTIFICATION SYSTEM", 35f, 831f, paint)
         canvas.drawText("PÁGINA 1 DE 1", 500f, 831f, paint)
 
         document.finishPage(page)

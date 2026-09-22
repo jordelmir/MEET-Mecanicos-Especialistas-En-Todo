@@ -117,7 +117,7 @@ object GpsTrailPdfExporter {
         // Title
         canvas.drawText("REPORTE FORENSE GPS", 50f, y, titlePaint)
         y += 30f
-        canvas.drawText("Elysium Vanguard · Evidencia de Recorrido", 50f, y, subtitlePaint)
+        canvas.drawText("Elysium Vanguard AI OS · Evidencia de Recorrido", 50f, y, subtitlePaint)
         y += 50f
 
         // QR Code
@@ -174,7 +174,7 @@ object GpsTrailPdfExporter {
         }
 
         y += 20f
-        canvas.drawText("Este documento es evidencia forense generada por Elysium Vanguard.", 50f, y, labelPaint)
+        canvas.drawText("Este documento es evidencia forense generada por Elysium Vanguard AI OS.", 50f, y, labelPaint)
         y += 14f
         canvas.drawText("El hash SHA-256 garantiza la integridad del contenido.", 50f, y, labelPaint)
         y += 14f
@@ -348,7 +348,7 @@ object GpsTrailPdfExporter {
             isAntiAlias = true
         }
         canvas.drawText(
-            "Elysium Vanguard · Hash: ${hash.take(32)}… · Generado ${System.currentTimeMillis()}",
+            "Elysium Vanguard AI OS · Hash: ${hash.take(32)}… · Generado ${System.currentTimeMillis()}",
             50f,
             pageHeight - 30f,
             footerPaint,

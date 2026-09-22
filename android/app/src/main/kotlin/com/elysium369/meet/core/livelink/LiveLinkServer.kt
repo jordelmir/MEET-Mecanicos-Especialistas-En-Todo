@@ -114,7 +114,7 @@ class LiveLinkServer {
                     // Send welcome
                     send(Frame.Text(json.encodeToString(LiveLinkMessage(
                         type = "welcome",
-                        payload = """{"message":"Conectado a Elysium Vanguard LiveLink","mode":"READ_ONLY","critical_controls":false}"""
+                        payload = """{"message":"Conectado a Elysium Vanguard AI OS LiveLink","mode":"READ_ONLY","critical_controls":false}"""
                     ))))
 
                     try {

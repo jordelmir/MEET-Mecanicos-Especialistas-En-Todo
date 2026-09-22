@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 
 object MeetPushDispatcher {
-    private const val TAG = "MeetPushDispatcher"
+    private const val TAG = "ElysiumPushDispatcher"
 
     /**
      * Dispatches high-priority push events to the user's phone notification tray

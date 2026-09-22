@@ -46,7 +46,7 @@ object KnowledgePackManager {
         if (currentAppVersionCode < manifest.minimumAppVersionCode) {
             return PackInstallResult(
                 status = PackVerificationStatus.INCOMPATIBLE_APP_VERSION,
-                message = "El paquete requiere MEET versión ${manifest.minimumAppVersionCode} o superior.",
+                message = "El paquete requiere Elysium versión ${manifest.minimumAppVersionCode} o superior.",
                 isInstalled = false,
             )
         }

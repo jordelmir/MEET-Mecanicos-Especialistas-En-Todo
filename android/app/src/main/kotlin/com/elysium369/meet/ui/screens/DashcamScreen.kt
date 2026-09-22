@@ -99,7 +99,7 @@ fun DashcamScreen(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Elysium Vanguard necesita acceder a la cámara trasera para poder grabar la carretera y superponer la telemetría en tiempo real sobre el video.",
+                    text = "Elysium Vanguard AI OS necesita acceder a la cámara trasera para poder grabar la carretera y superponer la telemetría en tiempo real sobre el video.",
                     color = MeetColors.textMuted,
                     fontSize = 13.sp,
                     textAlign = TextAlign.Center,

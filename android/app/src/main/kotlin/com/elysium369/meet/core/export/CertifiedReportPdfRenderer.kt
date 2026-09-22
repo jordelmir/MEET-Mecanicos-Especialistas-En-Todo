@@ -39,7 +39,7 @@ import java.util.Locale
  *   p6 — Evidence (photos, signatures, disclaimer, hash footer)
  *
  * Each page footer carries
- *   "Verified by Elysium Vanguard · <integrity_hash>"
+ *   "Verified by Elysium Vanguard AI OS · <integrity_hash>"
  * in 8pt mono. The QR on page 1 carries the [QrPayload] from Phase 3.
  *
  * Honest-phrases rule: if the report has no snapshot, page 4 must show
@@ -140,14 +140,14 @@ class CertifiedReportPdfRenderer(private val context: Context) {
     private fun drawHeader(canvas: Canvas, pageWidth: Int, title: String, accent: Int, dark: Int) {
         val headerPaint = Paint().apply { color = dark; textSize = 18f; isAntiAlias = true; isFakeBoldText = true }
         val underlinePaint = Paint().apply { color = accent; strokeWidth = 2f }
-        canvas.drawText("Elysium Vanguard · $title", 32f, 48f, headerPaint)
+        canvas.drawText("Elysium Vanguard AI OS · $title", 32f, 48f, headerPaint)
         canvas.drawLine(32f, 60f, (pageWidth - 32).toFloat(), 60f, underlinePaint)
     }
 
     private fun drawFooter(canvas: Canvas, pageWidth: Int, pageHeight: Int, hash: String, subtle: Int) {
         val footerPaint = Paint().apply { color = subtle; textSize = 8f; isAntiAlias = true; typeface = android.graphics.Typeface.MONOSPACE }
         canvas.drawText(
-            "Verified by Elysium Vanguard · $hash",
+            "Verified by Elysium Vanguard AI OS · $hash",
             32f, (pageHeight - 18).toFloat(), footerPaint
         )
     }
@@ -156,7 +156,7 @@ class CertifiedReportPdfRenderer(private val context: Context) {
         val big = Paint().apply { color = dark; textSize = 28f; isAntiAlias = true; isFakeBoldText = true }
         val label = Paint().apply { color = subtle; textSize = 11f; isAntiAlias = true }
         val value = Paint().apply { color = dark; textSize = 14f; isAntiAlias = true }
-        canvas.drawText("Elysium Vanguard", 32f, 70f, big)
+        canvas.drawText("Elysium Vanguard AI OS", 32f, 70f, big)
         canvas.drawText("Reporte Certificado V2", 32f, 95f, Paint().apply { color = accent; textSize = 14f; isAntiAlias = true; isFakeBoldText = true })
 
         val typeLabel = when (content.report.reportType) {
@@ -363,7 +363,7 @@ class CertifiedReportPdfRenderer(private val context: Context) {
 
         canvas.drawText("Disclaimer técnico:", 32f, y, Paint().apply { color = Color.BLACK; textSize = 12f; isAntiAlias = true; isFakeBoldText = true }); y += 18f
         listOf(
-            "Este reporte es un documento técnico generado por Elysium Vanguard V2.",
+            "Este reporte es un documento técnico generado por Elysium Vanguard AI OS V2.",
             "La integridad del contenido está protegida por SHA-256 (ver footer).",
             "Si el snapshot OBD fue capturado offline, los códigos DTC deben confirmarse con captura en vivo.",
             "Las piezas declaradas como usadas en este reporte NO implican compatibilidad EXACTA",

@@ -26,7 +26,7 @@ enum class CredentialAuthority(val displayName: String) {
     GOOGLE_WALLET("Google Wallet Digital Car Key"),
     OEM_APP("Aplicación Oficial del Fabricante"),
     CCC_PARTNER("Car Connectivity Consortium (CCC)"),
-    MEET_NATIVE("MEET Vanguard Security Engine"),
+    MEET_NATIVE("Elysium Vanguard AI OS Security Engine"),
     CERTIFIED_LOCKSMITH("Cerrajería Automotriz Certificada")
 }
 

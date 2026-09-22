@@ -111,6 +111,21 @@ class RideMapModelsTest {
     }
 
     @Test
+    fun `road authoritative preview never draws a straight line while routing is unavailable`() {
+        val pickup = RideGeoPoint(9.9281, -84.0907, null, 9_000)
+        val destination = RideGeoPoint(9.9350, -84.0800, null, 9_200)
+
+        val state = RideMapStateFactory.create(
+            pickup = pickup,
+            destination = destination,
+            route = null,
+            allowStraightLineFallback = false,
+        )
+
+        assertEquals(emptyList<RideGeoPoint>(), state.route)
+    }
+
+    @Test
     fun `factory omits unavailable positions instead of inventing coordinates`() {
         val pickup = RideGeoPoint(9.9281, -84.0907, null, 9_000)
 

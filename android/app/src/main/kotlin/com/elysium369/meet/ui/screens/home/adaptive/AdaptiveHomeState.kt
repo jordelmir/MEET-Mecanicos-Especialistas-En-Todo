@@ -3,7 +3,7 @@ package com.elysium369.meet.ui.screens.home.adaptive
 import com.elysium369.meet.core.obd.ObdState
 
 /**
- * MEET DHEA — Adaptive / Command Home Projection State.
+ * Elysium DHEA — Adaptive / Command Home Projection State.
  * Pure presentation state derived from verifiable domain truth without duplicating domain logic.
  */
 data class AdaptiveHomeState(
@@ -50,7 +50,8 @@ enum class HomeSectionCategory(val title: String, val glyph: String) {
     VEHICLE("MI VEHÍCULO & HISTORIAL", "🚗"),
     SERVICES("SERVICIOS & RED DE ASISTENCIA", "🛠️"),
     TOOLS("HERRAMIENTAS AVANZADAS", "🔬"),
-    PROFESSIONAL("VANGUARD PRO & FLOTA", "👑")
+    PROFESSIONAL("ELYSIUM VANGUARD AI OS PRO & FLOTA", "👑"),
+    SAFETY("SEGURIDAD", "🛡️")
 }
 
 data class HomeModuleItem(

@@ -925,9 +925,9 @@ fun ComponentLocatorScreen(
                         )
                         Text(
                             text = if (currentCatalogSystemId == "engine") {
-                                "Malla mecanica MEET L2 · no dimensional/OEM"
+                                "Malla mecanica Elysium L2 · no dimensional/OEM"
                             } else {
-                                "Construccion procedural MEET · no dimensional/OEM"
+                                "Construccion procedural Elysium · no dimensional/OEM"
                             },
                             color = MeetColors.warning,
                             fontSize = 7.sp,
@@ -944,7 +944,7 @@ fun ComponentLocatorScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "L2 · conjunto mecanico MEET · ID literal",
+                                text = "L2 · conjunto mecanico Elysium · ID literal",
                                 color = MeetColors.textSecondary,
                                 fontSize = 7.sp,
                                 maxLines = 1,
@@ -1680,7 +1680,7 @@ private fun sceneDisplayName(sceneType: SceneType, engineType: EngineType): Stri
         SceneType.ENGINE_BLOCK -> if (engineType == EngineType.ELECTRIC) "motor, inversor y batería" else "motor, admisión y escape"
         SceneType.RELAY_FUSE_BOX -> if (engineType == EngineType.ELECTRIC) "control y protecciones HV" else "fusibles, relés y protecciones"
         SceneType.WIRING_HARNESS -> if (engineType == EngineType.ELECTRIC) "arnés de alto voltaje" else "arnés, señales y alimentación"
-        SceneType.SUSPENSION -> "construccion MEET, no dimensional ni OEM"
+        SceneType.SUSPENSION -> "construccion Elysium, no dimensional ni OEM"
         SceneType.TRANSMISSION -> "transmisión, embrague y diferencial"
         SceneType.BRAKES_STEERING -> "sistema de frenado, dirección hidráulica/asistida"
         SceneType.UNIVERSAL_CATALOG -> "catálogo propietario completo · esquema procedural"
@@ -1748,7 +1748,7 @@ private fun CatalogPart.toComponentInfo(): ComponentInfo {
         professionalChecks = listOf("Confirme VIN, OEM, foto, conector o medidas antes de decidir compatibilidad."),
         repairWorkflow = listOf("Use el catálogo de Piezas y Reparaciones para abrir un procedimiento revisable."),
         serviceSpecs = listOf("Datos técnicos: no confirmados para esta variante."),
-        safetyNotes = listOf("Modelo visual MEET; no es una geometria OEM ni dimensional.")
+        safetyNotes = listOf("Modelo visual Elysium; no es una geometria OEM ni dimensional.")
     )
 }
 

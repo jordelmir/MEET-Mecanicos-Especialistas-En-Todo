@@ -388,7 +388,7 @@ private fun WiFiTelemetryPanel(
                             .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(8.dp))
                             .clickable {
                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Elysium Vanguard Live Link", serverUrl))
+                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Elysium Vanguard AI OS Live Link", serverUrl))
                                 Toast.makeText(context, "Enlace copiado al portapapeles", Toast.LENGTH_SHORT).show()
                             }
                             .padding(12.dp),
@@ -590,7 +590,7 @@ private fun RemoteTelemetryPanel(
                             onClick = {
                                 val shareIntent = android.content.Intent().apply {
                                     action = android.content.Intent.ACTION_SEND
-                                    putExtra(android.content.Intent.EXTRA_TEXT, "Elysium Vanguard LiveLink PRO: $secureShareUrl")
+                                    putExtra(android.content.Intent.EXTRA_TEXT, "Elysium Vanguard AI OS LiveLink PRO: $secureShareUrl")
                                     type = "text/plain"
                                 }
                                 context.startActivity(android.content.Intent.createChooser(shareIntent, "Compartir LiveLink PRO"))

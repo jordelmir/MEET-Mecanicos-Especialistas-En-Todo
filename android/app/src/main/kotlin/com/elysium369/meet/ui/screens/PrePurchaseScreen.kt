@@ -242,7 +242,7 @@ fun PrePurchaseScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Elysium Vanguard ejecutará un escaneo profundo de 8 dimensiones mecánicas y electrónicas usando únicamente datos OBD-II reales.",
+                            text = "Elysium Vanguard AI OS ejecutará un escaneo profundo de 8 dimensiones mecánicas y electrónicas usando únicamente datos OBD-II reales.",
                             color = MeetColors.textSecondary,
                             style = MaterialTheme.typography.bodyMedium,
                             textAlign = TextAlign.Center

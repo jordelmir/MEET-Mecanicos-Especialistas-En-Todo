@@ -100,7 +100,7 @@ object TheoryExamKnowledge {
             "Sistema Costarricense de Información Jurídica · PGR",
             "https://pgrweb.go.cr/Scij/Busqueda/Normativa/Normas/nrm_texto_completo.aspx?nValor1=1&nValor2=73504",
             TheorySourceKind.LAW,
-            "Texto normativo vigente. Los montos y artículos pueden reformarse; MEET enlaza la fuente viva en vez de congelar cifras.",
+            "Texto normativo vigente. Los montos y artículos pueden reformarse; Elysium enlaza la fuente viva en vez de congelar cifras.",
         ),
         TheorySource(
             "cosevi_curriculum",
@@ -116,7 +116,7 @@ object TheoryExamKnowledge {
             "Imprenta Nacional de Costa Rica",
             "https://www.imprentanacional.go.cr/noticias/2026/venta-nuevos-manuales-conductor.aspx",
             TheorySourceKind.OFFICIAL,
-            "Canales, precio y forma de adquirir el manual oficial. MEET no distribuye copias no autorizadas.",
+            "Canales, precio y forma de adquirir el manual oficial. Elysium no distribuye copias no autorizadas.",
         ),
         TheorySource(
             "learning_science",
@@ -132,7 +132,7 @@ object TheoryExamKnowledge {
             "99kph · recurso independiente",
             "https://99kph.com/curso-teorico-de-manejo",
             TheorySourceKind.INDEPENDENT_PRACTICE,
-            "Práctica externa gratuita. No es MOPT, DGEV ni COSEVI; MEET no certifica que sus preguntas sean oficiales.",
+            "Práctica externa gratuita. No es MOPT, DGEV ni COSEVI; Elysium no certifica que sus preguntas sean oficiales.",
         ),
         TheorySource(
             "free_manejogo",

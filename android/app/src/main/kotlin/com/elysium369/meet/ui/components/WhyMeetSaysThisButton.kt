@@ -34,7 +34,7 @@ fun WhyMeetSaysThisButton(
         ) {
             Text("🔍", fontSize = 10.sp)
             Text(
-                "¿Por qué MEET dice esto?",
+                "¿Por qué Elysium dice esto?",
                 color = MeetColors.electricBlue,
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold

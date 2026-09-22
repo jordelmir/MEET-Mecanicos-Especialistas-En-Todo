@@ -69,7 +69,7 @@ object QrCodeSharing {
     const val KIND_GAUGE = "meet.gauge.diy"
     const val SCHEMA_VERSION = 1
 
-    private const val QR_PREFIX = "MEET-GAUGE-QR:"
+    private const val QR_PREFIX = "Elysium-GAUGE-QR:"
     private const val MAX_QR_CHARS = 12_000
 
     private val json = Json {
@@ -125,7 +125,7 @@ object QrCodeSharing {
         val envelope = GaugeQrEnvelope(
             shareId = UUID.randomUUID().toString(),
             createdAt = createdAt,
-            displayName = sanitized.config.name.ifBlank { "MEET Gauge" },
+            displayName = sanitized.config.name.ifBlank { "Elysium Gauge" },
             sourceGaugeId = sourceGaugeId,
             sourceMarketplaceId = sourceMarketplaceId,
             sourcePublished = sourcePublished,
@@ -165,7 +165,7 @@ object QrCodeSharing {
             require(envelope.checksum == expectedChecksum) { "QR alterado o corrupto" }
 
             GaugeQrImport(
-                displayName = envelope.displayName.ifBlank { sanitized.config.name.ifBlank { "MEET Gauge" } },
+                displayName = envelope.displayName.ifBlank { sanitized.config.name.ifBlank { "Elysium Gauge" } },
                 config = sanitized.config,
                 fingerprint = expectedChecksum,
                 sourceGaugeId = envelope.sourceGaugeId,
@@ -178,7 +178,7 @@ object QrCodeSharing {
             val legacyConfig = json.decodeFromString(GaugeConfig.serializer(), payload)
             val sanitized = sanitizeGaugeConfig(legacyConfig)
             GaugeQrImport(
-                displayName = sanitized.config.name.ifBlank { "MEET Gauge" },
+                displayName = sanitized.config.name.ifBlank { "Elysium Gauge" },
                 config = sanitized.config,
                 fingerprint = fingerprintFor(sanitized.config),
                 sourceGaugeId = null,
@@ -194,7 +194,7 @@ object QrCodeSharing {
         val sanitized = sanitizeGaugeConfig(config).config
         val canonical = json.encodeToString(sanitized)
         val digest = MessageDigest.getInstance("SHA-256")
-            .digest("MEET_GAUGE_QR_V1|$canonical".toByteArray(Charsets.UTF_8))
+            .digest("Elysium_GAUGE_QR_V1|$canonical".toByteArray(Charsets.UTF_8))
         return digest.joinToString("") { "%02x".format(it) }
     }
 
@@ -241,7 +241,7 @@ object QrCodeSharing {
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "image/png"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_TEXT, "Gauge MEET: $title")
+            putExtra(Intent.EXTRA_TEXT, "Gauge Elysium: $title")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         context.startActivity(Intent.createChooser(shareIntent, "Compartir gauge QR"))
@@ -249,7 +249,7 @@ object QrCodeSharing {
 
     private fun sanitizeGaugeConfig(config: GaugeConfig): SanitizedGaugeConfig {
         val warnings = mutableListOf<String>()
-        val name = config.name.trim().ifBlank { "MEET Gauge" }.take(48)
+        val name = config.name.trim().ifBlank { "Elysium Gauge" }.take(48)
         val bgType = when (config.bgType) {
             0, 1 -> config.bgType
             2 -> {

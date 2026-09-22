@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -240,6 +241,7 @@ fun RideServiceScreen(
         }
     }
     var showInRideChat by rememberSaveable { mutableStateOf(false) }
+    var selectedChatRideId by rememberSaveable { mutableStateOf<String?>(null) }
     val passengerRegistrationMissing = passengerVerification == null
     val driverRegistrationMissing = driverVerification == null
     val voicePreferences = remember(context) {
@@ -500,6 +502,8 @@ fun RideServiceScreen(
                                 fontSize = 8.sp,
                                 fontWeight = FontWeight.Black,
                                 maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                             )
                             Text(
                                 text = if (driverMode) "CHOFER" else "PASAJERO",
@@ -507,6 +511,8 @@ fun RideServiceScreen(
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
                             )
                         }
                         val activeCanonicalState = effectiveActiveRide?.serverState ?: effectiveActiveRide?.status
@@ -574,6 +580,12 @@ fun RideServiceScreen(
                     isDriver = driverMode,
                     initialTab = profileInitialTab,
                     onBack = { showProfile = false },
+                    onOpenChat = { ride ->
+                        selectedChatRideId = ride.requestId
+                        viewModel.observeRideChatForRequestId(ride.requestId)
+                        showProfile = false
+                        showInRideChat = true
+                    },
                 )
             } else if (driverMode && effectiveActiveRide != null) {
                 com.elysium369.meet.ride.driver.ui.DriverActiveTripCockpitRoute(
@@ -599,13 +611,21 @@ fun RideServiceScreen(
                         viewModel = viewModel,
                         onRegisterDriver = onOpenDriverRegistration,
                         onOpenRideCenter = onNavigateToRideCenter,
-                        onOpenMessages = { showInRideChat = true },
+                        onOpenMessages = { rideId ->
+                            selectedChatRideId = rideId
+                            viewModel.observeRideChatForRequestId(rideId)
+                            showInRideChat = true
+                        },
                     )
                 } else {
                     PassengerDashboard(
                         viewModel = viewModel,
                         forceRegistration = firstAccessRole == "PASSENGER",
-                        onOpenMessages = { showInRideChat = true },
+                        onOpenMessages = { rideId ->
+                            selectedChatRideId = rideId
+                            viewModel.observeRideChatForRequestId(rideId)
+                            showInRideChat = true
+                        },
                     )
                 }
             }
@@ -763,7 +783,11 @@ fun RideServiceScreen(
             }
 
             // ═══ UNIFIED IN-RIDE REALTIME CHAT SHEET ═══
-            val chatTargetRide = effectiveActiveRide ?: activeRide
+            val chatTargetRide = if (selectedChatRideId != null) {
+                allRides.firstOrNull { it.requestId == selectedChatRideId }
+            } else {
+                effectiveActiveRide ?: activeRide
+            }
             if (showInRideChat && chatTargetRide != null) {
                 val role = if (driverMode) "DRIVER" else "PASSENGER"
                 val myPassengerId = passengerVerification?.passengerId ?: viewModel.currentUserId
@@ -780,7 +804,7 @@ fun RideServiceScreen(
                     myRole = role,
                     isDriver = driverMode,
                     chatMessages = chatMessages,
-                    onDismiss = { showInRideChat = false },
+                    onDismiss = { showInRideChat = false; selectedChatRideId = null },
                     onSendMessage = { text ->
                         viewModel.sendRideChatMessage(chatTargetRide.requestId, myId, myName, role, text)
                     },
@@ -815,8 +839,10 @@ private fun DriverWalletCard(
     message: String?,
     onRecharge: () -> Unit,
 ) {
-    val starter = policy?.starterCreditMinor ?: 15_000L
-    val commission = (policy?.commissionBasisPoints ?: 500) / 100
+    val starter = policy?.starterCreditMinor
+    val commission = policy?.commissionBasisPoints?.toDouble()?.div(100)
+    val paymentPolicyAvailable = policy?.sinpePhone?.isNotBlank() == true &&
+        policy.sinpeRecipientName.isNotBlank()
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xFF07131E)),
         border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.65f)),
@@ -824,7 +850,12 @@ private fun DriverWalletCard(
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("BILLETERA DEL CHOFER", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
-            Text("Saldo promocional inicial: ${CoreMoney.ofCrc(starter).formatted()}", color = Color.White, fontWeight = FontWeight.Bold)
+            Text(
+                starter?.let { "Saldo promocional inicial: ${CoreMoney.ofCrc(it).formatted()}" }
+                    ?: "Saldo promocional inicial: política no disponible",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+            )
             Text(
                 "Saldo disponible: ${balance?.availableMinor?.let { CoreMoney.ofCrc(it).formatted() } ?: "Consultando Supabase…"}",
                 color = MeetColors.neonGreen,
@@ -832,32 +863,31 @@ private fun DriverWalletCard(
             )
             balance?.let {
                 Text(
-                    "Reservado para viajes: ${CoreMoney.ofCrc(it.reservedMinor).formatted()} · Cobrado al finalizar: 5% de la tarifa aplicable",
+                    "Reservado para viajes: ${CoreMoney.ofCrc(it.reservedMinor).formatted()} · Comisión según política vigente",
                     color = MeetColors.textSecondary,
                     fontSize = 11.sp,
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Comisión por viaje: $commission%", color = MeetColors.textSecondary, fontSize = 12.sp)
-                Spacer(Modifier.width(8.dp))
-                Surface(
-                    color = MeetColors.neonGreen.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(4.dp)
-                ) {
-                    Text(
-                        "LÍMITE CONSTITUCIONAL 5% MAX",
-                        color = MeetColors.neonGreen,
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
-                }
+                Text(
+                    commission?.let { "Comisión por viaje: ${"%.2f".format(java.util.Locale.US, it)}%" }
+                        ?: "Comisión por viaje: política no disponible",
+                    color = MeetColors.textSecondary,
+                    fontSize = 12.sp,
+                )
             }
             Text("Recarga por SINPE Móvil", color = MeetColors.textSecondary, fontSize = 12.sp)
-            Text("${policy?.sinpePhone ?: "63194029"} · ${policy?.sinpeRecipientName ?: "Jorge David Del Valle Miranda"}", color = Color.White, fontWeight = FontWeight.Bold)
-            Text("El propietario valida el ingreso real en su cuenta antes de liberar el saldo.", color = MeetColors.warning, fontSize = 11.sp)
-            Button(onClick = onRecharge, modifier = Modifier.fillMaxWidth()) { Text("ENVIAR COMPROBANTE DE RECARGA") }
+            if (paymentPolicyAvailable) {
+                Text("${policy?.sinpePhone} · ${policy?.sinpeRecipientName}", color = Color.White, fontWeight = FontWeight.Bold)
+                Text("El comprobante se valida por el flujo autorizado antes de liberar saldo.", color = MeetColors.warning, fontSize = 11.sp)
+            } else {
+                Text("Datos de recarga no disponibles. Actualiza antes de transferir.", color = MeetColors.warning, fontSize = 11.sp)
+            }
+            Button(
+                onClick = onRecharge,
+                enabled = paymentPolicyAvailable,
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("ENVIAR COMPROBANTE DE RECARGA") }
             topups.take(3).forEach { topup ->
                 val status = when (topup.status) {
                     "PENDING_REVIEW" -> "PENDIENTE DE REVISIÓN"
@@ -944,7 +974,7 @@ private fun RideFirstAccessGateway(
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    "Antes de mostrar el mapa necesitamos saber cómo usarás Elysium Vanguard. El registro protege viajes, pagos y soporte.",
+                    "Antes de mostrar el mapa necesitamos saber cómo usarás Elysium Vanguard AI OS. El registro protege viajes, pagos y soporte.",
                     color = MeetColors.textSecondary,
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
@@ -1185,7 +1215,7 @@ fun PassengerDashboard(
             )
         }
         if (active.size > 1) {
-            android.util.Log.e("MeetRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for passenger $myPassengerIds — using most recent")
+            android.util.Log.e("ElysiumRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for passenger $myPassengerIds — using most recent")
         }
         active.maxByOrNull { it.createdAt }
     }
@@ -2259,7 +2289,7 @@ fun PassengerDashboard(
                             modifier = Modifier.fillMaxWidth(),
                         )
                         Text(
-                            "La solicitud queda a tu nombre; MEET protege los datos y vincula a quien realmente viajará.",
+                            "La solicitud queda a tu nombre; Elysium protege los datos y vincula a quien realmente viajará.",
                             color = MeetColors.textMuted,
                             fontSize = 9.sp,
                         )
@@ -2743,7 +2773,13 @@ fun PassengerDashboard(
                         }
                     }
                 }
-                2 -> RideHistoryPanel(userRides.filter { it.serverVersion > 0L && (it.serverState in listOf("COMPLETED", "CANCELLED") || it.status in listOf("COMPLETED", "CANCELLED")) })
+                2 -> RideHistoryPanel(
+                    rides = userRides.filter { it.serverVersion > 0L && (it.serverState in listOf("COMPLETED", "CANCELLED") || it.status in listOf("COMPLETED", "CANCELLED")) },
+                    onSendMessage = { ride, message ->
+                        viewModel.sendRideChatMessage(ride.requestId, viewModel.currentUserId.orEmpty(), ride.passengerName, "PASSENGER", message)
+                    },
+                    onOpenChat = { ride -> onOpenMessages(ride.requestId) },
+                )
             }
         }
     }
@@ -2770,9 +2806,54 @@ fun PassengerDashboard(
             )
         }
 
+        val pickerStops = stops.mapNotNull { stop ->
+            val latitude = stop.latitude ?: return@mapNotNull null
+            val longitude = stop.longitude ?: return@mapNotNull null
+            rideGeoPointOrNull(latitude, longitude, null, System.currentTimeMillis())
+        }
+        var pickerRoadRoute by remember(target) { mutableStateOf<RideRoadRoute?>(null) }
+        var pickerRouteLoading by remember(target) { mutableStateOf(false) }
+        var pickerRouteFailed by remember(target) { mutableStateOf(false) }
+        val movingPoint = pendingMapPin ?: if (target == RidePinTarget.PICKUP) effectivePickup else effectiveDestination
+        val pickerPickup = if (target == RidePinTarget.PICKUP) movingPoint else effectivePickup
+        val pickerDestination = if (target == RidePinTarget.DESTINATION) movingPoint else effectiveDestination
+
+        LaunchedEffect(
+            target,
+            pickerPickup?.latitude,
+            pickerPickup?.longitude,
+            pickerDestination?.latitude,
+            pickerDestination?.longitude,
+            pickerStops,
+        ) {
+            val pickup = pickerPickup
+            val destination = pickerDestination
+            if (pickup == null || destination == null || pickerStops.size != stops.size) {
+                pickerRoadRoute = null
+                pickerRouteLoading = false
+                pickerRouteFailed = false
+                return@LaunchedEffect
+            }
+            pickerRouteLoading = true
+            pickerRouteFailed = false
+            pickerRoadRoute = null
+            delay(350L)
+            val result = runCatching {
+                routingProvider.route(listOf(pickup) + pickerStops + destination)
+            }
+            pickerRoadRoute = result.getOrNull()
+            pickerRouteFailed = result.isFailure
+            pickerRouteLoading = false
+        }
+
         val mapPinState = RideMapStateFactory.create(
-            pickup = effectivePickup,
-            destination = effectiveDestination,
+            // The moving center pin is a draft. Confirmed R/D markers must not
+            // jump or accumulate while the user pans the map.
+            pickup = if (target == RidePinTarget.PICKUP) null else effectivePickup,
+            destination = if (target == RidePinTarget.DESTINATION) null else effectiveDestination,
+            stops = pickerStops,
+            route = pickerRoadRoute?.geometry,
+            allowStraightLineFallback = false,
         )
         val activeInitialPoint = if (target == RidePinTarget.PICKUP) {
             pendingMapPin ?: effectivePickup
@@ -2787,6 +2868,18 @@ fun PassengerDashboard(
             },
             state = mapPinState,
             initialPoint = activeInitialPoint,
+            routeStatus = when {
+                pickerRouteLoading -> "Calculando ruta vial real…"
+                pickerRoadRoute != null -> {
+                    val route = requireNotNull(pickerRoadRoute)
+                    val km = route.distanceMeters / 1_000.0
+                    val minutes = kotlin.math.ceil(route.durationSeconds / 60.0).toInt()
+                    "Ruta vial · ${String.format(currentLocale, "%.1f", km)} km · $minutes min"
+                }
+                pickerRouteFailed -> "Ruta vial no disponible. No se mostrará una línea recta falsa."
+                else -> "Fija ambos puntos para calcular la ruta por carretera."
+            },
+            routeStatusIsWarning = pickerRouteFailed,
             onPinChanged = { pendingMapPin = it },
             onDismiss = {
                 pendingMapPin = null
@@ -2928,6 +3021,8 @@ fun RidePinPickerDialog(
     targetLabel: String,
     state: com.elysium369.meet.ride.map.RideMapState,
     initialPoint: RideGeoPoint?,
+    routeStatus: String = "",
+    routeStatusIsWarning: Boolean = false,
     onPinChanged: (RideGeoPoint) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: (RideGeoPoint) -> Unit,
@@ -2973,16 +3068,37 @@ fun RidePinPickerDialog(
                         }
                     }
                 }
-                RideMapPanel(
-                    state = state,
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    pinSelectionEnabled = true,
-                    pinSelectionLabel = "El pin permanece fijo; mueve el mapa",
-                    pinSelectionInitialPoint = initialPoint,
-                    onPinSelectionChanged = onPinChanged,
-                    onPinSelectionCancelled = onDismiss,
-                    onPinSelectionConfirmed = onConfirm,
-                )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .navigationBarsPadding(),
+                ) {
+                    RideMapPanel(
+                        state = state,
+                        modifier = Modifier.fillMaxSize(),
+                        pinSelectionEnabled = true,
+                        pinSelectionLabel = "El pin permanece fijo; mueve el mapa",
+                        pinSelectionInitialPoint = initialPoint,
+                        onPinSelectionChanged = onPinChanged,
+                        onPinSelectionCancelled = onDismiss,
+                        onPinSelectionConfirmed = onConfirm,
+                    )
+                    if (routeStatus.isNotBlank()) {
+                        Text(
+                            text = routeStatus,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 12.dp, start = 56.dp, end = 56.dp)
+                                .background(Color(0xDD06121F), RoundedCornerShape(14.dp))
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            color = if (routeStatusIsWarning) MeetColors.warning else MeetColors.cyberCyan,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
             }
         }
     }
@@ -3311,7 +3427,7 @@ fun DriverDashboard(
                     it.assignedDriverId in driverIdCandidates
             }
             if (active.size > 1) {
-                android.util.Log.e("MeetRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for driver $driverIdCandidates — using most recent")
+                android.util.Log.e("ElysiumRides", "CONSISTENCY_VIOLATION: ${active.size} active rides for driver $driverIdCandidates — using most recent")
             }
             active.maxByOrNull { it.createdAt }
         }
@@ -3356,7 +3472,7 @@ fun DriverDashboard(
         )
     }
     LaunchedEffect(driverFeed) {
-        if (BuildConfig.DEBUG) android.util.Log.i("MeetRideFeed", "DRIVER_FEED roomOpen=${openRides.size} eligible=${driverFeed.eligibleRides.size} own=${driverFeed.ownPassengerRequests.size} hidden=${driverFeed.hiddenRides.size} expired=${driverFeed.expiredCount}")
+        if (BuildConfig.DEBUG) android.util.Log.i("ElysiumRideFeed", "DRIVER_FEED roomOpen=${openRides.size} eligible=${driverFeed.eligibleRides.size} own=${driverFeed.ownPassengerRequests.size} hidden=${driverFeed.hiddenRides.size} expired=${driverFeed.expiredCount}")
     }
     val rankedOpenRides = remember(driverFeed, destinationHomeEnabled, homeLatitude, homeLongitude) {
         val eligibleRides = driverFeed.eligibleRides
@@ -3949,7 +4065,11 @@ fun DriverDashboard(
                     }
                 }
             }
-            2 -> RideHistoryPanel(completedDriverRides)
+            2 -> RideHistoryPanel(
+                rides = completedDriverRides,
+                isDriver = true,
+                onOpenChat = { ride -> onOpenMessages(ride.requestId) },
+            )
             else -> {
                 FleetMogulDashboard(viewModel = viewModel)
             }
@@ -4032,9 +4152,13 @@ fun DriverDashboard(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("📱 SINPE Móvil: ${walletPolicy?.sinpePhone ?: "+506 8888-8888"}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("👤 Destinatario: ${walletPolicy?.sinpeRecipientName ?: "Jor Delmir / MEET Vanguard"}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text("✉️ Correo vinculado: jordelmir@gmail.com", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            val currentWalletPolicy = walletPolicy
+                            if (currentWalletPolicy?.sinpePhone?.isNotBlank() == true && currentWalletPolicy.sinpeRecipientName.isNotBlank()) {
+                                Text("📱 SINPE Móvil: ${currentWalletPolicy.sinpePhone}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text("👤 Destinatario: ${currentWalletPolicy.sinpeRecipientName}", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            } else {
+                                Text("Los datos de recarga no están disponibles. Cierra este diálogo y actualiza antes de transferir.", color = MeetColors.warning, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
                         }
                     }
 
@@ -4103,7 +4227,7 @@ fun DriverDashboard(
                         showTopupDialog = false
                         pendingTopupAmount = topupAmount.toLong()
                         proofPicker.launch(arrayOf("image/jpeg", "image/png", "application/pdf"))
-                        Toast.makeText(context, "Verificando comprobante con jordelmir@gmail.com...", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, "Comprobante enviado para validación autorizada.", Toast.LENGTH_LONG).show()
                     },
                     enabled = topupAmount > 0 && walletPolicy != null && driverHomeOwner != null,
                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black)
@@ -4922,7 +5046,9 @@ fun PassengerRideItem(
             if (itemPreferences.hasSpecialPreferences) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -4942,7 +5068,9 @@ fun PassengerRideItem(
                                     badge.label,
                                     color = badge.color,
                                     fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    softWrap = false,
                                 )
                             }
                         }
@@ -6297,7 +6425,9 @@ fun ActiveRidePanel(
                 if (activeRidePrefs.hasSpecialPreferences) {
                     Spacer(Modifier.height(6.dp))
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
@@ -6318,6 +6448,8 @@ fun ActiveRidePanel(
                                         color = badge.color,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
+                                        maxLines = 1,
+                                        softWrap = false,
                                     )
                                 }
                             }
@@ -6360,7 +6492,7 @@ fun ActiveRidePanel(
                         RideEtaEvidenceLevel.COMMUNITY_CORROBORATED -> "tráfico colaborativo"
                     }
                     Text(
-                        text = "ETA MEET: $minutes min · $evidence",
+                        text = "ETA Elysium: $minutes min · $evidence",
                         color = if (estimate.blockingSegmentIds.isEmpty()) {
                             MeetColors.cyberCyan
                         } else {
@@ -6916,14 +7048,14 @@ fun ActiveRidePanel(
                 val session = viewModel.rideLiveSharingEngine.createSession(
                     rideId = ride.requestId,
                     passengerId = ride.passengerId,
-                    passengerName = "Pasajero MEET",
+                    passengerName = "Pasajero Elysium",
                     driverName = ride.assignedDriverId ?: "Conductor Asignado",
                     vehicleDescription = "Vehículo Verificado",
-                    vehiclePlate = "MEET",
+                    vehiclePlate = "Elysium",
                     pickupName = ride.pickupAddress,
                     dropoffName = ride.destAddress,
                 )
-                val shareText = "🚗 Sigue mi viaje en tiempo real con seguridad certificada MEET:\n" +
+                val shareText = "🚗 Sigue mi viaje en tiempo real con seguridad certificada Elysium:\n" +
                     "ID: ${ride.requestId.take(8)}\n" +
                     "Token SHA-256: ${session.shareToken.take(16)}...\n" +
                     "Destino: ${ride.destAddress}"
@@ -9282,7 +9414,7 @@ private fun TipDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Agradecé y dignificá el trabajo del chofer con una propina voluntaria.", color = MeetColors.textSecondary, fontSize = 12.sp)
-                Text("La propina se entrega directamente al chofer. MEET no la suma a ningún saldo.", color = MeetColors.warning, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("La propina se entrega directamente al chofer. Elysium no la suma a ningún saldo.", color = MeetColors.warning, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     presetTips.forEach { amount ->
