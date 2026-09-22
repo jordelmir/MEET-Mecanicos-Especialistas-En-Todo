@@ -1,444 +1,165 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/MEET-Mecanicos%20Especialistas%20En%20Todo-00FFD1?style=for-the-badge&labelColor=0A0E1A" alt="MEET"/>
+  <img src="https://img.shields.io/badge/Elysium%20Vanguard-AI%20OS-00FFD1?style=for-the-badge&labelColor=0A0E1A" alt="Elysium Vanguard AI OS" />
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Platform-Android-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Platform"/>
-  <img src="https://img.shields.io/badge/Kotlin-1.9.23%20%7C%20Compose-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin"/>
-  <img src="https://img.shields.io/badge/SQLite-Offline%20First-39FF14?style=flat-square" alt="SQLite"/>
-  <img src="https://img.shields.io/badge/Status-Active%20Build-39FF14?style=flat-square" alt="Status"/>
+  <img src="https://img.shields.io/badge/Android-4.26.1%20%7C%20code%2060-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
+  <img src="https://img.shields.io/badge/Room-schema%2080-39FF14?style=flat-square" alt="Room schema" />
+  <img src="https://img.shields.io/badge/Architecture-offline--first-7F52FF?style=flat-square" alt="Offline first" />
 </p>
 
-# MEET
-
-> Vehicle Truth OS 4.17 implementation ledger: [docs/vehicle-truth/MEET-4.17-VEHICLE-TRUTH-IMPLEMENTATION.md](docs/vehicle-truth/MEET-4.17-VEHICLE-TRUTH-IMPLEMENTATION.md)
-
-MEET es una plataforma Android de diagnostico automotriz offline-first orientada a talleres, mecanicos independientes y usuarios avanzados. Su objetivo no es solo leer DTCs: busca unir escaneo real OBD/UDS/DoIP, conocimiento mecanico utilizable, red de reparacion y flujos de solicitud tipo marketplace en una sola app.
-
-## Versión de código: 4.26.1 (`versionCode 60`)
-
-La versión 4.26.1 incorpora la corrección de autoridad y auditoría de Viajes, además de mantener el **Módulo de Objetos Olvidados**, visibilidad bilateral de preferencias de pasajero (mascotas, niños y 5 pasajeros), y calificación idempotente sin bucles de repetición:
-
-- **Módulo de Objetos Olvidados (Lost & Found):** El pasajero describe el objeto en un viaje confirmado y el mensaje queda asociado al chat de ese viaje. El chofer dispone de un centro para abrir los chats históricos y llamar si existe un teléfono capturado. La interfaz informa las tarifas de entrega definidas para el producto; este flujo no calcula distancias ni ejecuta el cobro automáticamente. Accesible desde el viaje activo, el resumen de viaje finalizado y el detalle del historial.
-- **Visibilidad Bilateral de Preferencias:** Selección de mascotas (Gato/Perro), cantidad de niños y capacidad para 5 pasajeros persistidas en Supabase (`fare_breakdown -> 'preferences'`) y renderizadas mediante badges visuales de alto contraste en las interfaces de conductor y pasajero (feed, negociación, viaje activo y detalles).
-- **Calificación Idempotente Persistente:** Almacenamiento local persistente (`meet_ride_ratings_settled`) que garantiza que una calificación asentada o descartada no vuelva a solicitarse de forma recurrente al cambiar de pestaña o reiniciar pantallas.
-- **Limpieza de Interfaz para Conductor:** Remoción del botón redundante de chat en la barra superior cuando el usuario opera en modo conductor, reservando el espacio para controles operativos clave.
-- **Gate de Calidad Unitario:** 2.081 pruebas unitarias pasando al 100% con cero fallos y paridad cross-runtime continua (`ci-verify.sh`).
-
-## Versión previa: 4.25.0 (`versionCode 58`)
-
-La versión 4.25.0 incorpora la **Orden Maestra V9 de MEET Rides**, consolidando la autoridad estricta del servidor en la nube y eliminando el desfasaje de estado en movilidad, al tiempo que preserva y fortalece el ciclo técnico automotriz completo:
-
-- **MEET Rides V9 — Autoridad Servidor & Fin del Viaje Fantasma:** La aplicación Android ya no proyecta de forma optimista estados locales (`ACCEPTED`) antes del acuse remoto. La aceptación de solicitudes utiliza una cola persistente transaccional (*Outbox*) y solo se refleja en pantalla tras la confirmación remota con versión (`serverVersion > 0`).
-- **Feedback Visual Honesto en Tiempo Real:** El botón de acción pasa inmediatamente a estado inhabilitado con spinner e indicación `"CONFIRMANDO…"`. Si ocurre una colisión de concurrencia o rechazo por el servidor, la causa se imputa con transparencia.
-- **Cero Telemetría Falsa:** Eliminación completa de datos inventados, marcas/modelos placeholder (como "Toyota Corolla 2018 Gris"), calificaciones cableadas (`5.0`) y suplantación de ubicación del conductor con la del pasajero.
-- **Separación Limpia de Intenciones (CLAIM vs SUBMIT_OFFER):** La aceptación con un toque a la tarifa publicada y la contraoferta personalizada se desacoplan en canales de comando independientes sin emisiones paralelas.
-- **Invariantes Idénticos en Debug y Release:** Eliminación de cualquier bypass de inspección vehicular, PIN de abordaje o balance mínimo en modo desarrollo.
-- **V2 Reportes PDF Certificados & Historial Técnico:** Generador multi-página certificado con carátula forense, Pre-Scan, hallazgos DTC, evidencia fotográfica, firma pericial y Post-Scan con comparador de estados (`BeforeAfterComparator`).
-- **Encadenamiento Criptográfico por Vehículo:** Cada reporte enlaza criptográficamente al reporte anterior (`hash_N = SHA-256(canonical(report_N) + hash_N-1)`), alertando manipulación (`TAMPERED`) de inmediato.
-- **Código QR Forense Zero-PII:** Código QR de 6 campos canónicos (`report_id`, `integrity_hash`, `vehicle_id`, `generated_at`, `report_type`, `verifier_url`) sin exponer datos privados (VIN/placa/teléfono).
-- **V2 Marketplace Técnico de Repuestos:** Conexión directa DTC ↔ Catálogo Técnico ↔ Visual 3D Atlas (`G4ED` / `VehicleTechnicalAtlas3dCatalog`). Cotizaciones en tiempo real con clasificación anti-fraude (`OK`, `WARN`, `BLOCK`) y sellos de mejor opción (`BEST_COMPATIBILITY`, `CHEAPEST`, `FASTEST_DELIVERY`, `BEST_WARRANTY`).
-- **Billetera & Reconciliación Bancaria SINPE Móvil:** Conciliación automatizada de transferencias bancarias vía email webhook (BAC, BNCR, BCR, etc.) con acreditación instantánea a la billetera del conductor (`ride_driver_wallet_credit_v1`).
-- **Gate de Calidad Unitario:** 2.077 pruebas unitarias pasando al 100% con cero fallos y paridad cruzada continua (`ci-verify.sh`).
-
-La versión 4.9.0 añade identidad visual personalizable al mapa de Viajes: cuatro
-emblemas originales para conductor y cuatro avatares originales para pasajero,
-con selector accesible desde Perfil e Iconos del mapa. La preferencia se guarda
-localmente y el renderizador procedural mantiene bordes, neón y sombras nítidos
-en distintas densidades de pantalla sin alterar ubicación, seguridad ni datos
-del viaje.
-
-La versión 4.7.0 convierte Viajes en un vertical distribuido verificable:
-PostgreSQL es autoridad de asignación, PIN, ciclo de vida y comisión; Room es
-proyección y outbox. Implementa dinero entero, comisión exacta de 500 basis
-points, ledger de doble entrada, concurso transaccional, flujo pasajero/chofer,
-routing vial, Realtime recuperable, alta piloto honesta, Elysium Guardian,
-casos de soporte, aislamiento tenant y observabilidad sin PII.
-
-El flujo no inventa ruta, verificación, saldo, contacto con autoridades ni
-éxito remoto. La app ya no revela teléfonos reales durante el viaje y redacta
-el payload sensible del outbox después del acuse del servidor.
-
-El Atlas G4ED cubre un universo técnico de 6.405
-experiencias 3D/360 offline: 420 elementos de motor y 5.985 elementos de
-transmisión/hidráulica, sistema eléctrico, carrocería/interior, chasis y
-periféricos. Los 130 paquetes GLB comparten IDs canónicos con Motor 3D,
-Piezas, IA, DTC y Repuestos.
-
-Cada detalle permite orbitar, aislar, ver contexto, activar auto-rotación y
-despiece. La aplicabilidad registra lado, carrocería y equipamiento condicional;
-OEM, cantidad, supersesión y relaciones de fijación quedan explícitamente
-pendientes de VIN/EPC cuando la fuente no permite afirmarlos.
-
-La integración Master Automotive Knowledge añade un grafo determinista y
-citado que conecta DTC, pruebas, reparación, repuestos, IA y 3D sin eliminar el
-Motor 360° restaurado. Las decisiones de reemplazo y compra fallan cerradas sin
-evidencia canónica; la geometría actual sigue declarada como
-procedural/genérica y no dimensional.
-
-La acción `BUSCAR EN GOOGLE` de cada resultado DTC abre el navegador
-predeterminado del dispositivo. La consulta contiene únicamente el DTC cuando
-no hay vehículo activo y añade marca, modelo, año, transmisión y cilindrada
-cuando el usuario sí tiene uno seleccionado; nunca envía VIN ni placa.
-
-Documentación técnica:
-
-- [`docs/knowledge/AUTOMOTIVE_KNOWLEDGE_FABRIC.md`](docs/knowledge/AUTOMOTIVE_KNOWLEDGE_FABRIC.md)
-- [`docs/releases/2026-07-26-android-4.1.0-master-automotive-knowledge.md`](docs/releases/2026-07-26-android-4.1.0-master-automotive-knowledge.md)
-- [`docs/releases/2026-07-26-android-4.1.1-dtc-browser-search.md`](docs/releases/2026-07-26-android-4.1.1-dtc-browser-search.md)
-- [`docs/visual3d/G4ED-420-ATLAS.md`](docs/visual3d/G4ED-420-ATLAS.md)
-- [`docs/visual3d/VEHICLE-TECHNICAL-ATLASES.md`](docs/visual3d/VEHICLE-TECHNICAL-ATLASES.md)
-- [`docs/releases/2026-07-27-android-4.3.0-g4ed-420-atlas.md`](docs/releases/2026-07-27-android-4.3.0-g4ed-420-atlas.md)
-- [`docs/releases/2026-07-27-android-4.4.0-vehicle-technical-atlases.md`](docs/releases/2026-07-27-android-4.4.0-vehicle-technical-atlases.md)
-- [`docs/releases/2026-07-28-android-4.6.0-ride-profiles-search-dtc-3d.md`](docs/releases/2026-07-28-android-4.6.0-ride-profiles-search-dtc-3d.md)
-- [`docs/releases/2026-07-28-android-4.6.1-data-surface-hardening.md`](docs/releases/2026-07-28-android-4.6.1-data-surface-hardening.md)
-- [`docs/security/ANDROID-DATA-SURFACE-4.6.1.md`](docs/security/ANDROID-DATA-SURFACE-4.6.1.md)
-- [`docs/releases/2026-07-28-android-4.6.2-rides-reactive-locale.md`](docs/releases/2026-07-28-android-4.6.2-rides-reactive-locale.md)
-- [`docs/releases/2026-07-29-android-4.6.3-rides-primitive-compose-state.md`](docs/releases/2026-07-29-android-4.6.3-rides-primitive-compose-state.md)
-- [`docs/releases/2026-07-29-android-4.6.4-rides-atomic-offer-acceptance.md`](docs/releases/2026-07-29-android-4.6.4-rides-atomic-offer-acceptance.md)
-- [`docs/releases/2026-07-29-android-4.6.5-rides-lifecycle-guards.md`](docs/releases/2026-07-29-android-4.6.5-rides-lifecycle-guards.md)
-- [`docs/releases/2026-07-29-android-4.6.6-rides-actor-authorization.md`](docs/releases/2026-07-29-android-4.6.6-rides-actor-authorization.md)
-- [`docs/releases/2026-07-29-android-4.7.0-rides-mobility-authority.md`](docs/releases/2026-07-29-android-4.7.0-rides-mobility-authority.md)
-- [`docs/releases/2026-08-01-android-4.9.0-map-avatar-catalog.md`](docs/releases/2026-08-01-android-4.9.0-map-avatar-catalog.md)
-- [`docs/releases/2026-08-01-android-4.9.1-route-only-road-reports.md`](docs/releases/2026-08-01-android-4.9.1-route-only-road-reports.md)
-- [`docs/releases/2026-08-01-android-4.10.0-vanguard-neon-navigation.md`](docs/releases/2026-08-01-android-4.10.0-vanguard-neon-navigation.md)
-
-## Que es real hoy
-
-- Topologia real de ECUs: la pantalla de topologia ya no ofrece simulacion. Solo dibuja modulos que responden fisicamente al sondeo.
-- Borrado de DTCs, pruebas activas y adaptaciones: requieren enlace OBD real. Ya no se marcan como exitosas sin vehiculo conectado.
-- Escaneo DTC y registro de viajes: ya no fabrican resultados cuando no hay vehiculo enlazado.
-- La pantalla DTC muestra automaticamente los codigos del ultimo escaneo real aunque todavia no haya un vehiculo seleccionado para historial persistente.
-- DTC incluye una seccion `Hallazgos` con resumen de activos/pendientes/permanentes/historicos, modulos que respondieron y guia directa por codigo.
-- Bluetooth Classic: transporte RFCOMM/SPP real.
-- BLE: escaneo real con `BluetoothLeScanner` y conexion GATT real via `BleTransport`.
-- WiFi TCP: conexion real a adaptadores ELM por socket.
-- DoIP: activacion de routing ISO 13400 real y sondeo real del gateway/servidor UDS cuando se usa `:13400`.
-- Diagnostico Visual 3D: el visor ya se alimenta de fichas tecnicas por componente con DTCs, PIDs, pruebas, flujo de reparacion, herramientas, seguridad y contexto listo para IA.
-- Atlas G4ED: 420 experiencias 3D/360 offline enlazadas por ID canónico con Piezas, IA y solicitudes de Repuestos.
-- Atlas técnicos: 5.985 experiencias adicionales, 110 sistemas y 110 paquetes
-  GLB trazables para transmisión, eléctrico, carrocería, chasis y periféricos.
-- Monetizacion: la APK actual opera con acceso completo temporal sin paywalls; Google Play Billing 9.1.0 queda integrado para reactivacion futura.
-- Analytics web: eventos estructurados, consentimiento, cola offline, retencion y panel debug opcional para medir embudos reales sin depender de logs sueltos.
-- Onboarding y Home: perfil de uso, adaptador preferido, centro de mando con siguiente accion y demo de entrenamiento rotulada.
-- Seguridad bidireccional: pruebas activas bloqueadas si no hay conexion real, si el enlace es inestable o si el voltaje esta bajo.
-
-## Arquitectura
-
-MEET usa una estrategia offline-first con dos capas de conocimiento complementarias:
-
-1. `Room` para la app viva.
-   Guarda vehiculos, sesiones, DTCs, marketplace, conocimiento mecanico y la matriz hibrida local.
-
-2. `SQLite` preconstruida para el seed pesado.
-   El archivo `android/app/src/main/assets/databases/meet_dtc.db` se genera con `generate_db.py`. Por limite duro de GitHub para blobs mayores a 100 MB, el repositorio conserva un seed liviano y la base completa se reconstruye localmente antes de empaquetar releases.
-
-### Arquitectura hibrida de conocimiento
-
-MEET ya usa el patron que mejor calza para edge computing:
-
-- Columnas indexadas para busquedas rapidas:
-  `dtcCode`, `componentName`, `systemCategory`, `urgencyLevel`
-- Payloads JSON para conocimiento profundo:
-  `layerDiagnosticsJson`, `layerRebuildSpecsJson`, `layerTrenchKnowledgeJson`, `layerAdvancedEngJson`
-
-Eso permite evolucionar la base sin romper el esquema cada vez que aparezca una capa nueva de conocimiento de taller.
-
-## Base de datos actual
-
-### Grafo DTC offline generado
-
-La base completa generada localmente con `/usr/bin/python3 generate_db.py --include-graph` contiene:
-
-- `18,805` definiciones DTC
-- `36,363` sintomas ligados a DTC
-- `78,274` causas probables
-- `95,088` pasos de procedimiento
-- `87,769` PIDs relacionados
-- `71,445` co-ocurrencias entre codigos
-- `18,805` filas de costos de reparacion
-
-### Seed hibrido mecanico dentro del `.db`
-
-El seed mecanico que inyecta el generador SQLite incluye:
-
-- `3` filas en `meet_knowledge_matrix`
-- `4` `symptom_guides`
-- `5` `mechanical_procedures`
-- `2` `component_rebuild_guides`
-- `3` `trench_knowledge`
-- `4` entradas de `automotive_chemistry`
-- `3` `tool_usage_guides`
-- `3` `safety_protocols`
-
-### Seed mecanico en Room
-
-La app tambien crea y migra tablas de conocimiento mecanico para:
-
-- `symptom_guides`
-- `mechanical_procedures`
-- `component_rebuild_guides`
-- `trench_knowledge`
-- `automotive_chemistry`
-- `tool_usage_guides`
-- `safety_protocols`
-- `meet_knowledge_matrix`
-- `parts_stores`
-- `part_requests`
-- `part_offers`
-
-Esto permite que el conocimiento mecanico viva dentro del dispositivo, incluso con mala conectividad en taller.
-
-## Diagnostico y conectividad
-
-### OBD / UDS / DoIP
-
-- OBD-II modos estandar y DTCs
-- hub avanzado para OBD-II, Mode $05, Mode $06, VIN/freeze frame y UDS OEM
-- UDS sobre CAN para identificacion de ECU y servicios extendidos cuando el modulo responde
-- DoIP ISO 13400 para gateway Ethernet y servidor diagnostico
-- Sondeo topologico real por direcciones fisicas
-- Lectura de VIN/DID por ECU cuando el modulo soporta `22 F190`, `22 F187`, `22 F189`, `22 F191`, `22 F18C`
-
-### Topologia
-
-La topologia actual:
-
-- ya no muestra nodos demo
-- ya no trata el broadcast funcional como si fuera una ECU real
-- solo publica modulos que responden
-- reconoce nodos DoIP como `ETHERNET`
-- conserva latencia, protocolo, DTCs por modulo y soporte UDS cuando existe
-
-Limitacion importante:
-
-- un ELM generico no expone el mismo nivel de cobertura que un VCI OEM
-- en muchos vehiculos genericos solo se vera powertrain y algunos modulos adicionales
-- DoIP completo depende del gateway del vehiculo, la ruta fisica y los permisos del sistema OEM
-
-## Motor de conocimiento mecanico
-
-MEET ya no se limita a DTCs. El motor de conocimiento local esta tomando forma para cubrir:
-
-- guias por sintoma:
-  fuga de aceite, fuga de refrigerante, alternador que no carga, arranque dificil, pedal de freno esponjoso
-- procedimientos:
-  alternador, arranque, frenos, tapa de valvulas, carter, bomba de agua, parabrisas
-- reconstruccion:
-  alternadores y motores de arranque
-- tacticas avanzadas:
-  tornilleria trabada, esparragos rotos, reparacion de rosca en aluminio
-- quimica aplicada:
-  penetrantes, ATF + acetona, tinte UV, grasa dielectrica, limpiadores de sensor
-
-## Repair Network y marketplace
-
-Se mejoraron flujos para que la informacion entre mejor desde el principio:
-
-- la red de reparacion ahora muestra guia de busqueda y vista previa de conocimiento offline
-- publicar un caso pide mejor contexto tecnico y valida formato DTC real
-- el marketplace del cliente ahora explica que evidencia minima conviene publicar
-- el dashboard de taller ahora guia mejor la oferta: tiempo, garantia, enfoque diagnostico
-- el marketplace agrega subasta real de repuestos: el cliente crea una solicitud de pieza ligada a una solicitud de servicio, DTC y vehiculo
-- las repuesteras pueden ofertar marca, numero de parte, condicion, precio, envio, ETA y garantia
-- el cliente puede aceptar una oferta de repuesto; Room guarda la solicitud y la oferta aceptada para operar offline y sincronizar cuando exista backend
-
-La idea es que una solicitud no sea solo "el carro falla", sino una orden de triage util para cotizar, diagnosticar, conseguir la pieza correcta y resolver en una sola visita.
-
-## DIY Gauges y marketplace
-
-- el editor DIY ahora puede persistir configuraciones completas de gauge
-- el marketplace de gauges ya consume listados reales desde Supabase
-- las tarjetas y previews renderizan el gauge real a partir del `config_json`
-- el flujo de compra se engancha con Google Play Billing 9.1.0 y verifica cada `purchaseToken` en Supabase antes de activar el entitlement
-- en la APK actual, `MonetizationPolicy.PAYWALLS_ENABLED = false`: los gauges se pueden aplicar sin Google Play Billing mientras se decide el modelo comercial
-
-Limitacion honesta:
-
-- cuando se reactive monetizacion, las compras in-app requeriran un build distribuido por Google Play y productos `gauge_tier_*` activos
-- si `PAYWALLS_ENABLED` vuelve a `true`, el flujo mostrara errores reales de Billing si el servicio o los productos no estan disponibles
-
-## Monetizacion y entitlements
-
-Estado actual de la APK: sin restricciones de pago. La politica central vive en `android/app/src/main/kotlin/com/elysium369/meet/core/monetization/MonetizationPolicy.kt` y deja `PAYWALLS_ENABLED = false` con acceso PRO local completo.
-
-La app queda preparada para un modelo gratis + PRO sin cobrar la descarga inicial:
-
-- compras unicas: `pro_lifetime`, `gauge_pack_elite`, `report_pack`, `gauge_tier_1` a `gauge_tier_10`
-- suscripciones: `pro_monthly`, `pro_yearly`, `workshop_monthly`
-- verificador Supabase Edge Function: `verify-google-play-purchase`
-- tablas con RLS: `billing_products`, `google_play_purchase_receipts`, `user_entitlements`
-- el cliente Android no activa PRO por si solo; primero envia `productId`, `productType` y `purchaseToken` al backend
-
-Esto permite manejar renovaciones, cancelaciones, reembolsos y restauracion de acceso desde servidor, no solo desde UI modificable.
-
-## Analytics profesional web
-
-El frontend web ahora incluye:
-
-- `analytics.track(...)` tipado por evento
-- `anonymous_id`, `session_id`, rol y modo admin
-- cola IndexedDB/localStorage con reintento exponencial
-- eventos de pantalla, modulo, embudo, paywall y compra
-- retencion D1/D3/D7/D14/D30
-- consentimiento: `enabled`, `essential_only`, `disabled`
-- panel `/analytics-debug` cuando `VITE_ENABLE_ANALYTICS_DEBUG=true`
-
-Documentacion completa: `docs/ANALYTICS_WEB.md`.
-
-## Diagnostico Visual 3D
-
-El modulo 3D se organizo alrededor de dominio tecnico, no solo dibujo:
-
-- `DiagnosticComponent`: pieza, categoria, ubicacion, mesh 3D, DTCs, PIDs, pruebas y specs
-- `VisualDiagnosticRepository`: fuente de componentes por motor L4/V6/V8/EV
-- `DiagnosticAiContextBuilder`: paquete de contexto con vehiculo, DTCs activos y PIDs vivos
-- la UI muestra `Sin lectura en vivo` cuando el escaner no entrega dato real
-- fusibles/reles incluyen amperaje, alimentacion esperada, continuidad, funcion y procedimiento de prueba
-- EV/HV incluye advertencias de alto voltaje y desenergizacion OEM
-
-Documentacion completa: `docs/VISUAL_DIAGNOSTICS_3D.md`.
-
-## Sistema operativo automotriz
-
-MEET esta avanzando hacia un flujo completo:
+# Elysium Vanguard AI OS
+
+Elysium Vanguard AI OS coordina diagnóstico automotriz, conocimiento técnico,
+reparación, comercio, movilidad y evidencia verificable. `MEET` se conserva
+solamente como identificador técnico de compatibilidad: paquete Android,
+protocolos, rutas, tablas, base Room y repositorio.
+
+La regla del producto es simple: no se presenta una intención local, una
+estimación o un dato de demostración como un hecho físico o una confirmación
+del servidor.
+
+## Estado del código en este checkpoint
+
+- **Android:** `versionName 4.26.1`, `versionCode 60`.
+- **Web/package:** `4.26.1`.
+- **Persistencia local:** Room schema `80`, con las migraciones `78→79` y
+  `79→80` exportadas en el repositorio.
+- **Backend:** las migraciones Supabase son acumulativas. La autoridad de
+  viajes y auditoría de cierre está en
+  `20260920110000_ride_authority_and_completion_audit.sql`.
+- **Nombre comercial:** Elysium Vanguard AI OS. No se deben renombrar los
+  contratos técnicos heredados `MEET` durante una actualización normal.
+
+Este checkpoint es código sincronizado, no una declaración de lanzamiento en
+producción. Un APK debug, una compilación local o un workflow de firma efímera
+no sustituyen una firma de producción, una prueba física de dos cuentas ni una
+evidencia remota de PostgreSQL.
+
+## Capacidades integradas
+
+### Diagnóstico y reparación automotriz
+
+- Conexión OBD-II por Bluetooth Classic, BLE, Wi-Fi TCP y DoIP/UDS.
+- Lectura de DTC, telemetría y acciones bidireccionales sólo cuando existe un
+  enlace físico válido; el modo de entrenamiento se identifica como demo.
+- Guías de diagnóstico, reparación, piezas y visualización 3D enlazadas por
+  identificadores técnicos. La compatibilidad no se marca como exacta sin
+  evidencia VIN/OEM o una tupla técnica cerrada.
+- Reportes certificados con cadena hash y QR de seis campos sin VIN, placa ni
+  teléfono completos.
+
+### Viajes
+
+- PostgreSQL/Supabase es la autoridad para solicitud, asignación, PIN,
+  transiciones, comisión y liquidación. Android usa Room como proyección local
+  y outbox durable; no puede proyectar un `ACCEPTED` optimista.
+- La aceptación usa control de versión, idempotencia y una identidad de actor
+  validada en el servidor. PIN, inicio y finalización vuelven al cliente sólo
+  después de confirmación remota.
+- Los datos de ruta, ubicación, saldo, vehículo y estado remoto se muestran
+  con su fuente y disponibilidad. La interfaz no inventa GPS, vehículos,
+  calificaciones ni resultados de pago.
+- Preferencias de pasajeros, calificaciones idempotentes y Objetos Olvidados
+  están conectados al viaje y chat protegido correspondiente. Objetos Olvidados
+  no revela teléfonos ni inventa compensaciones o cobros de entrega.
+- La programación de viaje conserva una intención local con lugares geográficos
+  válidos, fecha/hora, recurrencia e indicaciones. No afirma un conductor
+  asignado hasta que el servidor lo confirme.
+
+### Seguridad, identidad y dinero
+
+- Las proyecciones de seguridad y los centros restringidos fallan cerrados;
+  una pantalla visible no concede autoridad.
+- Billeteras, comisiones, ingresos y recargas sólo se muestran como disponibles
+  tras el recibo correspondiente de Supabase. No se fabrican saldos locales.
+- Los pagos externos requieren una capacidad de proveedor confirmada. Los
+  asientos financieros usan importes enteros y un ledger inmutable.
+
+## Arquitectura de verdad
 
 ```text
-Detectar problema -> diagnosticar -> validar con datos reales -> guiar reparacion
--> cotizar -> documentar -> cobrar -> aprender del caso
+Intención local
+  → outbox durable
+  → RPC autenticado y validación de servidor
+  → recibo/evento/ledger cuando corresponda
+  → proyección Supabase
+  → Room
+  → interfaz
 ```
 
-La app ahora conserva esta regla: si no hay adaptador real, el usuario puede explorar con demo de entrenamiento, pero los datos se rotulan y no se venden como lectura fisica.
+La interfaz puede mostrar `pendiente`, `sin conexión`, `dato no capturado` o
+`requiere prueba física`. Nunca debe convertir esas condiciones en éxito.
 
-Documentacion de producto: `docs/PRODUCT_OS_ROADMAP.md`.
+## Evidencia física registrada
 
-## Estructura del proyecto
+Las rondas anteriores registran instalación, apertura y proceso estable en
+**Honor VER-N49** y **Xiaomi M2101K6R**. La
+[nota 4.26.0](docs/releases/2026-09-18-android-4.26.0-rides-lost-found-sync.md)
+documenta la instalación y apertura en ambos equipos; las notas de
+[4.25.0](docs/releases/2026-09-17-android-4.25.0-rides-v9-recovery.md) y
+[4.26.1](docs/releases/2026-09-20-elysium-vanguard-ai-os-4.26.1-authority-hardening.md)
+registran también arranque Android en Honor. Esta evidencia pertenece a esos
+artefactos y fechas, no prueba automáticamente un APK posterior.
 
-```text
-MEET/
-├── android/
-│   └── app/src/main/
-│       ├── kotlin/com/elysium369/meet/
-│       │   ├── ai/                    # Contexto IA especializado
-│       │   ├── core/obd/              # Sesion OBD, UDS, DoIP, PIDs, DTCs
-│       │   ├── core/billing/          # Google Play Billing y verificacion
-│       │   ├── core/transport/        # BT classic, BLE, WiFi
-│       │   ├── data/visualdiagnostics/# Seed/repositorio diagnostico 3D
-│       │   ├── domain/visualdiagnostics/# Modelo tecnico 3D
-│       │   ├── data/local/            # Room, entidades, conocimiento mecanico
-│       │   ├── data/supabase/         # Reparacion/red/sync cloud
-│       │   └── ui/screens/            # Scanner, topologia, marketplace, repair network
-│       └── assets/
-│           ├── dtc_database_es.json
-│           └── databases/meet_dtc.db
-├── docs/                              # Billing, analytics y diagnostico visual
-├── src/analytics/                     # SDK local de analytics web
-├── supabase/functions/                # Edge Functions
-├── supabase/migrations/               # RLS, entitlements, analytics
-├── generate_db.py                     # Generador del SQLite enriquecido
-└── README.md
-```
+El recorrido económico Golden E2E de dos cuentas —descubrimiento, doble claim,
+dos recuperaciones de proceso, PIN, inicio, cierre e invariantes
+exactly-once— debe repetirse sobre el SHA y el artefacto que se vaya a lanzar.
 
-## Build rapido
+## Verificación
 
-### Compilar APK debug
+Ejecuta las verificaciones desde una copia limpia del repositorio. En esta Mac,
+Gradle debe usar un solo worker y no mantener un daemon persistente.
 
 ```bash
+npm run check:versions
+bash tests/parity/ci-verify.sh
+
 cd android
-./gradlew assembleDebug
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug \
+  --no-daemon --max-workers=1
 ```
 
-APK:
-
-```text
-android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-### Regenerar la base SQLite completa
+Para cambios de Viajes, añade los gates del dominio:
 
 ```bash
-/usr/bin/python3 generate_db.py --include-graph
+bash tests/ride/verify-ride-android-authority.sh
+bash tests/ride/verify-ride-command-authority-postgres.sh
 ```
 
-Nota: el `.db` completo supera 100 MB y no se empuja a GitHub como blob normal. Para publicar ese binario en linea se debe usar Git LFS o adjuntarlo como release asset.
+La validación física requiere una instalación en un dispositivo real, apertura
+verificada, proceso en primer plano y revisión de logs. Para un lanzamiento de
+movilidad se requieren dos cuentas independientes y evidencia PostgreSQL de
+idempotencia y liquidación exactamente una vez.
 
-## Estado verificado en esta iteracion
+## Estructura
 
-- `npm run build` exitoso
-- `:app:compileDebugKotlin` exitoso
-- `:app:testDebugUnitTest` exitoso
-- Google Play Billing 9.1.0 compila usando el artefacto Java `com.android.billingclient:billing` para mantener compatibilidad con Kotlin 1.9.23
+```text
+android/                         Aplicación Android, Room y Compose
+supabase/migrations/             Esquema, RLS y RPCs autoritativos
+supabase/functions/              Edge Functions
+tests/                           Paridad, integración y gates de dominio
+docs/                            Contratos, arquitectura, seguridad y releases
+tools/                           Verificadores y utilidades de release
+```
 
-## Fuentes tecnicas
+## Documentación principal
 
-### SQLite y Android
+- [Visión de producto](docs/PRODUCT_VISION.md)
+- [Reglas de producto](docs/PRODUCT_OS_ROADMAP.md)
+- [Contrato de paridad TypeScript/Kotlin](docs/architecture/CROSS-RUNTIME-PARITY.md)
+- [Constitución de seguridad](docs/safety/SAFETY_CONSTITUTION.md)
+- [Especificación de recuperación de Viajes](docs/rides/MEET_RIDES_V9_APK_RECOVERY_SPEC.md)
+- [Ruta vial y programación](docs/rides/ROAD_ROUTE_AND_SCHEDULING_2026-09-21.md)
+- [Hardening de autoridad 4.26.1](docs/releases/2026-09-20-elysium-vanguard-ai-os-4.26.1-authority-hardening.md)
 
-- SQLite JSON functions and operators:
-  [sqlite.org/json1.html](https://www.sqlite.org/json1.html)
-- SQLite `CREATE INDEX`:
-  [sqlite.org/lang_createindex.html](https://www.sqlite.org/lang_createindex.html)
-- Android SQLite performance best practices:
-  [developer.android.com/topic/performance/sqlite-performance-best-practices](https://developer.android.com/topic/performance/sqlite-performance-best-practices)
+## Límites de publicación
 
-### Google Play Billing
-
-- Google Play Billing release notes:
-  [developer.android.com/google/play/billing/release-notes](https://developer.android.com/google/play/billing/release-notes)
-- Integrate Google Play Billing:
-  [developer.android.com/google/play/billing/integrate](https://developer.android.com/google/play/billing/integrate)
-- Migrate to Play Billing Library 9:
-  [developer.android.com/google/play/billing/migrate-gpblv9](https://developer.android.com/google/play/billing/migrate-gpblv9)
-- Google Play payments policy:
-  [support.google.com/googleplay/android-developer/answer/10281818](https://support.google.com/googleplay/android-developer/answer/10281818)
-
-### Diagnostico y topologia
-
-- ISO 13400 / DoIP overview:
-  [iso.org/standard/74785.html](https://www.iso.org/standard/74785.html)
-- Softing DoIP summary:
-  [automotive.softing.com/standards/protocols/doip-iso-13400.html](https://automotive.softing.com/standards/protocols/doip-iso-13400.html)
-- ISO 14229 / UDS overview:
-  [iso.org/standard/72439.html](https://www.iso.org/standard/72439.html)
-- Vector UDS overview:
-  [vector.com/us/en/products/solutions/diagnostic-standards/uds-unified-diagnostic-services-iso14229/](https://www.vector.com/us/en/products/solutions/diagnostic-standards/uds-unified-diagnostic-services-iso14229/)
-- Autel topology references:
-  [autel.us/ultra-series-toplogy-update/](https://autel.us/ultra-series-toplogy-update/)
-  [autel.us/new-autel-topology-helps-techs-diagnose-hidden-module-problems/](https://autel.us/new-autel-topology-helps-techs-diagnose-hidden-module-problems/)
-
-### DTC y regulacion
-
-- ISO 15031-6:
-  [iso.org/es/contents/data/standard/06/63/66369.html](https://www.iso.org/es/contents/data/standard/06/63/66369.html)
-- EPA readiness best practices:
-  [epa.gov/system/files/documents/2022-08/diesel-obd-im-readiness-14k-pounds-gwr-best-practices.pdf](https://www.epa.gov/system/files/documents/2022-08/diesel-obd-im-readiness-14k-pounds-gwr-best-practices.pdf)
-- CARB OBD II:
-  [ww2.arb.ca.gov/sites/default/files/barcu/regact/2021/obd2021/fro-obdii.pdf](https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2021/obd2021/fro-obdii.pdf)
-- CARB J1979-2 attachment:
-  [ww2.arb.ca.gov/sites/default/files/barcu/regact/2021/obd2021/15dayattc.pdf](https://ww2.arb.ca.gov/sites/default/files/barcu/regact/2021/obd2021/15dayattc.pdf)
-- NHTSA vPIC:
-  [vpic.nhtsa.dot.gov](https://vpic.nhtsa.dot.gov/)
-
-## MEET Rides V9: Movilidad Distribuida con Autoridad Servidor
-
-En la versión **V9**, el subsistema de viajes (**MEET Rides**) fue restaurado y blindado al 100% con un estándar de ingeniería de nivel mundial:
-
-- **Fin del viaje fantasma (*"acepto por 1 segundo y desaparece"*):** La aplicación móvil ya no finge localmente que un viaje fue aceptado (`status = "ACCEPTED"`). Toda aceptación se procesa mediante una cola persistente (*Transactional Outbox*) y solo se activa en la pantalla cuando el servidor en la nube confirma y Room proyecta la asignación oficial con versión validada (`serverVersion > 0`).
-- **Feedback honesto y visual en tiempo real:** Al tocar "Aceptar", el botón se deshabilita de inmediato y muestra un indicador de carga junto a `"CONFIRMANDO…"`. Si el servidor rechaza el reclamo (por ejemplo, porque otro conductor lo tomó milisegundos antes o por expiración), el conductor recibe un aviso comprensible y respetuoso con la causa exacta.
-- **Cero telemetría y datos ficticios:** Queda terminantemente prohibido inventar vehículos por defecto (como "Toyota Corolla 2018 Gris"), calificaciones cableadas (`5.0`) o usar las coordenadas del pasajero como posición del conductor. Si no hay señal GPS real o el vehículo no ha sido validado, el sistema no inventa información.
-- **Separación limpia de intención:** Un solo toque para aceptar la tarifa publicada ejecuta exclusivamente el reclamo (`CLAIM`), mientras que proponer otro precio ejecuta exclusivamente la contraoferta (`SUBMIT_OFFER`). Nunca se disparan ambas solicitudes a la vez.
-- **Invariantes estrictos (Debug ≡ Release):** Se eliminaron todos los atajos de desarrollo. La verificación de PIN de abordaje, el control de concurrencia y la validación de inspección vehicular aplican con el mismo rigor en cualquier entorno.
-- **Verificación Técnica Absoluta:**
-  - **2.077 pruebas unitarias automáticas** aprobadas al 100% con 0 fallos (`./gradlew testDebugUnitTest`).
-  - **419 pruebas especializadas de movilidad** en `com.elysium369.meet.ride.*`.
-  - **Paridad exacta de hash criptográfico** TS ≡ Kotlin comprobada mediante `bash tests/parity/ci-verify.sh`.
-  - **Contrato de autoridad Android** verificado mediante `bash tests/ride/verify-ride-android-authority.sh`.
-
-> Para especificaciones técnicas y diagramas de flujo completos para desarrolladores e IAs, consulta [docs/rides/MEET_RIDES_V9_APK_RECOVERY_SPEC.md](docs/rides/MEET_RIDES_V9_APK_RECOVERY_SPEC.md) y el registro de decisiones [docs/rides/RIDE_DECISION_LOG.md](docs/rides/RIDE_DECISION_LOG.md).
+No publiques un `app-debug.apk` como artefacto de producción. Una entrega
+oficial necesita un tag sobre el SHA final de `main`, una AAB/APK firmada con la
+clave de producción, manifiesto, hashes, SBOM, provenance y los gates requeridos
+en verde. Los secretos de Supabase y firma nunca pertenecen al repositorio.
 
 ## Licencia
 
 MIT
-
-<p align="center">
-  <strong>MEET sigue creciendo hacia una base mecanica industrial, offline y util de verdad.</strong>
-</p>

@@ -14,6 +14,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.elysium369.meet.ui.home.HomeExperience
 import com.elysium369.meet.ui.theme.MeetColors
 
@@ -23,9 +26,11 @@ fun HomeExperienceSwitcherHeaderButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val compact = LocalConfiguration.current.screenWidthDp < 420
     Surface(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
+            .semantics { contentDescription = "Cambiar experiencia de inicio: ${currentExperience.displayName}" }
             .clickable { onClick() },
         color = MeetColors.cardBackground,
         shape = RoundedCornerShape(8.dp),
@@ -37,12 +42,15 @@ fun HomeExperienceSwitcherHeaderButton(
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text("⌘", color = MeetColors.neonGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Text(
-                text = currentExperience.displayName,
-                color = Color.White,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+            if (!compact) {
+                Text(
+                    text = currentExperience.displayName,
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+            }
             Text("▾", color = MeetColors.textMuted, fontSize = 10.sp)
         }
     }

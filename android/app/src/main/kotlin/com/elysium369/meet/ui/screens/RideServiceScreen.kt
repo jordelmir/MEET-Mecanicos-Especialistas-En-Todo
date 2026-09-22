@@ -2806,9 +2806,54 @@ fun PassengerDashboard(
             )
         }
 
+        val pickerStops = stops.mapNotNull { stop ->
+            val latitude = stop.latitude ?: return@mapNotNull null
+            val longitude = stop.longitude ?: return@mapNotNull null
+            rideGeoPointOrNull(latitude, longitude, null, System.currentTimeMillis())
+        }
+        var pickerRoadRoute by remember(target) { mutableStateOf<RideRoadRoute?>(null) }
+        var pickerRouteLoading by remember(target) { mutableStateOf(false) }
+        var pickerRouteFailed by remember(target) { mutableStateOf(false) }
+        val movingPoint = pendingMapPin ?: if (target == RidePinTarget.PICKUP) effectivePickup else effectiveDestination
+        val pickerPickup = if (target == RidePinTarget.PICKUP) movingPoint else effectivePickup
+        val pickerDestination = if (target == RidePinTarget.DESTINATION) movingPoint else effectiveDestination
+
+        LaunchedEffect(
+            target,
+            pickerPickup?.latitude,
+            pickerPickup?.longitude,
+            pickerDestination?.latitude,
+            pickerDestination?.longitude,
+            pickerStops,
+        ) {
+            val pickup = pickerPickup
+            val destination = pickerDestination
+            if (pickup == null || destination == null || pickerStops.size != stops.size) {
+                pickerRoadRoute = null
+                pickerRouteLoading = false
+                pickerRouteFailed = false
+                return@LaunchedEffect
+            }
+            pickerRouteLoading = true
+            pickerRouteFailed = false
+            pickerRoadRoute = null
+            delay(350L)
+            val result = runCatching {
+                routingProvider.route(listOf(pickup) + pickerStops + destination)
+            }
+            pickerRoadRoute = result.getOrNull()
+            pickerRouteFailed = result.isFailure
+            pickerRouteLoading = false
+        }
+
         val mapPinState = RideMapStateFactory.create(
-            pickup = effectivePickup,
-            destination = effectiveDestination,
+            // The moving center pin is a draft. Confirmed R/D markers must not
+            // jump or accumulate while the user pans the map.
+            pickup = if (target == RidePinTarget.PICKUP) null else effectivePickup,
+            destination = if (target == RidePinTarget.DESTINATION) null else effectiveDestination,
+            stops = pickerStops,
+            route = pickerRoadRoute?.geometry,
+            allowStraightLineFallback = false,
         )
         val activeInitialPoint = if (target == RidePinTarget.PICKUP) {
             pendingMapPin ?: effectivePickup
@@ -2823,6 +2868,18 @@ fun PassengerDashboard(
             },
             state = mapPinState,
             initialPoint = activeInitialPoint,
+            routeStatus = when {
+                pickerRouteLoading -> "Calculando ruta vial real…"
+                pickerRoadRoute != null -> {
+                    val route = requireNotNull(pickerRoadRoute)
+                    val km = route.distanceMeters / 1_000.0
+                    val minutes = kotlin.math.ceil(route.durationSeconds / 60.0).toInt()
+                    "Ruta vial · ${String.format(currentLocale, "%.1f", km)} km · $minutes min"
+                }
+                pickerRouteFailed -> "Ruta vial no disponible. No se mostrará una línea recta falsa."
+                else -> "Fija ambos puntos para calcular la ruta por carretera."
+            },
+            routeStatusIsWarning = pickerRouteFailed,
             onPinChanged = { pendingMapPin = it },
             onDismiss = {
                 pendingMapPin = null
@@ -2964,6 +3021,8 @@ fun RidePinPickerDialog(
     targetLabel: String,
     state: com.elysium369.meet.ride.map.RideMapState,
     initialPoint: RideGeoPoint?,
+    routeStatus: String = "",
+    routeStatusIsWarning: Boolean = false,
     onPinChanged: (RideGeoPoint) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: (RideGeoPoint) -> Unit,
@@ -3009,16 +3068,37 @@ fun RidePinPickerDialog(
                         }
                     }
                 }
-                RideMapPanel(
-                    state = state,
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    pinSelectionEnabled = true,
-                    pinSelectionLabel = "El pin permanece fijo; mueve el mapa",
-                    pinSelectionInitialPoint = initialPoint,
-                    onPinSelectionChanged = onPinChanged,
-                    onPinSelectionCancelled = onDismiss,
-                    onPinSelectionConfirmed = onConfirm,
-                )
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .navigationBarsPadding(),
+                ) {
+                    RideMapPanel(
+                        state = state,
+                        modifier = Modifier.fillMaxSize(),
+                        pinSelectionEnabled = true,
+                        pinSelectionLabel = "El pin permanece fijo; mueve el mapa",
+                        pinSelectionInitialPoint = initialPoint,
+                        onPinSelectionChanged = onPinChanged,
+                        onPinSelectionCancelled = onDismiss,
+                        onPinSelectionConfirmed = onConfirm,
+                    )
+                    if (routeStatus.isNotBlank()) {
+                        Text(
+                            text = routeStatus,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = 12.dp, start = 56.dp, end = 56.dp)
+                                .background(Color(0xDD06121F), RoundedCornerShape(14.dp))
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            color = if (routeStatusIsWarning) MeetColors.warning else MeetColors.cyberCyan,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
             }
         }
     }

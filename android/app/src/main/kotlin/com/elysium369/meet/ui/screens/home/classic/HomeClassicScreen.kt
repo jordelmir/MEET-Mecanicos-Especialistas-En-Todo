@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
@@ -53,6 +54,7 @@ fun HomeClassicScreen(
     onCancelPreview: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val compactHeader = LocalConfiguration.current.screenWidthDp < 420
     val prefs = remember { context.getSharedPreferences("meet_prefs", Context.MODE_PRIVATE) }
     val userProfile = remember { prefs.getString("user_profile", "owner").orEmpty() }
     val activeVehicle by viewModel.selectedVehicle.collectAsState()
@@ -153,13 +155,15 @@ fun HomeClassicScreen(
                             Spacer(Modifier.height(2.dp))
                             Text(
                                 text = buildAnnotatedString {
-                                    withStyle(SpanStyle(color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 28.sp)) {
-                                        append("ELYSIUM ")
+                                    withStyle(SpanStyle(color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = if (compactHeader) 20.sp else 28.sp)) {
+                                        append(if (compactHeader) "ELYSIUM\n" else "ELYSIUM ")
                                     }
-                                    withStyle(SpanStyle(color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, fontSize = 20.sp)) {
+                                    withStyle(SpanStyle(color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, fontSize = if (compactHeader) 15.sp else 20.sp)) {
                                         append("VANGUARD AI OS")
                                     }
-                                }
+                                },
+                                softWrap = true,
+                                maxLines = 2,
                             )
                             // Role badge
                             val roleLabel = when (userProfile) {

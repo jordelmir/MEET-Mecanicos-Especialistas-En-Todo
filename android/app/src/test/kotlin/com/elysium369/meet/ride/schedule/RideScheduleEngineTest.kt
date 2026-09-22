@@ -60,6 +60,15 @@ class RideScheduleEngineTest {
     }
 
     @Test
+    fun `cannot schedule unresolved or invalid locations`() = runBlocking {
+        val unresolved = pickup().copy(latitude = Double.NaN)
+        val outOfWorld = dropoff().copy(longitude = -184.21)
+
+        assertNull(engine().scheduleRide("user1", listOf(unresolved, dropoff()), futureMs()))
+        assertNull(engine().scheduleRide("user1", listOf(pickup(), outOfWorld), futureMs()))
+    }
+
+    @Test
     fun `multi-stop adds intermediate stop`() = runBlocking {
         val e = engine()
         val ride = e.scheduleRide("user1", listOf(pickup(), dropoff()), futureMs())!!

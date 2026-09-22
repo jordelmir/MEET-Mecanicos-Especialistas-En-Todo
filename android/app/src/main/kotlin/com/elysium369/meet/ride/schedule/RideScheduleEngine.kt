@@ -150,6 +150,12 @@ class RideScheduleEngine @Inject constructor(
         notes: String = "",
     ): ScheduledRide? {
         if (stops.size < 2) return null
+        if (stops.any { stop ->
+                stop.displayName.isBlank() ||
+                    !stop.latitude.isFinite() || stop.latitude !in -90.0..90.0 ||
+                    !stop.longitude.isFinite() || stop.longitude !in -180.0..180.0
+            }
+        ) return null
         if (scheduledAtEpochMs <= System.currentTimeMillis()) return null
 
         val now = System.currentTimeMillis()

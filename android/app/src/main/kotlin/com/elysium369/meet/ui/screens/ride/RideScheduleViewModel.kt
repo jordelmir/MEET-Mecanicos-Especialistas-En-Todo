@@ -81,7 +81,7 @@ class RideScheduleViewModel @Inject constructor(
                 notes = notes,
             )
             if (ride != null) {
-                _feedback.value = "Viaje programado para ${ride.formattedFare}"
+                _feedback.value = "Viaje programado y guardado en tu agenda"
                 loadUpcoming(userId)
             } else {
                 _feedback.value = "No se pudo programar el viaje"
