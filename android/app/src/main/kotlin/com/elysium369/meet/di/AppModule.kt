@@ -4887,6 +4887,105 @@ object AppModule {
         }
     }
 
+    val MIGRATION_82_83 = object : Migration(82, 83) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `emission_sessions` (
+                    `id` TEXT NOT NULL,
+                    `vehicleId` TEXT,
+                    `vin` TEXT,
+                    `startedAt` INTEGER NOT NULL,
+                    `completedAt` INTEGER,
+                    `protocol` TEXT,
+                    `ruleSetId` TEXT,
+                    `appVersion` TEXT NOT NULL,
+                    `modelVersion` TEXT,
+                    `overallVerdict` TEXT,
+                    `confidence` REAL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `emission_frames` (
+                    `frameId` TEXT NOT NULL,
+                    `sessionId` TEXT NOT NULL,
+                    `timestampMs` INTEGER NOT NULL,
+                    `rpm` REAL,
+                    `coolantC` REAL,
+                    `mafGps` REAL,
+                    `mapKpa` REAL,
+                    `stftPct` REAL,
+                    `ltftPct` REAL,
+                    `o2B1S1` REAL,
+                    `o2B1S2` REAL,
+                    `lambda` REAL,
+                    `coEst` REAL,
+                    `hcEst` REAL,
+                    `co2Est` REAL,
+                    PRIMARY KEY(`frameId`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_emission_frames_sessionId` ON `emission_frames` (`sessionId`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `emission_phase_results` (
+                    `id` TEXT NOT NULL,
+                    `sessionId` TEXT NOT NULL,
+                    `phaseName` TEXT NOT NULL,
+                    `rpmMean` REAL NOT NULL,
+                    `ectMean` REAL NOT NULL,
+                    `coPoint` REAL NOT NULL,
+                    `coLower95` REAL NOT NULL,
+                    `coUpper95` REAL NOT NULL,
+                    `coEval` TEXT NOT NULL,
+                    `hcPoint` REAL NOT NULL,
+                    `hcLower95` REAL NOT NULL,
+                    `hcUpper95` REAL NOT NULL,
+                    `hcEval` TEXT NOT NULL,
+                    `co2Point` REAL NOT NULL,
+                    `co2Eval` TEXT NOT NULL,
+                    `lambdaVal` REAL,
+                    `lambdaEval` TEXT NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_emission_phase_results_sessionId` ON `emission_phase_results` (`sessionId`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `emission_estimates` (
+                    `id` TEXT NOT NULL,
+                    `sessionId` TEXT NOT NULL,
+                    `metricId` TEXT NOT NULL,
+                    `pointEstimate` REAL NOT NULL,
+                    `lower95` REAL NOT NULL,
+                    `upper95` REAL NOT NULL,
+                    `unit` TEXT NOT NULL,
+                    `origin` TEXT NOT NULL,
+                    `truthClass` TEXT NOT NULL,
+                    `quality` REAL,
+                    `capturedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_emission_estimates_sessionId` ON `emission_estimates` (`sessionId`)")
+
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `gas_probe_calibrations` (
+                    `id` TEXT NOT NULL,
+                    `sensorSerial` TEXT NOT NULL,
+                    `zeroTimestampMs` INTEGER NOT NULL,
+                    `spanTimestampMs` INTEGER NOT NULL,
+                    `referenceGasFormula` TEXT NOT NULL,
+                    `ambientTempC` REAL,
+                    `ambientPressureKpa` REAL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4956,6 +5055,7 @@ object AppModule {
             MIGRATION_79_80,
             MIGRATION_80_81,
             MIGRATION_81_82,
+            MIGRATION_82_83,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -5296,6 +5396,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideVehicleFinancialLedgerDao(db: MeetDatabase): VehicleFinancialLedgerDao = db.vehicleFinancialLedgerDao()
+
+    @Provides
+    @Singleton
+    fun provideEmissionDao(db: MeetDatabase): com.elysium369.meet.core.emissions.storage.EmissionDao = db.emissionDao()
 
     @Provides
     @Singleton

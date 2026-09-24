@@ -1,0 +1,55 @@
+{
+  "caseId": "accent_2005_dekra_case_001",
+  "vehicle": {
+    "make": "Hyundai",
+    "model": "Accent GLS",
+    "year": 2005,
+    "fuel": "GASOLINE",
+    "engineDisplacementLiters": 1.6,
+    "cylinders": 4,
+    "engineCycle": "FOUR_STROKE",
+    "costaRicaEntryDate": "2005-06-15"
+  },
+  "inspectionAuthority": "DEKRA / COSEVI Costa Rica",
+  "inspectionDate": "2024-05-18",
+  "measuredData": {
+    "idle": {
+      "rpm": 742,
+      "coVolPct": 0.62,
+      "hcPpm": 320,
+      "co2VolPct": 12.9,
+      "o2VolPct": 1.2,
+      "lambda": 1.124
+    },
+    "accelerated": {
+      "rpm": 2503,
+      "coVolPct": 0.64,
+      "hcPpm": 381,
+      "co2VolPct": 11.9,
+      "o2VolPct": 1.5,
+      "lambda": 1.293
+    }
+  },
+  "regulatoryExpectations": {
+    "jurisdiction": "CR",
+    "ruleSet": "COSEVI_2026_GAS_4T",
+    "idle": {
+      "coLimit": 0.50,
+      "expectedCoVerdict": "FAIL",
+      "hcLimit": 125,
+      "expectedHcVerdict": "FAIL",
+      "co2MinLimit": 10.0,
+      "expectedCo2Verdict": "PASS"
+    },
+    "accelerated": {
+      "coLimit": 0.30,
+      "expectedCoVerdict": "FAIL",
+      "hcLimit": 100,
+      "expectedHcVerdict": "FAIL",
+      "co2MinLimit": 12.0,
+      "expectedCo2Verdict": "FAIL",
+      "lambdaApplicable": false
+    },
+    "overallInspectionVerdict": "REPROBADO_FALTA_GRAVE"
+  }
+}

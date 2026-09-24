@@ -163,19 +163,19 @@ class PrePurchaseInspection @Inject constructor() {
             if (pendScore >= 4) DiagnosticSeverity.INFO else DiagnosticSeverity.MODERATE))
 
         // ── 8. Mode 06 Tests (5 pts) ──
-        val m06Score = if (mode06Results != null) {
-            val failed = mode06Results.count { !it.passed }
+        val m06Score = if (mode06Results != null && mode06Results.isNotEmpty()) {
+            val failed = mode06Results.count { it.verdict == Mode06Verdict.FAIL }
             when {
                 failed == 0 -> 5
-                failed <= 3 -> 3
+                failed <= 3 -> 2
                 else -> 0
             }
-        } else 3
-        val m06Findings = if (mode06Results != null) {
-            val failed = mode06Results.count { !it.passed }
+        } else 0
+        val m06Findings = if (mode06Results != null && mode06Results.isNotEmpty()) {
+            val failed = mode06Results.count { it.verdict == Mode06Verdict.FAIL }
             if (failed > 0) listOf("⚠️ $failed pruebas internas fallidas de ${mode06Results.size}")
-            else listOf("✅ Todas las pruebas internas pasaron")
-        } else listOf("ℹ️ Mode 06 no disponible")
+            else listOf("✅ Todas las pruebas internas evaluadas pasaron")
+        } else listOf("ℹ️ Mode 06 no disponible o no soportado (0 pts otorgados)")
         categories.add(InspectionCategory("Pruebas Internas ECU", "🧪", m06Score, 5, m06Findings,
             if (m06Score >= 3) DiagnosticSeverity.INFO else DiagnosticSeverity.MODERATE))
 

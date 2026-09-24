@@ -22,6 +22,7 @@ import com.elysium369.meet.safety.data.local.SafetyReportDao
 import com.elysium369.meet.safety.data.local.SafetyReportEntity
 import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerDao
 import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerEntity
+import com.elysium369.meet.core.emissions.storage.*
 
 @Database(
     entities = [
@@ -214,8 +215,14 @@ import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerEntity
         SafetyPublicTimelineEntity::class,
         SafetyPublicClaimEntity::class,
         VehicleFinancialLedgerEntity::class,
+        // EMISSIONS LAB PERSISTENCE
+        EmissionSessionEntity::class,
+        EmissionFrameEntity::class,
+        EmissionPhaseResultEntity::class,
+        EmissionEstimateEntity::class,
+        GasProbeCalibrationEntity::class,
     ],
-    version = 82,
+    version = 83,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -316,4 +323,7 @@ abstract class MeetDatabase : RoomDatabase() {
 
         // VEHICLE FINANCIAL LEDGER DAO
         abstract fun vehicleFinancialLedgerDao(): VehicleFinancialLedgerDao
+
+        // EMISSIONS LAB DAO
+        abstract fun emissionDao(): EmissionDao
 }

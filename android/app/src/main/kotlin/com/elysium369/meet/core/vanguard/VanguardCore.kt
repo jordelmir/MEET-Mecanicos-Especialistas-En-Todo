@@ -962,35 +962,70 @@ class ObdSessionRecorder @javax.inject.Inject constructor(
         if (boundSessionId.isBlank()) return
         val occurredAt = timestampMs.takeIf { it > 0L } ?: System.currentTimeMillis()
         persist {
-            results.orEmpty().filterIsInstance<ObdMode06Record>().forEach { result ->
-                val value = result.value
-                val min = result.minLimit
-                val max = result.maxLimit
-                if (value != null && min != null && max != null) {
-                    dao.insertMode06Result(
-                        Mode06ResultEntity(
-                            sessionId = boundSessionId,
-                            testId = result.testId,
-                            componentId = result.componentId,
-                            value = value,
-                            minValue = min,
-                            maxValue = max,
-                            status = result.status.ifBlank { "UNVERIFIED" },
-                            capturedAt = occurredAt,
-                        )
-                    )
-                } else {
-                    dao.insertAuditLog(
-                        AuditLogEntity(
-                            actorId = null,
-                            actorRole = "SYSTEM",
-                            action = "OBSERVE",
-                            resourceType = "MODE06_INCOMPLETE_RESULT",
-                            resourceId = boundSessionId,
-                            payloadJson = "{\"testId\":\"${jsonEscape(result.testId)}\",\"status\":\"UNVERIFIED\"}",
-                            occurredAt = occurredAt,
-                        )
-                    )
+            results.orEmpty().forEach { item ->
+                when (item) {
+                    is ObdMode06Record -> {
+                        val value = item.value
+                        val min = item.minLimit
+                        val max = item.maxLimit
+                        if (value != null && min != null && max != null) {
+                            dao.insertMode06Result(
+                                Mode06ResultEntity(
+                                    sessionId = boundSessionId,
+                                    testId = item.testId,
+                                    componentId = item.componentId,
+                                    value = value,
+                                    minValue = min,
+                                    maxValue = max,
+                                    status = item.status.ifBlank { "UNVERIFIED" },
+                                    capturedAt = occurredAt,
+                                )
+                            )
+                        } else {
+                            dao.insertAuditLog(
+                                AuditLogEntity(
+                                    actorId = null,
+                                    actorRole = "SYSTEM",
+                                    action = "OBSERVE",
+                                    resourceType = "MODE06_INCOMPLETE_RESULT",
+                                    resourceId = boundSessionId,
+                                    payloadJson = "{\"testId\":\"${jsonEscape(item.testId)}\",\"status\":\"UNVERIFIED\"}",
+                                    occurredAt = occurredAt,
+                                )
+                            )
+                        }
+                    }
+                    is com.elysium369.meet.core.obd.Mode06TestResult -> {
+                        val value = item.valueDouble
+                        val min = item.minLimitDouble
+                        val max = item.maxLimitDouble
+                        if (value != null && min != null && max != null) {
+                            dao.insertMode06Result(
+                                Mode06ResultEntity(
+                                    sessionId = boundSessionId,
+                                    testId = item.tid,
+                                    componentId = item.mid,
+                                    value = value,
+                                    minValue = min,
+                                    maxValue = max,
+                                    status = item.verdict.name,
+                                    capturedAt = occurredAt,
+                                )
+                            )
+                        } else {
+                            dao.insertAuditLog(
+                                AuditLogEntity(
+                                    actorId = null,
+                                    actorRole = "SYSTEM",
+                                    action = "OBSERVE",
+                                    resourceType = "MODE06_INCOMPLETE_RESULT",
+                                    resourceId = boundSessionId,
+                                    payloadJson = "{\"mid\":\"${jsonEscape(item.mid)}\",\"tid\":\"${jsonEscape(item.tid)}\",\"status\":\"${item.decodeStatus.name}\",\"verdict\":\"${item.verdict.name}\"}",
+                                    occurredAt = occurredAt,
+                                )
+                            )
+                        }
+                    }
                 }
             }
         }

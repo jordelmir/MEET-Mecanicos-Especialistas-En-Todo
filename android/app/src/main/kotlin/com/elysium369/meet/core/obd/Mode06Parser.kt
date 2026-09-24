@@ -1,129 +1,88 @@
 package com.elysium369.meet.core.obd
 
 import android.util.Log
-import com.elysium369.meet.core.obd.CanMultiFrameParser
 
 /**
- * Professional Mode 06 (On-Board Monitoring) Expert Parser.
- * Designed to decode raw hex data into human-readable, context-aware diagnostic reports.
- * This is "Top 1% Mundial" grade logic, mimicking high-end tools like Snap-on/Autel.
+ * Professional Mode $06 (On-Board Diagnostic Test Results) Parser.
+ * Strictly implements SAE J1979 / SAE J1979-DA / ISO 15765-4.
+ *
+ * Enforces Metrological Truth Safety:
+ * - Unknown UASID -> DecodeStatus.UNKNOWN_UASID, verdict UNKNOWN, no invented unit/scaling.
+ * - Missing limits (no min and no max) -> DecodeStatus.NO_LIMITS, verdict UNKNOWN (never silent PASS).
+ * - Distinguishes CAN vs Legacy OBD protocols.
  */
-class Mode06Parser {
+class Mode06Parser(
+    private val registry: Mode06DefinitionRegistry = DefaultMode06DefinitionRegistry()
+) {
 
     companion object {
         private const val TAG = "Mode06Parser"
 
         /**
-         * Test ID (TID) to Description Mapping (SAE J1979)
+         * SAE J1979-DA UASID Scaling and Offset Table.
+         * Returns (multiplier, offset, unit) if known, or null if unknown.
          */
-        private val tidDefinitions = mapOf(
-            "\$01" to "Voltaje de umbral Rico a Pobre del sensor (Rich-to-Lean)",
-            "\$02" to "Voltaje de umbral Pobre a Rico del sensor (Lean-to-Rich)",
-            "\$03" to "Voltaje bajo del sensor para tiempo de conmutación",
-            "\$04" to "Voltaje alto del sensor para tiempo de conmutación",
-            "\$05" to "Tiempo de conmutación Rico a Pobre (Rich-to-Lean switch time)",
-            "\$06" to "Tiempo de conmutación Pobre a Rico (Lean-to-Rich switch time)",
-            "\$07" to "Voltaje mínimo del sensor en el ciclo de prueba",
-            "\$08" to "Voltaje máximo del sensor en el ciclo de prueba",
-            "\$09" to "Tiempo entre transiciones del sensor",
-            "\$0A" to "Periodo del sensor de O2",
-            "\$0B" to "Conteo de fallas de encendido promedio (EWMA)",
-            "\$0C" to "Conteo de fallas de encendido máximas (Ciclo actual)",
-            "\$11" to "Monitoreo del catalizador: coeficiente de almacenamiento de oxígeno",
-            "\$12" to "Monitoreo del catalizador: pico de respuesta del sensor de O2 trasero",
-            "\$21" to "EVAP: Caída de presión del sistema (Fuga grande)",
-            "\$22" to "EVAP: Vacío / Tasa de cambio de presión (Fuga pequeña)",
-            "\$31" to "Prueba de fuga del sistema EVAP",
-            "\$32" to "Prueba de flujo de purga EVAP",
-            "\$41" to "Eficiencia del Catalizador",
-            "\$45" to "Calentador del Sensor de Oxígeno: Resistencia del elemento",
-            "\$51" to "Flujo del sistema EGR",
-            "\$52" to "EGR: Sensor de contrapresión / elevación de válvula",
-            "\$53" to "Control de sincronización del VVT / Sensor de posición de levas",
-            "\$61" to "Presión del Turbo: Desviación respecto al valor objetivo",
-            "\$71" to "Eficiencia de reducción de NOx del catalizador",
-            "\$81" to "Filtro DPF/GPF: Presión diferencial / Caída de presión",
-            "\$82" to "Filtro DPF/GPF: Regeneración o acumulación de hollín"
-        )
-
-        /**
-         * Monitor ID (MID) to Name Mapping (SAE J1979)
-         */
-        private val midDefinitions = mapOf(
-            "\$01" to "Sensor Oxígeno Banco 1 Sensor 1",
-            "\$02" to "Sensor Oxígeno Banco 1 Sensor 2",
-            "\$03" to "Sensor Oxígeno Banco 1 Sensor 3",
-            "\$04" to "Sensor Oxígeno Banco 1 Sensor 4",
-            "\$05" to "Sensor Oxígeno Banco 2 Sensor 1",
-            "\$06" to "Sensor Oxígeno Banco 2 Sensor 2",
-            "\$07" to "Sensor Oxígeno Banco 2 Sensor 3",
-            "\$08" to "Sensor Oxígeno Banco 2 Sensor 4",
-            "\$09" to "Sensor Oxígeno Banco 3 Sensor 1",
-            "\$0A" to "Sensor Oxígeno Banco 3 Sensor 2",
-            "\$0B" to "Sensor Oxígeno Banco 4 Sensor 1",
-            "\$0C" to "Sensor Oxígeno Banco 4 Sensor 2",
-            "\$21" to "Catalizador Banco 1",
-            "\$22" to "Catalizador Banco 2",
-            "\$23" to "Catalizador Banco 3",
-            "\$24" to "Catalizador Banco 4",
-            "\$31" to "Monitor EGR / VVT Banco 1",
-            "\$32" to "Monitor EGR / VVT Banco 2",
-            "\$35" to "Monitor EVAP (Fuga de 0.040\")",
-            "\$36" to "Monitor EVAP (Fuga de 0.020\")",
-            "\$39" to "Monitor EVAP (Flujo Purga)",
-            "\$3A" to "Monitor EVAP (Fuga muy pequeña)",
-            "\$3B" to "Monitor EVAP (Cánister / Sensor de presión)",
-            "\$41" to "Sistema Aire Secundario Banco 1",
-            "\$42" to "Sistema Aire Secundario Banco 2",
-            "\$51" to "Monitoreo del Sistema de Combustible Banco 1",
-            "\$52" to "Monitoreo del Sistema de Combustible Banco 2",
-            "\$61" to "Control de Presión de Sobrealimentación (Turbo) Banco 1",
-            "\$62" to "Control de Presión de Sobrealimentación (Turbo) Banco 2",
-            "\$71" to "Sensor / Adsorbedor NOx Banco 1",
-            "\$72" to "Sensor / Adsorbedor NOx Banco 2",
-            "\$81" to "Filtro de Partículas (DPF/GPF) Banco 1",
-            "\$82" to "Filtro de Partículas (DPF/GPF) Banco 2",
-            "\$91" to "Distribución Variable (VVT) Banco 1",
-            "\$92" to "Distribución Variable (VVT) Banco 2",
-            "\$A1" to "Falla Encendido Cilindro 1",
-            "\$A2" to "Falla Encendido Cilindro 2",
-            "\$A3" to "Falla Encendido Cilindro 3",
-            "\$A4" to "Falla Encendido Cilindro 4",
-            "\$A5" to "Falla Encendido Cilindro 5",
-            "\$A6" to "Falla Encendido Cilindro 6",
-            "\$A7" to "Falla Encendido Cilindro 7",
-            "\$A8" to "Falla Encendido Cilindro 8",
-            "\$A9" to "Falla Encendido Cilindro 9",
-            "\$AA" to "Falla Encendido Cilindro 10",
-            "\$AB" to "Falla Encendido Cilindro 11",
-            "\$AC" to "Falla Encendido Cilindro 12"
-        )
-
-        /**
-         * Unit ID (UID) Scaling & Units (SAE J1979-DA)
-         */
-        private fun getUnitInfo(uid: String): Pair<Float, String> {
-            return when (uid) {
-                "\$01" -> 1f to "cnt"
-                "\$07" -> 0.001f to "V"
-                "\$08" -> 0.01f to "V"
-                "\$0B" -> 1f to "ms"
-                "\$0C" -> 0.1f to "ms"
-                "\$0D" -> 0.001f to "s"
-                "\$10" -> 1f to "Pa"
-                "\$11" -> 0.1f to "kPa"
-                "\$13" -> 0.01f to "kPa"
-                "\$1B" -> 0.1f to "ratio"
-                "\$23" -> 1f to "g/s"
-                else -> 1f to ""
+        fun getUasidDefinition(uasid: Int): Triple<Double, Double, String>? {
+            return when (uasid) {
+                0x01 -> Triple(1.0, 0.0, "cnt")
+                0x02 -> Triple(0.1, 0.0, "cnt")
+                0x07 -> Triple(0.001, 0.0, "V")
+                0x08 -> Triple(0.01, 0.0, "V")
+                0x0B -> Triple(1.0, 0.0, "ms")
+                0x0C -> Triple(0.1, 0.0, "ms")
+                0x0D -> Triple(0.001, 0.0, "s")
+                0x10 -> Triple(1.0, 0.0, "Pa")
+                0x11 -> Triple(0.1, 0.0, "kPa")
+                0x13 -> Triple(0.01, 0.0, "kPa")
+                0x1B -> Triple(0.1, 0.0, "ratio")
+                0x23 -> Triple(1.0, 0.0, "g/s")
+                0x25 -> Triple(0.01, 0.0, "g/s")
+                0x2D -> Triple(0.1, -40.0, "°C")
+                0x30 -> Triple(0.01, 0.0, "A")
+                0x31 -> Triple(0.001, 0.0, "A")
+                else -> null
             }
         }
     }
 
-    fun parse(rawResponse: String): List<Mode06TestResult> {
-        val results = mutableListOf<Mode06TestResult>()
+    private val canDecoder = CanMode06Decoder(registry)
+    private val legacyDecoder = LegacyMode06Decoder(registry)
 
-        // 1. Strip known noise lines before hex processing
+    /**
+     * Backward-compatible parse function. Defaults to CAN decoding if protocol is unstated.
+     */
+    fun parse(rawResponse: String): List<Mode06TestResult> {
+        return parse(rawResponse, ProtocolFamily.CAN_11BIT, null)
+    }
+
+    /**
+     * Protocol-aware strict parse function.
+     */
+    fun parse(
+        rawResponse: String,
+        protocolFamily: ProtocolFamily,
+        ecuAddress: String? = null
+    ): List<Mode06TestResult> {
+        val clean = sanitizeResponse(rawResponse)
+        if (!clean.contains("46")) return emptyList()
+
+        return when (protocolFamily) {
+            ProtocolFamily.CAN_11BIT, ProtocolFamily.CAN_29BIT -> {
+                canDecoder.decode(clean, protocolFamily, ecuAddress, rawResponse)
+            }
+            ProtocolFamily.ISO_K_LINE, ProtocolFamily.J1850_PWM, ProtocolFamily.J1850_VPW -> {
+                legacyDecoder.decode(clean, protocolFamily, ecuAddress, rawResponse)
+            }
+            ProtocolFamily.UNKNOWN -> {
+                // If unknown, attempt CAN first; fallback to legacy if CAN produces nothing
+                val canResults = canDecoder.decode(clean, ProtocolFamily.CAN_11BIT, ecuAddress, rawResponse)
+                if (canResults.isNotEmpty()) canResults
+                else legacyDecoder.decode(clean, ProtocolFamily.ISO_K_LINE, ecuAddress, rawResponse)
+            }
+        }
+    }
+
+    private fun sanitizeResponse(rawResponse: String): String {
         val filtered = rawResponse
             .replace("\r", "\n")
             .split("\n")
@@ -134,6 +93,7 @@ class Mode06Parser {
                     upper != "OK" && upper != ">" &&
                     !upper.startsWith("AT") &&
                     !upper.startsWith("SEARCHING") &&
+                    !upper.startsWith("NODATA") &&
                     !upper.startsWith("NO DATA") &&
                     !upper.startsWith("UNABLE") &&
                     !upper.startsWith("ERROR") &&
@@ -141,128 +101,325 @@ class Mode06Parser {
             }
             .joinToString(" ")
 
-        // 2. Unify multi-frame via ISO-TP parser, then clean to pure hex
         val unified = CanMultiFrameParser.parse(filtered)
-        val clean = unified.uppercase().replace(Regex("[^0-9A-F]"), "")
+        return unified.uppercase().replace(Regex("[^0-9A-F]"), "")
+    }
+}
 
-        if (!clean.contains("46")) return emptyList()
+/**
+ * ISO 15765-4 CAN Mode $06 Decoder.
+ * Expects records formatted as:
+ * 46 [MID 1B] [TID 1B] [UASID 1B] [VAL 2B] [MIN 2B] [MAX 2B] = 10 bytes (20 hex characters).
+ */
+class CanMode06Decoder(
+    private val registry: Mode06DefinitionRegistry
+) {
+    companion object {
+        private const val TAG = "CanMode06Decoder"
+    }
 
-        try {
-            var i = 0
-            while (i < clean.length) {
-                val start = clean.indexOf("46", i)
-                if (start < 0) break
+    fun decode(
+        cleanHex: String,
+        protocolFamily: ProtocolFamily,
+        ecuAddress: String?,
+        originalRaw: String
+    ): List<Mode06TestResult> {
+        val results = mutableListOf<Mode06TestResult>()
+        var i = 0
 
-                // Need at least 18 hex chars for a minimum record (no UID)
-                if (start + 18 > clean.length) break
+        while (i < cleanHex.length) {
+            val start = cleanHex.indexOf("46", i)
+            if (start < 0) break
 
-                try {
-                    val midHex = clean.substring(start + 2, start + 4)
-                    val tidHex = clean.substring(start + 4, start + 6)
+            // A standard CAN record with 46 prefix requires at least 20 hex characters:
+            // 46 (2) + MID (2) + TID (2) + UASID (2) + VAL (4) + MIN (4) + MAX (4) = 20
+            if (start + 20 > cleanHex.length) {
+                i = start + 2
+                continue
+            }
 
-                    // Validate MID/TID are valid hex — skip garbage bytes
-                    midHex.toInt(16)
-                    tidHex.toInt(16)
+            try {
+                val midHex = cleanHex.substring(start + 2, start + 4)
+                val tidHex = cleanHex.substring(start + 4, start + 6)
+                val uasidHex = cleanHex.substring(start + 6, start + 8)
+                val valHex = cleanHex.substring(start + 8, start + 12)
+                val minHex = cleanHex.substring(start + 12, start + 16)
+                val maxHex = cleanHex.substring(start + 16, start + 20)
 
-                    var offset = start + 6
-                    val hasUid = start + 20 <= clean.length
-                    val uidHex = if (hasUid) clean.substring(start + 6, start + 8) else "00"
-                    if (hasUid) offset = start + 8
+                val mid = midHex.toInt(16)
+                val tid = tidHex.toInt(16)
+                val uasid = uasidHex.toInt(16)
 
-                    // Guard substring bounds
-                    if (offset + 12 > clean.length) {
-                        i = start + 2
-                        continue
+                val rawValue = valHex.toIntOrNull(16)
+                val rawMin = if (minHex != "FFFF") minHex.toIntOrNull(16) else null
+                val rawMax = if (maxHex != "FFFF") maxHex.toIntOrNull(16) else null
+
+                val uasidDef = Mode06Parser.getUasidDefinition(uasid)
+
+                val decodeStatus: DecodeStatus
+                val scaledValue: Double?
+                val scaledMin: Double?
+                val scaledMax: Double?
+                val unit: String
+                val verdict: Mode06Verdict
+
+                if (uasidDef == null) {
+                    // Strict Truth Safety: Unknown UASID must NEVER assume scaling 1.0 or verdict PASS
+                    decodeStatus = DecodeStatus.UNKNOWN_UASID
+                    scaledValue = null
+                    scaledMin = null
+                    scaledMax = null
+                    unit = ""
+                    verdict = Mode06Verdict.UNKNOWN
+                } else if (rawMin == null && rawMax == null) {
+                    // Strict Truth Safety: Missing limits cannot evaluate to PASS
+                    decodeStatus = DecodeStatus.NO_LIMITS
+                    val (scaling, offset, u) = uasidDef
+                    scaledValue = rawValue?.let { it * scaling + offset }
+                    scaledMin = null
+                    scaledMax = null
+                    unit = u
+                    verdict = Mode06Verdict.UNKNOWN
+                } else {
+                    decodeStatus = DecodeStatus.DECODED
+                    val (scaling, offset, u) = uasidDef
+                    scaledValue = rawValue?.let { it * scaling + offset }
+                    scaledMin = rawMin?.let { it * scaling + offset }
+                    scaledMax = rawMax?.let { it * scaling + offset }
+                    unit = u
+
+                    verdict = when {
+                        scaledValue == null -> Mode06Verdict.UNKNOWN
+                        scaledMin != null && scaledMax != null -> {
+                            if (scaledValue in scaledMin..scaledMax) Mode06Verdict.PASS else Mode06Verdict.FAIL
+                        }
+                        scaledMax != null -> {
+                            if (scaledValue <= scaledMax) Mode06Verdict.PASS else Mode06Verdict.FAIL
+                        }
+                        scaledMin != null -> {
+                            if (scaledValue >= scaledMin) Mode06Verdict.PASS else Mode06Verdict.FAIL
+                        }
+                        else -> Mode06Verdict.UNKNOWN
                     }
+                }
 
-                    val valHex = clean.substring(offset, offset + 4)
-                    val minHex = clean.substring(offset + 4, offset + 8)
-                    val maxHex = clean.substring(offset + 8, offset + 12)
+                val passed = verdict == Mode06Verdict.PASS
 
-                    val rawValue = valHex.toIntOrNull(16)
-                    if (rawValue == null) {
-                        i = start + 2
-                        continue
-                    }
-                    val rawMin = if (minHex != "FFFF") minHex.toIntOrNull(16) else null
-                    val rawMax = if (maxHex != "FFFF") maxHex.toIntOrNull(16) else null
+                // Severity calculation
+                var severity = when (verdict) {
+                    Mode06Verdict.FAIL -> DiagnosticSeverity.HIGH
+                    Mode06Verdict.PASS -> DiagnosticSeverity.INFO
+                    Mode06Verdict.UNKNOWN -> DiagnosticSeverity.MODERATE
+                    Mode06Verdict.NOT_APPLICABLE -> DiagnosticSeverity.INFO
+                }
 
-                    val (scaling, unit) = getUnitInfo("\$$uidHex")
+                if (verdict == Mode06Verdict.PASS && scaledValue != null) {
+                    if (scaledMax != null && scaledValue > (scaledMax * 0.9)) severity = DiagnosticSeverity.MODERATE
+                    if (scaledMin != null && scaledValue < (scaledMin * 1.1)) severity = DiagnosticSeverity.MODERATE
+                }
 
-                    val scaledValue = rawValue * scaling
-                    val scaledMin = rawMin?.let { it * scaling }
-                    val scaledMax = rawMax?.let { it * scaling }
+                val semanticKey = Mode06SemanticKey(protocolFamily, mid, tid, uasid)
+                val definition = registry.resolve(semanticKey)
+                val compName = definition?.componentName ?: String.format("Monitor ID \$%02X", mid)
+                val testName = definition?.testName ?: String.format("Prueba ID \$%02X", tid)
 
-                    val passed = when {
-                        scaledMin != null && scaledMax != null -> scaledValue in scaledMin..scaledMax
-                        scaledMax != null -> scaledValue <= scaledMax
-                        scaledMin != null -> scaledValue >= scaledMin
-                        else -> true
-                    }
+                val proTip = generateProTip(mid, tid, scaledValue, scaledMin, scaledMax, verdict, severity)
 
-                    // Severity Logic: "Near Limit" detection
-                    var severity = if (passed) DiagnosticSeverity.INFO else DiagnosticSeverity.HIGH
-
-                    if (passed) {
-                        if (scaledMax != null && scaledValue > (scaledMax * 0.9f)) severity = DiagnosticSeverity.MODERATE
-                        if (scaledMin != null && scaledValue < (scaledMin * 1.1f)) severity = DiagnosticSeverity.MODERATE
-                    }
-
-                    val midName = midDefinitions["\$$midHex"] ?: "Monitor ID \$$midHex"
-                    val tidName = tidDefinitions["\$$tidHex"] ?: "Prueba ID \$$tidHex"
-
-                    results.add(Mode06TestResult(
-                        mid = "\$$midHex",
-                        tid = "\$$tidHex",
-                        value = scaledValue,
-                        minLimit = scaledMin,
-                        maxLimit = scaledMax,
+                results.add(
+                    Mode06TestResult(
+                        mid = String.format("\$%02X", mid),
+                        tid = String.format("\$%02X", tid),
+                        value = scaledValue?.toFloat() ?: 0f,
+                        minLimit = scaledMin?.toFloat(),
+                        maxLimit = scaledMax?.toFloat(),
                         unit = unit,
                         passed = passed,
-                        testName = tidName,
-                        componentName = midName,
-                        proTip = generateProTip("\$$midHex", "\$$tidHex", scaledValue, scaledMin, scaledMax, passed, severity),
-                        severity = severity
-                    ))
+                        testName = testName,
+                        componentName = compName,
+                        proTip = proTip,
+                        severity = severity,
+                        ecuAddress = ecuAddress,
+                        protocol = protocolFamily.name,
+                        midInt = mid,
+                        tidInt = tid,
+                        uasid = uasid,
+                        rawValue = rawValue,
+                        rawMin = rawMin,
+                        rawMax = rawMax,
+                        valueDouble = scaledValue,
+                        minLimitDouble = scaledMin,
+                        maxLimitDouble = scaledMax,
+                        verdict = verdict,
+                        decodeStatus = decodeStatus,
+                        rawResponse = cleanHex.substring(start, start + 20),
+                        capturedAtMonotonicMs = System.currentTimeMillis()
+                    )
+                )
 
-                    i = if (hasUid) start + 20 else start + 18
-                } catch (e: Exception) {
-                    // Skip this record and try to find the next "46" marker
-                    Log.w(TAG, "Skipping corrupt Mode 06 record at offset $start: ${e.message}")
-                    i = start + 2
-                }
+                i = start + 20
+            } catch (e: Exception) {
+                Log.w(TAG, "Skipping malformed CAN Mode 06 record at offset $start: ${e.message}")
+                i = start + 2
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error parsing Mode 06: ${e.message}")
         }
 
         return results
     }
 
-    private fun generateProTip(mid: String, tid: String, value: Float, min: Float?, max: Float?, passed: Boolean, severity: DiagnosticSeverity): String? {
-        if (passed && severity == DiagnosticSeverity.INFO) return null
+    private fun generateProTip(
+        mid: Int,
+        tid: Int,
+        value: Double?,
+        min: Double?,
+        max: Double?,
+        verdict: Mode06Verdict,
+        severity: DiagnosticSeverity
+    ): String? {
+        if (verdict == Mode06Verdict.PASS && severity == DiagnosticSeverity.INFO) return null
 
-        if (passed && severity == DiagnosticSeverity.MODERATE) {
-            return "ALERTA PREVENTIVA: El valor está muy cerca del límite de falla. Aunque el test pasó, este componente está empezando a degradarse. Recomiende limpieza o revisión preventiva para evitar que se encienda el Check Engine pronto."
+        if (verdict == Mode06Verdict.PASS && severity == DiagnosticSeverity.MODERATE) {
+            return "ALERTA PREVENTIVA: El valor está muy cerca del límite de falla. Aunque el test pasó, este componente está empezando a degradarse. Recomiende revisión preventiva."
         }
 
         return when {
-            mid.startsWith("\$A") -> {
-                "Falla de encendido crítica detectada. Si el valor es alto, el daño al catalizador es inminente. Verifique bujías y bobinas inmediatamente. En motores GDI, considere también limpieza de válvulas por carbonilla."
+            mid in 0xA1..0xAC -> {
+                "Falla de encendido (Misfire) detectada en cilindro ${mid - 0xA0}. Verifique bujías, bobinas e inyector para evitar daños al catalizador."
             }
-            mid == "\$21" || mid == "\$22" -> {
-                "Baja eficiencia catalítica. Antes de cambiar el catalizador, verifique que no existan fugas de aire en la admisión o escape. Un sensor de O2 envejecido también puede causar una lectura falsa de falla de catalizador."
+            mid in 0x21..0x24 -> {
+                "Baja eficiencia catalítica detectada. Verifique si existen fugas de escape antes del catalizador o sensores de O2 degradados antes de cambiar el convertidor."
             }
-            mid == "\$31" || mid == "\$32" -> {
-                "Problema de flujo EGR. La causa más común es la obstrucción por carbón en el tubo o la válvula. Limpie el sistema antes de reemplazar componentes costosos."
+            mid in 0x31..0x32 -> {
+                "Falla en monitor EGR / VVT. Limpie conductos de carbonilla o revise la electroválvula antes de sustituir componentes."
             }
-            mid.startsWith("\$0") && mid <= "\$08" -> {
-                "Sensor de Oxígeno con respuesta lenta o fuera de rango. Esto destruye la economía de combustible y puede causar tirones. Verifique el calentador del sensor y posibles contaminantes como silicón o anticongelante."
+            mid in 0x01..0x08 -> {
+                "Sensor de Oxígeno fuera de rango o con conmutación lenta. Impacta directamente las emisiones y el consumo."
             }
-            mid.startsWith("\$3") -> {
-                "Fuga detectada en el sistema EVAP. Asegúrese de que el tapón de gasolina esté bien cerrado. Si persiste, use una máquina de humo para localizar fugas en las mangueras del cánister o la válvula de purga."
+            mid in 0x35..0x3B -> {
+                "Fuga detectada en sistema EVAP. Verifique el tapón de combustible y mangueras de vacío del cánister."
             }
-            else -> "El ECU reporta un valor fuera de parámetros operativos. Este fallo inminente afectará el rendimiento y las emisiones del vehículo. Se recomienda diagnóstico físico detallado."
+            else -> "Parámetro fuera de especificación según reporte de ECU."
         }
+    }
+}
+
+/**
+ * Pre-CAN (Legacy J1850 / ISO 9141-2 / ISO 14230 KWP) Mode $06 Decoder.
+ * Non-CAN Mode $06 has format: 46 [TID 1B] [VAL 2B] [LIM 2B] or 46 [MID 1B] [TID 1B] [VAL 2B] [MIN 2B] [MAX 2B] without UASID.
+ */
+class LegacyMode06Decoder(
+    private val registry: Mode06DefinitionRegistry
+) {
+    companion object {
+        private const val TAG = "LegacyMode06Decoder"
+    }
+
+    fun decode(
+        cleanHex: String,
+        protocolFamily: ProtocolFamily,
+        ecuAddress: String?,
+        originalRaw: String
+    ): List<Mode06TestResult> {
+        val results = mutableListOf<Mode06TestResult>()
+        var i = 0
+
+        while (i < cleanHex.length) {
+            val start = cleanHex.indexOf("46", i)
+            if (start < 0) break
+
+            // Need at least 14 hex chars for a legacy record: 46 (2) + MID (2) + TID (2) + VAL (4) + LIM (4) = 14
+            if (start + 14 > cleanHex.length) {
+                i = start + 2
+                continue
+            }
+
+            try {
+                val midHex = cleanHex.substring(start + 2, start + 4)
+                val tidHex = cleanHex.substring(start + 4, start + 6)
+                val valHex = cleanHex.substring(start + 6, start + 10)
+
+                val mid = midHex.toInt(16)
+                val tid = tidHex.toInt(16)
+                val rawValue = valHex.toIntOrNull(16)
+
+                // Check if min/max (18 hex chars total) or single limit (14 hex chars total)
+                val hasDualLimits = start + 18 <= cleanHex.length
+                val minHex = if (hasDualLimits) cleanHex.substring(start + 10, start + 14) else null
+                val maxHex = if (hasDualLimits) cleanHex.substring(start + 14, start + 18) else cleanHex.substring(start + 10, start + 14)
+
+                val rawMin = if (minHex != null && minHex != "FFFF") minHex.toIntOrNull(16) else null
+                val rawMax = if (maxHex != "FFFF") maxHex.toIntOrNull(16) else null
+
+                // In legacy Mode 06, scaling is defined by TID or OEM definition
+                val scaledValue = rawValue?.toDouble()
+                val scaledMin = rawMin?.toDouble()
+                val scaledMax = rawMax?.toDouble()
+
+                val verdict: Mode06Verdict
+                val decodeStatus: DecodeStatus
+
+                if (scaledMin == null && scaledMax == null) {
+                    decodeStatus = DecodeStatus.NO_LIMITS
+                    verdict = Mode06Verdict.UNKNOWN
+                } else {
+                    decodeStatus = DecodeStatus.DECODED
+                    verdict = when {
+                        scaledValue == null -> Mode06Verdict.UNKNOWN
+                        scaledMin != null && scaledMax != null -> {
+                            if (scaledValue in scaledMin..scaledMax) Mode06Verdict.PASS else Mode06Verdict.FAIL
+                        }
+                        scaledMax != null -> {
+                            if (scaledValue <= scaledMax) Mode06Verdict.PASS else Mode06Verdict.FAIL
+                        }
+                        scaledMin != null -> {
+                            if (scaledValue >= scaledMin) Mode06Verdict.PASS else Mode06Verdict.FAIL
+                        }
+                        else -> Mode06Verdict.UNKNOWN
+                    }
+                }
+
+                val semanticKey = Mode06SemanticKey(protocolFamily, mid, tid, null)
+                val definition = registry.resolve(semanticKey)
+                val compName = definition?.componentName ?: String.format("Monitor ID \$%02X", mid)
+                val testName = definition?.testName ?: String.format("Prueba ID \$%02X", tid)
+
+                val recordLen = if (hasDualLimits) 18 else 14
+                results.add(
+                    Mode06TestResult(
+                        mid = String.format("\$%02X", mid),
+                        tid = String.format("\$%02X", tid),
+                        value = scaledValue?.toFloat() ?: 0f,
+                        minLimit = scaledMin?.toFloat(),
+                        maxLimit = scaledMax?.toFloat(),
+                        unit = "raw",
+                        passed = verdict == Mode06Verdict.PASS,
+                        testName = testName,
+                        componentName = compName,
+                        severity = if (verdict == Mode06Verdict.FAIL) DiagnosticSeverity.HIGH else DiagnosticSeverity.INFO,
+                        ecuAddress = ecuAddress,
+                        protocol = protocolFamily.name,
+                        midInt = mid,
+                        tidInt = tid,
+                        uasid = null,
+                        rawValue = rawValue,
+                        rawMin = rawMin,
+                        rawMax = rawMax,
+                        valueDouble = scaledValue,
+                        minLimitDouble = scaledMin,
+                        maxLimitDouble = scaledMax,
+                        verdict = verdict,
+                        decodeStatus = decodeStatus,
+                        rawResponse = cleanHex.substring(start, start + recordLen),
+                        capturedAtMonotonicMs = System.currentTimeMillis()
+                    )
+                )
+
+                i = start + recordLen
+            } catch (e: Exception) {
+                Log.w(TAG, "Skipping legacy Mode 06 record at offset $start: ${e.message}")
+                i = start + 2
+            }
+        }
+
+        return results
     }
 }

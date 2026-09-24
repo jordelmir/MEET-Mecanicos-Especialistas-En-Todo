@@ -154,14 +154,29 @@ data class Mode06TestResult(
     val mid: String, // Monitor ID (e.g. "$01")
     val tid: String, // Test ID (e.g. "$01")
     val value: Float,
-    val minLimit: Float?,
-    val maxLimit: Float?,
-    val unit: String,
-    val passed: Boolean,
-    val testName: String,
-    val componentName: String,
+    val minLimit: Float? = null,
+    val maxLimit: Float? = null,
+    val unit: String = "",
+    val passed: Boolean = false,
+    val testName: String = "",
+    val componentName: String = "",
     val proTip: String? = null,
-    val severity: DiagnosticSeverity = DiagnosticSeverity.INFO
+    val severity: DiagnosticSeverity = DiagnosticSeverity.INFO,
+    val ecuAddress: String? = null,
+    val protocol: String? = null,
+    val midInt: Int = mid.removePrefix("$").toIntOrNull(16) ?: 0,
+    val tidInt: Int = tid.removePrefix("$").toIntOrNull(16) ?: 0,
+    val uasid: Int? = null,
+    val rawValue: Int? = null,
+    val rawMin: Int? = null,
+    val rawMax: Int? = null,
+    val valueDouble: Double? = if (value.isFinite()) value.toDouble() else null,
+    val minLimitDouble: Double? = minLimit?.toDouble(),
+    val maxLimitDouble: Double? = maxLimit?.toDouble(),
+    val verdict: Mode06Verdict = if (passed) Mode06Verdict.PASS else Mode06Verdict.FAIL,
+    val decodeStatus: DecodeStatus = DecodeStatus.DECODED,
+    val rawResponse: String = "",
+    val capturedAtMonotonicMs: Long = System.currentTimeMillis()
 )
 
 enum class DiagnosticSeverity {

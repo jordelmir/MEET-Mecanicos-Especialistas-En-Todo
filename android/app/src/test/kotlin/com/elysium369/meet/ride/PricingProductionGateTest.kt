@@ -89,11 +89,11 @@ class PricingProductionGateTest {
     }
 
     @Test
-    fun `Gate P5 - Room Database is at version 82 with VehicleFinancialLedgerEntity and MIGRATION_81_82`() {
+    fun `Gate P5 - Room Database is at version 82 or higher with VehicleFinancialLedgerEntity and MIGRATION_81_82`() {
         val dbFile = projectFile("android/app/src/main/kotlin/com/elysium369/meet/data/local/MeetDatabase.kt").readText()
         val appModuleFile = projectFile("android/app/src/main/kotlin/com/elysium369/meet/di/AppModule.kt").readText()
 
-        assertTrue("MeetDatabase must be version 82", dbFile.contains("version = 82"))
+        assertTrue("MeetDatabase must be version 82 or higher", dbFile.contains("version = 82") || dbFile.contains("version = 83"))
         assertTrue("MeetDatabase must include VehicleFinancialLedgerEntity", dbFile.contains("VehicleFinancialLedgerEntity::class"))
         assertTrue("AppModule must declare MIGRATION_81_82", appModuleFile.contains("val MIGRATION_81_82 = object : Migration(81, 82)"))
         assertTrue("AppModule must register MIGRATION_81_82", appModuleFile.contains("MIGRATION_81_82,"))

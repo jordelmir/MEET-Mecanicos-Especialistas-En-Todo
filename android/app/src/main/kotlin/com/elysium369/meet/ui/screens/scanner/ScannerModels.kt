@@ -51,9 +51,9 @@ fun Map<String, Float>.resolveGaugeValue(pid: String): Float? {
     val iat = this["010F"] ?: this["IAT"]
     val load = this["0104"] ?: this["ENGINE_LOAD"]
 
-    // Synthesize MAF from MAP and RPM if physical MAF is missing (Speed-Density engines like Hyundai Alpha 1.6L)
-    val synthMaf = if (map != null && rpm != null && rpm > 0f && iat != null && load != null) {
-        val displacementL = 1.6f
+    // Synthesize MAF from MAP and RPM only if engine displacement is explicitly provided
+    val displacementL = this["ENGINE_DISPLACEMENT_L"] ?: this["DISPLACEMENT_L"] ?: this["displacement"]
+    val synthMaf = if (displacementL != null && displacementL > 0f && map != null && rpm != null && rpm > 0f && iat != null && load != null) {
         val ve = (0.75f + (load / 100f) * 0.20f).coerceIn(0.70f, 0.95f)
         val tempK = iat + 273.15f
         ((map * rpm * displacementL * ve) / (120f * 0.287f * tempK)).coerceAtLeast(0f)

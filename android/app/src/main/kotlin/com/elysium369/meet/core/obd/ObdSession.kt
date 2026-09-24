@@ -3746,19 +3746,26 @@ class ObdSession(
             }
 
             if (availableMids.isEmpty()) {
-                Log.w(TAG, "No supported Mode 06 MIDs found via bitmaps. Falling back to standard list.")
-                availableMids.addAll(listOf("01", "02", "05", "06", "21", "31", "A1", "A2"))
-            }
+                Log.w(TAG, "No supported Mode 06 MIDs discovered via bitmaps. Mode 06 support unknown or unsupported.")
+                _statusMessage.value = "Mode $06: No se detectaron MIDs soportados en los mapas de bits de la ECU."
+            } else {
+                val protocolFamily = when {
+                    detectedProtocol.contains("CAN", ignoreCase = true) -> ProtocolFamily.CAN_11BIT
+                    detectedProtocol.contains("ISO", ignoreCase = true) || detectedProtocol.contains("KWP", ignoreCase = true) -> ProtocolFamily.ISO_K_LINE
+                    detectedProtocol.contains("J1850", ignoreCase = true) -> ProtocolFamily.J1850_PWM
+                    else -> ProtocolFamily.UNKNOWN
+                }
 
-            // Step 2: Query each available MID
-            for ((index, mid) in availableMids.withIndex()) {
-                _statusMessage.value = "Analizando monitor ${index + 1}/${availableMids.size} (MID \$$mid)..."
-                try {
-                    val response = sendRawCommand("06$mid")
-                    val parsed = mode06Parser.parse(response)
-                    allResults.addAll(parsed)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to read Mode 06 MID $mid: ${e.message}")
+                // Step 2: Query each available MID
+                for ((index, mid) in availableMids.withIndex()) {
+                    _statusMessage.value = "Analizando monitor ${index + 1}/${availableMids.size} (MID \$$mid)..."
+                    try {
+                        val response = sendRawCommand("06$mid")
+                        val parsed = mode06Parser.parse(response, protocolFamily, null)
+                        allResults.addAll(parsed)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to read Mode 06 MID $mid: ${e.message}")
+                    }
                 }
             }
         } catch (e: Exception) {

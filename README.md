@@ -4,7 +4,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Android-4.26.1%20%7C%20code%2060-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
-  <img src="https://img.shields.io/badge/Room-schema%2082-39FF14?style=flat-square" alt="Room schema" />
+  <img src="https://img.shields.io/badge/Room-schema%2083-39FF14?style=flat-square" alt="Room schema" />
   <img src="https://img.shields.io/badge/Architecture-offline--first-7F52FF?style=flat-square" alt="Offline first" />
 </p>
 
@@ -23,8 +23,12 @@ del servidor.
 
 - **Android:** `versionName 4.26.1`, `versionCode 60`.
 - **Web/package:** `4.26.1`.
-- **Persistencia local:** Room schema `82`, con las migraciones y esquemas
-  `81.json` y `82.json` exportados en el repositorio.
+- **Persistencia local:** Room schema `83`, con las migraciones `MIGRATION_82_83` y esquemas
+  `81.json`, `82.json` y `83.json` exportados en el repositorio (tablas de telemetría de emisiones,
+  snapshots termodinámicos, Mode 06 con límites de fabricante y ejecuciones Pre-ITV).
+- **Laboratorio de Emisiones & Pre-ITV Costa Rica:** Subsistema completo de evaluación
+  regulatoria COSEVI / CITA con contrato de verdad inquebrantable (`MEASURED` vs `PHYSICS_DERIVED`
+  vs `MODEL_ESTIMATED` vs `UNKNOWN`).
 - **Seguridad (Safety V2):** Suite completa de 9 pantallas elevadas al estándar
   visual y de movimiento con 8 componentes dedicados (`SafetyCategoryIcons`,
   `SafetyEmptyState`, `SafetyHaptics`, `SafetyShimmer`, `SafetyPulse`,
@@ -46,6 +50,12 @@ evidencia remota de PostgreSQL.
 ### Diagnóstico y reparación automotriz
 
 - Conexión OBD-II por Bluetooth Classic, BLE, Wi-Fi TCP y DoIP/UDS.
+- **Laboratorio de Emisiones y Pre-ITV Costa Rica:**
+  - Decodificador estricto SAE J1979 / SAE J1979-DA de Modo $06 (sin límites inventados ni pases falsos sin límites).
+  - Estimador físico de Flujo de Combustible y CO₂ (Speed-Density MAP/MAF + estequiometría de gasolina/etanol).
+  - Analizador Virtual de Gases con etiquetado explícito de proveniencia (`MODEL_ESTIMATED` para CO/HC sin sonda física de 4/5 gases).
+  - Osciloscopio dual O₂ en tiempo real con monitoreo de cruces por segundo y eficiencia catalítica.
+  - Asistente guiado de inspección Pre-ITV con tacómetro dinámico (Ralentí 700-1000 RPM vs Acelerado 2500 RPM) y verificación de corte de fecha Lambda (Decreto 37372-MOPT).
 - Lectura de DTC, telemetría y acciones bidireccionales sólo cuando existe un
   enlace físico válido; el modo de entrenamiento se identifica como demo.
 - Guías de diagnóstico, reparación, piezas y visualización 3D enlazadas por
