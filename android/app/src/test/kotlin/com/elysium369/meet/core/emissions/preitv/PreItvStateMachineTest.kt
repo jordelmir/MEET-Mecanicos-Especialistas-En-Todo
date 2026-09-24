@@ -28,19 +28,67 @@ class PreItvStateMachineTest {
             transmissionConfirmedParkOrNeutral = true
         )
         assertTrue(machine.phase.value is PreItvPhase.CatalystWarmup)
+    }
 
-        // 3. Fast-forward warmup (simulate ticks over 25 seconds)
-        Thread.sleep(50) // small delay to let monotonic time advance
-        // Tick warmup to exceed 20s target
-        for (i in 0..25) {
-            machine.tickTelemetry(
-                rpm = 2600.0,
-                ectC = 90.0,
-                speedKmh = 0.0,
-                stftPct = 1.0,
-                ltftPct = 2.0,
-                lambda = 1.001
-            )
-        }
+    @Test
+    fun `evaluates literal NO PASA DEKRA with exact failure reasons for high emissions`() {
+        val machine = PreItvStateMachine()
+        val profile = RegulatoryVehicleProfile(modelYear = 2005)
+
+        machine.setVehicleContext(
+            displayName = "Hyundai Accent GLS 2005",
+            vin = "KMHBT41BP5U123456",
+            plate = "ABC-123"
+        )
+        machine.start(profile)
+
+        // Inject severe emissions (simulating high positive fuel trims and out of spec lambda)
+        machine.injectPhaseData(
+            idleRpm = listOf(750.0, 760.0),
+            idleEct = listOf(89.0, 90.0),
+            idleStft = listOf(14.0, 15.0),
+            idleLtft = listOf(10.0, 11.0),
+            idleLambda = listOf(1.124, 1.125),
+            accelRpm = listOf(2500.0, 2520.0),
+            accelEct = listOf(91.0, 92.0),
+            accelStft = listOf(16.0, 17.0),
+            accelLtft = listOf(12.0, 13.0),
+            accelLambda = listOf(1.293, 1.295)
+        )
+
+        machine.computeFinalResult()
+
+        val completedPhase = machine.phase.value as PreItvPhase.Completed
+        val result = completedPhase.result
+
+        assertEquals("Hyundai Accent GLS 2005", result.vehicleDisplayName)
+        assertEquals(DekraOfficialResult.NO_PASA_DEKRA, result.dekraResult)
+        assertTrue("Must contain defect reasons", result.dekraFailureReasons.isNotEmpty())
+        assertTrue(
+            "Must report failure",
+            result.dekraFailureReasons.any { it.code.startsWith("DG-") }
+        )
+    }
+
+    @Test
+    fun `evaluates vehicle limits according to vehicle model year`() {
+        val machine = PreItvStateMachine()
+        val oldProfile = RegulatoryVehicleProfile(modelYear = 1993)
+
+        machine.setVehicleContext(
+            displayName = "Toyota Corolla 1993",
+            vin = "JT2AE...",
+            plate = "998877"
+        )
+        machine.start(oldProfile)
+
+        machine.computeFinalResult()
+
+        val result = (machine.phase.value as PreItvPhase.Completed).result
+        assertNotNull(result.ruleSet)
+        assertEquals(1993, result.vehicleProfile?.modelYear)
+        // 1993 vehicle has pre-1995 limits (CO <= 4.50%)
+        val coIdleLimit = result.ruleSet?.idleLimits?.find { it.metric.name == "CO" }?.max
+        assertEquals(4.50, coIdleLimit ?: 0.0, 0.01)
     }
 }

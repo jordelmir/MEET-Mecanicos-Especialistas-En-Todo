@@ -24,12 +24,21 @@ class PreItvStateMachine(
     val phase: StateFlow<PreItvPhase> = _phase.asStateFlow()
 
     private var activeProfile: RegulatoryVehicleProfile = RegulatoryVehicleProfile(modelYear = 2005)
+    private var vehicleDisplayName: String? = null
+    private var vehicleVin: String? = null
+    private var vehiclePlate: String? = null
     private var mode06Results: List<Mode06TestResult> = emptyList()
     private var readinessResult: ReadinessResult? = null
     private var o2Features: OxygenSignalFeatures? = null
     private var catalystAssessment: CatalystAssessment? = null
     private var misfireCount: Int = 0
     private var isConnected: Boolean = true
+
+    fun setVehicleContext(displayName: String?, vin: String?, plate: String?) {
+        vehicleDisplayName = displayName
+        vehicleVin = vin
+        vehiclePlate = plate
+    }
 
     private val idleSamples = mutableListOf<Pair<Long, Double>>()
     private val idleRpmList = mutableListOf<Double>()
@@ -205,7 +214,32 @@ class PreItvStateMachine(
         }
     }
 
-    private fun computeFinalResult() {
+    internal fun injectPhaseData(
+        idleRpm: List<Double> = emptyList(),
+        idleEct: List<Double> = emptyList(),
+        idleStft: List<Double> = emptyList(),
+        idleLtft: List<Double> = emptyList(),
+        idleLambda: List<Double> = emptyList(),
+        accelRpm: List<Double> = emptyList(),
+        accelEct: List<Double> = emptyList(),
+        accelStft: List<Double> = emptyList(),
+        accelLtft: List<Double> = emptyList(),
+        accelLambda: List<Double> = emptyList()
+    ) {
+        idleRpmList.addAll(idleRpm)
+        idleEctList.addAll(idleEct)
+        idleStftList.addAll(idleStft)
+        idleLtftList.addAll(idleLtft)
+        idleLambdaList.addAll(idleLambda)
+
+        accelRpmList.addAll(accelRpm)
+        accelEctList.addAll(accelEct)
+        accelStftList.addAll(accelStft)
+        accelLtftList.addAll(accelLtft)
+        accelLambdaList.addAll(accelLambda)
+    }
+
+    internal fun computeFinalResult() {
         val ruleSet = CostaRicaGasolineRules.resolveRuleSet(activeProfile)
 
         // 1. Idle Evaluation via Authoritative EmissionsEngine
@@ -294,11 +328,125 @@ class PreItvStateMachine(
             else -> PreItvVerdict.INCONCLUSIVE
         }
 
+        // 4. Literal DEKRA / COSEVI Evaluation based on each vehicle's real regulation limits
+        val failureReasons = mutableListOf<DekraFailureReason>()
+
+        val idleCoLimit = ruleSet.idleLimits.find { it.metric == GasMetric.CO }?.max
+        val idleHcLimit = ruleSet.idleLimits.find { it.metric == GasMetric.HC }?.max
+        val idleCo2Min = ruleSet.idleLimits.find { it.metric == GasMetric.CO2 }?.min
+
+        val accelCoLimit = ruleSet.acceleratedLimits.find { it.metric == GasMetric.CO }?.max
+        val accelHcLimit = ruleSet.acceleratedLimits.find { it.metric == GasMetric.HC }?.max
+        val accelCo2Min = ruleSet.acceleratedLimits.find { it.metric == GasMetric.CO2 }?.min
+        val lambdaLimit = ruleSet.acceleratedLimits.find { it.metric == GasMetric.LAMBDA }
+
+        // Evaluate Idle Point Estimates and Evaluations
+        if (idleOutput.coEvaluation == Evaluation.FAIL || (idleCoLimit != null && idleMeasurement.coEstimate.pointEstimate > idleCoLimit)) {
+            failureReasons.add(
+                DekraFailureReason(
+                    code = "DG-CO-RALENTÍ",
+                    description = "CO en Ralentí (${String.format("%.2f", idleMeasurement.coEstimate.pointEstimate)}%) supera el límite reglamentario (${String.format("%.2f", idleCoLimit ?: 0.50)}% vol)."
+                )
+            )
+        }
+
+        if (idleOutput.hcEvaluation == Evaluation.FAIL || (idleHcLimit != null && idleMeasurement.hcEstimate.pointEstimate > idleHcLimit)) {
+            failureReasons.add(
+                DekraFailureReason(
+                    code = "DG-HC-RALENTÍ",
+                    description = "HC en Ralentí (${idleMeasurement.hcEstimate.pointEstimate.toInt()} ppm) supera el límite reglamentario (${(idleHcLimit ?: 125.0).toInt()} ppm)."
+                )
+            )
+        }
+
+        if (idleOutput.co2Evaluation == Evaluation.FAIL || (idleCo2Min != null && idleMeasurement.co2Estimate.pointEstimate < idleCo2Min)) {
+            failureReasons.add(
+                DekraFailureReason(
+                    code = "DG-DILUCIÓN-RALENTÍ",
+                    description = "Dilución de gases en Ralentí: CO₂ (${String.format("%.1f", idleMeasurement.co2Estimate.pointEstimate)}%) por debajo del mínimo reglamentario (${String.format("%.1f", idleCo2Min ?: 10.0)}% vol)."
+                )
+            )
+        }
+
+        // Evaluate Accelerated Point Estimates and Evaluations
+        if (accelOutput.coEvaluation == Evaluation.FAIL || (accelCoLimit != null && accelMeasurement.coEstimate.pointEstimate > accelCoLimit)) {
+            failureReasons.add(
+                DekraFailureReason(
+                    code = "DG-CO-ACELERADO",
+                    description = "CO a 2500 RPM (${String.format("%.2f", accelMeasurement.coEstimate.pointEstimate)}%) supera el límite reglamentario (${String.format("%.2f", accelCoLimit ?: 0.30)}% vol)."
+                )
+            )
+        }
+
+        if (accelOutput.hcEvaluation == Evaluation.FAIL || (accelHcLimit != null && accelMeasurement.hcEstimate.pointEstimate > accelHcLimit)) {
+            failureReasons.add(
+                DekraFailureReason(
+                    code = "DG-HC-ACELERADO",
+                    description = "HC a 2500 RPM (${accelMeasurement.hcEstimate.pointEstimate.toInt()} ppm) supera el límite reglamentario (${(accelHcLimit ?: 100.0).toInt()} ppm)."
+                )
+            )
+        }
+
+        if (accelOutput.co2Evaluation == Evaluation.FAIL || (accelCo2Min != null && accelMeasurement.co2Estimate.pointEstimate < accelCo2Min)) {
+            failureReasons.add(
+                DekraFailureReason(
+                    code = "DG-DILUCIÓN-ACELERADO",
+                    description = "Dilución de gases a 2500 RPM: CO₂ (${String.format("%.1f", accelMeasurement.co2Estimate.pointEstimate)}%) por debajo del mínimo reglamentario (${String.format("%.1f", accelCo2Min ?: 12.0)}% vol)."
+                )
+            )
+        }
+
+        // Lambda Check
+        if (lambdaLimit != null && accelMeasurement.lambdaEstimate != null) {
+            val minLam = lambdaLimit.min ?: 0.93
+            val maxLam = lambdaLimit.max ?: 1.07
+            val lamVal = accelMeasurement.lambdaEstimate
+            if (lamVal < minLam || lamVal > maxLam) {
+                failureReasons.add(
+                    DekraFailureReason(
+                        code = "DG-LAMBDA-ACELERADO",
+                        description = "Factor Lambda (${String.format("%.3f", lamVal)}) fuera de la tolerancia oficial (${String.format("%.2f", minLam)} - ${String.format("%.2f", maxLam)})."
+                    )
+                )
+            }
+        }
+
+        // Severe Misfire or Critical OBD failure check
+        if (misfireCount > 15 || overallVerdict == PreItvVerdict.HIGH_RISK) {
+            if (failureReasons.isEmpty()) {
+                failureReasons.add(
+                    DekraFailureReason(
+                        code = "DG-FALLA-COMBUSTION-OBD",
+                        description = "Falla crítica de combustión/emisiones registrada en la ECU durante la prueba."
+                    )
+                )
+            }
+        }
+
+        val dekraResult = when {
+            failureReasons.isNotEmpty() -> DekraOfficialResult.NO_PASA_DEKRA
+            overallVerdict == PreItvVerdict.LOW_RISK &&
+            idleMeasurement.coEvaluation == Evaluation.PASS &&
+            idleMeasurement.hcEvaluation == Evaluation.PASS &&
+            idleMeasurement.co2Evaluation == Evaluation.PASS &&
+            accelMeasurement.coEvaluation == Evaluation.PASS &&
+            accelMeasurement.hcEvaluation == Evaluation.PASS &&
+            accelMeasurement.co2Evaluation == Evaluation.PASS -> DekraOfficialResult.PASA_DEKRA
+            else -> DekraOfficialResult.PENDIENTE_INCONCLUSO
+        }
+
         val explanations = (idleOutput.causalExplanations + accelOutput.causalExplanations).distinct()
 
         val result = PreItvResult(
             jurisdiction = ruleSet.jurisdiction,
             ruleVersion = ruleSet.version,
+            vehicleProfile = activeProfile,
+            vehicleDisplayName = vehicleDisplayName,
+            vehicleVin = vehicleVin,
+            vehiclePlate = vehiclePlate,
+            dekraResult = dekraResult,
+            dekraFailureReasons = failureReasons,
+            ruleSet = ruleSet,
             idle = idleMeasurement,
             accelerated = accelMeasurement,
             readiness = accelOutput.readinessEvaluation,

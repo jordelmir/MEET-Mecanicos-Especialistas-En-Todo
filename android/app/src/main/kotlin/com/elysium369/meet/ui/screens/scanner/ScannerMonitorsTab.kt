@@ -40,7 +40,7 @@ import com.elysium369.meet.core.emissions.domain.*
 import com.elysium369.meet.core.emissions.physics.*
 import com.elysium369.meet.core.emissions.physics.CO2Outputs
 import com.elysium369.meet.core.emissions.preitv.*
-import com.elysium369.meet.core.emissions.regulations.RegulatoryVehicleProfile
+import com.elysium369.meet.core.emissions.regulations.*
 import com.elysium369.meet.core.obd.DecodeStatus
 import com.elysium369.meet.core.obd.DiagnosticSeverity
 import com.elysium369.meet.core.obd.Mode06TestResult
@@ -48,6 +48,7 @@ import com.elysium369.meet.core.obd.Mode06Verdict
 import com.elysium369.meet.core.obd.O2SensorTestResult
 import com.elysium369.meet.core.obd.ObdState
 import com.elysium369.meet.core.obd.ReadinessResult
+import com.elysium369.meet.data.supabase.Vehicle
 import com.elysium369.meet.ui.ObdViewModel
 import kotlinx.coroutines.delay
 import com.elysium369.meet.ui.components.AnimatedNeonGlyph
@@ -478,6 +479,26 @@ private fun EmissionsLabView(
     val lambda = (liveData["LAMBDA"] ?: liveData["0124"] ?: liveData["0134"])?.toDouble()
     val maf = (liveData["0110"] ?: liveData["MAF"])?.toDouble()
 
+    val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val activeVehicleProfile = remember(selectedVehicle) {
+        val veh = selectedVehicle
+        if (veh != null && veh.year > 1900) {
+            val fuel = when (veh.fuel_type.lowercase()) {
+                "diesel", "diésel" -> FuelType.DIESEL
+                "lpg", "glp" -> FuelType.LPG
+                "cng", "gnc" -> FuelType.CNG
+                else -> FuelType.GASOLINE
+            }
+            RegulatoryVehicleProfile(
+                modelYear = veh.year,
+                fuelType = fuel,
+                engineCycle = EngineCycle.FOUR_STROKE
+            )
+        } else {
+            RegulatoryVehicleProfile(modelYear = 2005, fuelType = FuelType.GASOLINE)
+        }
+    }
+
     // Real-time Waveform analysis
     val upstreamFeatures = remember(o2UpstreamSamples.size) {
         o2Analyzer.analyze(o2UpstreamSamples)
@@ -511,6 +532,7 @@ private fun EmissionsLabView(
         catalystAssessment = catAssessment,
         mode06Results = mode06Results,
         readinessResult = firstReadiness,
+        activeProfile = activeVehicleProfile,
         isAcceleratedRpm = isAcceleratedRpm,
         isConnected = isConnected,
         physicalSampleCount = o2UpstreamSamples.size
@@ -660,6 +682,8 @@ private fun EmissionsLabView(
                 preItvMachine = preItvMachine,
                 phase = preItvPhase,
                 currentRpm = rpm ?: 0.0,
+                vehicle = selectedVehicle,
+                activeProfile = activeVehicleProfile,
                 isSpanish = isSpanish
             )
         }
@@ -1568,8 +1592,12 @@ private fun PreItvWizardSection(
     preItvMachine: PreItvStateMachine,
     phase: PreItvPhase,
     currentRpm: Double,
+    vehicle: Vehicle?,
+    activeProfile: RegulatoryVehicleProfile,
     isSpanish: Boolean
 ) {
+    val vehicleLabel = vehicle?.let { "${it.make} ${it.model} (${it.year})" } ?: "Vehículo Estándar (2005 Gasolina)"
+
     EliteCard(
         backgroundColor = MeetColors.backgroundDeep,
         borderColor = Color(0xFFFFD600).copy(alpha = 0.4f),
@@ -1582,23 +1610,31 @@ private fun PreItvWizardSection(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
-                        "PROTOCOLO PRE-ITV COSTA RICA",
+                        "PROTOCOLO PRE-DEKRA COSTA RICA",
                         color = Color(0xFFFFD600),
                         fontWeight = FontWeight.Black,
-                        fontSize = 14.sp
+                        fontSize = 13.sp
                     )
                     Text(
-                        "Normativa COSEVI / MOPT (Gasolina 4T)",
-                        color = MeetColors.textSecondary,
-                        fontSize = 9.sp
+                        "Vehículo: $vehicleLabel",
+                        color = MeetColors.neonGreen,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
 
                 if (phase is PreItvPhase.Idle) {
                     Button(
-                        onClick = { preItvMachine.start(RegulatoryVehicleProfile(modelYear = 2005)) },
+                        onClick = {
+                            preItvMachine.setVehicleContext(
+                                displayName = vehicleLabel,
+                                vin = vehicle?.vin,
+                                plate = vehicle?.plate
+                            )
+                            preItvMachine.start(activeProfile)
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFD600)),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
@@ -1722,63 +1758,137 @@ private fun TachometerBar(currentRpm: Double, targetLow: Double, targetHigh: Dou
 
 @Composable
 private fun PreItvResultCard(result: PreItvResult, onReset: () -> Unit, isSpanish: Boolean) {
-    val verdictColor = when (result.overall) {
-        PreItvVerdict.LOW_RISK -> MeetColors.neonGreen
-        PreItvVerdict.ELEVATED_RISK -> MeetColors.warning
-        PreItvVerdict.HIGH_RISK -> MeetColors.error
-        PreItvVerdict.INCONCLUSIVE -> Color.Gray
+    val (dekraTitle, dekraColor, dekraSubtitle) = when (result.dekraResult) {
+        DekraOfficialResult.PASA_DEKRA -> Triple(
+            "✅ PASA DEKRA (APROBADO)",
+            MeetColors.neonGreen,
+            "El vehículo cumple a cabalidad con los límites oficiales de emisiones COSEVI para su año y motorización."
+        )
+        DekraOfficialResult.NO_PASA_DEKRA -> Triple(
+            "❌ NO PASA DEKRA (REPROBADO)",
+            MeetColors.error,
+            "Se detectaron ${result.dekraFailureReasons.size} DEFECTO(S) GRAVE(S) determinantes de rechazo en inspección:"
+        )
+        DekraOfficialResult.PENDIENTE_INCONCLUSO -> Triple(
+            "⚠️ PRE-DEKRA: RESULTADO INCONCLUSO",
+            MeetColors.warning,
+            "Se requiere inspección física con analizador de gases de escape para emitir dictamen definitivo."
+        )
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Verdict Header
+        // Verdict Header Card
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(verdictColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                .border(1.dp, verdictColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                .padding(12.dp)
+                .background(dekraColor.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
+                .border(1.5.dp, dekraColor.copy(alpha = 0.8f), RoundedCornerShape(10.dp))
+                .padding(14.dp)
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    when (result.overall) {
-                        PreItvVerdict.LOW_RISK -> "BAJO RIESGO DE REPROBAR ITV"
-                        PreItvVerdict.ELEVATED_RISK -> "RIESGO MODERADO DE REPROBAR"
-                        PreItvVerdict.HIGH_RISK -> "ALTO RIESGO DE REPROBAR ITV"
-                        PreItvVerdict.INCONCLUSIVE -> "RESULTADO INCONCLUSO"
-                    },
-                    color = verdictColor,
+                    text = dekraTitle,
+                    color = dekraColor,
                     fontWeight = FontWeight.Black,
-                    fontSize = 14.sp
+                    fontSize = 16.sp
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "Confianza estimada del modelo: ${(result.confidence?.times(100))?.toInt() ?: 75}%",
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 10.sp
+                    text = dekraSubtitle,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
                 )
+
+                // List of Defectos Graves if failed
+                if (result.dekraFailureReasons.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF220D12), RoundedCornerShape(6.dp))
+                            .border(1.dp, MeetColors.error.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
+                            .padding(8.dp)
+                    ) {
+                        Text(
+                            text = "DEFECTOS GRAVES (DG) MOTIVO DE RECHAZO:",
+                            color = MeetColors.error,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        result.dekraFailureReasons.forEach { defect ->
+                            Text(
+                                text = "• [DG] ${defect.description}",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                lineHeight = 14.sp
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Vehículo: ${result.vehicleDisplayName ?: "Estándar"}",
+                        color = MeetColors.cyberCyan,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Confianza del modelo: ${(result.confidence?.times(100))?.toInt() ?: 75}%",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 9.sp
+                    )
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Table Ralentí vs 2500 RPM
-        Text("DETALLE DE EVALUACIÓN SEGÚN NORMATIVA COSEVI:", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+        // Table with Dynamic Limits according to each vehicle's real regulation
+        Text(
+            text = "EVALUACIÓN LITERAL SEGÚN NORMATIVA COSEVI / DEKRA:",
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 11.sp
+        )
+        Text(
+            text = "Límites calculados para: ${result.vehicleDisplayName ?: "Vehículo"} (Año ${result.vehicleProfile?.modelYear ?: "N/D"})",
+            color = MeetColors.textSecondary,
+            fontSize = 9.sp
+        )
         Spacer(modifier = Modifier.height(6.dp))
 
-        PhaseEvaluationRow("Ralentí CO", "${String.format("%.2f", result.idle.coEstimate.pointEstimate)}%", "<= 0.50%", result.idle.coEvaluation)
-        PhaseEvaluationRow("Ralentí HC", "${result.idle.hcEstimate.pointEstimate.toInt()} ppm", "<= 125 ppm", result.idle.hcEvaluation)
-        PhaseEvaluationRow("Ralentí CO₂", "${String.format("%.1f", result.idle.co2Estimate.pointEstimate)}%", ">= 10.0%", result.idle.co2Evaluation)
+        val idleCoLim = result.ruleSet?.idleLimits?.find { it.metric == GasMetric.CO }?.max?.let { "<= ${String.format("%.2f", it)}%" } ?: "<= 0.50%"
+        val idleHcLim = result.ruleSet?.idleLimits?.find { it.metric == GasMetric.HC }?.max?.let { "<= ${it.toInt()} ppm" } ?: "<= 125 ppm"
+        val idleCo2Lim = result.ruleSet?.idleLimits?.find { it.metric == GasMetric.CO2 }?.min?.let { ">= ${String.format("%.1f", it)}%" } ?: ">= 10.0%"
 
-        Divider(color = Color(0xFF333333), modifier = Modifier.padding(vertical = 4.dp))
+        val accelCoLim = result.ruleSet?.acceleratedLimits?.find { it.metric == GasMetric.CO }?.max?.let { "<= ${String.format("%.2f", it)}%" } ?: "<= 0.30%"
+        val accelHcLim = result.ruleSet?.acceleratedLimits?.find { it.metric == GasMetric.HC }?.max?.let { "<= ${it.toInt()} ppm" } ?: "<= 100 ppm"
+        val accelCo2Lim = result.ruleSet?.acceleratedLimits?.find { it.metric == GasMetric.CO2 }?.min?.let { ">= ${String.format("%.1f", it)}%" } ?: ">= 12.0%"
+        val lambdaLim = result.ruleSet?.acceleratedLimits?.find { it.metric == GasMetric.LAMBDA }?.let { "${String.format("%.2f", it.min ?: 0.93)} - ${String.format("%.2f", it.max ?: 1.07)}" } ?: "1.00 ± 0.07"
 
-        PhaseEvaluationRow("2500 RPM CO", "${String.format("%.2f", result.accelerated.coEstimate.pointEstimate)}%", "<= 0.30%", result.accelerated.coEvaluation)
-        PhaseEvaluationRow("2500 RPM HC", "${result.accelerated.hcEstimate.pointEstimate.toInt()} ppm", "<= 100 ppm", result.accelerated.hcEvaluation)
-        PhaseEvaluationRow("2500 RPM CO₂", "${String.format("%.1f", result.accelerated.co2Estimate.pointEstimate)}%", ">= 12.0%", result.accelerated.co2Evaluation)
+        PhaseEvaluationRow("Ralentí CO", "${String.format("%.2f", result.idle.coEstimate.pointEstimate)}%", idleCoLim, result.idle.coEvaluation)
+        PhaseEvaluationRow("Ralentí HC", "${result.idle.hcEstimate.pointEstimate.toInt()} ppm", idleHcLim, result.idle.hcEvaluation)
+        PhaseEvaluationRow("Ralentí CO₂", "${String.format("%.1f", result.idle.co2Estimate.pointEstimate)}%", idleCo2Lim, result.idle.co2Evaluation)
+
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF333333)).padding(vertical = 4.dp))
+
+        PhaseEvaluationRow("2500 RPM CO", "${String.format("%.2f", result.accelerated.coEstimate.pointEstimate)}%", accelCoLim, result.accelerated.coEvaluation)
+        PhaseEvaluationRow("2500 RPM HC", "${result.accelerated.hcEstimate.pointEstimate.toInt()} ppm", accelHcLim, result.accelerated.hcEvaluation)
+        PhaseEvaluationRow("2500 RPM CO₂", "${String.format("%.1f", result.accelerated.co2Estimate.pointEstimate)}%", accelCo2Lim, result.accelerated.co2Evaluation)
 
         if (result.accelerated.lambdaEstimate != null) {
-            PhaseEvaluationRow("Lambda", String.format("%.3f", result.accelerated.lambdaEstimate), "1.00 ± 0.07", result.accelerated.lambdaEvaluation)
+            PhaseEvaluationRow("Lambda (λ)", String.format("%.3f", result.accelerated.lambdaEstimate), lambdaLim, result.accelerated.lambdaEvaluation)
         }
 
-        Divider(color = Color(0xFF333333), modifier = Modifier.padding(vertical = 4.dp))
+        Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF333333)).padding(vertical = 4.dp))
         PhaseEvaluationRow("Monitores OBD", if (result.readiness == Evaluation.PASS) "Completos" else "Incompletos / MIL", "Cero fallas", result.readiness)
         val m06Pass = result.mode06Evidence.none { it.verdict == Mode06Verdict.FAIL }
         val m06Eval = if (result.mode06Evidence.isEmpty()) Evaluation.INCONCLUSIVE else if (m06Pass) Evaluation.PASS else Evaluation.FAIL

@@ -2,6 +2,8 @@ package com.elysium369.meet.core.emissions.preitv
 
 import com.elysium369.meet.core.emissions.analysis.GasEstimate
 import com.elysium369.meet.core.emissions.domain.Evaluation
+import com.elysium369.meet.core.emissions.regulations.EmissionRuleSet
+import com.elysium369.meet.core.emissions.regulations.RegulatoryVehicleProfile
 import com.elysium369.meet.core.obd.Mode06TestResult
 
 sealed interface PreItvPhase {
@@ -24,6 +26,18 @@ enum class PreItvVerdict {
     INCONCLUSIVE
 }
 
+enum class DekraOfficialResult {
+    PASA_DEKRA,          // Aprobado sin defectos graves
+    NO_PASA_DEKRA,       // Reprobado por defectos graves (CO, HC, Lambda, Dilución, Misfires, MIL)
+    PENDIENTE_INCONCLUSO // Requiere confirmación con analizador de sonda física
+}
+
+data class DekraFailureReason(
+    val code: String,          // e.g. "DG-CO-RALENTÍ", "DG-HC-ACELERADO", "DG-LAMBDA"
+    val description: String,   // e.g. "CO Ralentí 0.62% supera límite reglamentario (0.50% vol)"
+    val severity: String = "DEFECTO GRAVE" // Manual COSEVI RTV: Defecto Grave (DG)
+)
+
 data class PhaseMeasurement(
     val phaseName: String, // "RALENTÍ" or "ACELERADO_2500"
     val rpmMean: Double,
@@ -42,6 +56,13 @@ data class PreItvResult(
     val id: String = java.util.UUID.randomUUID().toString(),
     val jurisdiction: String,
     val ruleVersion: String,
+    val vehicleProfile: RegulatoryVehicleProfile? = null,
+    val vehicleDisplayName: String? = null,
+    val vehicleVin: String? = null,
+    val vehiclePlate: String? = null,
+    val dekraResult: DekraOfficialResult = DekraOfficialResult.PENDIENTE_INCONCLUSO,
+    val dekraFailureReasons: List<DekraFailureReason> = emptyList(),
+    val ruleSet: EmissionRuleSet? = null,
     val idle: PhaseMeasurement,
     val accelerated: PhaseMeasurement,
     val readiness: Evaluation,
