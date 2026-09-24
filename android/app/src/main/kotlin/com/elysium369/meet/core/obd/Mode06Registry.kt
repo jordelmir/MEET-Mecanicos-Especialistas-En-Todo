@@ -108,14 +108,44 @@ class DefaultMode06DefinitionRegistry : Mode06DefinitionRegistry {
     )
 
     override fun resolve(key: Mode06SemanticKey, vehicleContext: String?): Mode06Definition? {
-        val comp = midNames[key.mid] ?: String.format("Monitor ID \$%02X", key.mid)
+        if (key.protocolFamily in listOf(ProtocolFamily.ISO_K_LINE, ProtocolFamily.J1850_PWM, ProtocolFamily.J1850_VPW)) {
+            // In SAE J1979 Legacy (pre-CAN), byte 1 is TID and byte 2 is CID.
+            // Do NOT use CAN SAE J1979-DA MID mappings which cause bogus Bank 3/4 labels on 4-cylinder engines.
+            val legacyTid = key.mid
+            val legacyCid = key.tid
+            val tidDesc = tidNames[legacyTid] ?: String.format("Prueba Legacy TID \$%02X", legacyTid)
+            val compName = String.format("Monitor Legacy \$%02X (CID \$%02X)", legacyTid, legacyCid)
+            return Mode06Definition(
+                testName = tidDesc,
+                componentName = compName,
+                isStandardized = false,
+                proTip = "En protocolos heredados (ISO 9141-2 / J1850), los identificadores corresponden a la tabla OEM del fabricante. Semántica no confirmada."
+            )
+        }
+
+        // Sanity guard: Bank 3 and Bank 4 do not exist on inline-4 or single-bank engines
+        val isMultibankAnomalous = key.mid in listOf(0x09, 0x0A, 0x0B, 0x0C, 0x23, 0x24)
+        val isConfirmedSmallEngine = vehicleContext != null && (
+            vehicleContext.contains("4-cyl", ignoreCase = true) ||
+            vehicleContext.contains("1.6", ignoreCase = true) ||
+            vehicleContext.contains("Accent", ignoreCase = true) ||
+            vehicleContext.contains("I4", ignoreCase = true)
+        )
+
+        val rawComp = midNames[key.mid]
+        val comp = if (isMultibankAnomalous && isConfirmedSmallEngine) {
+            String.format("Monitor \$%02X (Definición OEM no confirmada)", key.mid)
+        } else {
+            rawComp ?: String.format("Monitor ID \$%02X", key.mid)
+        }
+
         val test = tidNames[key.tid] ?: String.format("Prueba ID \$%02X", key.tid)
         val isStd = midNames.containsKey(key.mid) || tidNames.containsKey(key.tid)
         return Mode06Definition(
             testName = test,
             componentName = comp,
-            isStandardized = isStd,
-            proTip = null
+            isStandardized = isStd && !(isMultibankAnomalous && isConfirmedSmallEngine),
+            proTip = if (isMultibankAnomalous && isConfirmedSmallEngine) "Banco 3/4 no existe en motores de 4 cilindros. Requiere definición OEM." else null
         )
     }
 }

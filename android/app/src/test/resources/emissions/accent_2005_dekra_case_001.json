@@ -8,7 +8,7 @@
     "engineDisplacementLiters": 1.6,
     "cylinders": 4,
     "engineCycle": "FOUR_STROKE",
-    "costaRicaEntryDate": "2005-06-15"
+    "costaRicaEntryDate": "2012-10-29"
   },
   "inspectionAuthority": "DEKRA / COSEVI Costa Rica",
   "inspectionDate": "2024-05-18",
@@ -39,7 +39,10 @@
       "hcLimit": 125,
       "expectedHcVerdict": "FAIL",
       "co2MinLimit": 10.0,
-      "expectedCo2Verdict": "PASS"
+      "expectedCo2Verdict": "PASS",
+      "lambdaLimitMin": 0.97,
+      "lambdaLimitMax": 1.03,
+      "expectedLambdaVerdict": "FAIL"
     },
     "accelerated": {
       "coLimit": 0.30,
@@ -48,7 +51,10 @@
       "expectedHcVerdict": "FAIL",
       "co2MinLimit": 12.0,
       "expectedCo2Verdict": "FAIL",
-      "lambdaApplicable": false
+      "lambdaApplicable": true,
+      "lambdaLimitMin": 0.97,
+      "lambdaLimitMax": 1.03,
+      "expectedLambdaVerdict": "FAIL"
     },
     "overallInspectionVerdict": "REPROBADO_FALTA_GRAVE"
   }

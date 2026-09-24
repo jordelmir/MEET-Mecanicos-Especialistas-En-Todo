@@ -134,5 +134,11 @@ class EmissionRuleSetCrTest {
         assertEquals("Accel CO (0.64%) > 0.30% must FAIL", Evaluation.FAIL, accelCoLimit.evaluatePoint(accelCoVal))
         assertEquals("Accel HC (381 ppm) > 100 ppm must FAIL", Evaluation.FAIL, accelHcLimit.evaluatePoint(accelHcVal))
         assertEquals("Accel CO2 (11.9%) < 12.0% must FAIL", Evaluation.FAIL, accelCo2Limit.evaluatePoint(accelCo2Val))
+
+        // 3. Evaluate Accelerated Lambda (entry date 2012-10-29 >= 2012-10-26 cutoff)
+        val accelLambdaLimit = ruleSet.acceleratedLimits.firstOrNull { it.metric == GasMetric.LAMBDA }
+        assertNotNull("Vehicle entering on 2012-10-29 must have Lambda regulation limit", accelLambdaLimit)
+        val accelLambdaVal = accel["lambda"]!!.jsonPrimitive.double
+        assertEquals("Accel Lambda (1.293) outside 0.93..1.07 must FAIL", Evaluation.FAIL, accelLambdaLimit!!.evaluatePoint(accelLambdaVal))
     }
 }

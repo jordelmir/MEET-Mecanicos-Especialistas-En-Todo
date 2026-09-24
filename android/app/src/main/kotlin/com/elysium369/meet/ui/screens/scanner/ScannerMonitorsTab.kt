@@ -14,9 +14,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,8 +45,11 @@ import com.elysium369.meet.core.obd.DecodeStatus
 import com.elysium369.meet.core.obd.DiagnosticSeverity
 import com.elysium369.meet.core.obd.Mode06TestResult
 import com.elysium369.meet.core.obd.Mode06Verdict
+import com.elysium369.meet.core.obd.O2SensorTestResult
 import com.elysium369.meet.core.obd.ObdState
+import com.elysium369.meet.core.obd.ReadinessResult
 import com.elysium369.meet.ui.ObdViewModel
+import kotlinx.coroutines.delay
 import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 import com.elysium369.meet.ui.components.EliteCard
@@ -68,6 +73,11 @@ fun ScannerMonitorsTab(
     val connectionState by viewModel.connectionState.collectAsState()
     val isConnected = connectionState == ObdState.CONNECTED
     val liveData by viewModel.liveData.collectAsState()
+    val telemetrySamples by viewModel.telemetrySamples.collectAsState()
+    val readinessMonitors by viewModel.readinessMonitors.collectAsState()
+    val o2SensorTests by viewModel.o2SensorTests.collectAsState()
+    val isReadingO2Tests by viewModel.isReadingO2Tests.collectAsState()
+    val activeDtcs by viewModel.activeDtcs.collectAsState()
     val detectedProtocol by viewModel.detectedProtocol.collectAsState()
     val qosMetrics by viewModel.qosMetrics.collectAsState()
 
@@ -81,30 +91,54 @@ fun ScannerMonitorsTab(
     // Sliding waveform history for O2 sensors (up to 40 samples)
     val o2UpstreamSamples = remember { mutableStateListOf<OxygenSample>() }
     val o2DownstreamSamples = remember { mutableStateListOf<OxygenSample>() }
+    var lastO2S1Monotonic by remember { mutableStateOf(0L) }
+    var lastO2S2Monotonic by remember { mutableStateOf(0L) }
 
-    // Update telemetry into state machine and oscilloscope on each live tick
-    LaunchedEffect(liveData) {
-        val now = System.currentTimeMillis()
+    LaunchedEffect(isConnected) {
+        if (!isConnected) {
+            o2UpstreamSamples.clear()
+            o2DownstreamSamples.clear()
+            lastO2S1Monotonic = 0L
+            lastO2S2Monotonic = 0L
+        }
+    }
+
+    // Only add O2 samples when a fresh physical frame arrives from the hardware
+    LaunchedEffect(telemetrySamples) {
+        val s1Sample = telemetrySamples["0114"] ?: telemetrySamples["14"]
+        if (s1Sample != null && s1Sample.timestampMonotonicMs > lastO2S1Monotonic) {
+            lastO2S1Monotonic = s1Sample.timestampMonotonicMs
+            val voltage = s1Sample.value
+            if (voltage != null) {
+                o2UpstreamSamples.add(OxygenSample(System.currentTimeMillis(), voltage))
+                if (o2UpstreamSamples.size > 40) o2UpstreamSamples.removeAt(0)
+            }
+        }
+
+        val s2Sample = telemetrySamples["0115"] ?: telemetrySamples["15"]
+        if (s2Sample != null && s2Sample.timestampMonotonicMs > lastO2S2Monotonic) {
+            lastO2S2Monotonic = s2Sample.timestampMonotonicMs
+            val voltage = s2Sample.value
+            if (voltage != null) {
+                o2DownstreamSamples.add(OxygenSample(System.currentTimeMillis(), voltage))
+                if (o2DownstreamSamples.size > 40) o2DownstreamSamples.removeAt(0)
+            }
+        }
+    }
+
+    // Update telemetry into state machine on each live tick
+    LaunchedEffect(liveData, readinessMonitors, mode06Results, isConnected) {
         val rpm = (liveData["010C"] ?: liveData["RPM"])?.toDouble()
         val ect = (liveData["0105"] ?: liveData["COOLANT"])?.toDouble()
         val speed = (liveData["010D"] ?: liveData["SPEED"])?.toDouble()
-        val stft = (liveData["0106"] ?: liveData["STFT1"])?.toDouble()
-        val ltft = (liveData["0107"] ?: liveData["LTFT1"])?.toDouble()
+        val stft = (liveData["0106"] ?: liveData["STFT1"] ?: liveData["06"])?.toDouble()
+        val ltft = (liveData["0107"] ?: liveData["LTFT1"] ?: liveData["07"])?.toDouble()
         val lambda = (liveData["LAMBDA"] ?: liveData["0124"] ?: liveData["0134"])?.toDouble()
 
-        val o2s1 = (liveData["0114"] ?: liveData["O2S1"] ?: liveData["0115"])?.toDouble()
-        val o2s2 = (liveData["0115"] ?: liveData["O2S2"] ?: liveData["0116"])?.toDouble()
-
-        if (o2s1 != null) {
-            o2UpstreamSamples.add(OxygenSample(now, o2s1))
-            if (o2UpstreamSamples.size > 40) o2UpstreamSamples.removeAt(0)
-        }
-        if (o2s2 != null) {
-            o2DownstreamSamples.add(OxygenSample(now, o2s2))
-            if (o2DownstreamSamples.size > 40) o2DownstreamSamples.removeAt(0)
-        }
-
+        preItvMachine.setConnectionState(isConnected)
         preItvMachine.setMode06Evidence(mode06Results)
+        preItvMachine.setReadinessEvidence(readinessMonitors)
+
         preItvMachine.tickTelemetry(
             rpm = rpm,
             ectC = ect,
@@ -144,11 +178,16 @@ fun ScannerMonitorsTab(
             }
             MonitorsSubTab.EMISSIONS_LAB -> {
                 EmissionsLabView(
+                    viewModel = viewModel,
                     liveData = liveData,
                     detectedProtocol = detectedProtocol,
                     qosMetrics = qosMetrics,
                     isConnected = isConnected,
                     mode06Results = mode06Results,
+                    readinessResult = readinessMonitors,
+                    o2SensorTests = o2SensorTests,
+                    isReadingO2Tests = isReadingO2Tests,
+                    activeDtcs = activeDtcs,
                     preItvMachine = preItvMachine,
                     preItvPhase = preItvPhase,
                     o2UpstreamSamples = o2UpstreamSamples,
@@ -389,27 +428,53 @@ private fun CategoryFilterRow(
 
 @Composable
 private fun EmissionsLabView(
+    viewModel: ObdViewModel,
     liveData: Map<String, Float>,
     detectedProtocol: String,
     qosMetrics: com.elysium369.meet.core.obd.QosMetrics,
     isConnected: Boolean,
     mode06Results: List<Mode06TestResult>,
+    readinessResult: ReadinessResult?,
+    o2SensorTests: List<O2SensorTestResult>,
+    isReadingO2Tests: Boolean,
+    activeDtcs: List<String>,
     preItvMachine: PreItvStateMachine,
     preItvPhase: PreItvPhase,
     o2UpstreamSamples: List<OxygenSample>,
     o2DownstreamSamples: List<OxygenSample>,
     isSpanish: Boolean
 ) {
+    val scope = rememberCoroutineScope()
     val o2Analyzer = remember { OxygenSignalAnalyzer() }
     val catalystAnalyzer = remember { CatalystEfficiencyAnalyzer() }
-    val combustionEstimator = remember { CombustionRiskEstimator() }
+    val emissionsEngine = remember { EmissionsEngine() }
     val co2Model = remember { CO2PhysicsModel() }
+
+    var isBurstActive by remember { mutableStateOf(false) }
+    var burstSecondsLeft by remember { mutableStateOf(0) }
+
+    fun triggerO2Burst() {
+        if (isBurstActive) return
+        scope.launch {
+            isBurstActive = true
+            burstSecondsLeft = 15
+            viewModel.pinPid("0114")
+            viewModel.setHighSpeedMode(true)
+            while (burstSecondsLeft > 0) {
+                delay(1000L)
+                burstSecondsLeft--
+            }
+            viewModel.unpinPid("0114")
+            viewModel.setHighSpeedMode(false)
+            isBurstActive = false
+        }
+    }
 
     val rpm = (liveData["010C"] ?: liveData["RPM"])?.toDouble()
     val ect = (liveData["0105"] ?: liveData["COOLANT"])?.toDouble()
     val speed = (liveData["010D"] ?: liveData["SPEED"])?.toDouble()
-    val stft = (liveData["0106"] ?: liveData["STFT1"])?.toDouble()
-    val ltft = (liveData["0107"] ?: liveData["LTFT1"])?.toDouble()
+    val stft = (liveData["0106"] ?: liveData["STFT1"] ?: liveData["06"])?.toDouble()
+    val ltft = (liveData["0107"] ?: liveData["LTFT1"] ?: liveData["07"])?.toDouble()
     val lambda = (liveData["LAMBDA"] ?: liveData["0124"] ?: liveData["0134"])?.toDouble()
     val maf = (liveData["0110"] ?: liveData["MAF"])?.toDouble()
 
@@ -430,26 +495,47 @@ private fun EmissionsLabView(
         )
     }
 
-    // Virtual Gas Estimates (CO, HC, CO2)
-    val assessment = remember(stft, ltft, lambda, ect, upstreamFeatures, catAssessment, rpm) {
-        val misfireCount = mode06Results.filter { it.mid.startsWith("\$A") && it.verdict == Mode06Verdict.FAIL }.size
-        combustionEstimator.estimate(
-            stftPct = stft,
-            ltftPct = ltft,
-            lambda = lambda,
-            coolantC = ect,
-            misfireCount = misfireCount,
-            o2UpstreamFeatures = upstreamFeatures,
-            catalystAssessment = catAssessment,
-            isAcceleratedRpm = (rpm ?: 0.0) >= 2200.0
-        )
+    // Authoritative Emissions & Virtual Gas Evaluation via unified EmissionsEngine
+    val firstReadiness = readinessResult
+    val misfireCount = mode06Results.count { it.mid.startsWith("\$A") && it.verdict == Mode06Verdict.FAIL }
+    val isAcceleratedRpm = (rpm ?: 0.0) >= 2200.0
+
+    val engineInput = EmissionsEngineInput(
+        rpm = rpm,
+        ectC = ect,
+        stftPct = stft,
+        ltftPct = ltft,
+        lambda = lambda,
+        misfireCount = misfireCount,
+        o2UpstreamFeatures = upstreamFeatures,
+        catalystAssessment = catAssessment,
+        mode06Results = mode06Results,
+        readinessResult = firstReadiness,
+        isAcceleratedRpm = isAcceleratedRpm,
+        isConnected = isConnected,
+        physicalSampleCount = o2UpstreamSamples.size
+    )
+
+    val engineOutput = remember(engineInput) {
+        emissionsEngine.evaluate(engineInput)
     }
+    val assessment = engineOutput.combustionAssessment
 
     // CO2 mass flow from estimated fuel rate
     val co2Outputs = remember(maf, lambda, speed) {
         val fuelGps = if (maf != null && maf > 0.0) maf / (14.7 * (lambda ?: 1.0)) else null
         co2Model.calculate(fuelRateGps = fuelGps, speedKmh = speed, lambda = lambda)
     }
+
+    val hasDtcConflict = isConnected && firstReadiness != null &&
+        (firstReadiness.milOn || firstReadiness.dtcCount > 0) && activeDtcs.isEmpty()
+
+    val isLegacyProtocol = isConnected && (
+        !detectedProtocol.contains("CAN", ignoreCase = true) ||
+        detectedProtocol.contains("9141", ignoreCase = true) ||
+        detectedProtocol.contains("14230", ignoreCase = true) ||
+        detectedProtocol.contains("J1850", ignoreCase = true)
+    )
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -468,6 +554,17 @@ private fun EmissionsLabView(
             )
         }
 
+        // DTC State Conflict Banner (if MIL is ON but Mode 03 returned 0 codes)
+        if (hasDtcConflict && firstReadiness != null) {
+            item {
+                DtcStateConflictCard(
+                    readiness = firstReadiness,
+                    activeDtcCount = activeDtcs.size,
+                    isSpanish = isSpanish
+                )
+            }
+        }
+
         // 2. Gas Estimate Cards (Virtual Gas Analyzer)
         item {
             Text(
@@ -484,6 +581,7 @@ private fun EmissionsLabView(
                     estimate = assessment.coEstimate,
                     badgeLabel = "MODEL ESTIMATED",
                     badgeColor = Color(0xFFFF9100),
+                    isConnected = isConnected,
                     modifier = Modifier.weight(1f)
                 )
                 GasCard(
@@ -492,6 +590,7 @@ private fun EmissionsLabView(
                     estimate = assessment.hcEstimate,
                     badgeLabel = "MODEL ESTIMATED",
                     badgeColor = Color(0xFFFF9100),
+                    isConnected = isConnected,
                     modifier = Modifier.weight(1f)
                 )
                 GasCard(
@@ -500,13 +599,14 @@ private fun EmissionsLabView(
                     estimate = assessment.co2Estimate,
                     badgeLabel = "MODEL ESTIMATED",
                     badgeColor = Color(0xFF00E5FF),
+                    isConnected = isConnected,
                     modifier = Modifier.weight(1f)
                 )
             }
         }
 
         // 3. Mass Balance CO2 Rate
-        if (co2Outputs != null) {
+        if (co2Outputs != null && isConnected) {
             item {
                 Co2MassCard(co2Outputs = co2Outputs, isSpanish = isSpanish)
             }
@@ -519,8 +619,23 @@ private fun EmissionsLabView(
                 downstreamSamples = o2DownstreamSamples,
                 upstreamFeatures = upstreamFeatures,
                 downstreamFeatures = downstreamFeatures,
+                isBurstActive = isBurstActive,
+                burstSecondsLeft = burstSecondsLeft,
+                onTriggerBurst = { triggerO2Burst() },
                 isSpanish = isSpanish
             )
+        }
+
+        // Mode $05 Card for Legacy / Pre-CAN Protocols (ISO 9141-2 / K-Line)
+        if (isLegacyProtocol) {
+            item {
+                Mode05O2Card(
+                    viewModel = viewModel,
+                    o2SensorTests = o2SensorTests,
+                    isReading = isReadingO2Tests,
+                    isSpanish = isSpanish
+                )
+            }
         }
 
         // 5. Catalyst Health & Fuel Trims Hub
@@ -623,19 +738,162 @@ private fun BannerMetric(label: String, value: String, color: Color) {
 }
 
 @Composable
+private fun DtcStateConflictCard(
+    readiness: ReadinessResult,
+    activeDtcCount: Int,
+    isSpanish: Boolean
+) {
+    EliteCard(
+        backgroundColor = MeetColors.backgroundDeep,
+        borderColor = MeetColors.warning.copy(alpha = 0.6f),
+        glowColor = MeetColors.warning.copy(alpha = 0.15f),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Icon(
+                Icons.Default.Warning,
+                contentDescription = null,
+                tint = MeetColors.warning,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column {
+                Text(
+                    if (isSpanish) "CONFLICTO DE ESTADO DTC" else "DTC STATE CONFLICT",
+                    color = MeetColors.warning,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    if (isSpanish)
+                        "La ECU reporta MIL encendida o ${readiness.dtcCount} falla(s) en PID 01, pero Mode \$03 reportó 0 códigos confirmados. Estado no concluyente para ITV. Inspeccione códigos pendientes (Mode \$07) o permanentes (Mode \$0A)."
+                    else
+                        "ECU reports MIL on or ${readiness.dtcCount} DTC(s) in PID 01, but Mode \$03 returned 0 stored DTCs. Inconclusive for ITV. Check pending (Mode \$07) or permanent (Mode \$0A) codes.",
+                    color = Color.White.copy(alpha = 0.85f),
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Mode05O2Card(
+    viewModel: ObdViewModel,
+    o2SensorTests: List<O2SensorTestResult>,
+    isReading: Boolean,
+    isSpanish: Boolean
+) {
+    EliteCard(
+        backgroundColor = MeetColors.backgroundDeep,
+        borderColor = MeetColors.cyberCyan.copy(alpha = 0.35f),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        if (isSpanish) "PRUEBAS DE SENSORES O₂ (MODE \$05)" else "O₂ SENSOR TESTS (MODE \$05)",
+                        color = MeetColors.cyberCyan,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 12.sp
+                    )
+                    Text(
+                        if (isSpanish) "Estándar SAE J1979 para protocolos pre-CAN (ISO 9141-2 / K-Line)"
+                        else "SAE J1979 standard for pre-CAN protocols (ISO 9141-2 / K-Line)",
+                        color = MeetColors.textSecondary,
+                        fontSize = 9.sp
+                    )
+                }
+
+                Button(
+                    onClick = { viewModel.readO2SensorTests() },
+                    enabled = !isReading,
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan.copy(alpha = 0.2f)),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    if (isReading) {
+                        CircularProgressIndicator(modifier = Modifier.size(12.dp), color = MeetColors.cyberCyan, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Text(
+                        if (isReading) "LEYENDO..." else "LEER MODE \$05",
+                        color = MeetColors.cyberCyan,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            if (o2SensorTests.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    o2SensorTests.forEach { test ->
+                        val pass = test.passed
+                        val statusColor = if (pass) MeetColors.neonGreen else MeetColors.error
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1.5f)) {
+                                Text(test.testDescription, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Text("Sensor ${test.sensorId}", color = MeetColors.textSecondary, fontSize = 8.sp)
+                            }
+                            Text(
+                                String.format("%.3f %s", test.value, test.unit),
+                                color = statusColor,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .background(statusColor.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            ) {
+                                Text(if (pass) "PASS" else "FAIL", color = statusColor, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun GasCard(
     title: String,
     gasName: String,
     estimate: GasEstimate,
     badgeLabel: String,
     badgeColor: Color,
+    isConnected: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    val isDisconnected = !isConnected || estimate.modelVersion == "DISCONNECTED"
+    val displayColor = if (isDisconnected) Color.Gray else badgeColor
+
     EliteCard(
         modifier = modifier,
         backgroundColor = MeetColors.backgroundDeep,
-        borderColor = badgeColor.copy(alpha = 0.35f),
-        glowColor = badgeColor.copy(alpha = 0.10f),
+        borderColor = displayColor.copy(alpha = 0.35f),
+        glowColor = if (isDisconnected) Color.Transparent else displayColor.copy(alpha = 0.10f),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(10.dp)) {
@@ -647,24 +905,32 @@ private fun GasCard(
                 Text(title, color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
                 Box(
                     modifier = Modifier
-                        .background(badgeColor.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
+                        .background(
+                            if (isDisconnected) Color(0xFF333333) else badgeColor.copy(alpha = 0.15f),
+                            RoundedCornerShape(3.dp)
+                        )
                         .padding(horizontal = 4.dp, vertical = 2.dp)
                 ) {
-                    Text(badgeLabel, color = badgeColor, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (isDisconnected) "DESCONECTADO" else badgeLabel,
+                        color = if (isDisconnected) Color(0xFFBBBBBB) else badgeColor,
+                        fontSize = 7.sp,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                String.format("%.2f %s", estimate.pointEstimate, estimate.unit),
-                color = Color.White,
+                if (isDisconnected) "---" else String.format("%.2f %s", estimate.pointEstimate, estimate.unit),
+                color = if (isDisconnected) MeetColors.textSecondary else Color.White,
                 fontWeight = FontWeight.Black,
                 fontSize = 15.sp
             )
 
             Spacer(modifier = Modifier.height(2.dp))
             Text(
-                "95%: ${String.format("%.2f", estimate.lower95)}–${String.format("%.2f", estimate.upper95)}",
+                if (isDisconnected) "Sin señal física OBD" else "95%: ${String.format("%.2f", estimate.lower95)}–${String.format("%.2f", estimate.upper95)}",
                 color = MeetColors.textSecondary,
                 fontSize = 9.sp
             )
@@ -713,6 +979,9 @@ private fun OxygenOscilloscopeCard(
     downstreamSamples: List<OxygenSample>,
     upstreamFeatures: OxygenSignalFeatures,
     downstreamFeatures: OxygenSignalFeatures,
+    isBurstActive: Boolean = false,
+    burstSecondsLeft: Int = 0,
+    onTriggerBurst: () -> Unit = {},
     isSpanish: Boolean
 ) {
     EliteCard(
@@ -732,6 +1001,66 @@ private fun OxygenOscilloscopeCard(
                     fontWeight = FontWeight.Black,
                     fontSize = 13.sp
                 )
+
+                // Ráfaga O2 Button for ISO 9141-2 / K-Line
+                Button(
+                    onClick = onTriggerBurst,
+                    enabled = !isBurstActive,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isBurstActive) MeetColors.neonGreen else MeetColors.cyberCyan.copy(alpha = 0.2f),
+                        disabledContainerColor = MeetColors.neonGreen.copy(alpha = 0.8f)
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    if (isBurstActive) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(12.dp),
+                            color = Color.Black,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "RÁFAGA (${burstSecondsLeft}s)",
+                            color = Color.Black,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 10.sp
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.FlashOn,
+                            contentDescription = null,
+                            tint = MeetColors.cyberCyan,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            "RÁFAGA O2 (15s)",
+                            color = MeetColors.cyberCyan,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+
+            if (isBurstActive) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "⚡ Modo Ráfaga activo: Bus OBD concentrado exclusivamente en sensor O2 (PID 0114) a máxima velocidad.",
+                    color = MeetColors.neonGreen,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     LegendItem("B1S1 Upstream", MeetColors.neonGreen)
                     LegendItem("B1S2 Downstream", Color(0xFFFF9100))
@@ -817,7 +1146,7 @@ private fun OxygenOscilloscopeCard(
             if (upstreamFeatures.insufficientSampleRate) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "⚠️ Tasa de muestreo limitada por protocolo OBD (< 2.0 Hz)",
+                    "⚠️ Tasa de muestreo limitada por protocolo OBD (< 2.0 Hz). Use [RÁFAGA O2] para captura en alta velocidad.",
                     color = MeetColors.warning,
                     fontSize = 9.sp
                 )
@@ -1145,6 +1474,12 @@ private fun PreItvResultCard(result: PreItvResult, onReset: () -> Unit, isSpanis
         if (result.accelerated.lambdaEstimate != null) {
             PhaseEvaluationRow("Lambda", String.format("%.3f", result.accelerated.lambdaEstimate), "1.00 ± 0.07", result.accelerated.lambdaEvaluation)
         }
+
+        Divider(color = Color(0xFF333333), modifier = Modifier.padding(vertical = 4.dp))
+        PhaseEvaluationRow("Monitores OBD", if (result.readiness == Evaluation.PASS) "Completos" else "Incompletos / MIL", "Cero fallas", result.readiness)
+        val m06Pass = result.mode06Evidence.none { it.verdict == Mode06Verdict.FAIL }
+        val m06Eval = if (result.mode06Evidence.isEmpty()) Evaluation.INCONCLUSIVE else if (m06Pass) Evaluation.PASS else Evaluation.FAIL
+        PhaseEvaluationRow("Mode \$06", if (m06Pass) "Sin fallas" else "Fallas detectadas", "0 Fails", m06Eval)
 
         Spacer(modifier = Modifier.height(10.dp))
 

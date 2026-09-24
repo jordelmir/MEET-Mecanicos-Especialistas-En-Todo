@@ -82,16 +82,17 @@ object CostaRicaGasolineRules {
     }
 
     private fun resolveEffectiveYear(profile: RegulatoryVehicleProfile): Int? {
-        val entryStr = profile.costaRicaEntryDate
-        if (!entryStr.isNullOrBlank() && entryStr.length >= 4) {
-            val year = entryStr.substring(0, 4).toIntOrNull()
-            if (year != null) return year
-        }
+        if (profile.modelYear != null) return profile.modelYear
         val firstReg = profile.firstRegistrationDate
         if (!firstReg.isNullOrBlank() && firstReg.length >= 4) {
             val year = firstReg.substring(0, 4).toIntOrNull()
             if (year != null) return year
         }
-        return profile.modelYear
+        val entryStr = profile.costaRicaEntryDate
+        if (!entryStr.isNullOrBlank() && entryStr.length >= 4) {
+            val year = entryStr.substring(0, 4).toIntOrNull()
+            if (year != null) return year
+        }
+        return null
     }
 }

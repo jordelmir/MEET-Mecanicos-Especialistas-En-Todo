@@ -64,31 +64,45 @@ class CombustionRiskEstimator {
             explanations.add("$misfireCount falla(s) de encendido (misfire): combustible sin quemar expulsado al escape (HC elevado)")
         }
 
-        // 3. Fuel Trims & Lambda
+        // 3. Fuel Trims (Continuous proportional scaling)
         if (combinedTrim != null) {
             when {
-                combinedTrim > 12.0 -> {
-                    // ECU compensating for lean condition (vacuum leak, dirty MAF, low fuel pressure)
-                    hcScore += 0.30
-                    explanations.add("Corrección de combustible elevada (+${String.format("%.1f", combinedTrim)}%): compensación por mezcla pobre")
+                combinedTrim < -5.0 -> {
+                    // ECU removing fuel -> rich condition sensed by upstream O2
+                    val richDrift = ((-combinedTrim - 5.0) / 12.0).coerceIn(0.1, 1.2)
+                    coScore += (richDrift * 0.50)
+                    hcScore += (richDrift * 0.30)
+                    explanations.add("Corrección de combustible negativa (${String.format("%.1f", combinedTrim)}%): ECU detecta mezcla rica y reduce inyección")
                 }
-                combinedTrim < -12.0 -> {
-                    // ECU pulling fuel -> rich condition
-                    coScore += 0.45
-                    hcScore += 0.25
-                    explanations.add("Corrección de combustible muy negativa (${String.format("%.1f", combinedTrim)}%): exceso de combustible no quemado (CO elevado)")
+                combinedTrim > 8.0 -> {
+                    // ECU adding fuel -> lean condition (vacuum leak, weak fuel pump)
+                    val leanDrift = ((combinedTrim - 8.0) / 12.0).coerceIn(0.1, 1.2)
+                    hcScore += (leanDrift * 0.45)
+                    explanations.add("Corrección de combustible elevada (+${String.format("%.1f", combinedTrim)}%): compensación por mezcla pobre (fuga de vacío o baja presión)")
                 }
             }
         }
 
-        // 4. Lambda
+        // 4. Lambda & Exhaust Leak Correlation
         if (lambda != null) {
-            if (lambda < 0.95) {
-                coScore += 0.40
-                explanations.add("Mezcla rica detectada (Lambda = ${String.format("%.3f", lambda)} < 1.0): combustión deficiente en oxígeno, genera CO")
-            } else if (lambda > 1.10) {
-                hcScore += 0.30
-                explanations.add("Exceso de oxígeno en escape (Lambda = ${String.format("%.3f", lambda)} > 1.0): posible fuga en escape o combustión incompleta")
+            when {
+                lambda < 0.95 -> {
+                    val richDelta = ((0.98 - lambda) / 0.15).coerceIn(0.1, 1.0)
+                    coScore += (richDelta * 0.45)
+                    explanations.add("Mezcla rica detectada (Lambda = ${String.format("%.3f", lambda)} < 1.0): exceso de combustible relativo al aire")
+                }
+                lambda > 1.05 -> {
+                    val leanDelta = ((lambda - 1.03) / 0.20).coerceIn(0.1, 1.5)
+                    hcScore += (leanDelta * 0.55)
+                    if (combinedTrim != null && combinedTrim < -5.0) {
+                        // High Lambda + Negative Trims: Classic exhaust leak allowing ambient air ingress
+                        hcScore += 0.35
+                        coScore += 0.15
+                        explanations.add("Lambda alta (${String.format("%.3f", lambda)}) con trims negativos (${String.format("%.1f", combinedTrim)}%): evidencia fuerte de fuga en tubo de escape (ingreso de aire) o fallo de encendido")
+                    } else {
+                        explanations.add("Exceso de oxígeno en escape (Lambda = ${String.format("%.3f", lambda)} > 1.0): mezcla pobre o dilución en escape")
+                    }
+                }
             }
         }
 
@@ -96,13 +110,13 @@ class CombustionRiskEstimator {
         if (catalystAssessment != null) {
             when (catalystAssessment.state) {
                 CatalystAssessmentState.STRONG_DEGRADATION_EVIDENCE -> {
-                    coScore += 0.40
-                    hcScore += 0.45
+                    coScore += 0.45
+                    hcScore += 0.55
                     explanations.add("Catalizador con evidencia severa de degradación: baja conversión de CO y HC")
                 }
                 CatalystAssessmentState.DEGRADED_EVIDENCE -> {
-                    coScore += 0.20
-                    hcScore += 0.25
+                    coScore += 0.25
+                    hcScore += 0.35
                     explanations.add("Catalizador con eficiencia reducida")
                 }
                 CatalystAssessmentState.NORMAL_EVIDENCE -> {
@@ -123,36 +137,33 @@ class CombustionRiskEstimator {
         }
 
         val coRisk = when {
-            coScore >= 0.55 -> CombustionRiskLevel.HIGH
-            coScore >= 0.25 -> CombustionRiskLevel.MODERATE
+            coScore >= 0.50 -> CombustionRiskLevel.HIGH
+            coScore >= 0.20 -> CombustionRiskLevel.MODERATE
             coScore <= 0.10 && combinedTrim != null -> CombustionRiskLevel.LOW
             else -> CombustionRiskLevel.INCONCLUSIVE
         }
 
         val hcRisk = when {
-            hcScore >= 0.55 -> CombustionRiskLevel.HIGH
-            hcScore >= 0.25 -> CombustionRiskLevel.MODERATE
+            hcScore >= 0.50 -> CombustionRiskLevel.HIGH
+            hcScore >= 0.20 -> CombustionRiskLevel.MODERATE
             hcScore <= 0.10 && combinedTrim != null -> CombustionRiskLevel.LOW
             else -> CombustionRiskLevel.INCONCLUSIVE
         }
 
-        // Calibrated model estimation curves based on physical domain anchors
         // Baseline for standard healthy gasoline engine:
-        // Idle: CO ~ 0.10%, HC ~ 45 ppm, CO2 ~ 14.5%
-        // Accel: CO ~ 0.08%, HC ~ 30 ppm, CO2 ~ 14.8%
-        val baseCo = if (isAcceleratedRpm) 0.12 else 0.15
-        val baseHc = if (isAcceleratedRpm) 50.0 else 65.0
+        val baseCo = if (isAcceleratedRpm) 0.10 else 0.12
+        val baseHc = if (isAcceleratedRpm) 40.0 else 55.0
         val baseCo2 = if (isAcceleratedRpm) 14.5 else 14.0
 
-        val estCo = (baseCo + coScore * 0.70).coerceIn(0.05, 4.5)
+        val estCo = (baseCo + coScore * 0.75).coerceIn(0.05, 4.5)
         val coLow = (estCo * 0.75).coerceAtLeast(0.01)
         val coHigh = (estCo * 1.35).coerceAtLeast(coLow + 0.05)
 
-        val estHc = (baseHc + hcScore * 350.0).coerceIn(15.0, 800.0)
+        val estHc = (baseHc + hcScore * 480.0).coerceIn(15.0, 950.0)
         val hcLow = (estHc * 0.70).coerceAtLeast(5.0)
         val hcHigh = (estHc * 1.40).coerceAtLeast(hcLow + 15.0)
 
-        val estCo2 = (baseCo2 - (coScore + hcScore) * 1.5).coerceIn(9.0, 15.5)
+        val estCo2 = (baseCo2 - (coScore + hcScore) * 1.6).coerceIn(8.5, 15.5)
         val co2Low = (estCo2 - 0.7).coerceAtLeast(5.0)
         val co2High = (estCo2 + 0.7).coerceAtMost(16.0)
 

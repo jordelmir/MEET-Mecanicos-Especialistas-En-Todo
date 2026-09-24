@@ -76,7 +76,7 @@ data class EmissionRuleSet(
 )
 
 data class RegulatoryVehicleProfile(
-    val modelYear: Int?,
+    val modelYear: Int? = null,
     val firstRegistrationDate: String? = null,
     val costaRicaEntryDate: String? = null,
     val fuelType: FuelType = FuelType.GASOLINE,

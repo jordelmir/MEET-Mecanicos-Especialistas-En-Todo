@@ -152,13 +152,23 @@ object DtcUtils {
             "P0172" -> "Sistema demasiado rico en banco 1"
             "P0174" -> "Sistema demasiado pobre en banco 2"
             "P0175" -> "Sistema demasiado rico en banco 2"
+            "P0230" -> "Circuito primario de la bomba de combustible"
             "P0420" -> "Eficiencia del catalizador por debajo del umbral en banco 1"
             "P0430" -> "Eficiencia del catalizador por debajo del umbral en banco 2"
+            "P0760" -> "Solenoide de cambio C (Shift Solenoid C) - Falla en circuito eléctrico"
             "P0100" -> "Falla en circuito del sensor MAF"
             "P0101" -> "Rango o rendimiento incorrecto del sensor MAF"
             "P0102" -> "Entrada baja del circuito del sensor MAF"
             "P0103" -> "Entrada alta del circuito del sensor MAF"
             "P0113" -> "Entrada alta del circuito del sensor de temperatura de aire de admisión"
+            "P0115" -> "Falla en circuito del sensor de temperatura de refrigerante (ECT)"
+            "P0120" -> "Falla en circuito del sensor de posición de acelerador (TPS)"
+            "P0130" -> "Falla en circuito de sensor de oxígeno (Banco 1, Sensor 1)"
+            "P0135" -> "Falla en circuito calefactor de sensor de oxígeno (Banco 1, Sensor 1)"
+            "P0136" -> "Falla en circuito de sensor de oxígeno (Banco 1, Sensor 2)"
+            "P0141" -> "Falla en circuito calefactor de sensor de oxígeno (Banco 1, Sensor 2)"
+            "P0500" -> "Falla en sensor de velocidad del vehículo (VSS)"
+            "P0505" -> "Falla en sistema de control de aire de ralentí (IAC)"
             else -> null
         }
     }

@@ -1,20 +1,23 @@
 package com.elysium369.meet.core.emissions.preitv
 
-import com.elysium369.meet.core.emissions.analysis.CombustionRiskEstimator
-import com.elysium369.meet.core.emissions.analysis.GasEstimate
+import com.elysium369.meet.core.emissions.analysis.CatalystAssessment
+import com.elysium369.meet.core.emissions.analysis.EmissionsEngine
+import com.elysium369.meet.core.emissions.analysis.EmissionsEngineInput
+import com.elysium369.meet.core.emissions.analysis.OxygenSignalFeatures
 import com.elysium369.meet.core.emissions.domain.Evaluation
 import com.elysium369.meet.core.emissions.regulations.CostaRicaGasolineRules
 import com.elysium369.meet.core.emissions.regulations.GasMetric
 import com.elysium369.meet.core.emissions.regulations.RegulatoryVehicleProfile
 import com.elysium369.meet.core.obd.Mode06TestResult
 import com.elysium369.meet.core.obd.Mode06Verdict
+import com.elysium369.meet.core.obd.ReadinessResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class PreItvStateMachine(
     private val stabilityDetector: SignalStabilityDetector = SignalStabilityDetector(),
-    private val combustionEstimator: CombustionRiskEstimator = CombustionRiskEstimator()
+    private val emissionsEngine: EmissionsEngine = EmissionsEngine()
 ) {
 
     private val _phase = MutableStateFlow<PreItvPhase>(PreItvPhase.Idle)
@@ -22,6 +25,11 @@ class PreItvStateMachine(
 
     private var activeProfile: RegulatoryVehicleProfile = RegulatoryVehicleProfile(modelYear = 2005)
     private var mode06Results: List<Mode06TestResult> = emptyList()
+    private var readinessResult: ReadinessResult? = null
+    private var o2Features: OxygenSignalFeatures? = null
+    private var catalystAssessment: CatalystAssessment? = null
+    private var misfireCount: Int = 0
+    private var isConnected: Boolean = true
 
     private val idleSamples = mutableListOf<Pair<Long, Double>>()
     private val idleRpmList = mutableListOf<Double>()
@@ -60,6 +68,26 @@ class PreItvStateMachine(
 
     fun setMode06Evidence(results: List<Mode06TestResult>) {
         mode06Results = results
+    }
+
+    fun setReadinessEvidence(readiness: ReadinessResult?) {
+        readinessResult = readiness
+    }
+
+    fun setO2Features(features: OxygenSignalFeatures?) {
+        o2Features = features
+    }
+
+    fun setCatalystAssessment(assessment: CatalystAssessment?) {
+        catalystAssessment = assessment
+    }
+
+    fun setMisfireCount(count: Int) {
+        misfireCount = count
+    }
+
+    fun setConnectionState(connected: Boolean) {
+        isConnected = connected
     }
 
     fun abort(reason: String) {
@@ -180,123 +208,109 @@ class PreItvStateMachine(
     private fun computeFinalResult() {
         val ruleSet = CostaRicaGasolineRules.resolveRuleSet(activeProfile)
 
-        // 1. Idle Evaluation
+        // 1. Idle Evaluation via Authoritative EmissionsEngine
         val idleRpmMean = if (idleRpmList.isNotEmpty()) idleRpmList.average() else 750.0
         val idleEctMean = if (idleEctList.isNotEmpty()) idleEctList.average() else 90.0
-        val idleStft = if (idleStftList.isNotEmpty()) idleStftList.average() else 0.0
-        val idleLtft = if (idleLtftList.isNotEmpty()) idleLtftList.average() else 0.0
+        val idleStft = if (idleStftList.isNotEmpty()) idleStftList.average() else null
+        val idleLtft = if (idleLtftList.isNotEmpty()) idleLtftList.average() else null
         val idleLambda = if (idleLambdaList.isNotEmpty()) idleLambdaList.average() else null
 
-        val idleAssessment = combustionEstimator.estimate(
+        val idleInput = EmissionsEngineInput(
+            rpm = idleRpmMean,
+            ectC = idleEctMean,
             stftPct = idleStft,
             ltftPct = idleLtft,
             lambda = idleLambda,
-            coolantC = idleEctMean,
-            isAcceleratedRpm = false
+            misfireCount = misfireCount,
+            o2UpstreamFeatures = o2Features,
+            catalystAssessment = catalystAssessment,
+            mode06Results = mode06Results,
+            readinessResult = readinessResult,
+            activeProfile = activeProfile,
+            isAcceleratedRpm = false,
+            isConnected = isConnected,
+            physicalSampleCount = idleRpmList.size
         )
-
-        val idleCoLimit = ruleSet.idleLimits.find { it.metric == GasMetric.CO }
-        val idleHcLimit = ruleSet.idleLimits.find { it.metric == GasMetric.HC }
-        val idleCo2Limit = ruleSet.idleLimits.find { it.metric == GasMetric.CO2 }
-
-        val idleCoEval = idleCoLimit?.evaluate(idleAssessment.coEstimate) ?: Evaluation.NOT_APPLICABLE
-        val idleHcEval = idleHcLimit?.evaluate(idleAssessment.hcEstimate) ?: Evaluation.NOT_APPLICABLE
-        val idleCo2Eval = idleCo2Limit?.evaluate(idleAssessment.co2Estimate) ?: Evaluation.NOT_APPLICABLE
+        val idleOutput = emissionsEngine.evaluate(idleInput)
 
         val idleMeasurement = PhaseMeasurement(
             phaseName = "RALENTÍ",
             rpmMean = idleRpmMean,
             ectMean = idleEctMean,
-            coEstimate = idleAssessment.coEstimate,
-            hcEstimate = idleAssessment.hcEstimate,
-            co2Estimate = idleAssessment.co2Estimate,
-            coEvaluation = idleCoEval,
-            hcEvaluation = idleHcEval,
-            co2Evaluation = idleCo2Eval,
-            lambdaEstimate = idleLambda
+            coEstimate = idleOutput.combustionAssessment.coEstimate,
+            hcEstimate = idleOutput.combustionAssessment.hcEstimate,
+            co2Estimate = idleOutput.combustionAssessment.co2Estimate,
+            coEvaluation = idleOutput.coEvaluation,
+            hcEvaluation = idleOutput.hcEvaluation,
+            co2Evaluation = idleOutput.co2Evaluation,
+            lambdaEstimate = idleLambda,
+            lambdaEvaluation = idleOutput.lambdaEvaluation
         )
 
-        // 2. Accelerated Evaluation
+        // 2. Accelerated Evaluation via Authoritative EmissionsEngine
         val accelRpmMean = if (accelRpmList.isNotEmpty()) accelRpmList.average() else 2500.0
         val accelEctMean = if (accelEctList.isNotEmpty()) accelEctList.average() else 92.0
-        val accelStft = if (accelStftList.isNotEmpty()) accelStftList.average() else 0.0
-        val accelLtft = if (accelLtftList.isNotEmpty()) accelLtftList.average() else 0.0
+        val accelStft = if (accelStftList.isNotEmpty()) accelStftList.average() else null
+        val accelLtft = if (accelLtftList.isNotEmpty()) accelLtftList.average() else null
         val accelLambda = if (accelLambdaList.isNotEmpty()) accelLambdaList.average() else null
 
-        val accelAssessment = combustionEstimator.estimate(
+        val accelInput = EmissionsEngineInput(
+            rpm = accelRpmMean,
+            ectC = accelEctMean,
             stftPct = accelStft,
             ltftPct = accelLtft,
             lambda = accelLambda,
-            coolantC = accelEctMean,
-            isAcceleratedRpm = true
+            misfireCount = misfireCount,
+            o2UpstreamFeatures = o2Features,
+            catalystAssessment = catalystAssessment,
+            mode06Results = mode06Results,
+            readinessResult = readinessResult,
+            activeProfile = activeProfile,
+            isAcceleratedRpm = true,
+            isConnected = isConnected,
+            physicalSampleCount = accelRpmList.size
         )
-
-        val accelCoLimit = ruleSet.acceleratedLimits.find { it.metric == GasMetric.CO }
-        val accelHcLimit = ruleSet.acceleratedLimits.find { it.metric == GasMetric.HC }
-        val accelCo2Limit = ruleSet.acceleratedLimits.find { it.metric == GasMetric.CO2 }
-        val accelLambdaLimit = ruleSet.acceleratedLimits.find { it.metric == GasMetric.LAMBDA }
-
-        val accelCoEval = accelCoLimit?.evaluate(accelAssessment.coEstimate) ?: Evaluation.NOT_APPLICABLE
-        val accelHcEval = accelHcLimit?.evaluate(accelAssessment.hcEstimate) ?: Evaluation.NOT_APPLICABLE
-        val accelCo2Eval = accelCo2Limit?.evaluate(accelAssessment.co2Estimate) ?: Evaluation.NOT_APPLICABLE
-        val accelLambdaEval = if (accelLambda != null && accelLambdaLimit != null) {
-            accelLambdaLimit.evaluatePoint(accelLambda)
-        } else Evaluation.NOT_APPLICABLE
+        val accelOutput = emissionsEngine.evaluate(accelInput)
 
         val accelMeasurement = PhaseMeasurement(
             phaseName = "ACELERADO_2500",
             rpmMean = accelRpmMean,
             ectMean = accelEctMean,
-            coEstimate = accelAssessment.coEstimate,
-            hcEstimate = accelAssessment.hcEstimate,
-            co2Estimate = accelAssessment.co2Estimate,
-            coEvaluation = accelCoEval,
-            hcEvaluation = accelHcEval,
-            co2Evaluation = accelCo2Eval,
+            coEstimate = accelOutput.combustionAssessment.coEstimate,
+            hcEstimate = accelOutput.combustionAssessment.hcEstimate,
+            co2Estimate = accelOutput.combustionAssessment.co2Estimate,
+            coEvaluation = accelOutput.coEvaluation,
+            hcEvaluation = accelOutput.hcEvaluation,
+            co2Evaluation = accelOutput.co2Evaluation,
             lambdaEstimate = accelLambda,
-            lambdaEvaluation = accelLambdaEval
+            lambdaEvaluation = accelOutput.lambdaEvaluation
         )
 
         // 3. Overall Verdict Synthesis
-        val anyFail = idleCoEval == Evaluation.FAIL || idleHcEval == Evaluation.FAIL ||
-            accelCoEval == Evaluation.FAIL || accelHcEval == Evaluation.FAIL ||
-            accelLambdaEval == Evaluation.FAIL
-
-        val anyInconclusive = idleCoEval == Evaluation.INCONCLUSIVE || idleHcEval == Evaluation.INCONCLUSIVE ||
-            accelCoEval == Evaluation.INCONCLUSIVE || accelHcEval == Evaluation.INCONCLUSIVE
-
         val overallVerdict = when {
-            anyFail -> PreItvVerdict.HIGH_RISK
-            anyInconclusive -> PreItvVerdict.ELEVATED_RISK
-            idleCoEval == Evaluation.PASS && idleHcEval == Evaluation.PASS &&
-                accelCoEval == Evaluation.PASS && accelHcEval == Evaluation.PASS -> PreItvVerdict.LOW_RISK
+            idleOutput.overallVerdict == PreItvVerdict.HIGH_RISK || accelOutput.overallVerdict == PreItvVerdict.HIGH_RISK -> PreItvVerdict.HIGH_RISK
+            idleOutput.overallVerdict == PreItvVerdict.ELEVATED_RISK || accelOutput.overallVerdict == PreItvVerdict.ELEVATED_RISK -> PreItvVerdict.ELEVATED_RISK
+            idleOutput.overallVerdict == PreItvVerdict.LOW_RISK && accelOutput.overallVerdict == PreItvVerdict.LOW_RISK -> PreItvVerdict.LOW_RISK
             else -> PreItvVerdict.INCONCLUSIVE
         }
 
-        val explanations = mutableListOf<String>()
-        explanations.addAll(idleAssessment.causalExplanations)
-        explanations.addAll(accelAssessment.causalExplanations)
-
-        val m06FailedCount = mode06Results.count { it.verdict == Mode06Verdict.FAIL }
-        if (m06FailedCount > 0) {
-            explanations.add("$m06FailedCount pruebas internas Mode \$06 reprobadas por la ECU")
-        }
+        val explanations = (idleOutput.causalExplanations + accelOutput.causalExplanations).distinct()
 
         val result = PreItvResult(
             jurisdiction = ruleSet.jurisdiction,
             ruleVersion = ruleSet.version,
             idle = idleMeasurement,
             accelerated = accelMeasurement,
-            readiness = Evaluation.PASS,
+            readiness = accelOutput.readinessEvaluation,
             mode06Evidence = mode06Results,
             overall = overallVerdict,
-            confidence = (idleAssessment.confidence + accelAssessment.confidence) / 2.0,
+            confidence = (idleOutput.combustionAssessment.confidence + accelOutput.combustionAssessment.confidence) / 2.0,
             limitations = listOf(
                 "No sustituye la inspección oficial ni el analizador de gases con sonda física.",
                 "CO y HC son estimaciones estadísticas derivadas de sensores ECU, fuel trims y física de combustión.",
                 "La presencia de fugas en el tubo de escape puede alterar lecturas reales del analizador de gases."
             ),
-            causalExplanations = explanations.distinct()
+            causalExplanations = explanations
         )
 
         _phase.value = PreItvPhase.Completed(result)
