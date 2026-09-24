@@ -619,6 +619,11 @@ private fun EmissionsLabView(
                 downstreamSamples = o2DownstreamSamples,
                 upstreamFeatures = upstreamFeatures,
                 downstreamFeatures = downstreamFeatures,
+                catalystAssessment = catAssessment,
+                stftPct = stft,
+                ltftPct = ltft,
+                lambda = lambda,
+                isConnected = isConnected,
                 isBurstActive = isBurstActive,
                 burstSecondsLeft = burstSecondsLeft,
                 onTriggerBurst = { triggerO2Burst() },
@@ -979,11 +984,37 @@ private fun OxygenOscilloscopeCard(
     downstreamSamples: List<OxygenSample>,
     upstreamFeatures: OxygenSignalFeatures,
     downstreamFeatures: OxygenSignalFeatures,
+    catalystAssessment: CatalystAssessment? = null,
+    stftPct: Double? = null,
+    ltftPct: Double? = null,
+    lambda: Double? = null,
+    isConnected: Boolean = true,
     isBurstActive: Boolean = false,
     burstSecondsLeft: Int = 0,
     onTriggerBurst: () -> Unit = {},
     isSpanish: Boolean
 ) {
+    val diagnostician = remember { WaveformAutoDiagnostician() }
+    val diagnosis = remember(
+        upstreamFeatures,
+        downstreamFeatures,
+        catalystAssessment,
+        stftPct,
+        ltftPct,
+        lambda,
+        isConnected
+    ) {
+        diagnostician.diagnose(
+            upstreamFeatures = upstreamFeatures,
+            downstreamFeatures = downstreamFeatures,
+            catalystAssessment = catalystAssessment,
+            stftPct = stftPct,
+            ltftPct = ltftPct,
+            lambda = lambda,
+            isConnected = isConnected
+        )
+    }
+
     EliteCard(
         backgroundColor = MeetColors.backgroundDeep,
         borderColor = MeetColors.neonGreen.copy(alpha = 0.4f),
@@ -1149,6 +1180,278 @@ private fun OxygenOscilloscopeCard(
                     "⚠️ Tasa de muestreo limitada por protocolo OBD (< 2.0 Hz). Use [RÁFAGA O2] para captura en alta velocidad.",
                     color = MeetColors.warning,
                     fontSize = 9.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFF222222)))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // AUTO-DIAGNÓSTICO CLÍNICO Y OBSERVABILIDAD MATEMÁTICA
+            WaveformClinicalDiagnosisSection(
+                diagnosis = diagnosis,
+                isSpanish = isSpanish
+            )
+        }
+    }
+}
+
+@Composable
+private fun WaveformClinicalDiagnosisSection(
+    diagnosis: WaveformClinicalDiagnosis,
+    isSpanish: Boolean
+) {
+    val badgeColor = Color(diagnosis.badgeColorHex)
+    val healthIndex = diagnosis.metrics.healthIndexPct
+    val healthColor = when {
+        healthIndex >= 80 -> MeetColors.neonGreen
+        healthIndex >= 50 -> MeetColors.warning
+        else -> MeetColors.error
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF101010), RoundedCornerShape(10.dp))
+            .border(1.dp, badgeColor.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+            .padding(12.dp)
+    ) {
+        // 1. Header with Diagnosis Badge and Health Index
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .background(badgeColor.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                    .border(1.dp, badgeColor.copy(alpha = 0.7f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = diagnosis.title,
+                    color = badgeColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black
+                )
+            }
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            // Health Index Pill
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .background(healthColor.copy(alpha = 0.15f), CircleShape)
+                    .border(1.dp, healthColor.copy(alpha = 0.5f), CircleShape)
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = if (isSpanish) "Salud O₂: $healthIndex%" else "O₂ Health: $healthIndex%",
+                    color = healthColor,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 2. Plain-Spanish Clinical Summary
+        Text(
+            text = diagnosis.summary,
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            lineHeight = 15.sp
+        )
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        // 3. Technical Physical Explanation
+        Text(
+            text = "🔬 ${diagnosis.technicalExplanation}",
+            color = MeetColors.textSecondary,
+            fontSize = 10.sp,
+            lineHeight = 14.sp
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 4. Observability Telemetry Matrix (Mathematical Ranges)
+        Text(
+            text = if (isSpanish) "TELEMETRÍA Y RANGOS FÍSICOS (OBSERVABILIDAD)" else "TELEMETRY & PHYSICAL RANGES",
+            color = MeetColors.cyberCyan,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black
+        )
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            val vpp = diagnosis.metrics.peakToPeakVolts
+            val vppColor = when {
+                vpp >= 0.55 -> MeetColors.neonGreen
+                vpp >= 0.25 -> MeetColors.warning
+                else -> MeetColors.error
+            }
+            ObservabilityMetricPill(
+                title = "Vpp (Amplitud)",
+                value = String.format("%.2f V", vpp),
+                range = "0.60V - 0.90V",
+                accentColor = vppColor,
+                modifier = Modifier.weight(1f)
+            )
+
+            val vBias = diagnosis.metrics.centerBiasVolts
+            val biasColor = when {
+                vBias in 0.38..0.52 -> MeetColors.neonGreen
+                vBias in 0.30..0.60 -> MeetColors.warning
+                else -> MeetColors.error
+            }
+            ObservabilityMetricPill(
+                title = "Vbias (Centro)",
+                value = String.format("%.2f V", vBias),
+                range = "0.40V - 0.50V",
+                accentColor = biasColor,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            val rich = diagnosis.metrics.richDwellPct.toInt()
+            val lean = diagnosis.metrics.leanDwellPct.toInt()
+            val dwellColor = if (rich in 35..65) MeetColors.neonGreen else MeetColors.warning
+
+            ObservabilityMetricPill(
+                title = "Dwell Rico/Pobre",
+                value = "$rich% / $lean%",
+                range = "Equil: 40-60%",
+                accentColor = dwellColor,
+                modifier = Modifier.weight(1f)
+            )
+
+            val slew = diagnosis.metrics.slewRateVPerSec
+            val slewColor = when {
+                slew == null -> MeetColors.textMuted
+                slew >= 2.0 -> MeetColors.neonGreen
+                slew >= 1.0 -> MeetColors.warning
+                else -> MeetColors.error
+            }
+            ObservabilityMetricPill(
+                title = "Velocidad dV/dt",
+                value = slew?.let { String.format("%.1f V/s", it) } ?: "N/D",
+                range = "> 2.0 V/s",
+                accentColor = slewColor,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // 5. Impact on ITV / DEKRA
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF1A1A1A), RoundedCornerShape(6.dp))
+                .padding(8.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Text("⚖️", fontSize = 11.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+            Column {
+                Text(
+                    text = if (isSpanish) "Impacto en Inspección Técnica (ITV / DEKRA):" else "Impact on ITV / Technical Inspection:",
+                    color = MeetColors.warning,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = diagnosis.impactOnItv,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // 6. Actionable Mechanical Recommendation
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF14201A), RoundedCornerShape(6.dp))
+                .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.25f), RoundedCornerShape(6.dp))
+                .padding(8.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Text("🔧", fontSize = 11.sp)
+            Spacer(modifier = Modifier.width(6.dp))
+            Column {
+                Text(
+                    text = if (isSpanish) "Acción de Reparación Sugerida:" else "Recommended Mechanical Repair:",
+                    color = MeetColors.neonGreen,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = diagnosis.recommendedAction,
+                    color = Color.White.copy(alpha = 0.9f),
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ObservabilityMetricPill(
+    title: String,
+    value: String,
+    range: String,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .background(Color(0xFF181818), RoundedCornerShape(6.dp))
+            .border(1.dp, Color(0xFF282828), RoundedCornerShape(6.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp)
+    ) {
+        Column {
+            Text(
+                text = title,
+                color = MeetColors.textMuted,
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Medium
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = value,
+                    color = accentColor,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black
+                )
+                Text(
+                    text = range,
+                    color = Color.Gray,
+                    fontSize = 8.sp
                 )
             }
         }
@@ -1784,6 +2087,60 @@ fun Mode06VisualRange(
 ) {
     val statusColor = if (passed) MeetColors.neonGreen else MeetColors.error
 
+    val marginObservability: String? = remember(value, minLimit, maxLimit, passed) {
+        if (minLimit != null && maxLimit != null) {
+            val range = maxLimit - minLimit
+            if (range > 0f) {
+                val distToMin = value - minLimit
+                val distToMax = maxLimit - value
+                val minDist = kotlin.math.min(distToMin, distToMax)
+                val marginPct = (minDist / range * 100f).coerceIn(-999f, 100f)
+                if (passed) {
+                    if (marginPct >= 20f) {
+                        if (isSpanish) "✅ Margen seguro: ${String.format("%.0f%%", marginPct)} dentro de tolerancia"
+                        else "✅ Safe margin: ${String.format("%.0f%%", marginPct)} within tolerance"
+                    } else {
+                        if (isSpanish) "⚠️ Límite crítico: a solo ${String.format("%.0f%%", marginPct)} de reprobar"
+                        else "⚠️ Critical limit: only ${String.format("%.0f%%", marginPct)} from rejection"
+                    }
+                } else {
+                    if (isSpanish) "❌ Fuera de rango por ${String.format("%.3f", kotlin.math.abs(minDist))} $unit"
+                    else "❌ Out of range by ${String.format("%.3f", kotlin.math.abs(minDist))} $unit"
+                }
+            } else null
+        } else if (maxLimit != null) {
+            val diff = maxLimit - value
+            val marginPct = if (maxLimit != 0f) (diff / kotlin.math.abs(maxLimit) * 100f) else 0f
+            if (passed) {
+                if (marginPct >= 20f) {
+                    if (isSpanish) "✅ Margen seguro: ${String.format("%.0f%%", marginPct)} bajo el máximo"
+                    else "✅ Safe margin: ${String.format("%.0f%%", marginPct)} below max"
+                } else {
+                    if (isSpanish) "⚠️ Próximo al máximo: margen ${String.format("%.0f%%", marginPct)}"
+                    else "⚠️ Near max limit: margin ${String.format("%.0f%%", marginPct)}"
+                }
+            } else {
+                if (isSpanish) "❌ Supera límite máximo por +${String.format("%.3f", -diff)} $unit"
+                else "❌ Exceeds max limit by +${String.format("%.3f", -diff)} $unit"
+            }
+        } else if (minLimit != null) {
+            val diff = value - minLimit
+            val marginPct = if (minLimit != 0f) (diff / kotlin.math.abs(minLimit) * 100f) else 0f
+            if (passed) {
+                if (marginPct >= 20f) {
+                    if (isSpanish) "✅ Margen seguro: ${String.format("%.0f%%", marginPct)} sobre el mínimo"
+                    else "✅ Safe margin: ${String.format("%.0f%%", marginPct)} above min"
+                } else {
+                    if (isSpanish) "⚠️ Próximo al mínimo: margen ${String.format("%.0f%%", marginPct)}"
+                    else "⚠️ Near min limit: margin ${String.format("%.0f%%", marginPct)}"
+                }
+            } else {
+                if (isSpanish) "❌ Por debajo del mínimo por -${String.format("%.3f", -diff)} $unit"
+                else "❌ Below min limit by -${String.format("%.3f", -diff)} $unit"
+            }
+        } else null
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         Box(
             modifier = Modifier
@@ -1922,6 +2279,19 @@ fun Mode06VisualRange(
                 color = MeetColors.textMuted,
                 style = MaterialTheme.typography.labelSmall,
                 fontSize = 10.sp
+            )
+        }
+
+        marginObservability?.let { text ->
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = text,
+                color = if (passed) {
+                    if (text.startsWith("⚠️")) MeetColors.warning else MeetColors.neonGreen
+                } else MeetColors.error,
+                style = MaterialTheme.typography.labelSmall,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Medium
             )
         }
     }
