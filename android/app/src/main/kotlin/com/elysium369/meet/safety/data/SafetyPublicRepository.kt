@@ -93,6 +93,18 @@ data class SafetyPublicPointWire(
 
     @SerialName("server_version")
     val serverVersion: Long,
+
+    @SerialName("victim_count_documented")
+    val victimCountDocumented: Int = 0,
+
+    @SerialName("victim_female_count")
+    val victimFemaleCount: Int = 0,
+
+    @SerialName("victim_male_count")
+    val victimMaleCount: Int = 0,
+
+    @SerialName("victim_unknown_sex_count")
+    val victimUnknownSexCount: Int = 0,
 ) {
     fun toEntity(syncedAt: Long): SafetyPublicPointEntity =
         SafetyPublicPointEntity(
@@ -121,6 +133,10 @@ data class SafetyPublicPointWire(
             publishedAt = runCatching { Instant.parse(publishedAt).toEpochMilli() }.getOrNull() ?: syncedAt,
             serverVersion = serverVersion,
             syncedAt = syncedAt,
+            victimCountDocumented = victimCountDocumented,
+            victimFemaleCount = victimFemaleCount,
+            victimMaleCount = victimMaleCount,
+            victimUnknownSexCount = victimUnknownSexCount,
         )
 }
 
@@ -217,15 +233,33 @@ class SafetyPublicRepository @Inject constructor(
         }
         check(requireSession() == owner)
         val now = System.currentTimeMillis()
+        var versionGapCount = 0
+        var maxGap = 0L
         database.withTransaction {
             dao.removeMissingPoints(remote.map { it.id })
             for (row in remote) {
                 require(row.serverVersion > 0)
                 val old = dao.getPoint(row.id)
                 if (old == null || row.serverVersion > old.serverVersion) {
+                    // Detect version discontinuity: gap > 1 means we missed intermediate updates.
+                    if (old != null) {
+                        val gap = row.serverVersion - old.serverVersion
+                        if (gap > 1) {
+                            versionGapCount++
+                            maxGap = maxOf(maxGap, gap)
+                        }
+                    }
                     dao.upsertPoint(row.toEntity(now))
                 }
             }
+        }
+        if (versionGapCount > 0) {
+            MeetTelemetry.event("safety.public.version_gap", mapOf(
+                "operation" to "public_points",
+                "gapCount" to versionGapCount,
+                "maxGap" to maxGap,
+                "totalPoints" to remote.size,
+            ))
         }
         recordRefresh("public_points", remote.size)
     }
@@ -239,6 +273,8 @@ class SafetyPublicRepository @Inject constructor(
             }.decodeList<SafetyPublicCaseWire>()
         }
         check(requireSession() == owner)
+        var versionGapCount = 0
+        var maxGap = 0L
         database.withTransaction {
             dao.removeMissingCases(remote.map { it.caseId })
             dao.removeOrphanTimeline()
@@ -247,9 +283,24 @@ class SafetyPublicRepository @Inject constructor(
                 require(row.serverVersion > 0)
                 val old = dao.getCase(row.caseId)
                 if (old == null || row.serverVersion > old.serverVersion) {
+                    if (old != null) {
+                        val gap = row.serverVersion - old.serverVersion
+                        if (gap > 1) {
+                            versionGapCount++
+                            maxGap = maxOf(maxGap, gap)
+                        }
+                    }
                     dao.upsertCases(listOf(row.toEntity()))
                 }
             }
+        }
+        if (versionGapCount > 0) {
+            MeetTelemetry.event("safety.public.version_gap", mapOf(
+                "operation" to "public_cases",
+                "gapCount" to versionGapCount,
+                "maxGap" to maxGap,
+                "totalCases" to remote.size,
+            ))
         }
         recordRefresh("public_cases", remote.size)
     }

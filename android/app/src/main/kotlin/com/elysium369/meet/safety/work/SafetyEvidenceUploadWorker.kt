@@ -11,6 +11,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.elysium369.meet.data.remote.SupabaseModule
+import com.elysium369.meet.observability.MeetTelemetry
 import com.elysium369.meet.safety.crypto.AeadBlob
 import com.elysium369.meet.safety.crypto.SafetyPayloadCipher
 import com.elysium369.meet.safety.data.SafetyRuntimeFeatureGates
@@ -99,12 +100,23 @@ class SafetyEvidenceUploadWorker @AssistedInject constructor(
                 }).decodeAs<JsonObject>()
                 check(receipt["ok"]?.jsonPrimitive?.booleanOrNull == true && receipt["evidence_id"]?.jsonPrimitive?.contentOrNull == item.evidenceId && receipt["storage_path"]?.jsonPrimitive?.contentOrNull == path && receipt["content_sha256"]?.jsonPrimitive?.contentOrNull == item.contentSha256) { "INVALID_EVIDENCE_RECEIPT" }
                 dao.update(item.evidenceId, owner, "RECEIVED", item.attemptCount + 1, null, receipt.toString())
+                // Privacy-safe: no evidence URLs, content, GPS, or report narrative.
+                MeetTelemetry.event("safety.evidence.registered", mapOf(
+                    "mimeType" to item.mimeType,
+                    "attemptCount" to (item.attemptCount + 1),
+                ))
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
                 val integrityFailure = error.message in setOf("EVIDENCE_INTEGRITY_MISMATCH", "REMOTE_EVIDENCE_INTEGRITY_MISMATCH", "INVALID_LOCAL_PATH", "LOCAL_EVIDENCE_UNAVAILABLE", "INVALID_EVIDENCE_RECEIPT") || error is javax.crypto.AEADBadTagException
                 val failed = integrityFailure || item.attemptCount >= 11
                 dao.update(item.evidenceId, owner, if (failed) "FAILED" else "RETRY", item.attemptCount + 1, if (integrityFailure) "INTEGRITY_CHECK_FAILED" else "UPLOAD_OR_REGISTRATION_PENDING")
+                if (failed) {
+                    MeetTelemetry.event("safety.evidence.failed", mapOf(
+                        "failureCode" to (if (integrityFailure) "INTEGRITY_CHECK_FAILED" else "MAX_RETRIES"),
+                        "attemptCount" to (item.attemptCount + 1),
+                    ))
+                }
                 if (!failed) retry = true
             } finally { bytes?.fill(0) }
         }

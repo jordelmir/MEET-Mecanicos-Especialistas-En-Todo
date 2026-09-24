@@ -13,6 +13,7 @@ import com.elysium369.meet.data.local.MeetDatabase
 import com.elysium369.meet.data.local.dao.*
 import com.elysium369.meet.core.reports.ReportVerifier
 import com.elysium369.meet.data.local.CertifiedReportRepository
+import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerDao
 import io.github.jan.supabase.postgrest.postgrest
 
 import dagger.Module
@@ -4852,6 +4853,40 @@ object AppModule {
         }
     }
 
+    val MIGRATION_80_81 = object : Migration(80, 81) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `safety_public_points_local` ADD COLUMN `victimCountDocumented` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `safety_public_points_local` ADD COLUMN `victimFemaleCount` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `safety_public_points_local` ADD COLUMN `victimMaleCount` INTEGER NOT NULL DEFAULT 0")
+            db.execSQL("ALTER TABLE `safety_public_points_local` ADD COLUMN `victimUnknownSexCount` INTEGER NOT NULL DEFAULT 0")
+        }
+    }
+
+    val MIGRATION_81_82 = object : Migration(81, 82) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `vehicle_financial_ledger` (
+                    `entryId` TEXT NOT NULL,
+                    `vehicleId` TEXT NOT NULL,
+                    `category` TEXT NOT NULL,
+                    `state` TEXT NOT NULL,
+                    `amountMinor` INTEGER NOT NULL,
+                    `currency` TEXT NOT NULL,
+                    `description` TEXT NOT NULL,
+                    `dateUtc` INTEGER NOT NULL,
+                    `invoiceRefDocId` TEXT,
+                    `odometerKmAtExpense` INTEGER,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`entryId`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_financial_ledger_vehicleId` ON `vehicle_financial_ledger` (`vehicleId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_financial_ledger_category` ON `vehicle_financial_ledger` (`category`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_financial_ledger_dateUtc` ON `vehicle_financial_ledger` (`dateUtc`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_vehicle_financial_ledger_state` ON `vehicle_financial_ledger` (`state`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -4919,6 +4954,8 @@ object AppModule {
             MIGRATION_77_78,
             MIGRATION_78_79,
             MIGRATION_79_80,
+            MIGRATION_80_81,
+            MIGRATION_81_82,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -5255,6 +5292,10 @@ object AppModule {
 
     @Provides
     fun provideScheduledRideDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.ScheduledRideDao = db.scheduledRideDao()
+
+    @Provides
+    @Singleton
+    fun provideVehicleFinancialLedgerDao(db: MeetDatabase): VehicleFinancialLedgerDao = db.vehicleFinancialLedgerDao()
 
     @Provides
     @Singleton

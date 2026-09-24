@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "label": "CR_GAM STD_RIDE canonical pricing parity v2",
+  "marketId": "CR_GAM",
+  "serviceCategoryId": "STD_RIDE",
+  "rateCardVersion": 2,
+  "currency": "CRC",
+  "currencyDecimalPlaces": 0,
+  "baseFareMinor": 0,
+  "distanceRateMinorPerKm": 300,
+  "timeRateMinorPerMinute": 60,
+  "minimumFareMinor": 0,
+  "bookingFeeMinor": 0,
+  "platformCommissionBasisPoints": 500
+}

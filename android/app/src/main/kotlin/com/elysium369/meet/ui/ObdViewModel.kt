@@ -10780,7 +10780,7 @@ class ObdViewModel @Inject constructor(
                 _activeRideRequest.value = updated
             }
 
-            // Authoritative Cloud Sync to notify all drivers via Supabase
+            // Authoritative Cloud Sync to notify all drivers via Supabase (CAS & Idempotent)
             val rpcResult = runCatching {
                 SupabaseManager.client.postgrest.rpc(
                     function = "ride_change_fare_v1",
@@ -10788,20 +10788,13 @@ class ObdViewModel @Inject constructor(
                         put("p_request_id", requestId)
                         put("p_fare_minor", normalizedMinor)
                         put("p_currency", request.currency.uppercase())
+                        put("p_expected_version", request.serverVersion)
+                        put("p_idempotency_key", java.util.UUID.randomUUID().toString())
                     }
                 )
             }
             if (rpcResult.isFailure) {
-                runCatching {
-                    SupabaseManager.client.postgrest["ride_requests"]
-                        .update(
-                            kotlinx.serialization.json.buildJsonObject {
-                                put("offered_fare_minor", normalizedMinor)
-                            }
-                        ) {
-                            filter { eq("id", requestId) }
-                        }
-                }
+                android.util.Log.w("ObdViewModel", "ride_change_fare_v1 failed closed: ${rpcResult.exceptionOrNull()?.message}")
             }
             _rideVerificationNotice.emit("Oferta aumentada a ${normalizedPrice.toInt()} ${request.currency}. Notificando a choferes...")
             refreshRideProjectionNow()

@@ -1,6 +1,7 @@
 <resources>
     <string name="safety_public_map_title">Mapa de seguridad</string>
     <string name="safety_public_back">Regresar</string>
+    <string name="safety_back">Regresar</string>
     <string name="safety_public_refresh">Actualizar</string>
     <string name="safety_public_map_disclosure">Ubicaciones públicas autorizadas; pueden ser aproximadas. Un reporte no demuestra un hecho.</string>
     <string name="safety_public_show_list">Ver lista accesible (%1$d puntos)</string>
@@ -65,4 +66,190 @@
     <string name="safety_map_general_title">MAPA GENERAL</string>
     <string name="safety_map_general_body">Consulta mundial de puntos ciudadanos por categoría, región y fecha.</string>
     <string name="safety_map_no_public_points">Aún no hay puntos públicos para estos filtros.</string>
+    <string name="safety_map_private_label">Mi reporte</string>
+    <string name="safety_map_independent_sources_suffix">\u0020fuentes independientes</string>
+    <string name="safety_map_not_captured">Dato no capturado</string>
+
+    <!-- Observatory Dashboard V2 -->
+    <string name="safety_observatory_title">OBSERVATORIO</string>
+    <string name="safety_observatory_subtitle">Inteligencia ciudadana de seguridad</string>
+    <string name="safety_observatory_published_points">Puntos\npublicados</string>
+    <string name="safety_observatory_homicides">Homicidios\ndocumentados</string>
+    <string name="safety_observatory_victims">Víctimas\ndocumentadas</string>
+    <string name="safety_observatory_sources">Fuentes\nindependientes</string>
+    <string name="safety_observatory_category_chart">DISTRIBUCIÓN POR CATEGORÍA</string>
+    <string name="safety_observatory_victims_gender">VÍCTIMAS POR SEXO</string>
+    <string name="safety_observatory_resolution_time">TIEMPO PROMEDIO DE RESOLUCIÓN</string>
+    <string name="safety_observatory_sources_type">FUENTES POR TIPO</string>
+    <string name="safety_observatory_methodology_title">⚠ NOTAS METODOLÓGICAS</string>
+
+    <!-- Victim Demographics Step -->
+    <string name="safety_report_identify">IDENTIFÍCATE</string>
+    <string name="safety_report_identify_body">¿Cuál es tu relación con los hechos? Esto determina cómo se clasifica tu aporte y su peso en la corroboración.</string>
+    <string name="safety_report_victims_title">VÍCTIMAS DOCUMENTADAS</string>
+    <string name="safety_report_victims_body">Este dato es opcional. Si no lo sabes, déjalo vacío. Los datos se usan para estadísticas agregadas, nunca para identificar personas.</string>
+    <string name="safety_report_victim_count">¿Cuántas víctimas se documentaron?</string>
+    <string name="safety_report_victim_female">¿Cuántas eran mujeres?</string>
+    <string name="safety_report_victim_male">¿Cuántos eran hombres?</string>
+    <string name="safety_report_victim_sum_error">⚠ La suma de mujeres y hombres (%1$d) supera el total de víctimas (%2$d).</string>
+    <!-- Safety: Report Screen -->
+    <string name="safety_report_header_title">REPORTAR INCIDENTE</string>
+    <string name="safety_report_header_step">Paso %1$d / %2$d</string>
+    <string name="safety_report_button_saving">GUARDANDO...</string>
+    <string name="safety_report_button_submit">ENVIAR REPORTE</string>
+    <string name="safety_report_button_continue">CONTINUAR</string>
+
+    <string name="safety_report_step_category_title">¿Qué ocurrió?</string>
+
+    <string name="safety_report_source_witness_desc">Presencié los hechos personalmente</string>
+    <string name="safety_report_source_family_desc">Tengo información directa de alguien cercano</string>
+    <string name="safety_report_source_secondhand_desc">Me lo contó alguien que no presenció directamente</string>
+    <string name="safety_report_source_documentary_desc">Tengo un documento que lo respalda (foto, video, audio)</string>
+    <string name="safety_report_source_journalistic_desc">Soy periodista cubriendo los hechos</string>
+    <string name="safety_report_source_public_desc">Lo extraje de un registro o documento oficial</string>
+    <string name="safety_report_source_unknown_desc">No encajo en las anteriores</string>
+
+    <string name="safety_report_step_narrative_title">Describe lo ocurrido</string>
+    <string name="safety_report_step_narrative_count">%1$d / 10,000 caracteres</string>
+    <string name="safety_report_step_narrative_placeholder">Mínimo 10 caracteres...</string>
+
+    <string name="safety_report_step_when_title">¿Cuándo ocurrió?</string>
+    <string name="safety_report_step_when_optional">Opcional</string>
+    <string name="safety_report_step_when_none">No especificar</string>
+    <string name="safety_report_step_when_now">Ahora</string>
+    <string name="safety_report_step_when_label">Fecha/hora (ISO)</string>
+    <string name="safety_report_step_when_placeholder">Ej: 2026-09-18T14:30:00</string>
+
+    <string name="safety_report_step_where_title">¿Dónde?</string>
+    <string name="safety_report_step_where_optional">Opcional. La ubicación exacta nunca se publica.</string>
+    <string name="safety_report_step_where_search_label">Buscar lugar, dirección o referencia</string>
+    <string name="safety_report_step_where_search_placeholder">Ej: Escuela Los Pinos, San José</string>
+    <string name="safety_report_step_where_captured_title">Ubicación capturada</string>
+    <string name="safety_report_step_where_captured_acc">±%1$sm</string>
+    <string name="safety_report_step_where_captured_clear">BORRAR</string>
+    <string name="safety_report_step_where_use_location">Usar mi ubicación</string>
+    <string name="safety_report_step_where_location_desc">Se solicita una lectura reciente solo cuando pulsas el botón. Puedes continuar sin ubicación.</string>
+    <string name="safety_report_step_where_hide_map">OCULTAR MAPA</string>
+    <string name="safety_report_step_where_show_map">FIJAR UBICACIÓN EN EL MAPA</string>
+    <string name="safety_report_step_where_map_hint">Mantén presionado el punto exacto del incidente.</string>
+    <string name="safety_report_step_where_marker_title">Ubicación del reporte</string>
+    <string name="safety_report_step_where_marker_desc">Selección privada</string>
+
+    <string name="safety_report_step_evidence_title">Evidencia opcional</string>
+    <string name="safety_report_step_evidence_desc">El original queda cifrado localmente y solo se entrega al almacenamiento privado.</string>
+    <string name="safety_report_step_evidence_item">%1$s · %2$d KB</string>
+    <string name="safety_report_step_evidence_remove">Quitar</string>
+    <string name="safety_report_step_evidence_protecting">Protegiendo archivo…</string>
+    <string name="safety_report_step_evidence_attach">Adjuntar archivo</string>
+
+    <string name="safety_report_step_review_title">Revisar y guardar</string>
+    <string name="safety_report_step_review_source">Fuente: %1$s</string>
+    <string name="safety_report_step_review_source_pending">Pendiente</string>
+    <string name="safety_report_step_review_category">Categoría: %1$s</string>
+    <string name="safety_report_step_review_category_pending">Pendiente</string>
+    <string name="safety_report_step_review_victims">Víctimas: %1$s total · %2$s mujeres · %3$s hombres</string>
+    <string name="safety_report_step_review_victims_unknown">?</string>
+    <string name="safety_report_step_review_date">Fecha: %1$s</string>
+    <string name="safety_report_step_review_date_missing">Dato no capturado</string>
+    <string name="safety_report_step_review_location_missing">Ubicación: Dato no capturado</string>
+    <string name="safety_report_step_review_location">Ubicación privada capturada · precisión ±%1$s m</string>
+    <string name="safety_report_step_review_evidence">Evidencias cifradas: %1$d</string>
+    <string name="safety_report_step_review_notice">Al guardar, el estado inicial es local. La entrega, revisión y publicación requieren confirmación del servidor.</string>
+
+    <string name="safety_report_receipt_title">RECIBO DE REPORTE</string>
+    <string name="safety_report_receipt_saved_title">Reporte guardado</string>
+    <string name="safety_report_receipt_saved_desc">Guardado localmente. Entrega remota pendiente.</string>
+    <string name="safety_report_receipt_id">REPORTE ID</string>
+    <string name="safety_report_receipt_status">ESTADO</string>
+    <string name="safety_report_receipt_status_local">LOCAL_ONLY</string>
+    <string name="safety_report_receipt_network">CUANDO RED VUELVA</string>
+    <string name="safety_report_receipt_network_desc">Worker enviará al servidor</string>
+    <string name="safety_report_receipt_done">VER MIS REPORTES</string>
+
+    <string name="safety_my_reports_title">MIS REPORTES</string>
+    <string name="safety_my_reports_subtitle">%1$d reporte(s) · %2$d pendiente(s)</string>
+    <string name="safety_my_reports_loading">Cargando reportes…</string>
+    <string name="safety_my_reports_empty_title">SIN REPORTES</string>
+    <string name="safety_my_reports_empty_message">Tus reportes de seguridad aparecerán aquí.</string>
+    <string name="safety_my_reports_withdraw_dialog_title">Retirar reporte</string>
+    <string name="safety_my_reports_withdraw_dialog_text">Se retirará del servidor, desaparecerá del mapa y se borrará el contenido privado. La constancia mínima de retiro se conserva para auditoría.</string>
+    <string name="safety_my_reports_remove">QUITAR REPORTE</string>
+    <string name="safety_error">ERROR</string>
+    <string name="safety_cancel">CANCELAR</string>
+    <string name="safety_withdraw">RETIRAR</string>
+    <string name="safety_withdrawing">RETIRANDO…</string>
+    <!-- Safety: Hub Screen -->
+    <string name="safety_hub_subtitle">Evidencia · Memoria · Prevención</string>
+    <string name="safety_hub_global_center">CENTRO CIUDADANO GLOBAL</string>
+    <string name="safety_hub_global_center_desc">Documenta · preserva evidencia · sigue la respuesta pública</string>
+    <string name="safety_hub_pending">PENDIENTES</string>
+    <string name="safety_hub_network">RED</string>
+    <string name="safety_hub_network_active">ACTIVA</string>
+    <string name="safety_hub_network_review">REVISAR</string>
+    <string name="safety_hub_verifying">Verificando Supabase y funciones activas…</string>
+    <string name="safety_hub_network_error">No se confirmó la red. Los reportes locales permanecen protegidos.</string>
+    <string name="safety_hub_sync">SINCRONIZAR ESTADO</string>
+    <string name="safety_hub_card_map">MAPA</string>
+    <string name="safety_hub_card_map_desc">Puntos públicos de seguridad en el mapa</string>
+    <string name="safety_hub_card_report">REPORTAR</string>
+    <string name="safety_hub_card_report_desc">Crear un nuevo reporte de seguridad</string>
+    <string name="safety_hub_card_my_reports_desc">Consulta el estado de tus reportes</string>
+    <string name="safety_hub_card_cases">CASOS PÚBLICOS</string>
+    <string name="safety_hub_card_cases_desc">Casos documentados y su evolución</string>
+    <string name="safety_hub_card_timelines">CRONOLOGÍAS</string>
+    <string name="safety_hub_card_timelines_desc">Línea de tiempo pública por caso</string>
+    <string name="safety_hub_card_accountability">ACCOUNTABILITY</string>
+    <string name="safety_hub_card_accountability_desc">Seguimiento a respuestas institucionales</string>
+    <string name="safety_hub_card_observatory">OBSERVATORIO</string>
+    <string name="safety_hub_card_observatory_desc">Métricas agregadas y tendencias</string>
+    <string name="safety_hub_guardian">RED GUARDIAN</string>
+    <string name="safety_hub_guardian_desc">Próximamente / piloto cerrado</string>
+
+    <!-- Safety: Common -->
+    <string name="safety_loading">Cargando…</string>
+    <string name="safety_retry">Reintentar</string>
+
+    <!-- Safety: Cases Screen -->
+    <string name="safety_cases_title">CASOS PÚBLICOS</string>
+    <string name="safety_cases_count_subtitle">%1$d caso(s) documentado(s)</string>
+    <string name="safety_cases_loading">Cargando casos…</string>
+    <string name="safety_cases_empty_title">SIN CASOS PUBLICADOS</string>
+    <string name="safety_cases_empty_desc">Los casos se publican solo tras revisión editorial. Ninguna acusación ciudadana se convierte en caso público automáticamente.</string>
+    <string name="safety_cases_events">EVENTOS</string>
+    <string name="safety_cases_claims">RECLAMOS</string>
+    <string name="safety_cases_confidence">CONFIANZA</string>
+
+    <!-- Safety: Accountability Screen -->
+    <string name="safety_accountability_title">ACCOUNTABILITY</string>
+    <string name="safety_accountability_subtitle">Métricas de respuesta institucional</string>
+    <string name="safety_accountability_loading">Cargando métricas…</string>
+    <string name="safety_accountability_empty_title">SIN REGISTROS DOCUMENTADOS</string>
+    <string name="safety_accountability_empty_desc">El reloj de rendición de cuentas calcula el tiempo transcurrido desde la entrega del reporte hasta la respuesta oficial observable.</string>
+    <string name="safety_accountability_time_receipt">TIEMPO HASTA RECEPCIÓN</string>
+    <string name="safety_accountability_time_response">TIEMPO HASTA RESPUESTA</string>
+    <string name="safety_accountability_days_since_report">DÍAS DESDE REPORTE</string>
+    <string name="safety_accountability_days_since_action">DÍAS DESDE ÚLTIMA ACCIÓN</string>
+    <string name="safety_accountability_no_data">Sin datos</string>
+    <string name="safety_accountability_days_format">%1$d días</string>
+    <string name="safety_accountability_hours_format">%1$d horas</string>
+    <string name="safety_accountability_events_subtitle">%1$d evento(s) registrado(s)</string>
+    <string name="safety_accountability_days_sent">Días desde envío: %1$s</string>
+    <string name="safety_accountability_hours_receipt">Horas hasta recepción: %1$s</string>
+    <string name="safety_accountability_hours_response">Horas hasta respuesta: %1$s</string>
+    <string name="safety_accountability_days_last_action">Días desde última acción documentada: %1$s</string>
+    <string name="safety_accountability_case_default">Caso documentado</string>
+    <string name="safety_accountability_no_receipt">Sin recepción documentada</string>
+    <string name="safety_accountability_no_response">Sin respuesta documentada</string>
+
+    <!-- Safety: Observatory Screen Extra -->
+    <string name="safety_observatory_coverage_title">COBERTURA DE DATOS</string>
+    <string name="safety_observatory_coverage_desc">Pocos reportes no significa que una zona sea segura; puede indicar baja cobertura de observadores.</string>
+    <string name="safety_observatory_coverage_very_low">MUY BAJA (Datos insuficientes)</string>
+    <string name="safety_observatory_coverage_low">BAJA (Muestra limitada)</string>
+    <string name="safety_observatory_coverage_medium">MEDIA (Tendencia observable)</string>
+    <string name="safety_observatory_coverage_high">ALTA (Muestra robusta)</string>
+    <string name="safety_observatory_filter_category">Filtrar por categoría</string>
+    <string name="safety_observatory_filter_dates">Rango de fechas</string>
+    <string name="safety_observatory_apply_filters">APLICAR FILTROS</string>
+    <string name="safety_observatory_reset_filters">REINICIAR</string>
 </resources>

@@ -90,3 +90,26 @@ fixtures and the parity script are the source of truth.
 
 If the verifier ever fails, **fix the canonicalization, not the test**.
 The fixture is the contract.
+
+## Pricing authority parity
+
+`tests/parity/fixtures/crc-ride-pricing-v2.json` is also the executable
+contract for the currently deployed Costa Rica `STD_RIDE` rate card. The
+TypeScript verifier and Kotlin contract test fail closed when any of these
+drift independently:
+
+- CRC decimal places;
+- Android distance/time rates;
+- the current `ride_create_request_v3` server guards;
+- the active `mobility_pricing_policies` migration;
+- the 500 basis-point platform commission.
+
+Run the same mandatory wrapper:
+
+```bash
+bash tests/parity/ci-verify.sh
+```
+
+The proposed `900/350/80` pilot is intentionally not activated by this
+contract. Changing the rate card requires one reviewed fixture update plus the
+matching Android and server-authority changes in the same commit.

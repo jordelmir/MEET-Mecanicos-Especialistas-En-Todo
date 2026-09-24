@@ -3,6 +3,8 @@ package com.elysium369.meet.vehiclelife.costs
 import com.elysium369.meet.core.domain.EntityRef
 import com.elysium369.meet.core.money.CurrencyCode
 import com.elysium369.meet.core.money.Money
+import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerDao
+import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,19 +58,40 @@ interface VehicleFinancialLedgerRepository {
     suspend fun recordEntry(entry: FinancialEntry)
     suspend fun getEntriesForVehicle(vehicleId: String): List<FinancialEntry>
     suspend fun calculateTco(vehicleId: String, totalKmDriven: Int?, targetCurrency: CurrencyCode? = null): TcoMetrics
+    suspend fun getFuelCostPerKmMinor(vehicleId: String, totalKmDriven: Int?): Long?
 }
 
 @Singleton
-class DefaultVehicleFinancialLedgerRepository @Inject constructor() : VehicleFinancialLedgerRepository {
+class DefaultVehicleFinancialLedgerRepository @Inject constructor(
+    private val dao: VehicleFinancialLedgerDao,
+) : VehicleFinancialLedgerRepository {
+
+    constructor() : this(InMemoryVehicleFinancialLedgerDao)
+
     private val _entries = MutableStateFlow<List<FinancialEntry>>(emptyList())
     override val entries: StateFlow<List<FinancialEntry>> = _entries.asStateFlow()
 
     override suspend fun recordEntry(entry: FinancialEntry) {
         _entries.value = listOf(entry) + _entries.value.filter { it.entryId != entry.entryId }
+        dao?.insert(VehicleFinancialLedgerEntity.fromDomain(entry))
     }
 
     override suspend fun getEntriesForVehicle(vehicleId: String): List<FinancialEntry> {
+        val fromDao = dao?.getEntriesForVehicle(vehicleId)?.map { it.toDomain() }
+        if (fromDao != null) {
+            val daoIds = fromDao.map { it.entryId }.toSet()
+            val memOnly = _entries.value.filter { it.vehicleId == vehicleId && it.entryId !in daoIds }
+            return fromDao + memOnly
+        }
         return _entries.value.filter { it.vehicleId == vehicleId }
+    }
+
+    override suspend fun getFuelCostPerKmMinor(vehicleId: String, totalKmDriven: Int?): Long? {
+        if (totalKmDriven == null || totalKmDriven <= 0) return null
+        val entries = getEntriesForVehicle(vehicleId)
+        val fuelEntries = entries.filter { it.category == ExpenseCategory.FUEL && it.state == FinancialState.PAID }
+        val totalFuelMinor = fuelEntries.sumOf { it.amount.amountMinor }
+        return if (totalFuelMinor > 0) totalFuelMinor / totalKmDriven else null
     }
 
     override suspend fun calculateTco(vehicleId: String, totalKmDriven: Int?, targetCurrency: CurrencyCode?): TcoMetrics {
@@ -112,4 +135,17 @@ class DefaultVehicleFinancialLedgerRepository @Inject constructor() : VehicleFin
             monthlyAverage = monthlyAverage
         )
     }
+}
+
+private object InMemoryVehicleFinancialLedgerDao : VehicleFinancialLedgerDao {
+    override suspend fun insert(entry: VehicleFinancialLedgerEntity) {}
+    override suspend fun insertAll(entries: List<VehicleFinancialLedgerEntity>) {}
+    override fun observeEntriesForVehicle(vehicleId: String) = kotlinx.coroutines.flow.flowOf(emptyList<VehicleFinancialLedgerEntity>())
+    override suspend fun getEntriesForVehicle(vehicleId: String) = emptyList<VehicleFinancialLedgerEntity>()
+    override fun observeAllEntries() = kotlinx.coroutines.flow.flowOf(emptyList<VehicleFinancialLedgerEntity>())
+    override suspend fun getAllEntries() = emptyList<VehicleFinancialLedgerEntity>()
+    override suspend fun getPaidEntriesByCategory(vehicleId: String, category: String) = emptyList<VehicleFinancialLedgerEntity>()
+    override suspend fun getEntriesSince(vehicleId: String, sinceUtc: Long) = emptyList<VehicleFinancialLedgerEntity>()
+    override suspend fun deleteById(entryId: String) {}
+    override suspend fun clearForVehicle(vehicleId: String) {}
 }

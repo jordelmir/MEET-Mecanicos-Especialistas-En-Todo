@@ -14,4 +14,17 @@ object SafetyPayloadAad {
         return "safety-report:v1:$principalId:$reportId:$payloadId"
             .toByteArray(Charsets.UTF_8)
     }
+
+    fun evidence(
+        principalId: String,
+        evidenceId: String,
+        payloadId: String,
+    ): ByteArray {
+        require(principalId.isNotBlank())
+        require(evidenceId.isNotBlank())
+        require(payloadId.isNotBlank())
+
+        return "safety-evidence:v1:$principalId:$evidenceId:$payloadId"
+            .toByteArray(Charsets.UTF_8)
+    }
 }

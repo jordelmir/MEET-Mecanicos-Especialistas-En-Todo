@@ -19,4 +19,5 @@
 
     <!-- Play Store: Account Deletion -->
     <string name="account_deletion_info">Puedes eliminar tu cuenta desde Configuración → Eliminar Cuenta, o visitando https://elysium-vanguard.app/delete-account desde cualquier navegador.</string>
+
 </resources>

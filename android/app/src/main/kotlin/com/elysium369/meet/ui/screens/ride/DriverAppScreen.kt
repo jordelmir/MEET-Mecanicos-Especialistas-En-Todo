@@ -68,8 +68,20 @@ fun DriverAppScreen(
     val completedRides = remember(allRequests, currentDriverId) {
         allRequests.filter { it.assignedDriverId == currentDriverId && (it.status == "COMPLETED" || it.serverState == "COMPLETED") }
     }
-    val todayEarnings = remember(completedRides) {
-        completedRides.sumOf { it.priceOfferMinor }
+    // Settlement truth: finalPriceMinor is the server-authoritative post-metering fare.
+    // priceOfferMinor is only the pre-trip bid and must NOT be presented as net earnings.
+    val todayGrossEarnings = remember(completedRides) {
+        completedRides.sumOf { it.finalPriceMinor ?: it.priceOfferMinor }
+    }
+    val todayTips = remember(completedRides) {
+        completedRides.sumOf { it.tipAmountMinor ?: 0L }
+    }
+    // Net driver payout after authoritative platform commission (500 bps = 5.0%)
+    val todayCommission = remember(todayGrossEarnings) {
+        (todayGrossEarnings * 500L) / 10000L
+    }
+    val todayNetEarnings = remember(todayGrossEarnings, todayCommission, todayTips) {
+        todayGrossEarnings - todayCommission + todayTips
     }
     val dominantCurrency = remember(completedRides) {
         completedRides.firstOrNull()?.currency ?: "CRC"
@@ -413,7 +425,7 @@ fun DriverAppScreen(
                     }
                 }
 
-                // Today's Earnings Snapshot
+                // Today's Earnings Snapshot (Net after 5% Platform Commission)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -421,14 +433,19 @@ fun DriverAppScreen(
                     border = BorderStroke(1.dp, MeetColors.borderSubtle)
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Ganancias de Hoy", style = MaterialTheme.typography.labelMedium, color = MeetColors.textSecondary)
+                        Text("Ganancias Netas de Hoy (Comisión 5%)", style = MaterialTheme.typography.labelMedium, color = MeetColors.textSecondary)
                         Text(
-                            runCatching { Money.of(todayEarnings, dominantCurrency).formatted() }.getOrDefault("—"),
+                            runCatching { Money.of(todayNetEarnings, dominantCurrency).formatted() }.getOrDefault("—"),
                             style = MaterialTheme.typography.headlineMedium,
                             fontWeight = FontWeight.Bold,
                             color = MeetColors.neonGreen
                         )
-                        Text("$tripsToday viajes completados hoy", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text("$tripsToday viajes completados hoy", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                            if (todayCommission > 0L) {
+                                Text("Comisión MEET: ${Money.of(todayCommission, dominantCurrency).formatted()}", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                            }
+                        }
                     }
                 }
 
@@ -438,9 +455,11 @@ fun DriverAppScreen(
             // Bottom Sheets
             if (showEarnings) {
                 DriverEarningsBottomSheet(
-                    todayEarnings = todayEarnings,
-                    weekEarnings = todayEarnings,
-                    monthEarnings = todayEarnings,
+                    todayEarnings = todayNetEarnings,
+                    // TODO(PR-4): Replace with real week/month settlement queries from backend.
+                    weekEarnings = todayNetEarnings,
+                    monthEarnings = todayNetEarnings,
+                    todayTips = todayTips,
                     tripsToday = tripsToday,
                     onDismiss = { showEarnings = false }
                 )

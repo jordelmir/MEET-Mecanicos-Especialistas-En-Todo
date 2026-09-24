@@ -344,6 +344,8 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                 RpcInvocation(
                     functionName = if (type == RideCommandType.PUBLISH_GUEST) {
                         "ride_create_guest_request_v1"
+                    } else if (rateCardVersion >= 3L) {
+                        "ride_create_request_v4"
                     } else {
                         "ride_create_request_v3"
                     },
@@ -374,6 +376,10 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                             ?.let { runCatching { json.parseToJsonElement(it) }.getOrNull() }
                             ?: buildJsonObject {}
                         put("p_preferences", preferencesJson)
+                        if (rateCardVersion >= 3L) {
+                            put("p_market_id", "CR_GAM")
+                            put("p_service_category_id", "STD_RIDE")
+                        }
                         if (guestName != null && guestPhone != null) {
                             put("p_guest_name", guestName)
                             put("p_guest_phone_e164", guestPhone)

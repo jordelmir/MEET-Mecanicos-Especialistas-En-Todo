@@ -24,14 +24,58 @@ data class PublicAccountabilityEvent(
 
 @Serializable
 data class SafetyObservatoryMetrics(
-    val public_point_count: Long,
-    val independent_source_count: Long,
-    val civil_source_count: Long,
-    val journalistic_source_count: Long,
-    val public_record_source_count: Long,
-    val documentary_source_count: Long,
-    val institutional_source_count: Long,
-)
+    val public_point_count: Long = 0,
+    val independent_source_count: Long = 0,
+    val civil_source_count: Long = 0,
+    val journalistic_source_count: Long = 0,
+    val public_record_source_count: Long = 0,
+    val documentary_source_count: Long = 0,
+    val institutional_source_count: Long = 0,
+    // V2 — Category breakdown
+    val homicide_count: Long = 0,
+    val violence_count: Long = 0,
+    val drugs_count: Long = 0,
+    val threat_count: Long = 0,
+    val missing_count: Long = 0,
+    val institutional_count: Long = 0,
+    // V2 — Victim demographics (aggregates only, never PII)
+    val total_victims_documented: Long = 0,
+    val female_victims: Long = 0,
+    val male_victims: Long = 0,
+    val unknown_sex_victims: Long = 0,
+    // V2 — Resolution time analytics (days, -1 = no data)
+    val avg_resolution_days_all: Double = -1.0,
+    val avg_resolution_days_female_victim: Double = -1.0,
+    val avg_resolution_days_male_victim: Double = -1.0,
+) {
+    /** Category breakdown as label→count pairs for chart rendering. */
+    fun categoryBreakdown(): List<Pair<String, Long>> = listOf(
+        "Homicidio" to homicide_count,
+        "Violencia" to violence_count,
+        "Drogas" to drugs_count,
+        "Amenazas" to threat_count,
+        "Desaparecidos" to missing_count,
+        "Institucional" to institutional_count,
+    ).filter { it.second > 0 }
+
+    /** Source breakdown as label→count pairs for chart rendering. */
+    fun sourceBreakdown(): List<Pair<String, Long>> = listOf(
+        "Civil" to civil_source_count,
+        "Periodístico" to journalistic_source_count,
+        "Registro público" to public_record_source_count,
+        "Documental" to documentary_source_count,
+        "Institucional" to institutional_source_count,
+    ).filter { it.second > 0 }
+
+    /** Victim breakdown by sex for bar chart. */
+    fun victimsByGender(): List<Pair<String, Long>> = listOf(
+        "Mujeres" to female_victims,
+        "Hombres" to male_victims,
+        "Sin dato" to unknown_sex_victims,
+    ).filter { it.second > 0 }
+
+    val hasResolutionData: Boolean get() = avg_resolution_days_all >= 0
+}
 
 data class SafetyObservatoryFilters(
     val from: String = "", val to: String = "", val category: String = "",
@@ -61,9 +105,23 @@ class SafetyInsightsRepository @Inject constructor(
             order("occurred_at", Order.DESCENDING)
         }.decodeList<PublicAccountabilityEvent>().filter { it.server_version > 0 }
     }
+
+    /** V1 — legacy basic metrics. */
     suspend fun observatory(filters: SafetyObservatoryFilters): SafetyObservatoryMetrics {
         val params = filters.parameters()
         gates.requireEnabled("safety_observatory")
         return client.postgrest.rpc("safety_observatory_query_v1", params).decodeAs<SafetyObservatoryMetrics>()
+    }
+
+    /** V2 — demographics + resolution times + category breakdown. */
+    suspend fun observatoryV2(filters: SafetyObservatoryFilters): SafetyObservatoryMetrics {
+        val params = filters.parameters()
+        gates.requireEnabled("safety_observatory")
+        return try {
+            client.postgrest.rpc("safety_observatory_query_v2", params).decodeAs<SafetyObservatoryMetrics>()
+        } catch (_: Exception) {
+            // Graceful fallback to V1 if V2 RPC not yet deployed
+            observatory(filters)
+        }
     }
 }

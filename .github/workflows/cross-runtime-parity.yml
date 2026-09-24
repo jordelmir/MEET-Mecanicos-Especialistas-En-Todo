@@ -21,6 +21,8 @@ jobs:
         run: npx vitest run
       - name: Verify fixture parity
         run: npx tsx tests/parity/hash-parity.ts tests/parity/fixtures/snapshot-p0230.json
+      - name: Verify pricing authority parity
+        run: npx tsx tests/parity/pricing-authority-parity.ts tests/parity/fixtures/crc-ride-pricing-v2.json
 
   kotlin-parity:
     name: Kotlin parity
@@ -36,8 +38,11 @@ jobs:
           java-version: 17
       - name: Make gradlew executable
         run: chmod +x ./gradlew
-      - name: Run HashEngineParityTest
-        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.core.reports.HashEngineParityTest'
+      - name: Run cross-runtime parity tests
+        run: >-
+          ./gradlew :app:testDebugUnitTest
+          --tests 'com.elysium369.meet.core.reports.HashEngineParityTest'
+          --tests 'com.elysium369.meet.ride.data.RidePricingAuthorityParityTest'
       - name: Upload parity artifact
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

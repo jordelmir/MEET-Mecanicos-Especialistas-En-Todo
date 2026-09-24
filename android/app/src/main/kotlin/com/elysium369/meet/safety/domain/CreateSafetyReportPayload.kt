@@ -12,6 +12,10 @@ data class CreateSafetyReportPayload(
     val longitude: Double? = null,
     val accuracyMeters: Float? = null,
     val locationSource: LocationSource = LocationSource.NONE,
+    // V2 — Victim demographics (optional, for HOMICIDE category)
+    val reportedVictimCount: Int? = null,
+    val reportedVictimFemale: Int? = null,
+    val reportedVictimMale: Int? = null,
 )
 
 @Serializable

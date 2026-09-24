@@ -355,6 +355,7 @@ fun DriverEarningsBottomSheet(
     todayEarnings: Long = 0L,
     weekEarnings: Long = 0L,
     monthEarnings: Long = 0L,
+    todayTips: Long = 0L,
     tripsToday: Int = 0,
     onDismiss: () -> Unit,
 ) {
@@ -405,6 +406,9 @@ fun DriverEarningsBottomSheet(
                             Text("Hoy", style = MaterialTheme.typography.labelMedium, color = MeetColors.textSecondary)
                             Text(Money.ofCrc(todayEarnings).formatted(), style = MaterialTheme.typography.headlineMedium, color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
                             Text("$tripsToday viajes completados", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                            if (todayTips > 0L) {
+                                Text("Propinas: ${Money.ofCrc(todayTips).formatted()}", style = MaterialTheme.typography.bodySmall, color = MeetColors.neonGreen.copy(alpha = 0.7f))
+                            }
                         }
                     }
 

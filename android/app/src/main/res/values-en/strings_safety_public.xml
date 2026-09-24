@@ -1,6 +1,7 @@
 <resources>
     <string name="safety_public_map_title">Safety map</string>
     <string name="safety_public_back">Back</string>
+    <string name="safety_back">Back</string>
     <string name="safety_public_refresh">Refresh</string>
     <string name="safety_public_map_disclosure">Authorized public locations; they may be approximate. A report does not establish a fact.</string>
     <string name="safety_public_show_list">Show accessible list (%1$d points)</string>
@@ -65,4 +66,192 @@
     <string name="safety_map_general_title">GENERAL MAP</string>
     <string name="safety_map_general_body">Worldwide view of citizen points by category, region, and date.</string>
     <string name="safety_map_no_public_points">There are no public points for these filters yet.</string>
+    <string name="safety_map_private_label">My report</string>
+    <string name="safety_map_independent_sources_suffix">\u0020independent sources</string>
+    <string name="safety_map_not_captured">Data not captured</string>
+
+    <!-- Observatory Dashboard V2 -->
+    <string name="safety_observatory_title">OBSERVATORY</string>
+    <string name="safety_observatory_subtitle">Citizen safety intelligence</string>
+    <string name="safety_observatory_published_points">Published\npoints</string>
+    <string name="safety_observatory_homicides">Documented\nhomicides</string>
+    <string name="safety_observatory_victims">Documented\nvictims</string>
+    <string name="safety_observatory_sources">Independent\nsources</string>
+    <string name="safety_observatory_category_chart">DISTRIBUTION BY CATEGORY</string>
+    <string name="safety_observatory_victims_gender">VICTIMS BY SEX</string>
+    <string name="safety_observatory_resolution_time">AVERAGE RESOLUTION TIME</string>
+    <string name="safety_observatory_sources_type">SOURCES BY TYPE</string>
+    <string name="safety_observatory_methodology_title">⚠ METHODOLOGY NOTES</string>
+
+    <!-- Victim Demographics Step -->
+    <string name="safety_report_identify">IDENTIFY YOURSELF</string>
+    <string name="safety_report_identify_body">What is your relationship to the events? This determines how your contribution is classified and its weight in corroboration.</string>
+    <string name="safety_report_victims_title">DOCUMENTED VICTIMS</string>
+    <string name="safety_report_victims_body">This data is optional. If you don\'t know, leave it empty. Data is used for aggregate statistics, never to identify individuals.</string>
+    <string name="safety_report_victim_count">How many victims were documented?</string>
+    <string name="safety_report_victim_female">How many were female?</string>
+    <string name="safety_report_victim_male">How many were male?</string>
+    <string name="safety_report_victim_sum_error">⚠ The sum of female and male (%1$d) exceeds total victims (%2$d).</string>
+
+    <!-- Safety: Report Screen -->
+    <string name="safety_report_header_title">REPORT INCIDENT</string>
+    <string name="safety_report_header_step">Step %1$d / %2$d</string>
+    <string name="safety_report_button_saving">SAVING...</string>
+    <string name="safety_report_button_submit">SUBMIT REPORT</string>
+    <string name="safety_report_button_continue">CONTINUE</string>
+
+    <string name="safety_report_step_category_title">What happened?</string>
+
+    <string name="safety_report_source_witness_desc">I witnessed the events in person</string>
+    <string name="safety_report_source_family_desc">I have direct information from someone close</string>
+    <string name="safety_report_source_secondhand_desc">Someone told me who was not a direct witness</string>
+    <string name="safety_report_source_documentary_desc">I have supporting documentation (photo, video, audio)</string>
+    <string name="safety_report_source_journalistic_desc">I am a journalist covering the events</string>
+    <string name="safety_report_source_public_desc">Extracted from official record or public document</string>
+    <string name="safety_report_source_unknown_desc">None of the above</string>
+
+    <string name="safety_report_step_narrative_title">Describe what happened</string>
+    <string name="safety_report_step_narrative_count">%1$d / 10,000 characters</string>
+    <string name="safety_report_step_narrative_placeholder">Minimum 10 characters...</string>
+
+    <string name="safety_report_step_when_title">When did it occur?</string>
+    <string name="safety_report_step_when_optional">Optional</string>
+    <string name="safety_report_step_when_none">Not specified</string>
+    <string name="safety_report_step_when_now">Now</string>
+    <string name="safety_report_step_when_label">Date/time (ISO)</string>
+    <string name="safety_report_step_when_placeholder">E.g., 2026-09-18T14:30:00</string>
+
+    <string name="safety_report_step_where_title">Where?</string>
+    <string name="safety_report_step_where_optional">Optional. Exact location is never published.</string>
+    <string name="safety_report_step_where_search_label">Search place, address, or landmark</string>
+    <string name="safety_report_step_where_search_placeholder">E.g., Los Pinos School, San José</string>
+    <string name="safety_report_step_where_captured_title">Location captured</string>
+    <string name="safety_report_step_where_captured_acc">±%1$sm</string>
+    <string name="safety_report_step_where_captured_clear">CLEAR</string>
+    <string name="safety_report_step_where_use_location">Use my location</string>
+    <string name="safety_report_step_where_location_desc">A recent reading is requested only when pressing this button. You can continue without location.</string>
+    <string name="safety_report_step_where_hide_map">HIDE MAP</string>
+    <string name="safety_report_step_where_show_map">PIN LOCATION ON MAP</string>
+    <string name="safety_report_step_where_map_hint">Press and hold the exact location of the incident.</string>
+    <string name="safety_report_step_where_marker_title">Report location</string>
+    <string name="safety_report_step_where_marker_desc">Private selection</string>
+
+    <string name="safety_report_step_evidence_title">Optional evidence</string>
+    <string name="safety_report_step_evidence_desc">The original remains encrypted locally and is delivered only to private storage.</string>
+    <string name="safety_report_step_evidence_item">%1$s · %2$d KB</string>
+    <string name="safety_report_step_evidence_remove">Remove</string>
+    <string name="safety_report_step_evidence_protecting">Protecting file…</string>
+    <string name="safety_report_step_evidence_attach">Attach file</string>
+
+    <string name="safety_report_step_review_title">Review and save</string>
+    <string name="safety_report_step_review_source">Source: %1$s</string>
+    <string name="safety_report_step_review_source_pending">Pending</string>
+    <string name="safety_report_step_review_category">Category: %1$s</string>
+    <string name="safety_report_step_review_category_pending">Pending</string>
+    <string name="safety_report_step_review_victims">Victims: %1$s total · %2$s female · %3$s male</string>
+    <string name="safety_report_step_review_victims_unknown">?</string>
+    <string name="safety_report_step_review_date">Date: %1$s</string>
+    <string name="safety_report_step_review_date_missing">Data not captured</string>
+    <string name="safety_report_step_review_location_missing">Location: Data not captured</string>
+    <string name="safety_report_step_review_location">Private location captured · accuracy ±%1$s m</string>
+    <string name="safety_report_step_review_evidence">Encrypted evidence: %1$d</string>
+    <string name="safety_report_step_review_notice">Upon saving, initial state is local. Delivery, review, and publication require server confirmation.</string>
+
+    <string name="safety_report_receipt_title">REPORT RECEIPT</string>
+    <string name="safety_report_receipt_saved_title">Report saved</string>
+    <string name="safety_report_receipt_saved_desc">Saved locally. Remote delivery pending.</string>
+    <string name="safety_report_receipt_id">REPORT ID</string>
+    <string name="safety_report_receipt_status">STATUS</string>
+    <string name="safety_report_receipt_status_local">LOCAL_ONLY</string>
+    <string name="safety_report_receipt_network">WHEN ONLINE</string>
+    <string name="safety_report_receipt_network_desc">Worker will dispatch to server</string>
+    <string name="safety_report_receipt_done">VIEW MY REPORTS</string>
+
+    <string name="safety_my_reports_title">MY REPORTS</string>
+    <string name="safety_my_reports_subtitle">%1$d report(s) · %2$d pending</string>
+    <string name="safety_my_reports_loading">Loading reports…</string>
+    <string name="safety_my_reports_empty_title">NO REPORTS</string>
+    <string name="safety_my_reports_empty_message">Your safety reports will appear here.</string>
+    <string name="safety_my_reports_withdraw_dialog_title">Withdraw report</string>
+    <string name="safety_my_reports_withdraw_dialog_text">It will be withdrawn from the server, removed from map, and private content will be purged. Minimal audit trace is preserved.</string>
+    <string name="safety_my_reports_remove">REMOVE REPORT</string>
+    <string name="safety_error">ERROR</string>
+    <string name="safety_cancel">CANCEL</string>
+    <string name="safety_withdraw">WITHDRAW</string>
+    <string name="safety_withdrawing">WITHDRAWING…</string>
+
+    <!-- Safety: Hub Screen -->
+    <string name="safety_hub_subtitle">Evidence · Memory · Prevention</string>
+    <string name="safety_hub_global_center">GLOBAL CITIZEN CENTER</string>
+    <string name="safety_hub_global_center_desc">Document · preserve evidence · follow public response</string>
+    <string name="safety_hub_pending">PENDING</string>
+    <string name="safety_hub_network">NETWORK</string>
+    <string name="safety_hub_network_active">ACTIVE</string>
+    <string name="safety_hub_network_review">REVIEW</string>
+    <string name="safety_hub_verifying">Verifying Supabase and active features…</string>
+    <string name="safety_hub_network_error">Network unconfirmed. Local reports remain protected.</string>
+    <string name="safety_hub_sync">SYNC STATE</string>
+    <string name="safety_hub_card_map">MAP</string>
+    <string name="safety_hub_card_map_desc">Public safety points on the map</string>
+    <string name="safety_hub_card_report">REPORT</string>
+    <string name="safety_hub_card_report_desc">Create a new safety report</string>
+    <string name="safety_hub_card_my_reports_desc">Check your report statuses</string>
+    <string name="safety_hub_card_cases">PUBLIC CASES</string>
+    <string name="safety_hub_card_cases_desc">Documented cases and their evolution</string>
+    <string name="safety_hub_card_timelines">TIMELINES</string>
+    <string name="safety_hub_card_timelines_desc">Public timeline per case</string>
+    <string name="safety_hub_card_accountability">ACCOUNTABILITY</string>
+    <string name="safety_hub_card_accountability_desc">Institutional response tracking</string>
+    <string name="safety_hub_card_observatory">OBSERVATORY</string>
+    <string name="safety_hub_card_observatory_desc">Aggregated metrics and trends</string>
+    <string name="safety_hub_guardian">GUARDIAN NETWORK</string>
+    <string name="safety_hub_guardian_desc">Coming soon / closed pilot</string>
+
+    <!-- Safety: Common -->
+    <string name="safety_loading">Loading…</string>
+    <string name="safety_retry">Retry</string>
+
+    <!-- Safety: Cases Screen -->
+    <string name="safety_cases_title">PUBLIC CASES</string>
+    <string name="safety_cases_count_subtitle">%1$d documented case(s)</string>
+    <string name="safety_cases_loading">Loading cases…</string>
+    <string name="safety_cases_empty_title">NO PUBLISHED CASES</string>
+    <string name="safety_cases_empty_desc">Cases are published only after editorial review. No citizen allegation automatically becomes a public case.</string>
+    <string name="safety_cases_events">EVENTS</string>
+    <string name="safety_cases_claims">CLAIMS</string>
+    <string name="safety_cases_confidence">CONFIDENCE</string>
+
+    <!-- Safety: Accountability Screen -->
+    <string name="safety_accountability_title">ACCOUNTABILITY</string>
+    <string name="safety_accountability_subtitle">Institutional response metrics</string>
+    <string name="safety_accountability_loading">Loading metrics…</string>
+    <string name="safety_accountability_empty_title">NO DOCUMENTED RECORDS</string>
+    <string name="safety_accountability_empty_desc">The accountability clock measures time elapsed from report delivery to observable official response.</string>
+    <string name="safety_accountability_time_receipt">TIME TO RECEIPT</string>
+    <string name="safety_accountability_time_response">TIME TO RESPONSE</string>
+    <string name="safety_accountability_days_since_report">DAYS SINCE REPORT</string>
+    <string name="safety_accountability_days_since_action">DAYS SINCE LAST ACTION</string>
+    <string name="safety_accountability_no_data">No data</string>
+    <string name="safety_accountability_days_format">%1$d days</string>
+    <string name="safety_accountability_hours_format">%1$d hours</string>
+    <string name="safety_accountability_events_subtitle">%1$d recorded event(s)</string>
+    <string name="safety_accountability_days_sent">Days since sent: %1$s</string>
+    <string name="safety_accountability_hours_receipt">Hours to receipt: %1$s</string>
+    <string name="safety_accountability_hours_response">Hours to response: %1$s</string>
+    <string name="safety_accountability_days_last_action">Days since last documented action: %1$s</string>
+    <string name="safety_accountability_case_default">Documented case</string>
+    <string name="safety_accountability_no_receipt">No documented receipt</string>
+    <string name="safety_accountability_no_response">No documented response</string>
+
+    <!-- Safety: Observatory Screen Extra -->
+    <string name="safety_observatory_coverage_title">DATA COVERAGE</string>
+    <string name="safety_observatory_coverage_desc">Few reports do not mean an area is safe; it may indicate low observer coverage.</string>
+    <string name="safety_observatory_coverage_very_low">VERY LOW (Insufficient data)</string>
+    <string name="safety_observatory_coverage_low">LOW (Limited sample)</string>
+    <string name="safety_observatory_coverage_medium">MEDIUM (Observable trend)</string>
+    <string name="safety_observatory_coverage_high">HIGH (Robust sample)</string>
+    <string name="safety_observatory_filter_category">Filter by category</string>
+    <string name="safety_observatory_filter_dates">Date range</string>
+    <string name="safety_observatory_apply_filters">APPLY FILTERS</string>
+    <string name="safety_observatory_reset_filters">RESET</string>
 </resources>

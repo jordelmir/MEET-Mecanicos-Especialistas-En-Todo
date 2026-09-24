@@ -4,7 +4,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Android-4.26.1%20%7C%20code%2060-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
-  <img src="https://img.shields.io/badge/Room-schema%2080-39FF14?style=flat-square" alt="Room schema" />
+  <img src="https://img.shields.io/badge/Room-schema%2082-39FF14?style=flat-square" alt="Room schema" />
   <img src="https://img.shields.io/badge/Architecture-offline--first-7F52FF?style=flat-square" alt="Offline first" />
 </p>
 
@@ -23,11 +23,16 @@ del servidor.
 
 - **Android:** `versionName 4.26.1`, `versionCode 60`.
 - **Web/package:** `4.26.1`.
-- **Persistencia local:** Room schema `80`, con las migraciones `78→79` y
-  `79→80` exportadas en el repositorio.
-- **Backend:** las migraciones Supabase son acumulativas. La autoridad de
-  viajes y auditoría de cierre está en
-  `20260920110000_ride_authority_and_completion_audit.sql`.
+- **Persistencia local:** Room schema `82`, con las migraciones y esquemas
+  `81.json` y `82.json` exportados en el repositorio.
+- **Seguridad (Safety V2):** Suite completa de 9 pantallas elevadas al estándar
+  visual y de movimiento con 8 componentes dedicados (`SafetyCategoryIcons`,
+  `SafetyEmptyState`, `SafetyHaptics`, `SafetyShimmer`, `SafetyPulse`,
+  `AccountabilityGauge`, `SafetyTimeline`, `SafetyOfflineBanner`).
+- **Backend / Supabase:** Migraciones acumulativas incluyendo autoridad de
+  precios `20260922090000_crc_ride_pricing_authority_parity.sql`, demografía del
+  observatorio de seguridad `20260923000000_safety_observatory_demographics.sql`,
+  y solicitudes unificadas de movilidad v4.
 - **Nombre comercial:** Elysium Vanguard AI OS. No se deben renombrar los
   contratos técnicos heredados `MEET` durante una actualización normal.
 

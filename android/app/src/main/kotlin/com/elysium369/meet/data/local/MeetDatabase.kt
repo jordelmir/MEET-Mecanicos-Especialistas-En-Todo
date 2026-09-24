@@ -20,6 +20,8 @@ import com.elysium369.meet.safety.data.local.SafetyPublicPointEntity
 import com.elysium369.meet.safety.data.local.SafetyPublicTimelineEntity
 import com.elysium369.meet.safety.data.local.SafetyReportDao
 import com.elysium369.meet.safety.data.local.SafetyReportEntity
+import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerDao
+import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerEntity
 
 @Database(
     entities = [
@@ -211,8 +213,9 @@ import com.elysium369.meet.safety.data.local.SafetyReportEntity
         SafetyPublicCaseEntity::class,
         SafetyPublicTimelineEntity::class,
         SafetyPublicClaimEntity::class,
+        VehicleFinancialLedgerEntity::class,
     ],
-    version = 80,
+    version = 82,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -310,4 +313,7 @@ abstract class MeetDatabase : RoomDatabase() {
         // SAFETY FOUNDATION V2 — PUBLIC PROJECTIONS DAO
         abstract fun safetyPublicDao(): SafetyPublicDao
         abstract fun safetyEvidenceDao(): SafetyEvidenceDao
+
+        // VEHICLE FINANCIAL LEDGER DAO
+        abstract fun vehicleFinancialLedgerDao(): VehicleFinancialLedgerDao
 }

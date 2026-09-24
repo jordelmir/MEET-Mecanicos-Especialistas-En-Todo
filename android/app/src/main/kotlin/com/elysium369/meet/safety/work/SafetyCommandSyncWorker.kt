@@ -20,6 +20,7 @@ import com.elysium369.meet.safety.crypto.SafetyPayloadCipher
 import com.elysium369.meet.safety.domain.SafetyGatewayResult
 import com.elysium369.meet.safety.domain.SafetyRetryPolicy
 import com.elysium369.meet.data.remote.SupabaseModule
+import com.elysium369.meet.observability.MeetTelemetry
 import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.CancellationException
 import dagger.assisted.Assisted
@@ -130,6 +131,11 @@ class SafetyCommandSyncWorker @AssistedInject constructor(
                     check(ackResult == 1) {
                         "ACK failed for ${entity.idempotencyKey}: expected 1 row, got $ackResult"
                     }
+                    // Privacy-safe telemetry: no report IDs, GPS, or narrative content.
+                    MeetTelemetry.event("safety.command.synced", mapOf(
+                        "commandType" to entity.commandType,
+                        "attemptCount" to entity.attemptCount,
+                    ))
                 }
 
                 is SafetyGatewayResult.Rejected -> {
@@ -185,6 +191,13 @@ class SafetyCommandSyncWorker @AssistedInject constructor(
         if (entity.commandType == com.elysium369.meet.safety.domain.SafetyCommandType.CREATE_REPORT.name) {
             reportDao.markFailed(reportId = entity.aggregateId, now = now)
         }
+
+        // Privacy-safe: only failure code + command type, never report content or GPS.
+        MeetTelemetry.event("safety.command.dead_letter", mapOf(
+            "commandType" to entity.commandType,
+            "failureCode" to code,
+            "attemptCount" to entity.attemptCount,
+        ))
     }
 
     private suspend fun finishRetry(

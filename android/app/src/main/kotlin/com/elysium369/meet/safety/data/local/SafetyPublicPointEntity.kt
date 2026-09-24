@@ -49,4 +49,9 @@ data class SafetyPublicPointEntity(
     val serverVersion: Long,
 
     val syncedAt: Long,
+
+    val victimCountDocumented: Int = 0,
+    val victimFemaleCount: Int = 0,
+    val victimMaleCount: Int = 0,
+    val victimUnknownSexCount: Int = 0,
 )

@@ -21,7 +21,9 @@ FIXTURE="$REPO_ROOT/tests/parity/fixtures/snapshot-p0230.json"
 TS_RESULT="$(mktemp)"
 TS_STDERR="$(mktemp)"
 KOTLIN_RESULT="$(mktemp)"
-trap 'rm -f "$TS_RESULT" "$TS_STDERR" "$KOTLIN_RESULT"' EXIT
+PRICING_TS_RESULT="$(mktemp)"
+PRICING_KOTLIN_RESULT="$(mktemp)"
+trap 'rm -f "$TS_RESULT" "$TS_STDERR" "$KOTLIN_RESULT" "$PRICING_TS_RESULT" "$PRICING_KOTLIN_RESULT"' EXIT
 
 echo "=== TS parity ==="
 ( cd "$REPO_ROOT" && npm_config_update_notifier=false npx tsx tests/parity/hash-parity.ts "$FIXTURE" > "$TS_RESULT" 2> "$TS_STDERR" ) || {
@@ -35,7 +37,10 @@ cat "$TS_RESULT"
 echo
 echo "=== Kotlin parity ==="
 if [[ -f "$REPO_ROOT/android/gradlew" ]]; then
-  ( cd "$REPO_ROOT/android" && ./gradlew --no-parallel :app:testDebugUnitTest --tests 'com.elysium369.meet.core.reports.HashEngineParityTest' --info --quiet ) || {
+  ( cd "$REPO_ROOT/android" && ./gradlew --no-parallel :app:testDebugUnitTest \
+      --tests 'com.elysium369.meet.core.reports.HashEngineParityTest' \
+      --tests 'com.elysium369.meet.ride.data.RidePricingAuthorityParityTest' \
+      --info --quiet ) || {
     echo "Kotlin parity test failed. Cross-runtime verification is mandatory."
     exit 1
   }
@@ -45,9 +50,31 @@ if [[ -f "$REPO_ROOT/android/gradlew" ]]; then
     exit 1
   fi
   cat "$KOTLIN_HASH_FILE" > "$KOTLIN_RESULT"
+  PRICING_KOTLIN_FILE="$REPO_ROOT/android/app/build/reports/parity/pricing-crc.txt"
+  if [[ ! -f "$PRICING_KOTLIN_FILE" ]]; then
+    echo "Kotlin pricing parity did not produce the expected output file."
+    exit 1
+  fi
+  cat "$PRICING_KOTLIN_FILE" > "$PRICING_KOTLIN_RESULT"
 else
   echo "android/gradlew not found; skipping Kotlin parity."
   exit 0
+fi
+
+echo
+echo "=== Pricing authority parity ==="
+( cd "$REPO_ROOT" && npm_config_update_notifier=false npx tsx \
+    tests/parity/pricing-authority-parity.ts \
+    tests/parity/fixtures/crc-ride-pricing-v2.json > "$PRICING_TS_RESULT" ) || {
+  cat "$PRICING_TS_RESULT"
+  echo "Pricing authority parity FAILED"
+  exit 1
+}
+cat "$PRICING_TS_RESULT"
+if ! diff -q "$PRICING_TS_RESULT" "$PRICING_KOTLIN_RESULT" > /dev/null; then
+  echo "TypeScript and Kotlin pricing authority outputs DIVERGED:"
+  diff "$PRICING_TS_RESULT" "$PRICING_KOTLIN_RESULT" || true
+  exit 1
 fi
 
 echo

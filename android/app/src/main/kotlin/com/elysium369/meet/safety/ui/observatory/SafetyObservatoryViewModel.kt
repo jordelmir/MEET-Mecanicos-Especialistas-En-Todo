@@ -34,7 +34,7 @@ class SafetyObservatoryViewModel @Inject constructor(private val repository: Saf
             val filters = mutable.value.filters
             mutable.update { it.copy(isLoading = true, error = null, stats = null) }
             try {
-                val stats = repository.observatory(filters)
+                val stats = repository.observatoryV2(filters)
                 mutable.update { it.copy(stats = stats, isLoading = false) }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {

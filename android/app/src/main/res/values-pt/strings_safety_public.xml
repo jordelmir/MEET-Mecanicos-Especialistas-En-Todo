@@ -1,6 +1,7 @@
 <resources>
     <string name="safety_public_map_title">Mapa de segurança</string>
     <string name="safety_public_back">Voltar</string>
+    <string name="safety_back">Voltar</string>
     <string name="safety_public_refresh">Atualizar</string>
     <string name="safety_public_map_disclosure">Locais públicos autorizados; podem ser aproximados. Um relato não comprova um fato.</string>
     <string name="safety_public_show_list">Ver lista acessível (%1$d pontos)</string>
@@ -65,4 +66,30 @@
     <string name="safety_map_general_title">MAPA GERAL</string>
     <string name="safety_map_general_body">Consulta mundial de pontos cidadãos por categoria, região e data.</string>
     <string name="safety_map_no_public_points">Ainda não há pontos públicos para estes filtros.</string>
+    <string name="safety_map_private_label">Meu relatório</string>
+    <string name="safety_map_independent_sources_suffix">\u0020fontes independentes</string>
+    <string name="safety_map_not_captured">Dado não registrado</string>
+
+    <!-- Observatory Dashboard V2 -->
+    <string name="safety_observatory_title">OBSERVATÓRIO</string>
+    <string name="safety_observatory_subtitle">Inteligência cidadã de segurança</string>
+    <string name="safety_observatory_published_points">Pontos\npublicados</string>
+    <string name="safety_observatory_homicides">Homicídios\ndocumentados</string>
+    <string name="safety_observatory_victims">Vítimas\ndocumentadas</string>
+    <string name="safety_observatory_sources">Fontes\nindependentes</string>
+    <string name="safety_observatory_category_chart">DISTRIBUIÇÃO POR CATEGORIA</string>
+    <string name="safety_observatory_victims_gender">VÍTIMAS POR SEXO</string>
+    <string name="safety_observatory_resolution_time">TEMPO MÉDIO DE RESOLUÇÃO</string>
+    <string name="safety_observatory_sources_type">FONTES POR TIPO</string>
+    <string name="safety_observatory_methodology_title">⚠ NOTAS METODOLÓGICAS</string>
+
+    <!-- Victim Demographics Step -->
+    <string name="safety_report_identify">IDENTIFIQUE-SE</string>
+    <string name="safety_report_identify_body">Qual é a sua relação com os fatos? Isso determina como sua contribuição é classificada e seu peso na corroboração.</string>
+    <string name="safety_report_victims_title">VÍTIMAS DOCUMENTADAS</string>
+    <string name="safety_report_victims_body">Este dado é opcional. Se não souber, deixe vazio. Os dados são usados para estatísticas agregadas, nunca para identificar pessoas.</string>
+    <string name="safety_report_victim_count">Quantas vítimas foram documentadas?</string>
+    <string name="safety_report_victim_female">Quantas eram mulheres?</string>
+    <string name="safety_report_victim_male">Quantos eram homens?</string>
+    <string name="safety_report_victim_sum_error">⚠ A soma de mulheres e homens (%1$d) ultrapassa o total de vítimas (%2$d).</string>
 </resources>

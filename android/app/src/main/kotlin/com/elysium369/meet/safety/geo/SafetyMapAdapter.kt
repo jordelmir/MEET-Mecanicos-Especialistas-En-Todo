@@ -10,9 +10,15 @@ import com.elysium369.meet.safety.data.SafetyPrivateMapPoint
 
 object SafetyMapAdapter {
 
+    /**
+     * @param privateLabel Localized label for the driver's own private reports (e.g., "Mi reporte").
+     * @param independentSourcesSuffix Localized suffix for source count (e.g., " fuentes independientes").
+     */
     fun build(
         points: List<SafetyPublicPoint>,
         privatePoints: List<SafetyPrivateMapPoint> = emptyList(),
+        privateLabel: String = "Mi reporte",
+        independentSourcesSuffix: String = " fuentes independientes",
     ): CommonMapState {
         val publicMarkers = points.map { point ->
             GeoMarker(
@@ -28,7 +34,7 @@ object SafetyMapAdapter {
                     if (point.independentSourceCount > 0) {
                         append(" · ")
                         append(point.independentSourceCount)
-                        append(" fuentes independientes")
+                        append(independentSourcesSuffix)
                     }
                 },
             )
@@ -38,7 +44,7 @@ object SafetyMapAdapter {
                 id = point.markerId,
                 role = GeoMarkerRole.PRIVATE_INCIDENT_PIN,
                 point = GeoPoint(point.latitude, point.longitude, point.accuracyMeters, point.occurredAt),
-                label = "Mi reporte",
+                label = privateLabel,
                 subtitle = point.serverState ?: point.syncState,
                 isHighlighted = point.syncState != "SYNCED",
             )

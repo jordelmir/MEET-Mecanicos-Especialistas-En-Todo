@@ -39,7 +39,7 @@ data class SafetyDraftLocation(
 
 data class SafetyReportUiState(
     val step: Int = 0,
-    val totalSteps: Int = 6,
+    val totalSteps: Int = 7,
     val category: SafetyReportCategory? = null,
     val sourceRelation: SourceRelation? = null,
     val narrative: String = "",
@@ -54,7 +54,14 @@ data class SafetyReportUiState(
     val locationQuery: String = "",
     val locationSuggestions: List<RidePlaceSuggestion> = emptyList(),
     val searchingLocation: Boolean = false,
-)
+    // V2 — Victim demographics (optional, shown only for HOMICIDE)
+    val victimCount: Int? = null,
+    val victimFemale: Int? = null,
+    val victimMale: Int? = null,
+) {
+    /** Whether victim demographics step should be shown (only for homicide). */
+    val showVictimStep: Boolean get() = category == SafetyReportCategory.HOMICIDE
+}
 
 @HiltViewModel
 class SafetyReportViewModel @Inject constructor(
@@ -143,6 +150,18 @@ class SafetyReportViewModel @Inject constructor(
         _state.update { it.copy(occurredAtIso = iso, error = null) }
     }
 
+    fun updateVictimCount(count: Int?) {
+        _state.update { it.copy(victimCount = count, error = null) }
+    }
+
+    fun updateVictimFemale(count: Int?) {
+        _state.update { it.copy(victimFemale = count, error = null) }
+    }
+
+    fun updateVictimMale(count: Int?) {
+        _state.update { it.copy(victimMale = count, error = null) }
+    }
+
     fun updateLocation(location: SafetyDraftLocation?) {
         _state.update { it.copy(location = location, error = null) }
     }
@@ -174,10 +193,14 @@ class SafetyReportViewModel @Inject constructor(
     fun nextStep() {
         val s = _state.value
         when {
-            s.step == 1 && s.category == null -> return
-            s.step == 2 && s.sourceRelation == null -> return
-            s.step == 3 && s.narrative.trim().length < 10 -> return
-            s.step == 4 && s.occurredAtIso != null && runCatching { Instant.parse(s.occurredAtIso) }.isFailure -> {
+            s.step == 0 && s.sourceRelation == null -> return
+            s.step == 2 && s.category == null -> return
+            // Step 3 = VictimDemographics: skip if not HOMICIDE
+            s.step == 2 && s.category != null && !s.showVictimStep -> {
+                _state.update { it.copy(step = 4) }; return
+            }
+            s.step == 4 && s.narrative.trim().length < 10 -> return
+            s.step == 5 && s.occurredAtIso != null && runCatching { Instant.parse(s.occurredAtIso) }.isFailure -> {
                 _state.update { it.copy(error = "Indica una fecha ISO con zona horaria, por ejemplo 2026-09-19T14:30:00-06:00.") }; return
             }
             s.staging || s.locating -> return
@@ -187,7 +210,11 @@ class SafetyReportViewModel @Inject constructor(
 
     fun previousStep() {
         val s = _state.value
-        if (s.step > 0) _state.update { it.copy(step = s.step - 1) }
+        if (s.step > 0) {
+            // Skip victim step (3) when going back from narrative (4) if not HOMICIDE
+            val target = if (s.step == 4 && !s.showVictimStep) 2 else s.step - 1
+            _state.update { it.copy(step = target) }
+        }
     }
 
     fun goToStep(step: Int) {
@@ -218,6 +245,9 @@ class SafetyReportViewModel @Inject constructor(
                         longitude = snapshot.location?.longitude,
                         accuracyMeters = snapshot.location?.accuracyMeters,
                         locationSource = snapshot.location?.source ?: LocationSource.NONE,
+                        reportedVictimCount = snapshot.victimCount,
+                        reportedVictimFemale = snapshot.victimFemale,
+                        reportedVictimMale = snapshot.victimMale,
                     ),
                 )
 
