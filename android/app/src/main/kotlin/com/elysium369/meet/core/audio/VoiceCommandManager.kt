@@ -311,6 +311,20 @@ class VoiceCommandManager(
                 phraseToProcess.contains("summary") || phraseToProcess.contains("general status") || phraseToProcess.contains("overall") || phraseToProcess.contains("car status") -> {
                     onCommandRecognized?.invoke(VoiceCommand.SAY_GENERAL_STATUS)
                 }
+                else -> {
+                    // EVAIR Intelligent Hands-Free Vocal Copilot (Laya AI)
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val bridge = com.elysium369.meet.core.agent.laya.VoiceLayaBridge()
+                            val res = bridge.processVoiceQuery(phraseToProcess)
+                            withContext(Dispatchers.Main) {
+                                speakConfirmation(res.spokenAnswerEs, res.spokenAnswerEn)
+                            }
+                        } catch (e: Exception) {
+                            Log.w("VoiceCommand", "Laya hands-free vocal fallback error: ${e.message}")
+                        }
+                    }
+                }
             }
         } else {
             // Spanish commands
@@ -379,6 +393,20 @@ class VoiceCommandManager(
                 }
                 phraseToProcess.contains("resumen") || phraseToProcess.contains("estado general") || phraseToProcess.contains("información del auto") -> {
                     onCommandRecognized?.invoke(VoiceCommand.SAY_GENERAL_STATUS)
+                }
+                else -> {
+                    // EVAIR Intelligent Hands-Free Vocal Copilot (Laya AI)
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val bridge = com.elysium369.meet.core.agent.laya.VoiceLayaBridge()
+                            val res = bridge.processVoiceQuery(phraseToProcess)
+                            withContext(Dispatchers.Main) {
+                                speakConfirmation(res.spokenAnswerEs, res.spokenAnswerEn)
+                            }
+                        } catch (e: Exception) {
+                            Log.w("VoiceCommand", "Laya hands-free vocal fallback error: ${e.message}")
+                        }
+                    }
                 }
             }
         }
