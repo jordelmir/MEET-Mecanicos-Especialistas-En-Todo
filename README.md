@@ -26,16 +26,24 @@ del servidor.
 - **Persistencia local:** Room schema `84`, con migración `MIGRATION_83_84` y esquema
   `84.json` exportado en el repositorio (tabla `commerce_orders` para pedidos triangulares de pulperías,
   sodas y comercios locales con estados de preparación, mensajero y PIN de entrega).
+- **Navegación 1-Click con Waze (`WazeNavigationButton`):**
+  - Protocolo nativo `waze://?ll=lat,lng&navigate=yes` integrado en todas las tarjetas de servicios (viajes, misiones courier, rescate técnico y radar en vivo).
+  - Fallback automático en cascada: Geo Intent (Google Maps / navegador vehicular) y Waze Live Map Web.
+- **Hub Universal de Servicios Activos, Historial y Oferta:**
+  - `⚡ SERVICIOS ACTIVOS`: Seguimiento simultáneo de Viajes, Misiones de Entrega y Servicios Técnicos para Clientes y Prestadores.
+  - `📜 HISTORIAL FORENSE`: Balance financiero acumulado en ₡ CRC, métricas de actividad y verificación de integridad SHA-256.
+  - `🛠️ CONFIGURACIÓN DE OFERTA & MATERIALES`:
+    - Definición formal de especialidad (Mecánica, Grúas, Pulpería, Soda, Plomería, Electricidad, Cerrajería, Hogar).
+    - Fórmulas de cobro matemáticas en colones costarricenses (mano de obra ₡/hora, tarifa base, costo ₡/km y recargos).
+    - Políticas de suministro de materiales (`MATERIALS_INCLUDED`, `CLIENT_SUPPLIED`, `AT_COST_WITH_MARGIN`).
+    - Sub-servicios con horas estimadas, materiales requeridos y equipamiento certificado.
+- **Cancelación Autoritativa de Viajes:**
+  - Cancelación local inmediata garantizada (`LOCAL_CANCELLED`) y sincronización outbox resiliente con Supabase.
+  - Limpieza atómica de selecciones activas para evitar estados residuales o bloqueos.
 - **Comercio Local & Delivery Triangular:**
   - Pulperías & Minisúper: Abarrotes, recargas y canasta básica con despacho local.
   - Sodas & Restaurantes: Comida típica y bebidas preparadas en tiempo real.
   - Mensajería & Courier: Asignación de repartidor, seguimiento de trayecto y custodia de entrega por PIN.
-- **Hub de Servicios Activos y Finalizados:**
-  - Pantalla dual unificada (`ActiveAndCompletedServicesHubScreen`) accesible para Clientes y Proveedores.
-  - Tres pestañas operativas en tiempo real: Movilidad (Viajes), Servicios Técnicos (Talleres, Pre-ITV, Grúas) y Comercio/Delivery.
-- **Cancelación Autoritativa de Viajes:**
-  - Cancelación local inmediata garantizada (`LOCAL_CANCELLED`) y sincronización outbox resiliente con Supabase.
-  - Limpieza atómica de selecciones activas para evitar estados residuales o bloqueos.
 - **Laboratorio de Emisiones & Pre-ITV Costa Rica:** Subsistema completo de evaluación
   regulatoria COSEVI / CITA con contrato de verdad inquebrantable (`MEASURED` vs `PHYSICS_DERIVED`
   vs `MODEL_ESTIMATED` vs `UNKNOWN`).

@@ -48,6 +48,8 @@ import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.navigation.MeetDestinations
 import com.elysium369.meet.ui.navigation.safeNavigate
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.util.WazeNavigationButton
+import com.elysium369.meet.ui.screens.provider.ProviderServiceCatalogConfigScreen
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -222,7 +224,7 @@ fun ActiveAndCompletedServicesHubScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Pestañas Principales: ACTIVOS vs FINALIZADOS
+            // Pestañas Principales: ACTIVOS vs HISTORIAL vs MI OFERTA (PRESTADORES)
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = MeetColors.cardBackground,
@@ -230,7 +232,11 @@ fun ActiveAndCompletedServicesHubScreen(
                 indicator = { tabPositions ->
                     TabRowDefaults.SecondaryIndicator(
                         Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                        color = if (selectedTab == 0) MeetColors.neonGreen else MeetColors.cyberCyan
+                        color = when (selectedTab) {
+                            0 -> MeetColors.neonGreen
+                            1 -> MeetColors.cyberCyan
+                            else -> Color(0xFFFFB74D)
+                        }
                     )
                 }
             ) {
@@ -242,7 +248,8 @@ fun ActiveAndCompletedServicesHubScreen(
                             Text(
                                 "⚡ ACTIVOS",
                                 fontWeight = FontWeight.Bold,
-                                color = if (selectedTab == 0) MeetColors.neonGreen else Color.LightGray
+                                color = if (selectedTab == 0) MeetColors.neonGreen else Color.LightGray,
+                                fontSize = 12.sp
                             )
                             if (totalActiveCount > 0) {
                                 Spacer(Modifier.width(6.dp))
@@ -263,105 +270,130 @@ fun ActiveAndCompletedServicesHubScreen(
                     onClick = { selectedTab = 1 },
                     text = {
                         Text(
-                            "📜 FINALIZADOS",
+                            "📜 HISTORIAL",
                             fontWeight = FontWeight.Bold,
-                            color = if (selectedTab == 1) MeetColors.cyberCyan else Color.LightGray
+                            color = if (selectedTab == 1) MeetColors.cyberCyan else Color.LightGray,
+                            fontSize = 12.sp
+                        )
+                    }
+                )
+                Tab(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    text = {
+                        Text(
+                            "🛠️ MI OFERTA",
+                            fontWeight = FontWeight.Bold,
+                            color = if (selectedTab == 2) Color(0xFFFFB74D) else Color.LightGray,
+                            fontSize = 12.sp
                         )
                     }
                 )
             }
 
-            // Chips de filtrado por categoría
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val filterOptions = listOf(
-                    "TODOS" to "Todos",
-                    "RIDES" to "🚗 Viajes",
-                    "COMMERCE" to "🏪 Pulperías & Sodas",
-                    "TECHNICAL" to "🔧 Mecánica & Grúas"
-                )
-                items(filterOptions) { (key, label) ->
-                    FilterChip(
-                        selected = selectedCategoryFilter == key,
-                        onClick = { selectedCategoryFilter = key },
-                        label = { Text(label, fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = MeetColors.neonGreen.copy(alpha = 0.2f),
-                            selectedLabelColor = MeetColors.neonGreen,
-                            containerColor = MeetColors.cardBackground,
-                            labelColor = Color.LightGray
-                        )
+            // Chips de filtrado por categoría (visibles en Activos e Historial)
+            if (selectedTab != 2) {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val filterOptions = listOf(
+                        "TODOS" to "Todos",
+                        "RIDES" to "🚗 Viajes",
+                        "COMMERCE" to "🏪 Pulperías & Sodas",
+                        "TECHNICAL" to "🔧 Mecánica & Grúas"
                     )
+                    items(filterOptions) { (key, label) ->
+                        FilterChip(
+                            selected = selectedCategoryFilter == key,
+                            onClick = { selectedCategoryFilter = key },
+                            label = { Text(label, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MeetColors.neonGreen.copy(alpha = 0.2f),
+                                selectedLabelColor = MeetColors.neonGreen,
+                                containerColor = MeetColors.cardBackground,
+                                labelColor = Color.LightGray
+                            )
+                        )
+                    }
                 }
             }
 
             // Contenido según pestaña
-            if (selectedTab == 0) {
-                // ─── PESTAÑA: SERVICIOS ACTIVOS ───
-                ActiveServicesList(
-                    isProviderMode = isProviderMode,
-                    filter = selectedCategoryFilter,
-                    userRides = userRides,
-                    activeRide = activeRideRequest,
-                    openRides = openRideRequests,
-                    serviceRequests = serviceRequests,
-                    activeCommerceOrders = activeCommerceOrders,
-                    courierMissions = courierMissions,
-                    onCancelRide = { ride -> rideToCancel = ride },
-                    onTrackRide = { navController.safeNavigate(MeetDestinations.RIDE_HOME) },
-                    onCancelCommerce = { orderId -> viewModel.cancelCommerceOrder(orderId) },
-                    onCancelService = { reqId -> viewModel.cancelServiceRequest(reqId) },
-                    onMerchantAdvance = { orderId, status -> viewModel.advanceCommerceMerchantStatus(orderId, status) },
-                    onCourierClaim = { orderId ->
-                        viewModel.assignCommerceCourier(
-                            orderId = orderId,
-                            courierId = "courier_${System.currentTimeMillis() % 1000}",
-                            courierName = "Conductor Repartidor MEET",
-                            courierPhone = "+506 8888-9999",
-                            courierVehicle = "Motocicleta Express (Placa MOT-4421)"
-                        )
-                        Toast.makeText(context, "¡Misión de transporte asignada a ti!", Toast.LENGTH_SHORT).show()
-                    },
-                    onCourierTransit = { orderId, status -> viewModel.advanceCommerceCourierStatus(orderId, status) },
-                    onVerifyPinClick = { order -> pinVerificationOrder = order }
-                )
-            } else {
-                // ─── PESTAÑA: SERVICIOS FINALIZADOS ───
-                CompletedServicesList(
-                    filter = selectedCategoryFilter,
-                    userRides = userRides,
-                    serviceRequests = serviceRequests,
-                    completedCommerceOrders = completedCommerceOrders,
-                    onViewCertificate = { cert -> certificateData = cert },
-                    onReorderCommerce = { order ->
-                        viewModel.createCommerceOrder(
-                            commerceType = order.commerceType,
-                            merchantId = order.merchantId,
-                            merchantName = order.merchantName,
-                            merchantPhone = order.merchantPhone,
-                            merchantAddress = order.merchantAddress,
-                            merchantLat = order.merchantLat,
-                            merchantLng = order.merchantLng,
-                            customerName = order.customerName,
-                            customerPhone = order.customerPhone,
-                            deliveryAddress = order.deliveryAddress,
-                            deliveryLat = order.deliveryLat,
-                            deliveryLng = order.deliveryLng,
-                            itemsJson = order.itemsJson,
-                            itemsSubtotalMinor = order.itemsSubtotalMinor,
-                            deliveryFeeMinor = order.deliveryFeeMinor,
-                            paymentMethod = order.paymentMethod,
-                            onCreated = {
-                                Toast.makeText(context, "¡Pedido repetido con éxito! Preparando en local.", Toast.LENGTH_LONG).show()
-                                selectedTab = 0
-                            }
-                        )
-                    }
-                )
+            when (selectedTab) {
+                0 -> {
+                    // ─── PESTAÑA 0: SERVICIOS ACTIVOS ───
+                    ActiveServicesList(
+                        isProviderMode = isProviderMode,
+                        filter = selectedCategoryFilter,
+                        userRides = userRides,
+                        activeRide = activeRideRequest,
+                        openRides = openRideRequests,
+                        serviceRequests = serviceRequests,
+                        activeCommerceOrders = activeCommerceOrders,
+                        courierMissions = courierMissions,
+                        onCancelRide = { ride -> rideToCancel = ride },
+                        onTrackRide = { navController.safeNavigate(MeetDestinations.RIDE_HOME) },
+                        onCancelCommerce = { orderId -> viewModel.cancelCommerceOrder(orderId) },
+                        onCancelService = { reqId -> viewModel.cancelServiceRequest(reqId) },
+                        onMerchantAdvance = { orderId, status -> viewModel.advanceCommerceMerchantStatus(orderId, status) },
+                        onCourierClaim = { orderId ->
+                            viewModel.assignCommerceCourier(
+                                orderId = orderId,
+                                courierId = "courier_${System.currentTimeMillis() % 1000}",
+                                courierName = "Conductor Repartidor MEET",
+                                courierPhone = "+506 8888-9999",
+                                courierVehicle = "Motocicleta Express (Placa MOT-4421)"
+                            )
+                            Toast.makeText(context, "¡Misión de transporte asignada a ti!", Toast.LENGTH_SHORT).show()
+                        },
+                        onCourierTransit = { orderId, status -> viewModel.advanceCommerceCourierStatus(orderId, status) },
+                        onVerifyPinClick = { order -> pinVerificationOrder = order }
+                    )
+                }
+                1 -> {
+                    // ─── PESTAÑA 1: HISTORIAL DE SERVICIOS ───
+                    CompletedServicesList(
+                        filter = selectedCategoryFilter,
+                        userRides = userRides,
+                        serviceRequests = serviceRequests,
+                        completedCommerceOrders = completedCommerceOrders,
+                        onViewCertificate = { cert -> certificateData = cert },
+                        onReorderCommerce = { order ->
+                            viewModel.createCommerceOrder(
+                                commerceType = order.commerceType,
+                                merchantId = order.merchantId,
+                                merchantName = order.merchantName,
+                                merchantPhone = order.merchantPhone,
+                                merchantAddress = order.merchantAddress,
+                                merchantLat = order.merchantLat,
+                                merchantLng = order.merchantLng,
+                                customerName = order.customerName,
+                                customerPhone = order.customerPhone,
+                                deliveryAddress = order.deliveryAddress,
+                                deliveryLat = order.deliveryLat,
+                                deliveryLng = order.deliveryLng,
+                                itemsJson = order.itemsJson,
+                                itemsSubtotalMinor = order.itemsSubtotalMinor,
+                                deliveryFeeMinor = order.deliveryFeeMinor,
+                                paymentMethod = order.paymentMethod,
+                                onCreated = {
+                                    Toast.makeText(context, "¡Pedido repetido con éxito! Preparando en local.", Toast.LENGTH_LONG).show()
+                                    selectedTab = 0
+                                }
+                            )
+                        }
+                    )
+                }
+                2 -> {
+                    // ─── PESTAÑA 2: CONFIGURACIÓN DE OFERTA Y MATERIALES ───
+                    ProviderServiceCatalogConfigScreen(
+                        viewModel = viewModel,
+                        onBack = { selectedTab = 0 }
+                    )
+                }
             }
         }
     }
@@ -793,7 +825,18 @@ private fun ActiveRideCard(
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
+
+            // Waze 1-click Navigation
+            WazeNavigationButton(
+                latitude = ride.destLatitude,
+                longitude = ride.destLongitude,
+                label = ride.destAddress,
+                text = "Viajar a Destino con Waze 🚗💨",
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(Modifier.height(8.dp))
 
             // Botones de acción
             Row(
@@ -980,7 +1023,19 @@ private fun ActiveCommerceOrderCard(
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
+            // Navegación con Waze
+            val wazeTargetLat = if (order.status in listOf("PLACED", "CONFIRMED", "PREPARING", "READY_FOR_PICKUP", "COURIER_ASSIGNED")) order.merchantLat else order.deliveryLat
+            val wazeTargetLng = if (order.status in listOf("PLACED", "CONFIRMED", "PREPARING", "READY_FOR_PICKUP", "COURIER_ASSIGNED")) order.merchantLng else order.deliveryLng
+            val wazeTargetLabel = if (order.status in listOf("PLACED", "CONFIRMED", "PREPARING", "READY_FOR_PICKUP", "COURIER_ASSIGNED")) order.merchantAddress else order.deliveryAddress
+            val wazeText = if (order.status in listOf("PLACED", "CONFIRMED", "PREPARING", "READY_FOR_PICKUP", "COURIER_ASSIGNED")) "Waze al Local (${order.merchantName}) 🏪💨" else "Waze a Entrega (${order.deliveryAddress}) 🛵💨"
+            WazeNavigationButton(
+                latitude = wazeTargetLat,
+                longitude = wazeTargetLng,
+                label = wazeTargetLabel,
+                text = wazeText,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+            )
 
             // Acciones según Modo
             if (!isProviderMode) {
@@ -1127,15 +1182,29 @@ private fun AvailableCourierMissionCard(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = onClaimMission,
-                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier.fillMaxWidth()
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Tomar Misión de Envío", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                if (order.merchantLat != 0.0 && order.merchantLng != 0.0) {
+                    WazeNavigationButton(
+                        destinationLat = order.merchantLat,
+                        destinationLng = order.merchantLng,
+                        destinationLabel = order.merchantName,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Button(
+                    onClick = onClaimMission,
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.weight(1.3f)
+                ) {
+                    Icon(Icons.Default.Check, null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Tomar Misión", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
             }
         }
     }
@@ -1195,13 +1264,25 @@ private fun ActiveTechnicalServiceCard(
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
-                OutlinedButton(
-                    onClick = onCancel,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252)),
-                    border = BorderStroke(1.dp, Color(0xFFFF5252)),
-                    shape = RoundedCornerShape(8.dp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Cancelar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    if (request.latitude != 0.0 && request.longitude != 0.0) {
+                        WazeNavigationButton(
+                            destinationLat = request.latitude,
+                            destinationLng = request.longitude,
+                            destinationLabel = request.problem
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onCancel,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252)),
+                        border = BorderStroke(1.dp, Color(0xFFFF5252)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Text("Cancelar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -1222,6 +1303,16 @@ private fun CompletedServicesList(
 ) {
     val completedRides = userRides.filter { it.status in listOf("COMPLETED", "CANCELLED") }
     val completedServices = serviceRequests.filter { it.status in listOf("COMPLETED", "CANCELLED") }
+
+    val totalCommerceCrc = completedCommerceOrders.filter { it.status == "DELIVERED" || it.status == "COMPLETED" }.sumOf { it.totalAmountMinor }
+    val totalRidesCrc = completedRides.filter { it.status == "COMPLETED" }.sumOf { it.finalPriceMinor ?: it.priceOfferMinor }
+    val totalServicesCrc = completedServices.filter { it.status == "COMPLETED" }.sumOf {
+        if (it.priceOfferMinor > 0L) it.priceOfferMinor else (it.priceOffer * 1.0).toLong()
+    }
+    val grandTotalCrc = totalCommerceCrc + totalRidesCrc + totalServicesCrc
+    val completedCount = completedRides.count { it.status == "COMPLETED" } +
+            completedCommerceOrders.count { it.status in listOf("DELIVERED", "COMPLETED") } +
+            completedServices.count { it.status == "COMPLETED" }
 
     val hasAny = completedRides.isNotEmpty() || completedServices.isNotEmpty() || completedCommerceOrders.isNotEmpty()
 
@@ -1265,6 +1356,67 @@ private fun CompletedServicesList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
         contentPadding = PaddingValues(top = 8.dp, bottom = 80.dp)
     ) {
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "📊 BALANCE TOTAL HISTÓRICO",
+                            color = MeetColors.cyberCyan,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 12.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                "🔒 SHA-256 FORENSE",
+                                color = MeetColors.neonGreen,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text("Total Transaccionado", color = Color.Gray, fontSize = 11.sp)
+                            Text(
+                                "₡${String.format("%,d", grandTotalCrc)} CRC",
+                                color = Color.White,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 18.sp
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Servicios Finalizados", color = Color.Gray, fontSize = 11.sp)
+                            Text(
+                                "$completedCount servicios",
+                                color = MeetColors.neonGreen,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
         // Pulperías y Sodas finalizadas
         if (filter == "TODOS" || filter == "COMMERCE") {
             items(completedCommerceOrders, key = { "comp_comm_${it.orderId}" }) { order ->

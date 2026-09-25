@@ -1099,6 +1099,9 @@ fun MeetApp(
                     viewModel = obdViewModel,
                     onBack = { navController.backOrHome() },
                     onOpenMessages = { navController.navigate("messages?serviceVertical=universal") },
+                    onNavigateToActiveServices = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                    onNavigateToHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                    onNavigateToProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
                 )
             }
             composable("elysium_services") {
@@ -1136,6 +1139,12 @@ fun MeetApp(
                     navController = navController,
                     viewModel = obdViewModel,
                     initialTab = initialTab
+                )
+            }
+            composable(MeetDestinations.PROVIDER_SERVICES_CONFIG) {
+                com.elysium369.meet.ui.screens.provider.ProviderServiceCatalogConfigScreen(
+                    viewModel = obdViewModel,
+                    onBack = { navController.popBackStack() }
                 )
             }
             composable("universal_activity/{serviceId}") { backStackEntry ->
