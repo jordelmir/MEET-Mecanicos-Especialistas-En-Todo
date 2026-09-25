@@ -30,6 +30,32 @@ object UniversalServiceCatalog {
 
     val definitions = listOf(
         UniversalServiceDefinition(
+            id = "pulperia_groceries",
+            domain = "Pulperías & Minisúper",
+            name = "Pulpería Express: Abarrotes, Panadería y Bebidas",
+            modalities = physical(),
+            icon = "🏪",
+            riskTier = "STANDARD",
+            commonTasks = listOf("Canasta básica y abarrotes", "Arroz, frijoles y azúcar", "Pan fresco y bollos", "Leche, huevos y natilla", "Bebidas y refrescos fríos", "Botanas y snacks", "Artículos de aseo y hogar", "Recargas y mandados"),
+            defaultEstimatedPriceCrc = 8500.0,
+            requiresDestination = true,
+            adminRoleName = "Pulpería / Minisúper Afiliado",
+            adminDescription = "Venta de abarrotes de barrio con despacho rápido y transporte por choferes de la red MEET.",
+        ),
+        UniversalServiceDefinition(
+            id = "soda_traditional_food",
+            domain = "Sodas & Restaurantes",
+            name = "Soda Tradicional: Casados, Desayunos y Comida Típica",
+            modalities = physical(),
+            icon = "🍳",
+            riskTier = "STANDARD",
+            commonTasks = listOf("Casado con carne mechada o pollo", "Casado con chuleta o bistec encebollado", "Desayuno típico con gallo pinto y huevo", "Olla de carne con verduras", "Empanadas arregladas y chicharrones", "Batidos naturales en agua o leche"),
+            defaultEstimatedPriceCrc = 4500.0,
+            requiresDestination = true,
+            adminRoleName = "Soda / Restaurante Criollo",
+            adminDescription = "Comida casera costarricense recién hecha, con entrega express por choferes de la red MEET.",
+        ),
+        UniversalServiceDefinition(
             id = "hardware_materials",
             domain = "Ferretería & Materiales",
             name = "Ferretería y Materiales (Tubos, Grifería, Cables)",

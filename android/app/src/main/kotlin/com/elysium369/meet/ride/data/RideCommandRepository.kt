@@ -52,6 +52,9 @@ class RideCommandRepository @Inject constructor(
     suspend fun cancelStuckPendingPublication(rideId: String): Int =
         outboxDao.cancelStuckPendingPublication(rideId)
 
+    suspend fun cancelPublicationCommands(rideId: String): Int =
+        outboxDao.cancelPublicationCommands(rideId)
+
     /** UI-facing stream for authoritative rejections (for example, balance). */
     fun recentFailures(): Flow<List<RideCommandOutboxEntity>> = outboxDao.recentFailures()
 

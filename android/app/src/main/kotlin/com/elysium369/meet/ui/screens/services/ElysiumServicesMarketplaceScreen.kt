@@ -51,6 +51,8 @@ import com.elysium369.meet.core.geo.runtime.CommonMapPanel
 import com.elysium369.meet.ride.map.LayaEnhancedPlaceSearchProvider
 import com.elysium369.meet.ride.map.RidePlaceSuggestion
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.navigation.MeetDestinations
+import com.elysium369.meet.ui.navigation.safeNavigate
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -97,7 +99,9 @@ fun ElysiumServicesMarketplaceScreen(
             ServiceCategoryItem("Ferretería", "🔩", "HARDWARE", "Vanguard Titan"),
             ServiceCategoryItem("Lavado & Detailing", "✨", "DETAILING", "Neo Concierge"),
             ServiceCategoryItem("Plomería", "🚰", "PLUMBING", "Vanguard Titan"),
-            ServiceCategoryItem("Electricidad", "💡", "ELECTRICAL", "Aura Sentinel")
+            ServiceCategoryItem("Electricidad", "💡", "ELECTRICAL", "Aura Sentinel"),
+            ServiceCategoryItem("Pulperías & Minisúper", "🏪", "PULPERIA", "Neo Concierge"),
+            ServiceCategoryItem("Sodas & Restaurantes", "🍳", "SODA_RESTAURANT", "Neo Concierge")
         )
     }
 
@@ -197,6 +201,11 @@ fun ElysiumServicesMarketplaceScreen(
                     }
                 },
                 actions = {
+                    // Acceso directo a Servicios Activos / Finalizados
+                    IconButton(onClick = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) }) {
+                        Icon(Icons.Default.ReceiptLong, contentDescription = "Mis Servicios", tint = MeetColors.neonGreen)
+                    }
+
                     // Mode Switcher Chip
                     Surface(
                         modifier = Modifier
@@ -2522,7 +2531,7 @@ data class ServiceCompletionCertificateData(
  * ── Dialog: Certificado de Servicio Forense con Código QR & Escrow Liberado ──
  */
 @Composable
-private fun ServiceCompletionCertificateDialog(
+fun ServiceCompletionCertificateDialog(
     certificate: ServiceCompletionCertificateData,
     onDismiss: () -> Unit,
 ) {

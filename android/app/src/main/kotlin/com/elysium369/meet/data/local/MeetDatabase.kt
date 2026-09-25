@@ -23,6 +23,8 @@ import com.elysium369.meet.safety.data.local.SafetyReportEntity
 import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerDao
 import com.elysium369.meet.vehiclelife.costs.local.VehicleFinancialLedgerEntity
 import com.elysium369.meet.core.emissions.storage.*
+import com.elysium369.meet.commerce.data.local.CommerceOrderEntity
+import com.elysium369.meet.commerce.data.local.CommerceOrderDao
 
 @Database(
     entities = [
@@ -221,8 +223,10 @@ import com.elysium369.meet.core.emissions.storage.*
         EmissionPhaseResultEntity::class,
         EmissionEstimateEntity::class,
         GasProbeCalibrationEntity::class,
+        // LOCAL COMMERCE & DELIVERY (PULPERIAS & SODAS)
+        CommerceOrderEntity::class,
     ],
-    version = 83,
+    version = 84,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -326,4 +330,7 @@ abstract class MeetDatabase : RoomDatabase() {
 
         // EMISSIONS LAB DAO
         abstract fun emissionDao(): EmissionDao
+
+        // LOCAL COMMERCE & DELIVERY DAO
+        abstract fun commerceOrderDao(): CommerceOrderDao
 }

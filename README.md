@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Android-4.26.1%20%7C%20code%2060-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
-  <img src="https://img.shields.io/badge/Room-schema%2083-39FF14?style=flat-square" alt="Room schema" />
+  <img src="https://img.shields.io/badge/Android-4.27.0%20%7C%20code%2061-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
+  <img src="https://img.shields.io/badge/Room-schema%2084-39FF14?style=flat-square" alt="Room schema" />
   <img src="https://img.shields.io/badge/Architecture-offline--first-7F52FF?style=flat-square" alt="Offline first" />
 </p>
 
@@ -21,11 +21,21 @@ del servidor.
 
 ## Estado del código en este checkpoint
 
-- **Android:** `versionName 4.26.1`, `versionCode 60`.
-- **Web/package:** `4.26.1`.
-- **Persistencia local:** Room schema `83`, con las migraciones `MIGRATION_82_83` y esquemas
-  `81.json`, `82.json` y `83.json` exportados en el repositorio (tablas de telemetría de emisiones,
-  snapshots termodinámicos, Mode 06 con límites de fabricante y ejecuciones Pre-ITV).
+- **Android:** `versionName 4.27.0`, `versionCode 61`.
+- **Web/package:** `4.27.0`.
+- **Persistencia local:** Room schema `84`, con migración `MIGRATION_83_84` y esquema
+  `84.json` exportado en el repositorio (tabla `commerce_orders` para pedidos triangulares de pulperías,
+  sodas y comercios locales con estados de preparación, mensajero y PIN de entrega).
+- **Comercio Local & Delivery Triangular:**
+  - Pulperías & Minisúper: Abarrotes, recargas y canasta básica con despacho local.
+  - Sodas & Restaurantes: Comida típica y bebidas preparadas en tiempo real.
+  - Mensajería & Courier: Asignación de repartidor, seguimiento de trayecto y custodia de entrega por PIN.
+- **Hub de Servicios Activos y Finalizados:**
+  - Pantalla dual unificada (`ActiveAndCompletedServicesHubScreen`) accesible para Clientes y Proveedores.
+  - Tres pestañas operativas en tiempo real: Movilidad (Viajes), Servicios Técnicos (Talleres, Pre-ITV, Grúas) y Comercio/Delivery.
+- **Cancelación Autoritativa de Viajes:**
+  - Cancelación local inmediata garantizada (`LOCAL_CANCELLED`) y sincronización outbox resiliente con Supabase.
+  - Limpieza atómica de selecciones activas para evitar estados residuales o bloqueos.
 - **Laboratorio de Emisiones & Pre-ITV Costa Rica:** Subsistema completo de evaluación
   regulatoria COSEVI / CITA con contrato de verdad inquebrantable (`MEASURED` vs `PHYSICS_DERIVED`
   vs `MODEL_ESTIMATED` vs `UNKNOWN`).
@@ -33,10 +43,8 @@ del servidor.
   visual y de movimiento con 8 componentes dedicados (`SafetyCategoryIcons`,
   `SafetyEmptyState`, `SafetyHaptics`, `SafetyShimmer`, `SafetyPulse`,
   `AccountabilityGauge`, `SafetyTimeline`, `SafetyOfflineBanner`).
-- **Backend / Supabase:** Migraciones acumulativas incluyendo autoridad de
-  precios `20260922090000_crc_ride_pricing_authority_parity.sql`, demografía del
-  observatorio de seguridad `20260923000000_safety_observatory_demographics.sql`,
-  y solicitudes unificadas de movilidad v4.
+- **Backend / Supabase:** Migración `20260925120000_commerce_and_delivery_ecosystem.sql`
+  con RLS, RPCs autoritativas de despacho/custodia y trazabilidad de eventos.
 - **Nombre comercial:** Elysium Vanguard AI OS. No se deben renombrar los
   contratos técnicos heredados `MEET` durante una actualización normal.
 
@@ -167,6 +175,8 @@ tools/                           Verificadores y utilidades de release
 - [Especificación de recuperación de Viajes](docs/rides/MEET_RIDES_V9_APK_RECOVERY_SPEC.md)
 - [Ruta vial y programación](docs/rides/ROAD_ROUTE_AND_SCHEDULING_2026-09-21.md)
 - [Hardening de autoridad 4.26.1](docs/releases/2026-09-20-elysium-vanguard-ai-os-4.26.1-authority-hardening.md)
+- [Comercio Local y Delivery Triangular V1](docs/commerce/MEET_LOCAL_COMMERCE_AND_DELIVERY_V1.md)
+- [Release 4.27.0 — Comercio Local, Delivery y Hub de Servicios Activos](docs/releases/2026-09-25-elysium-vanguard-ai-os-4.27.0-commerce-and-active-services.md)
 
 ## Límites de publicación
 

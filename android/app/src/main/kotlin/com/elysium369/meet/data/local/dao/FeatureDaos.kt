@@ -150,6 +150,9 @@ interface MarketplaceDao {
     @Query("UPDATE service_requests SET status = 'OPEN', assignedMechanicId = null, assignedMechanicName = null, assignedMechanicPhone = null, escrowStatus = 'REFUNDED' WHERE requestId = :requestId")
     suspend fun cancelServiceWithEscrow(requestId: String)
 
+    @Query("UPDATE service_requests SET status = 'CANCELLED', escrowStatus = 'REFUNDED' WHERE requestId = :requestId")
+    suspend fun markServiceCancelled(requestId: String)
+
     @Query("UPDATE service_bids SET status = 'PENDING' WHERE requestId = :requestId AND status = 'ACCEPTED'")
     suspend fun reopenAcceptedBidsForPaymentFailure(requestId: String)
 
@@ -928,6 +931,38 @@ interface RideDao {
         actorId: String,
         actorRole: String,
         cancelledAt: Long,
+    ): Int
+
+    @Query(
+        """
+        UPDATE ride_requests
+        SET status = 'CANCELLED',
+            serverState = 'CANCELLED',
+            syncState = 'LOCAL_CANCELLED',
+            completedAt = :cancelledAt
+        WHERE requestId = :requestId
+        """
+    )
+    suspend fun markRequestCancelledLocally(
+        requestId: String,
+        cancelledAt: Long = System.currentTimeMillis(),
+    ): Int
+
+    @Query(
+        """
+        UPDATE ride_requests
+        SET status = 'CANCELLED',
+            serverState = 'CANCELLED',
+            syncState = 'LOCAL_CANCELLED',
+            completedAt = :cancelledAt
+        WHERE passengerId = :passengerId
+          AND status IN ('PENDING_PUBLICATION', 'OPEN')
+          AND serverVersion = 0
+        """
+    )
+    suspend fun cancelUnpublishedRidesForPassenger(
+        passengerId: String,
+        cancelledAt: Long = System.currentTimeMillis(),
     ): Int
 
     @Query(

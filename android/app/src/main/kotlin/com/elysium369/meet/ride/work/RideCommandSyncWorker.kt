@@ -103,20 +103,67 @@ class RideCommandSyncWorker @AssistedInject constructor(
                 return@forEach
             }
 
-            // A version-zero cancellation is a durable intent. A missing snapshot
-            // is not proof of absence while publication may still be in flight.
+            // A version-zero cancellation is a durable intent.
             if (command.type == RideCommandType.CANCEL && command.expectedVersion == 0L) {
                 when (val snapshot = gateway.fetchSnapshot(entity.rideId)) {
                     is RideSnapshotResult.Found -> {
+                        val state = snapshot.snapshot.state
+                        if (state in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED")) {
+                            // Trip is already terminated on the server.
+                            rideDao.applyServerProjection(
+                                requestId = entity.rideId,
+                                legacyStatus = state,
+                                serverState = state,
+                                serverVersion = snapshot.snapshot.version,
+                                finalPriceMinor = snapshot.snapshot.finalFareMinor,
+                                syncedAt = System.currentTimeMillis(),
+                                correlationId = "terminal_remote_snapshot",
+                            )
+                            rideDao.clearActiveRideSelectionsForRide(entity.rideId)
+                            outboxDao.acknowledge(
+                                idempotencyKey = entity.idempotencyKey,
+                                correlationId = "already_terminal",
+                                now = System.currentTimeMillis(),
+                            )
+                            return@forEach
+                        }
                         if (snapshot.snapshot.version <= 0L ||
-                            outboxDao.resolveCancellationVersion(entity.idempotencyKey, snapshot.snapshot.version) != 1) {
+                            outboxDao.resolveCancellationVersion(entity.idempotencyKey, snapshot.snapshot.version) != 1
+                        ) {
                             retryNeeded = true
                             finishRetry(entity, "CANCEL_AWAITING_PUBLICATION", "Esperando una versión autoritativa para cancelar.")
                             return@forEach
                         }
                         command = command.copy(expectedVersion = snapshot.snapshot.version)
                     }
+                    is RideSnapshotResult.NotFound -> {
+                        // The trip was never published to the remote authority or was removed.
+                        // Reconcile locally as cancelled, cancel unsent publications, clear active selection, and acknowledge.
+                        outboxDao.cancelPublicationCommands(entity.rideId)
+                        outboxDao.cancelStuckPendingPublication(entity.rideId)
+                        rideDao.markRequestCancelledLocally(entity.rideId)
+                        rideDao.clearActiveRideSelectionsForRide(entity.rideId)
+                        outboxDao.acknowledge(
+                            idempotencyKey = entity.idempotencyKey,
+                            correlationId = "local_cancel_unpublished",
+                            now = System.currentTimeMillis(),
+                        )
+                        return@forEach
+                    }
                     else -> {
+                        // Network/transport error during snapshot check:
+                        if (entity.attemptCount >= 2) {
+                            outboxDao.cancelPublicationCommands(entity.rideId)
+                            outboxDao.cancelStuckPendingPublication(entity.rideId)
+                            rideDao.markRequestCancelledLocally(entity.rideId)
+                            rideDao.clearActiveRideSelectionsForRide(entity.rideId)
+                            outboxDao.acknowledge(
+                                idempotencyKey = entity.idempotencyKey,
+                                correlationId = "local_cancel_fallback",
+                                now = System.currentTimeMillis(),
+                            )
+                            return@forEach
+                        }
                         retryNeeded = true
                         finishRetry(entity, "CANCEL_AWAITING_PUBLICATION", "Cancelación guardada; esperando reconciliar la publicación.")
                         return@forEach
@@ -290,6 +337,22 @@ class RideCommandSyncWorker @AssistedInject constructor(
                             correlationId = result.correlationId,
                         )
                     }
+                    val isTerminal = result.code == "TERMINAL_STATE"
+                    if (isTerminal || result.code == "NOT_FOUND") {
+                        // Server is already in a terminal state (or trip not found on remote authority).
+                        // Clear active ride selections, mark local request cancelled if cancel command, and acknowledge outbox.
+                        rideDao.clearActiveRideSelectionsForRide(entity.rideId)
+                        if (entity.commandType == RideCommandType.CANCEL.name) {
+                            rideDao.markRequestCancelledLocally(entity.rideId)
+                        }
+                        outboxDao.acknowledge(
+                            idempotencyKey = entity.idempotencyKey,
+                            correlationId = result.correlationId ?: "terminal_ack",
+                            now = System.currentTimeMillis(),
+                        )
+                        return@forEach
+                    }
+
                     if (
                         result.retryable &&
                         !isConflict &&

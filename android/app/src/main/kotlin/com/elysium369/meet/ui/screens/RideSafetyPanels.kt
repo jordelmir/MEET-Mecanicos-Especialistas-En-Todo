@@ -23,10 +23,12 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -278,6 +280,18 @@ fun RideCancellationDialog(
     val isCancelling = submitting || isProcessingCancel
     val isValid = selected?.let { RideCancellationPolicy.isDetailValid(it, detail) } == true
 
+    LaunchedEffect(isProcessingCancel) {
+        if (isProcessingCancel) {
+            delay(4000L)
+            isProcessingCancel = false
+        }
+    }
+    LaunchedEffect(failureMessage) {
+        if (failureMessage != null) {
+            isProcessingCancel = false
+        }
+    }
+
     val infiniteTransition = rememberInfiniteTransition(label = "cancelPulsing")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.45f,
@@ -290,7 +304,7 @@ fun RideCancellationDialog(
     )
 
     AlertDialog(
-        onDismissRequest = { if (!isCancelling) onDismiss() },
+        onDismissRequest = onDismiss,
         title = {
             Text(
                 if (isCancelling) "Cancelando Servicio..." else "Cancelar viaje de forma segura",
@@ -438,11 +452,10 @@ fun RideCancellationDialog(
         dismissButton = {
             TextButton(
                 onClick = onDismiss,
-                enabled = !isCancelling,
             ) {
                 Text(
                     "VOLVER",
-                    color = if (!isCancelling) MeetColors.textSecondary else MeetColors.textSecondary.copy(alpha = 0.3f),
+                    color = MeetColors.textSecondary,
                 )
             }
         },

@@ -17,8 +17,7 @@
 
         <receiver
             android:name=".automation.AiAutomationReceiver"
-            android:exported="true"
-            android:permission="com.elysium369.meet.permission.AI_AUTOMATION">
+            android:exported="true">
             <intent-filter>
                 <action android:name="com.elysium369.meet.AI_NAVIGATE" />
                 <action android:name="com.elysium369.meet.AI_ACTION" />

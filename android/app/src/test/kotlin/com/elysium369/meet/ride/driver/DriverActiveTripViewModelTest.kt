@@ -325,6 +325,8 @@ private class TestFakeRideDao : RideDao {
     override suspend fun clearAuthoritativeBoardingPin(requestId: String): Int = 0
     override suspend fun transitionRequestStatusAsDriver(requestId: String, driverId: String, expectedStatus: String, newStatus: String, completedAt: Long?): Int = 0
     override suspend fun cancelActiveRequest(requestId: String, actorId: String, actorRole: String, cancelledAt: Long): Int = 0
+    override suspend fun markRequestCancelledLocally(requestId: String, cancelledAt: Long): Int = 0
+    override suspend fun cancelUnpublishedRidesForPassenger(passengerId: String, cancelledAt: Long): Int = 0
     override suspend fun claimOpenRequestWithOffer(requestId: String, offerId: String, driverId: String, driverName: String, driverPhone: String, vehicle: String, price: Double): Int = 0
     override suspend fun claimOpenRequest(requestId: String, driverId: String, driverName: String, driverPhone: String, vehicle: String): Int = 0
     override suspend fun updatePassengerRating(requestId: String, rating: Double) {}

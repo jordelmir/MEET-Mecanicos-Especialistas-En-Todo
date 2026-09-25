@@ -87,7 +87,7 @@ fun UniversalServicesScreen(
     }
 
     var selectedDomain by rememberSaveable { mutableStateOf("TODOS") }
-    val domains = remember { listOf("TODOS", "Ferretería & Materiales", "Hogar", "Movilidad", "Automotriz", "Profesional", "Digital", "Logística") }
+    val domains = remember { listOf("TODOS", "Pulperías & Minisúper", "Sodas & Restaurantes", "Ferretería & Materiales", "Hogar", "Movilidad", "Automotriz", "Profesional", "Digital", "Logística") }
 
     val activeSelection = selected
     if (activeSelection != null) {

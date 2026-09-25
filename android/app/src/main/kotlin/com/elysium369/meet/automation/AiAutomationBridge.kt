@@ -33,6 +33,9 @@ sealed interface AiAction {
         val requestId: String,
         val offerId: String? = null,
     ) : AiAction
+    data class VoiceCommand(val command: String) : AiAction
+    data class CancelRide(val rideId: String? = null) : AiAction
+    object ClearStuckRides : AiAction
     object DumpState : AiAction
 }
 

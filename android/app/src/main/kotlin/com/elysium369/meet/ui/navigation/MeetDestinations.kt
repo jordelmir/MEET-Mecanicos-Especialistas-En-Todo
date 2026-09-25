@@ -59,6 +59,8 @@ object MeetDestinations {
     const val PROPERTIES = "elysium_properties"
     const val FUEL_REWARDS = "fuel_rewards"
     const val ELYSIUM_SERVICES = "elysium_services"
+    const val SERVICES_ACTIVE = "services_active"
+    const val SERVICES_COMPLETED = "services_completed"
     const val AGENT_STORE = "agent_store"
 
     // SAFETY FOUNDATION V1

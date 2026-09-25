@@ -518,6 +518,7 @@ class ObdViewModel @Inject constructor(
     private val ridePaymentGateway: com.elysium369.meet.ride.payment.RidePaymentGateway,
     private val rideLiveVoiceBridge: com.elysium369.meet.communications.RideLiveVoiceBridge? = null,
     private val rideChatBridge: com.elysium369.meet.communications.RideRealtimeChatBridge? = null,
+    private val commerceOrderDao: com.elysium369.meet.commerce.data.local.CommerceOrderDao? = null,
 ) : ViewModel() {
 
     // Device-level identity must be initialized before init{} calls provider role refresh.
@@ -1358,6 +1359,140 @@ class ObdViewModel @Inject constructor(
 
     val openPartRequests: StateFlow<List<PartRequestEntity>> = marketplaceDao.getOpenPartRequests()
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    // ── Local Commerce & Delivery (Pulperías & Sodas) ──
+    val activeCommerceOrders: StateFlow<List<com.elysium369.meet.commerce.data.local.CommerceOrderEntity>> =
+        commerceOrderDao?.getActiveOrders()
+            ?.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+            ?: MutableStateFlow(emptyList())
+
+    val completedCommerceOrders: StateFlow<List<com.elysium369.meet.commerce.data.local.CommerceOrderEntity>> =
+        commerceOrderDao?.getCompletedOrders()
+            ?.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+            ?: MutableStateFlow(emptyList())
+
+    val activeCourierMissions: StateFlow<List<com.elysium369.meet.commerce.data.local.CommerceOrderEntity>> =
+        commerceOrderDao?.getActiveCourierMissions()
+            ?.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+            ?: MutableStateFlow(emptyList())
+
+    fun createCommerceOrder(
+        commerceType: String,
+        merchantId: String,
+        merchantName: String,
+        merchantPhone: String,
+        merchantAddress: String,
+        merchantLat: Double,
+        merchantLng: Double,
+        customerName: String,
+        customerPhone: String,
+        deliveryAddress: String,
+        deliveryLat: Double,
+        deliveryLng: Double,
+        itemsJson: String,
+        itemsSubtotalMinor: Long,
+        deliveryFeeMinor: Long,
+        paymentMethod: String,
+        onCreated: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val orderId = java.util.UUID.randomUUID().toString()
+            val pin = (1000..9999).random().toString()
+            val total = itemsSubtotalMinor + deliveryFeeMinor
+            val order = com.elysium369.meet.commerce.data.local.CommerceOrderEntity(
+                orderId = orderId,
+                commerceType = commerceType,
+                merchantId = merchantId,
+                merchantName = merchantName,
+                merchantPhone = merchantPhone,
+                merchantAddress = merchantAddress,
+                merchantLat = merchantLat,
+                merchantLng = merchantLng,
+                customerId = localDeviceId,
+                customerName = customerName,
+                customerPhone = customerPhone,
+                deliveryAddress = deliveryAddress,
+                deliveryLat = deliveryLat,
+                deliveryLng = deliveryLng,
+                itemsJson = itemsJson,
+                itemsSubtotalMinor = itemsSubtotalMinor,
+                deliveryFeeMinor = deliveryFeeMinor,
+                totalAmountMinor = total,
+                paymentMethod = paymentMethod,
+                paymentStatus = if (paymentMethod == "SINPE") "ESCROW_HELD" else "PENDING",
+                deliveryPin = pin,
+                status = "PLACED",
+                createdAt = System.currentTimeMillis()
+            )
+            commerceOrderDao?.insertOrder(order)
+            onCreated(orderId)
+        }
+    }
+
+    fun advanceCommerceMerchantStatus(orderId: String, newStatus: String) {
+        viewModelScope.launch {
+            val readyAt = if (newStatus == "READY_FOR_PICKUP") System.currentTimeMillis() else null
+            commerceOrderDao?.updateMerchantStatus(orderId, newStatus, readyAt)
+        }
+    }
+
+    fun assignCommerceCourier(
+        orderId: String,
+        courierId: String,
+        courierName: String,
+        courierPhone: String,
+        courierVehicle: String
+    ) {
+        viewModelScope.launch {
+            commerceOrderDao?.assignCourier(orderId, courierId, courierName, courierPhone, courierVehicle)
+        }
+    }
+
+    fun advanceCommerceCourierStatus(orderId: String, newStatus: String) {
+        viewModelScope.launch {
+            val pickedUpAt = if (newStatus == "IN_TRANSIT") System.currentTimeMillis() else null
+            commerceOrderDao?.updateCourierTransitStatus(orderId, newStatus, pickedUpAt)
+        }
+    }
+
+    fun verifyCommerceDeliveryPin(
+        orderId: String,
+        enteredPin: String,
+        rating: Int = 5,
+        review: String = "",
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val order = commerceOrderDao?.getOrderById(orderId)
+            if (order == null) {
+                onError("Orden no encontrada")
+                return@launch
+            }
+            if (order.deliveryPin.trim() != enteredPin.trim()) {
+                onError("PIN de entrega incorrecto. Pide el código de 4 dígitos al cliente.")
+                return@launch
+            }
+            val epochMs = System.currentTimeMillis()
+            val raw = "$orderId|${order.totalAmountMinor}|${order.customerId}|${order.courierId}|$epochMs|DELIVERED_PIN_VERIFIED"
+            val hash = com.elysium369.meet.core.reports.HashEngine.sha256Hex(raw)
+            commerceOrderDao?.completeDeliveryWithPin(orderId, epochMs, hash)
+            commerceOrderDao?.rateOrder(orderId, rating, review)
+            onSuccess()
+        }
+    }
+
+    fun cancelCommerceOrder(orderId: String) {
+        viewModelScope.launch {
+            commerceOrderDao?.cancelOrder(orderId)
+        }
+    }
+
+    fun cancelServiceRequest(requestId: String) {
+        viewModelScope.launch {
+            marketplaceDao.markServiceCancelled(requestId)
+        }
+    }
 
     private val _dekraConciergeSubmission = MutableStateFlow<DekraConciergeSubmissionState>(
         DekraConciergeSubmissionState.Idle,
@@ -8935,6 +9070,11 @@ class ObdViewModel @Inject constructor(
         canSelectRide(request, _rideDriverMode.value)
 
     private fun canSelectRide(request: RideRequestEntity, driverMode: Boolean): Boolean {
+        if (request.status in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED") ||
+            request.serverState in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED")
+        ) {
+            return false
+        }
         val currentDriverId = driverVerification.value?.driverId
         val actorId = currentRideActorId
         val cloudUserId = currentCloudUserId()
@@ -9192,6 +9332,30 @@ class ObdViewModel @Inject constructor(
                 }
             }
             is com.elysium369.meet.automation.AiAction.TriggerObdDemo -> {
+                dumpAiStateSnapshot()
+            }
+            is com.elysium369.meet.automation.AiAction.VoiceCommand -> {
+                Log.i("ObdViewModel", "VoiceCommand received via AiAction: ${action.command}")
+                val q = action.command.lowercase().trim()
+                if (q.contains("viaje") || q.contains("ride") || q.contains("transporte")) {
+                    setRideDriverMode(false)
+                }
+                dumpAiStateSnapshot()
+            }
+            is com.elysium369.meet.automation.AiAction.CancelRide -> {
+                val targetId = action.rideId ?: _activeRideRequest.value?.requestId
+                if (targetId != null) {
+                    cancelRide(
+                        requestId = targetId,
+                        reason = RideCancellationReason.CHANGE_OF_PLANS,
+                        detail = "Cancelado por operador AI",
+                        actorRole = if (_rideDriverMode.value) "DRIVER" else "PASSENGER",
+                    )
+                }
+                dumpAiStateSnapshot()
+            }
+            is com.elysium369.meet.automation.AiAction.ClearStuckRides -> {
+                clearAllStuckRides()
                 dumpAiStateSnapshot()
             }
             is com.elysium369.meet.automation.AiAction.DumpState -> {
@@ -10495,15 +10659,36 @@ class ObdViewModel @Inject constructor(
     fun localCancelStuckRide(requestId: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val request = rideDao.getRequestById(requestId) ?: return@launch
-            if (request.status != "PENDING_PUBLICATION" || request.serverVersion != 0L) return@launch
+            rideCommandRepository.cancelPublicationCommands(requestId)
+            rideCommandRepository.cancelStuckPendingPublication(requestId)
+            rideDao.markRequestCancelledLocally(requestId)
+            rideDao.clearActiveRideSelectionsForRide(requestId)
+            applyActiveRide(null)
+            _rideVerificationNotice.emit("Viaje local cancelado.")
             val queued = reportRideCommandEnqueue(
                 rideCommandRepository.enqueue(
                     envelope = rideCommandEnvelope(requestId, 0L, RideCommandType.CANCEL),
                     payload = RideCommandPayload(reasonCode = RideCancellationReason.DUPLICATE_OR_ACCIDENTAL.name),
                 ),
-                acceptedMessage = "Cancelación registrada. Esperando confirmación si la publicación llegó al servidor.",
+                acceptedMessage = "Cancelación registrada.",
             )
             if (queued) RideCommandSyncWorker.enqueueNow(context)
+        }
+    }
+
+    fun clearAllStuckRides() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val principal = activePrincipalKernel.current().id
+            val myPassengerId = currentRideActorId.ifBlank { principal }
+            rideDao.cancelUnpublishedRidesForPassenger(myPassengerId)
+            selectedRideRequestId?.let { rideDao.clearActiveRideSelectionsForRide(it) }
+            val roleKey = com.elysium369.meet.ride.domain.RideRoleContextPolicy
+                .selectionOwnerKey(principal, _rideDriverMode.value)
+            if (roleKey != null) {
+                rideDao.clearActiveRideSelection(roleKey)
+            }
+            applyActiveRide(null)
+            _rideVerificationNotice.emit("Viajes activos restablecidos.")
         }
     }
 
@@ -10515,10 +10700,13 @@ class ObdViewModel @Inject constructor(
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             val role = runCatching { RideActorRole.valueOf(actorRole.uppercase()) }.getOrNull()
+                ?: if (_rideDriverMode.value) RideActorRole.DRIVER else RideActorRole.PASSENGER
+            val safeReason = if (role == RideActorRole.DRIVER && reason !in RideCancellationPolicy.reasonsFor(role)) {
+                RideCancellationReason.OTHER
+            } else reason
             val error = when {
-                !RideCancellationPolicy.isDetailValid(reason, detail) -> "Revisa el detalle de la cancelación."
+                !RideCancellationPolicy.isDetailValid(safeReason, detail) -> "Revisa el detalle de la cancelación."
                 role !in setOf(RideActorRole.PASSENGER, RideActorRole.DRIVER) -> "El rol no permite cancelar este viaje."
-                role != null && reason !in RideCancellationPolicy.reasonsFor(role) -> "Selecciona un motivo válido para tu rol."
                 currentCloudUserId().isNullOrBlank() && currentRideActorId.isBlank() -> "Inicia sesión para cancelar el viaje."
                 else -> null
             }
@@ -10529,8 +10717,39 @@ class ObdViewModel @Inject constructor(
             val request = rideDao.getRequestById(requestId)
             if (request == null) {
                 rideDao.clearActiveRideSelectionsForRide(requestId)
-                selectActiveRide(null)
+                applyActiveRide(null)
                 _rideVerificationNotice.emit("No se encontró el viaje. Solicitud cerrada.")
+                return@launch
+            }
+            // If already completed or cancelled, release local pointer immediately:
+            if (request.status in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED") ||
+                request.serverState in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED")
+            ) {
+                rideDao.clearActiveRideSelectionsForRide(requestId)
+                applyActiveRide(null)
+                _rideVerificationNotice.emit("El servicio ya se encuentra finalizado o cancelado.")
+                return@launch
+            }
+            // If still in PENDING_PUBLICATION (version 0):
+            if (request.serverVersion == 0L || request.status == "PENDING_PUBLICATION") {
+                rideCommandRepository.cancelPublicationCommands(requestId)
+                rideCommandRepository.cancelStuckPendingPublication(requestId)
+                rideDao.markRequestCancelledLocally(requestId)
+                rideDao.clearActiveRideSelectionsForRide(requestId)
+                applyActiveRide(null)
+                _rideVerificationNotice.emit("Viaje cancelado exitosamente.")
+                rideCommandRepository.enqueue(
+                    envelope = rideCommandEnvelope(
+                        requestId = requestId,
+                        serverVersion = 0L,
+                        type = RideCommandType.CANCEL,
+                    ),
+                    payload = RideCommandPayload(
+                        reasonCode = safeReason.name,
+                        detail = detail?.trim()?.takeIf(String::isNotEmpty),
+                    ),
+                )
+                RideCommandSyncWorker.enqueueNow(context)
                 return@launch
             }
             val expectedVersion: Long = request.serverVersion
@@ -10550,7 +10769,7 @@ class ObdViewModel @Inject constructor(
                             type = RideCommandType.CANCEL,
                         ),
                         payload = RideCommandPayload(
-                            reasonCode = reason.name,
+                            reasonCode = safeReason.name,
                             detail = detail?.trim()?.takeIf(String::isNotEmpty),
                         ),
                     ),

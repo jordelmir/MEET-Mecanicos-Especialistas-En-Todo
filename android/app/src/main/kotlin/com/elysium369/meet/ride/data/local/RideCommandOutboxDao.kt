@@ -259,6 +259,17 @@ interface RideCommandOutboxDao {
     suspend fun cancelStuckPendingPublication(rideId: String): Int
 
     @Query("""
+        UPDATE ride_command_outbox
+        SET status = 'SUPERSEDED',
+            lastErrorCode = 'CANCELLED_BY_USER',
+            updatedAt = :now
+        WHERE rideId = :rideId
+          AND commandType IN ('PUBLISH', 'PUBLISH_GUEST')
+          AND status IN ('PENDING', 'RETRYABLE', 'IN_FLIGHT', 'FAILED')
+    """)
+    suspend fun cancelPublicationCommands(rideId: String, now: Long = System.currentTimeMillis()): Int
+
+    @Query("""
         SELECT requestId FROM ride_requests
         WHERE status = 'PENDING_PUBLICATION'
           AND syncState = 'PENDING'

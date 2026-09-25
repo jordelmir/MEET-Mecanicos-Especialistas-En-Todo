@@ -17,13 +17,11 @@ class AgentEntitlementRepository @Inject constructor() {
     val equippedAgentId: StateFlow<String> = _equippedAgentId.asStateFlow()
 
     fun hasEntitlement(entitlementId: String?): Boolean {
-        if (entitlementId == null) return true // Free capability
-        return _userEntitlements.value.contains(entitlementId)
+        return true // Todos los agentes desbloqueados
     }
 
     fun isAgentOwned(agentId: String, requiredEntitlement: String?): Boolean {
-        if (requiredEntitlement == null || agentId == "agent.evair_core") return true
-        return _userEntitlements.value.contains(requiredEntitlement)
+        return true // Todos los agentes desbloqueados por defecto
     }
 
     fun grantEntitlement(entitlementId: String) {

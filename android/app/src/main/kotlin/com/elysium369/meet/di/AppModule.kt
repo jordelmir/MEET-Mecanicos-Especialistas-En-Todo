@@ -4986,6 +4986,55 @@ object AppModule {
         }
     }
 
+    val MIGRATION_83_84 = object : Migration(83, 84) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `commerce_orders` (
+                    `orderId` TEXT NOT NULL,
+                    `commerceType` TEXT NOT NULL,
+                    `merchantId` TEXT NOT NULL,
+                    `merchantName` TEXT NOT NULL,
+                    `merchantPhone` TEXT NOT NULL,
+                    `merchantAddress` TEXT NOT NULL,
+                    `merchantLat` REAL NOT NULL,
+                    `merchantLng` REAL NOT NULL,
+                    `customerId` TEXT NOT NULL,
+                    `customerName` TEXT NOT NULL,
+                    `customerPhone` TEXT NOT NULL,
+                    `deliveryAddress` TEXT NOT NULL,
+                    `deliveryLat` REAL NOT NULL,
+                    `deliveryLng` REAL NOT NULL,
+                    `itemsJson` TEXT NOT NULL,
+                    `itemsSubtotalMinor` INTEGER NOT NULL,
+                    `deliveryFeeMinor` INTEGER NOT NULL,
+                    `totalAmountMinor` INTEGER NOT NULL,
+                    `currency` TEXT NOT NULL,
+                    `paymentMethod` TEXT NOT NULL,
+                    `paymentStatus` TEXT NOT NULL,
+                    `courierId` TEXT,
+                    `courierName` TEXT,
+                    `courierPhone` TEXT,
+                    `courierVehicle` TEXT,
+                    `deliveryPin` TEXT NOT NULL,
+                    `status` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `readyAt` INTEGER,
+                    `pickedUpAt` INTEGER,
+                    `deliveredAt` INTEGER,
+                    `completedAt` INTEGER,
+                    `integrityHash` TEXT,
+                    `ratingStars` INTEGER,
+                    `reviewNotes` TEXT,
+                    PRIMARY KEY(`orderId`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_commerce_orders_status` ON `commerce_orders` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_commerce_orders_customerId` ON `commerce_orders` (`customerId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_commerce_orders_merchantId` ON `commerce_orders` (`merchantId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_commerce_orders_courierId` ON `commerce_orders` (`courierId`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -5056,6 +5105,7 @@ object AppModule {
             MIGRATION_80_81,
             MIGRATION_81_82,
             MIGRATION_82_83,
+            MIGRATION_83_84,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -5262,6 +5312,9 @@ object AppModule {
 
     @Provides
     fun provideRideDao(db: MeetDatabase): com.elysium369.meet.data.local.dao.RideDao = db.rideDao()
+
+    @Provides
+    fun provideCommerceOrderDao(db: MeetDatabase): com.elysium369.meet.commerce.data.local.CommerceOrderDao = db.commerceOrderDao()
 
     @Provides
     fun provideRideCommandOutboxDao(

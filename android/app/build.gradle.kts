@@ -52,8 +52,8 @@ android {
         targetSdk = 36
         // Navigation continuity: retained auth graph, ordered back stack and
         // saveable transactional drafts across recreation.
-        versionCode = 60
-        versionName = "4.26.1"
+        versionCode = 61
+        versionName = "4.27.0"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a"))

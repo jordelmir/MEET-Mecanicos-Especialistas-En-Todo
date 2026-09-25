@@ -98,7 +98,7 @@ def run_adb(args, capture=True):
         return "", "", res.returncode
 
 def dump_state():
-    run_adb(["shell", "am", "broadcast", "-a", "com.elysium369.meet.AI_ACTION", "--es", "type", "DUMP_STATE"])
+    run_adb(["shell", "am", "broadcast", "-p", "com.elysium369.meet", "-a", "com.elysium369.meet.AI_ACTION", "--es", "type", "DUMP_STATE"])
     time.sleep(0.4)
     out, _, code = run_adb(["shell", "run-as", "com.elysium369.meet", "cat", "files/meet_state.json"])
     if code == 0 and out and out.startswith("{"):
@@ -241,13 +241,14 @@ def resolve_route(route_query):
 
 def nav(route):
     target = resolve_route(route)
-    run_adb(["shell", "am", "broadcast", "-a", "com.elysium369.meet.AI_NAVIGATE", "--es", "route", target])
+    run_adb(["shell", "am", "broadcast", "-p", "com.elysium369.meet", "-a", "com.elysium369.meet.AI_NAVIGATE", "--es", "route", target])
     time.sleep(0.5)
     print(f"Dispatched AI_NAVIGATE to route: {target} (requested: {route})")
 
 def switch_role(is_driver):
     run_adb([
         "shell", "am", "broadcast",
+        "-p", "com.elysium369.meet",
         "-a", "com.elysium369.meet.AI_ACTION",
         "--es", "type", "SWITCH_ROLE",
         "--ez", "isDriver", "true" if is_driver else "false"
@@ -291,6 +292,7 @@ def switch_mode(target_mode):
 def inject_gps(lat, lng):
     run_adb([
         "shell", "am", "broadcast",
+        "-p", "com.elysium369.meet",
         "-a", "com.elysium369.meet.AI_ACTION",
         "--es", "type", "INJECT_GPS",
         "--ef", "lat", str(lat),
@@ -645,6 +647,7 @@ def main():
             if r_id:
                 run_adb([
                     "shell", "am", "broadcast",
+                    "-p", "com.elysium369.meet",
                     "-a", "com.elysium369.meet.AI_ACTION",
                     "--es", "type", "ADVANCE_RIDE_STATUS",
                     "--es", "rideId", r_id,
@@ -655,12 +658,23 @@ def main():
                 print(msg)
         else:
             print("Tapped 'Completar Viaje ✅'")
+    elif cmd in ["voice", "companion-voice", "talk"]:
+        text = " ".join(sys.argv[2:]) if len(sys.argv) > 2 else "pedirme un viaje"
+        run_adb([
+            "shell", "am", "broadcast",
+            "-p", "com.elysium369.meet",
+            "-a", "com.elysium369.meet.AI_ACTION",
+            "--es", "type", "VOICE_COMMAND",
+            "--es", "command", text,
+        ])
+        print(f"Dispatched VOICE_COMMAND to 3D Companion: '{text}'")
     elif cmd == "create-ride":
         pickup = sys.argv[2] if len(sys.argv) > 2 else "San José Centro"
         dest = sys.argv[3] if len(sys.argv) > 3 else "Cartago Centro"
         price = float(sys.argv[4]) if len(sys.argv) > 4 else 3500.0
         run_adb([
             "shell", "am", "broadcast",
+            "-p", "com.elysium369.meet",
             "-a", "com.elysium369.meet.AI_ACTION",
             "--es", "type", "CREATE_RIDE",
             "--es", "pickup", pickup,
@@ -678,6 +692,7 @@ def main():
         msg = sys.argv[5] if len(sys.argv) > 5 else None
         b_args = [
             "shell", "am", "broadcast",
+            "-p", "com.elysium369.meet",
             "-a", "com.elysium369.meet.AI_ACTION",
             "--es", "type", "SUBMIT_OFFER",
             "--es", "requestId", req_id,
@@ -696,6 +711,7 @@ def main():
         offer_id = sys.argv[3] if len(sys.argv) > 3 else None
         b_args = [
             "shell", "am", "broadcast",
+            "-p", "com.elysium369.meet",
             "-a", "com.elysium369.meet.AI_ACTION",
             "--es", "type", "ACCEPT_OFFER",
             "--es", "requestId", req_id,
@@ -712,6 +728,7 @@ def main():
         status = sys.argv[3]
         run_adb([
             "shell", "am", "broadcast",
+            "-p", "com.elysium369.meet",
             "-a", "com.elysium369.meet.AI_ACTION",
             "--es", "type", "ADVANCE_RIDE_STATUS",
             "--es", "rideId", req_id,

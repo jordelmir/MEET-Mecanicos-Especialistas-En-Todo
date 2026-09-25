@@ -9503,12 +9503,14 @@ private fun AuthoritativeRideCancellationDialog(
             "La cancelación no fue confirmada. Actualiza el viaje y revisa su estado antes de reintentar."
         else -> null
     }
-    LaunchedEffect(request?.serverState, request?.syncState, request?.status) {
-        if (request?.serverState == "CANCELLED" ||
-            request?.syncState == "LOCAL_CANCELLED" ||
-            request?.status == "CANCELLED"
+    val currentRequest = request
+    LaunchedEffect(currentRequest?.serverState, currentRequest?.syncState, currentRequest?.status) {
+        if (currentRequest == null ||
+            currentRequest.serverState in setOf("CANCELLED", "COMPLETED") ||
+            currentRequest.syncState == "LOCAL_CANCELLED" ||
+            currentRequest.status in setOf("CANCELLED", "COMPLETED")
         ) {
-            delay(500L)
+            delay(300L)
             onDismiss()
         }
     }

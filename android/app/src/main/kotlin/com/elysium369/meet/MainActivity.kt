@@ -1,6 +1,7 @@
 package com.elysium369.meet
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
+import com.elysium369.meet.ui.components.ElysiumLivingCompanionOverlay
 
 import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.theme.MeetTheme
@@ -1106,6 +1107,37 @@ fun MeetApp(
                     viewModel = obdViewModel
                 )
             }
+            composable(MeetDestinations.SERVICES_ACTIVE) {
+                com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
+                    navController = navController,
+                    viewModel = obdViewModel,
+                    initialTab = 0
+                )
+            }
+            composable(MeetDestinations.SERVICES_COMPLETED) {
+                com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
+                    navController = navController,
+                    viewModel = obdViewModel,
+                    initialTab = 1
+                )
+            }
+            composable(
+                route = "services_active?tab={tab}",
+                arguments = listOf(
+                    androidx.navigation.navArgument("tab") {
+                        type = androidx.navigation.NavType.StringType
+                        defaultValue = "active"
+                    }
+                )
+            ) { backStackEntry ->
+                val tabParam = backStackEntry.arguments?.getString("tab") ?: "active"
+                val initialTab = if (tabParam == "completed") 1 else 0
+                com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
+                    navController = navController,
+                    viewModel = obdViewModel,
+                    initialTab = initialTab
+                )
+            }
             composable("universal_activity/{serviceId}") { backStackEntry ->
                 val serviceId = backStackEntry.arguments?.getString("serviceId").orEmpty()
                 val service = com.elysium369.meet.core.services.UniversalServiceCatalog.getById(serviceId)
@@ -1610,11 +1642,18 @@ fun MeetApp(
                         ride = activeRide,
                         notice = rideNotice,
                         onCancelRide = {
+                            val isDriver = isDriverMode
+                            val role = if (isDriver) "DRIVER" else "PASSENGER"
+                            val reason = if (isDriver) {
+                                com.elysium369.meet.ride.domain.RideCancellationReason.PASSENGER_NO_SHOW
+                            } else {
+                                com.elysium369.meet.ride.domain.RideCancellationReason.CHANGE_OF_PLANS
+                            }
                             obdViewModel.cancelRide(
                                 requestId = activeRide.rideId,
-                                reason = com.elysium369.meet.ride.domain.RideCancellationReason.CHANGE_OF_PLANS,
+                                reason = reason,
                                 detail = "Cancelado desde seguimiento",
-                                actorRole = "PASSENGER"
+                                actorRole = role
                             )
                         },
                         onGeneratePin = {
@@ -1795,6 +1834,14 @@ fun MeetApp(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .zIndex(99f),
+        )
+
+        // Elysium Living 3D Companion Overlay (Draco Dragon, Pokemon Volt, Goku SSJ4, Evair, etc.)
+        // Lives across all screens, draggable, speech bubble, TTS audible interaction, companion switcher
+        ElysiumLivingCompanionOverlay(
+            navController = navController,
+            obdViewModel = obdViewModel,
+            activeRoute = activeRoute,
         )
         }
         BackHandler(enabled = activeRoute != null && activeRoute != MeetDestinations.HOME) {

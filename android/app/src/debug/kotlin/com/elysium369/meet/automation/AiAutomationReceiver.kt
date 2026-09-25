@@ -85,6 +85,18 @@ class AiAutomationReceiver : BroadcastReceiver() {
                         val offerId = intent.getStringExtra("offerId")
                         AiAutomationBridge.dispatchAction(AiAction.AcceptOffer(rideId, offerId))
                     }
+                    "VOICE_COMMAND", "COMPANION_VOICE" -> {
+                        val cmd = intent.getStringExtra("command") ?: intent.getStringExtra("text") ?: "pedirme un viaje"
+                        Log.i(TAG, "AiAutomation: Dispatching VoiceCommand: $cmd")
+                        AiAutomationBridge.dispatchAction(AiAction.VoiceCommand(cmd))
+                    }
+                    "CANCEL_RIDE", "CANCEL_ACTIVE_RIDE" -> {
+                        val rideId = intent.getStringExtra("rideId") ?: intent.getStringExtra("requestId")
+                        AiAutomationBridge.dispatchAction(AiAction.CancelRide(rideId))
+                    }
+                    "CLEAR_STUCK_RIDES", "RESET_RIDES" -> {
+                        AiAutomationBridge.dispatchAction(AiAction.ClearStuckRides)
+                    }
                     "DUMP_STATE" -> {
                         AiAutomationBridge.dispatchAction(AiAction.DumpState)
                     }
