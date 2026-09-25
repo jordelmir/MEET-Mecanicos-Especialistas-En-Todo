@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,6 +39,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elysium369.meet.core.agent.laya.ActionType
+import com.elysium369.meet.core.agent.laya.RideAssistantContext
 import com.elysium369.meet.core.geo.CommonMapState
 import com.elysium369.meet.core.geo.GeoMarker
 import com.elysium369.meet.core.geo.GeoMarkerRole
@@ -46,6 +49,7 @@ import com.elysium369.meet.core.geo.GeoRoute
 import com.elysium369.meet.core.geo.runtime.CommonMapPanel
 import com.elysium369.meet.ride.domain.RideState
 import com.elysium369.meet.ride.payment.RidePaymentMethod
+import com.elysium369.meet.ui.agent.laya.EvairAssistantSheet
 import com.elysium369.meet.ui.theme.MeetColors
 
 /**
@@ -65,6 +69,7 @@ fun ActiveRideTrackingScreen(
 ) {
     val context = LocalContext.current
     var showSafetyCenter by remember { mutableStateOf(false) }
+    var showEvairAssistant by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
     var now by remember(ride.rideId) { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(ride.rideId) {
@@ -291,6 +296,51 @@ fun ActiveRideTrackingScreen(
                             )
                         }
 
+                        // EVAIR Smart Assistant card (Laya AI)
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showEvairAssistant = true },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MeetColors.cardBackgroundLighter,
+                            border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.SmartToy,
+                                        contentDescription = null,
+                                        tint = MeetColors.neonGreen,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            "Asistente EVAIR (Laya AI)",
+                                            color = MeetColors.textPrimary,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            "¿Dudas de ETA, Sinpe Móvil o tu viaje?",
+                                            color = MeetColors.cyberCyan,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                                Text(
+                                    "Consultar →",
+                                    color = MeetColors.neonGreen,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
                         // Boarding PIN card when driver has arrived
                         if (ride.state == RideState.ARRIVED) {
                             if (ride.boardingPin != null) {
@@ -405,6 +455,33 @@ fun ActiveRideTrackingScreen(
                     dismissButton = { TextButton(onClick = { showSafetyCenter = false }) { Text("Cerrar") } }
                 )
             }
+
+            // Laya AI Assistant Modal Bottom Sheet
+            EvairAssistantSheet(
+                isOpen = showEvairAssistant,
+                onDismiss = { showEvairAssistant = false },
+                rideContext = RideAssistantContext(
+                    rideId = ride.rideId,
+                    driverName = ride.driver?.name,
+                    driverPlate = ride.driver?.plate,
+                    driverVehicle = ride.driver?.vehicle,
+                    state = ride.state.name,
+                    etaMinutes = ride.driver?.etaMinutes ?: ride.fareQuote.estimatedDurationMin,
+                    pickupAddress = ride.pickup.displayName,
+                    dropoffAddress = ride.dropoff.displayName,
+                    fareFormatted = ride.fareQuote.formattedTotal,
+                    paymentMethod = "SINPE_MOVIL"
+                ),
+                onActionTriggered = { action ->
+                    when (action.type) {
+                        ActionType.CALL_DRIVER -> onCallDriver?.invoke()
+                        ActionType.MESSAGE_DRIVER -> onMessageDriver?.invoke()
+                        ActionType.SAFETY_CENTER -> showSafetyCenter = true
+                        ActionType.CANCEL_RIDE -> onCancelRide()
+                        else -> {}
+                    }
+                }
+            )
         }
     }
 }

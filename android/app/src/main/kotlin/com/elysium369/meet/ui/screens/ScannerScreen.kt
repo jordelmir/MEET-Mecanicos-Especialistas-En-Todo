@@ -47,10 +47,13 @@ import com.elysium369.meet.ui.components.hud.HudFaceSelector
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.material.icons.filled.SmartToy
 import com.elysium369.meet.core.agent.anchor.AgentAnchorId
 import com.elysium369.meet.core.agent.anchor.agentAnchor
 import com.elysium369.meet.core.agent.evair.EvairTutorialEngine
+import com.elysium369.meet.core.agent.laya.VehicleAssistantContext
 import com.elysium369.meet.ui.agent.evair.EvairLivingGuideOverlay
+import com.elysium369.meet.ui.agent.laya.EvairAssistantSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -137,6 +140,7 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     var selectedTab by remember { mutableIntStateOf(0) }
     var hudMode by remember { mutableStateOf(false) }
+    var showDiagnosticAssistant by remember { mutableStateOf(false) }
 
     // AI Anomaly Snackbar Notification
     LaunchedEffect(anomalousPids) {
@@ -245,6 +249,18 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                         }
                     },
                     actions = {
+                        // EVAIR Diagnostic Assistant (Laya AI) Button
+                        IconButton(
+                            onClick = { showDiagnosticAssistant = true },
+                            modifier = Modifier.padding(end = 2.dp)
+                        ) {
+                            AnimatedNeonIcon(
+                                imageVector = Icons.Default.SmartToy,
+                                contentDescription = "Asistente EVAIR (Laya AI)",
+                                tint = MeetColors.neonGreen,
+                            )
+                        }
+
                         // Voice Copilot Active / Deactive Toggle Button
                         IconButton(
                             onClick = {
@@ -429,5 +445,16 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
 
     // ── E V A I R   L I V I N G   G U I D E   O V E R L A Y ──
     EvairLivingGuideOverlay()
+
+    // ── E V A I R   D I A G N O S T I C   A S S I S T A N T   ( L A Y A   A I ) ──
+    EvairAssistantSheet(
+        isOpen = showDiagnosticAssistant,
+        onDismiss = { showDiagnosticAssistant = false },
+        vehicleContext = VehicleAssistantContext(
+            vehicleName = "Vehículo Conectado",
+            coolantTempC = liveData["0105"]?.toInt(),
+            isObdConnected = state == ObdState.CONNECTED
+        )
+    )
 }
 }
