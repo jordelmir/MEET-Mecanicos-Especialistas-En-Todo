@@ -58,6 +58,13 @@ data class AgentRegistration(
     val state: AgentState = AgentState.IDLE,
 )
 
+data class AgentIntentMatch(
+    val agent: AgentRegistration,
+    val matchedCapability: AgentCapability,
+    val score: Double,
+    val matchType: String,
+)
+
 // ─── Bus Messages ───
 
 @Serializable
@@ -140,14 +147,93 @@ class ElysiumAgentBus {
             if (domainAgents.isNotEmpty()) return domainAgents.first()
         }
 
-        // Capability-based routing (intent matching)
-        val capableAgents = agents.values.filter { reg ->
-            reg.capabilities.any { cap ->
-                request.intent.contains(cap.intentPattern, ignoreCase = true)
+        // Capability-based routing with calibrated intent scoring (Master Order Omega P0-C & §15)
+        val matches = agents.values.flatMap { reg ->
+            reg.capabilities.mapNotNull { cap ->
+                calculateMatchScore(request.intent, cap.intentPattern)?.let { (score, matchType) ->
+                    AgentIntentMatch(
+                        agent = reg,
+                        matchedCapability = cap,
+                        score = score,
+                        matchType = matchType,
+                    )
+                }
             }
-        }.sortedByDescending { it.priority }
+        }.sortedWith(
+            compareByDescending<AgentIntentMatch> { it.score }
+                .thenByDescending { it.agent.priority }
+        )
 
-        return capableAgents.firstOrNull()
+        return matches.firstOrNull()?.agent
+    }
+
+    /**
+     * Resolves the best agent and capability with its matching confidence score.
+     */
+    fun routeWithMatch(request: AgentRequest): AgentIntentMatch? {
+        if (request.toAgentId != null) {
+            val agent = agents[AgentId(request.toAgentId)] ?: return null
+            val defaultCap = agent.capabilities.firstOrNull() ?: AgentCapability("direct", "Direct addressing")
+            return AgentIntentMatch(agent, defaultCap, 1.0, "DIRECT")
+        }
+
+        return agents.values.flatMap { reg ->
+            if (request.targetDomain != null && reg.domain != request.targetDomain) {
+                emptyList()
+            } else {
+                reg.capabilities.mapNotNull { cap ->
+                    calculateMatchScore(request.intent, cap.intentPattern)?.let { (score, matchType) ->
+                        AgentIntentMatch(reg, cap, score, matchType)
+                    }
+                }
+            }
+        }.sortedWith(
+            compareByDescending<AgentIntentMatch> { it.score }
+                .thenByDescending { it.agent.priority }
+        ).firstOrNull()
+    }
+
+    private fun calculateMatchScore(inputIntent: String, pattern: String): Pair<Double, String>? {
+        val trimmedInput = inputIntent.trim()
+        val trimmedPattern = pattern.trim()
+        if (trimmedInput.isEmpty() || trimmedPattern.isEmpty()) return null
+
+        // 1. Exact match (highest confidence)
+        if (trimmedInput.equals(trimmedPattern, ignoreCase = true)) {
+            return 1.0 to "EXACT"
+        }
+
+        // 2. Regex pattern match
+        if (trimmedPattern.contains(".*") || trimmedPattern.startsWith("^") || trimmedPattern.endsWith("$") || trimmedPattern.contains("\\b")) {
+            try {
+                val regex = Regex(trimmedPattern, RegexOption.IGNORE_CASE)
+                if (regex.containsMatchIn(trimmedInput)) {
+                    return 0.95 to "REGEX"
+                }
+            } catch (_: Exception) {}
+        }
+
+        // 3. Whole-word / token boundary match
+        try {
+            val wordRegex = Regex("\\b${Regex.escape(trimmedPattern)}\\b", RegexOption.IGNORE_CASE)
+            if (wordRegex.containsMatchIn(trimmedInput)) {
+                return 0.85 to "WORD_BOUNDARY"
+            }
+        } catch (_: Exception) {}
+
+        // 4. Token intersection match (multi-word input vs pattern)
+        val inputTokens = trimmedInput.lowercase().split("\\s+".toRegex()).toSet()
+        val patternTokens = trimmedPattern.lowercase().split("\\s+".toRegex()).toSet()
+        if (patternTokens.isNotEmpty() && inputTokens.containsAll(patternTokens)) {
+            return 0.80 to "TOKEN_EXHAUSTIVE"
+        }
+
+        // 5. Substring match fallback
+        if (trimmedInput.contains(trimmedPattern, ignoreCase = true)) {
+            return 0.60 to "SUBSTRING"
+        }
+
+        return null
     }
 
     /**

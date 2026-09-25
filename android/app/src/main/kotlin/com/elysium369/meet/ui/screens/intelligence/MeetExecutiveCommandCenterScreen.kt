@@ -25,6 +25,7 @@ import com.elysium369.meet.core.identity.ScopeType
 import com.elysium369.meet.core.intelligence.engine.AnomalyLevel
 import com.elysium369.meet.core.intelligence.engine.IntelligenceEngine
 import com.elysium369.meet.core.intelligence.engine.OperationalAnomaly
+import com.elysium369.meet.core.owner.domain.DataFreshness
 import com.elysium369.meet.ui.theme.MeetColors
 
 /**
@@ -138,13 +139,25 @@ fun MeetExecutiveCommandCenterScreen(
                                 fontWeight = FontWeight.ExtraBold,
                                 letterSpacing = 0.5.sp,
                             )
+                            val badgeText = when (projection.freshness) {
+                                DataFreshness.LIVE -> "VERDAD AUTORITATIVA (LIVE)"
+                                DataFreshness.STALE -> "DATOS EN CACHÉ"
+                                DataFreshness.DEGRADED -> "TELEMETRÍA DEGRADADA"
+                                DataFreshness.UNAVAILABLE -> "TELEMETRÍA NO CONECTADA"
+                            }
+                            val badgeColor = when (projection.freshness) {
+                                DataFreshness.LIVE -> MeetColors.neonGreen
+                                DataFreshness.STALE -> MeetColors.cyberCyan
+                                DataFreshness.DEGRADED -> MeetColors.warning
+                                DataFreshness.UNAVAILABLE -> MeetColors.textSecondary
+                            }
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                                color = badgeColor.copy(alpha = 0.15f),
                             ) {
                                 Text(
-                                    "VERDAD AUTORITATIVA",
-                                    color = MeetColors.neonGreen,
+                                    badgeText,
+                                    color = badgeColor,
                                     fontSize = 9.sp,
                                     fontWeight = FontWeight.Black,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),

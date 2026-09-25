@@ -4,6 +4,8 @@ import com.elysium369.meet.core.finance.Money
 import com.elysium369.meet.core.identity.AnalyticsScope
 import com.elysium369.meet.core.identity.ScopeType
 import com.elysium369.meet.core.intelligence.metrics.MetricsRegistry
+import com.elysium369.meet.core.owner.domain.DataFreshness
+import com.elysium369.meet.core.owner.domain.OwnerCommandCenterSnapshot
 import kotlinx.serialization.Serializable
 import java.util.UUID
 
@@ -58,6 +60,7 @@ data class ExecutiveIntelligenceProjection(
     val expiringDocumentsCount: Int,
     val asOfEpochMs: Long = System.currentTimeMillis(),
     val freshnessSeconds: Int = 15,
+    val freshness: DataFreshness = DataFreshness.LIVE,
 )
 
 @Serializable
@@ -182,46 +185,80 @@ class IntelligenceEngine {
     /**
      * Projects executive analytics for authorized platform administrators.
      * Enforces that callers hold executive platform capabilities.
+     *
+     * In accordance with ELYSIUM MASTER ORDER OMEGA §45, §48:
+     * ZERO synthetic business truth in production.
+     * When no authoritative snapshot is provided, returns honest UNAVAILABLE / zero state.
+     * When an authoritative snapshot is provided, executes pure derived analytics.
      */
-    fun projectExecutive(scope: AnalyticsScope): ExecutiveIntelligenceProjection {
+    fun projectExecutive(
+        scope: AnalyticsScope,
+        authoritativeSnapshot: OwnerCommandCenterSnapshot? = null,
+    ): ExecutiveIntelligenceProjection {
         require(scope.canAccess(targetOrgId = null, targetSubjectId = null)) {
             "Unauthorized access to executive command intelligence"
         }
 
-        val anomalies = listOf(
-            OperationalAnomaly(
-                level = AnomalyLevel.WARNING,
-                domain = "Mobility",
-                title = "Aumento de tiempo de recogida (ETA p95)",
-                message = "El ETA p95 en San José subió de 9.2 min a 14.8 min por alta demanda en hora pico.",
-                metricKey = "mobility.eta_p95",
-                baselineValue = 9.2,
-                currentValue = 14.8,
-                actionDeepLink = "meet://mobility/dispatch?zone=sanjose",
-            ),
-            OperationalAnomaly(
-                level = AnomalyLevel.INFO,
-                domain = "Services",
-                title = "Calidad de diagnóstico destacada",
-                message = "Tasa de retrabajo ≤30d se mantiene en 2.1% (óptimo por debajo de 5%).",
-                metricKey = "service.rework_30d_rate",
-                baselineValue = 3.5,
-                currentValue = 2.1,
-            ),
-        )
+        if (authoritativeSnapshot == null) {
+            return ExecutiveIntelligenceProjection(
+                totalGmv = Money.zero(),
+                platformRevenue = Money.zero(),
+                netRevenue = Money.zero(),
+                activeUsers = 0,
+                activeProviders = 0,
+                completedTrips = 0,
+                completedServices = 0,
+                completedTowCalls = 0,
+                anomalies = emptyList(),
+                trustAlertCount = 0,
+                expiringDocumentsCount = 0,
+                freshnessSeconds = 0,
+                freshness = DataFreshness.UNAVAILABLE,
+            )
+        }
+
+        val anomalies = mutableListOf<OperationalAnomaly>()
+        if (authoritativeSnapshot.systemHealth.deadLetterCount > 0) {
+            anomalies.add(
+                OperationalAnomaly(
+                    level = AnomalyLevel.CRITICAL,
+                    domain = "System",
+                    title = "Eventos en Dead Letter Queue",
+                    message = "${authoritativeSnapshot.systemHealth.deadLetterCount} eventos sin procesar requieren atención del operador.",
+                    metricKey = "system.dlq_count",
+                    baselineValue = 0.0,
+                    currentValue = authoritativeSnapshot.systemHealth.deadLetterCount.toDouble(),
+                )
+            )
+        }
+        if (authoritativeSnapshot.systemHealth.outboxLagSeconds > 60) {
+            anomalies.add(
+                OperationalAnomaly(
+                    level = AnomalyLevel.WARNING,
+                    domain = "Outbox",
+                    title = "Retraso en el Outbox Transaccional",
+                    message = "El retardo de publicación es de ${authoritativeSnapshot.systemHealth.outboxLagSeconds}s.",
+                    metricKey = "system.outbox_lag",
+                    baselineValue = 5.0,
+                    currentValue = authoritativeSnapshot.systemHealth.outboxLagSeconds.toDouble(),
+                )
+            )
+        }
 
         return ExecutiveIntelligenceProjection(
-            totalGmv = Money.ofCrc(875_422_190L),
-            platformRevenue = Money.ofCrc(121_833_401L),
-            netRevenue = Money.ofCrc(108_230_912L),
-            activeUsers = 71_223,
-            activeProviders = 12_843,
-            completedTrips = 184_553,
-            completedServices = 28_410,
-            completedTowCalls = 4_192,
+            totalGmv = authoritativeSnapshot.money.totalGmv,
+            platformRevenue = authoritativeSnapshot.money.platformRevenue,
+            netRevenue = authoritativeSnapshot.money.netRevenue,
+            activeUsers = authoritativeSnapshot.mobility.activeUsers,
+            activeProviders = authoritativeSnapshot.mobility.activeProviders,
+            completedTrips = authoritativeSnapshot.mobility.completedTrips,
+            completedServices = authoritativeSnapshot.servicesCompleted,
+            completedTowCalls = authoritativeSnapshot.towCallsCompleted,
             anomalies = anomalies,
-            trustAlertCount = 8,
-            expiringDocumentsCount = 14,
+            trustAlertCount = authoritativeSnapshot.trust.alertCount,
+            expiringDocumentsCount = authoritativeSnapshot.trust.expiringDocumentsCount,
+            asOfEpochMs = authoritativeSnapshot.asOfEpochMs,
+            freshness = authoritativeSnapshot.freshness,
         )
     }
 

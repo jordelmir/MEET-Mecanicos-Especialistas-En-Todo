@@ -32,12 +32,52 @@ enum class PluginState {
     REGISTERED, ACTIVE, SUSPENDED, ERROR, DEPRECATED,
 }
 
+// ─── Capability OS Contracts (Master Order Omega §19, §20, §21) ───
+
+enum class CapabilityRisk {
+    READ_ONLY,
+    NAVIGATION,
+    REVERSIBLE,
+    COMMITTING,
+    FINANCIAL,
+    PRIVACY_SENSITIVE,
+    SAFETY_CRITICAL,
+    VEHICLE_CRITICAL,
+}
+
+enum class FieldDataType {
+    STRING, INTEGER, DECIMAL, BOOLEAN, OBJECT, ARRAY, TIMESTAMP
+}
+
+@Serializable
+data class CapabilityField(
+    val name: String,
+    val type: FieldDataType,
+    val description: String = "",
+    val required: Boolean = true,
+    val defaultValue: String? = null,
+)
+
+@Serializable
+data class CapabilityContract(
+    val id: String,
+    val version: Int = 1,
+    val risk: CapabilityRisk = CapabilityRisk.READ_ONLY,
+    val inputFields: List<CapabilityField> = emptyList(),
+    val outputFields: List<CapabilityField> = emptyList(),
+    val requiresConfirmation: Boolean = false,
+    val idempotencyRequired: Boolean = false,
+)
+
 // ─── Plugin Capability ───
 
 @Serializable
 data class PluginCapability(
     val name: String,
     val description: String,
+    val version: String = "1.0.0",
+    val risk: CapabilityRisk = CapabilityRisk.READ_ONLY,
+    val contract: CapabilityContract? = null,
     val inputSchema: Map<String, String> = emptyMap(),
     val outputSchema: Map<String, String> = emptyMap(),
     val requiresAuth: Boolean = false,
