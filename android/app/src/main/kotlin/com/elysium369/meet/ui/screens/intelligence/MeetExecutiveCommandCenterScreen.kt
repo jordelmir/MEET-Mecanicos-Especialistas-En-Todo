@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,6 +26,9 @@ import com.elysium369.meet.core.identity.ScopeType
 import com.elysium369.meet.core.intelligence.engine.AnomalyLevel
 import com.elysium369.meet.core.intelligence.engine.IntelligenceEngine
 import com.elysium369.meet.core.intelligence.engine.OperationalAnomaly
+import com.elysium369.meet.core.operations.AutonomousOperationsEngine
+import com.elysium369.meet.core.operations.CaseSeverity
+import com.elysium369.meet.core.operations.OperationCase
 import com.elysium369.meet.core.owner.domain.DataFreshness
 import com.elysium369.meet.ui.theme.MeetColors
 
@@ -35,8 +39,9 @@ import com.elysium369.meet.ui.theme.MeetColors
  *  Answers: "¿Qué está ocurriendo económica y operacionalmente en Elysium?"
  *  Exclusive to platform owner and executive administrators.
  *  - GMV ≠ Revenue ≠ Profit strictly displayed.
- *  - Operational anomalies prioritized over vanity statistics.
- *  - Deep links into Trust Center for compliance investigations.
+ *  - Zero synthetic data: adheres to Rule 1 ("Never invent data").
+ *  - EAOS Solo-Operator Inbox: review real exceptions, SRE/Finance incidents.
+ *  - Conversational Owner Agent: query system health and pending cases.
  * ══════════════════════════════════════════════════════════════════════
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,8 +49,11 @@ import com.elysium369.meet.ui.theme.MeetColors
 fun MeetExecutiveCommandCenterScreen(
     onNavigateBack: () -> Unit,
     onNavigateToTrustCenter: (String?) -> Unit,
+    onNavigateToAgentStore: () -> Unit = {},
 ) {
     val engine = remember { IntelligenceEngine() }
+    val opsEngine = remember { AutonomousOperationsEngine() }
+
     val scope = remember {
         AnalyticsScope(
             principalId = "platform-owner",
@@ -55,6 +63,10 @@ fun MeetExecutiveCommandCenterScreen(
     }
 
     val projection = remember(scope) { engine.projectExecutive(scope) }
+
+    var operatorQueryText by remember { mutableStateOf("") }
+    var operatorResponseText by remember { mutableStateOf<String?>(null) }
+    var pendingCases by remember { mutableStateOf(opsEngine.listCasesRequiringOwner()) }
 
     Scaffold(
         topBar = {
@@ -69,7 +81,7 @@ fun MeetExecutiveCommandCenterScreen(
                             letterSpacing = 1.sp,
                         )
                         Text(
-                            "Executive Intelligence & Platform Truth",
+                            "EAOS Autonomous Operations & Platform Truth",
                             fontSize = 11.sp,
                             color = MeetColors.cyberCyan,
                         )
@@ -174,7 +186,7 @@ fun MeetExecutiveCommandCenterScreen(
                         )
 
                         Spacer(Modifier.height(16.dp))
-                        Divider(color = MeetColors.borderSubtle.copy(alpha = 0.5f))
+                        HorizontalDivider(color = MeetColors.borderSubtle.copy(alpha = 0.5f))
                         Spacer(Modifier.height(16.dp))
 
                         // Revenue vs Net Breakdown
@@ -208,7 +220,68 @@ fun MeetExecutiveCommandCenterScreen(
                 }
             }
 
-            // ── Section 3: Operational Anomalies ──
+            // ── Section 3: EAOS Solo-Operator Exception Inbox ──
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "INBOX DE EXCEPCIONES OPERACIONALES (EAOS)",
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                    )
+                    Text(
+                        "${pendingCases.size} pendientes",
+                        color = if (pendingCases.isEmpty()) MeetColors.neonGreen else MeetColors.warning,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+
+            if (pendingCases.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(20.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                "Cero incidentes requieren atención humana. EAOS opera con autonomía total y resiliencia SRE.",
+                                color = MeetColors.textSecondary,
+                                fontSize = 11.sp,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(pendingCases, key = { it.id }) { case ->
+                    OperatorCaseCard(
+                        case = case,
+                        onApprove = {
+                            opsEngine.resolveCaseByOwner(case.id, true, "Aprobado por el Operador")
+                            pendingCases = opsEngine.listCasesRequiringOwner()
+                        },
+                        onReject = {
+                            opsEngine.resolveCaseByOwner(case.id, false, "Rechazado por el Operador")
+                            pendingCases = opsEngine.listCasesRequiringOwner()
+                        }
+                    )
+                }
+            }
+
+            // ── Section 4: Operational Anomalies ──
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -234,7 +307,7 @@ fun MeetExecutiveCommandCenterScreen(
                 AnomalyCard(anomaly = anomaly)
             }
 
-            // ── Section 4: Cross-Layer Integration Jump ──
+            // ── Section 5: Trust Center Integration (Truth-Verified) ──
             item {
                 Card(
                     modifier = Modifier
@@ -259,8 +332,13 @@ fun MeetExecutiveCommandCenterScreen(
                         Spacer(Modifier.width(14.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text("AUDITORÍA EN CENTRO DE CONFIANZA", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            val auditSummary = if (projection.expiringDocumentsCount == 0 && projection.trustAlertCount == 0) {
+                                "Documentos y alertas de riesgo al día."
+                            } else {
+                                "${projection.expiringDocumentsCount} documentos por vencer y ${projection.trustAlertCount} alertas de riesgo pendientes de validación."
+                            }
                             Text(
-                                "14 documentos por vencer y 8 alertas de riesgo pendientes de validación.",
+                                auditSummary,
                                 color = MeetColors.textSecondary,
                                 fontSize = 11.sp,
                             )
@@ -270,7 +348,206 @@ fun MeetExecutiveCommandCenterScreen(
                 }
             }
 
+            // ── Section 6: Conversational Solo-Operator Assistant ──
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF081525)),
+                    border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "ASISTENTE CONVERSACIONAL DE OPERACIONES",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                        Spacer(Modifier.height(10.dp))
+
+                        // Quick queries chips
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            listOf("¿Qué necesita mi atención?", "¿Hay dinero descuadrado?", "¿Salud del sistema?").forEach { queryPrompt ->
+                                Surface(
+                                    modifier = Modifier.clickable {
+                                        operatorQueryText = queryPrompt
+                                        operatorResponseText = opsEngine.answerOwnerQuery(queryPrompt, null)
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MeetColors.backgroundDark,
+                                    border = BorderStroke(0.5.dp, MeetColors.borderSubtle)
+                                ) {
+                                    Text(
+                                        text = queryPrompt,
+                                        color = MeetColors.cyberCyan,
+                                        fontSize = 10.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
+                        // Custom Query input
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = operatorQueryText,
+                                onValueChange = { operatorQueryText = it },
+                                placeholder = { Text("Consultar a EAOS...", color = MeetColors.textMuted, fontSize = 12.sp) },
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = MeetColors.cyberCyan,
+                                    unfocusedBorderColor = MeetColors.borderSubtle,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                ),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            IconButton(
+                                onClick = {
+                                    if (operatorQueryText.isNotBlank()) {
+                                        operatorResponseText = opsEngine.answerOwnerQuery(operatorQueryText, null)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(MeetColors.cyberCyan.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Enviar", tint = MeetColors.cyberCyan)
+                            }
+                        }
+
+                        if (operatorResponseText != null) {
+                            Spacer(Modifier.height(10.dp))
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                color = MeetColors.backgroundDeep,
+                                border = BorderStroke(0.5.dp, MeetColors.cyberCyan.copy(alpha = 0.5f))
+                            ) {
+                                Text(
+                                    text = operatorResponseText!!,
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    lineHeight = 17.sp,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun OperatorCaseCard(
+    case: OperationCase,
+    onApprove: () -> Unit,
+    onReject: () -> Unit,
+) {
+    val severityColor = when (case.severity) {
+        CaseSeverity.P0 -> Color(0xFFFF3B30)
+        CaseSeverity.P1 -> Color(0xFFFF9500)
+        CaseSeverity.P2 -> Color(0xFFFFCC00)
+        CaseSeverity.P3 -> MeetColors.cyberCyan
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.dp, severityColor.copy(alpha = 0.7f)),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = severityColor.copy(alpha = 0.18f),
+                    border = BorderStroke(1.dp, severityColor)
+                ) {
+                    Text(
+                        text = "${case.severity.name} • ${case.domain}",
+                        color = severityColor,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+                Text(
+                    text = "Requiere Decisión",
+                    color = MeetColors.warning,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Text(case.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Spacer(Modifier.height(4.dp))
+            Text(case.whatHappened, color = MeetColors.textSecondary, fontSize = 11.sp, lineHeight = 16.sp)
+
+            Spacer(Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MeetColors.backgroundDeep,
+            ) {
+                Text(
+                    text = "Acción: ${case.requestedOwnerAction}",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onApprove,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                    contentPadding = PaddingValues(vertical = 6.dp)
+                ) {
+                    Text("Aprobar", color = MeetColors.backgroundDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                OutlinedButton(
+                    onClick = onReject,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF3B30)),
+                    border = BorderStroke(1.dp, Color(0xFFFF3B30).copy(alpha = 0.7f)),
+                    contentPadding = PaddingValues(vertical = 6.dp)
+                ) {
+                    Text("Rechazar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

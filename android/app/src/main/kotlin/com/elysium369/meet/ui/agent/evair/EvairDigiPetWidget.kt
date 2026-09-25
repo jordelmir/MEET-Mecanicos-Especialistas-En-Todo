@@ -42,6 +42,7 @@ fun EvairDigiPetWidget(
     modifier: Modifier = Modifier,
     engine: EvairDigiSoulEngine = remember { EvairDigiSoulEngine() },
     onOpenAssistant: () -> Unit = {},
+    onOpenAgentStore: () -> Unit = {},
 ) {
     var state by remember { mutableStateOf(engine.getState()) }
     var isExpanded by remember { mutableStateOf(false) }
@@ -305,23 +306,44 @@ fun EvairDigiPetWidget(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Open Full Assistant Button
-                    Button(
-                        onClick = onOpenAssistant,
+                    // Actions: Chat & Agent Store
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = stageColor,
-                            contentColor = Color.Black
-                        ),
-                        shape = RoundedCornerShape(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Hablar con ${state.name} (${state.stage.title})",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                        Button(
+                            onClick = onOpenAssistant,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = stageColor,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Chat, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Hablar",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = onOpenAgentStore,
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
+                            border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.7f)),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Storefront, contentDescription = null, modifier = Modifier.size(15.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Agent Store",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }

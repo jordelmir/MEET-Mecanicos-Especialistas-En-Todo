@@ -18,7 +18,8 @@ class AgentCatalogRepository @Inject constructor() {
         return OfficialAgents.ALL.firstOrNull { it.id == id }
     }
 
-    fun listByCategory(category: com.elysium369.meet.core.agentstore.domain.AgentCategory): List<AgentManifest> {
+    fun listByCategory(category: com.elysium369.meet.core.agentstore.domain.AgentCategory?): List<AgentManifest> {
+        if (category == null) return OfficialAgents.ALL
         return OfficialAgents.ALL.filter { it.category == category }
     }
 }

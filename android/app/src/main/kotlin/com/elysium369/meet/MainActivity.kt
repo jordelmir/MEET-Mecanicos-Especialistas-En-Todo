@@ -1015,6 +1015,13 @@ fun MeetApp(
                     onNavigateToLiveTelemetry = { navController.navigate("scanner") }
                 )
             }
+            composable("agent_store") {
+                val agentStoreViewModel: com.elysium369.meet.core.agentstore.presentation.AgentStoreViewModel = androidx.hilt.navigation.compose.hiltViewModel()
+                com.elysium369.meet.core.agentstore.ui.AgentStoreScreen(
+                    navController = navController,
+                    viewModel = agentStoreViewModel
+                )
+            }
             composable("vehicle_access") {
                 com.elysium369.meet.ui.screens.vehicleaccess.VehicleAccessDashboardScreen(
                     navController = navController,

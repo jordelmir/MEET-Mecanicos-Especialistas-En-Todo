@@ -347,11 +347,46 @@ class EvairDigiSoulEngine(
         } catch (_: Exception) {}
     }
 
+    fun recordInteraction(action: String, xpGained: Int, narrative: String): DigiInteractionResult {
+        val memory = DigiMemory(
+            memoryId = "mem_${System.currentTimeMillis()}",
+            timestamp = System.currentTimeMillis(),
+            title = action,
+            narrative = narrative,
+            emotion = "BOND_MOMENT",
+            xpGained = xpGained,
+        )
+        val newXp = currentState.currentXp + xpGained
+        val newStage = DigiEvolutionStage.fromXp(newXp)
+        val didDigivolve = newStage != currentState.stage
+        val updatedMemories = (listOf(memory) + currentState.memories).take(50)
+        val newState = currentState.copy(
+            currentXp = newXp,
+            stageName = newStage.name,
+            bondPercent = (currentState.bondPercent + 2).coerceAtMost(100),
+            memories = updatedMemories,
+        )
+        currentState = newState
+        persistState(newState)
+        return DigiInteractionResult(
+            updatedState = newState,
+            speechResponse = narrative,
+            didDigivolve = didDigivolve,
+            newStage = if (didDigivolve) newStage else null,
+            xpGained = xpGained,
+            newMemoryCreated = memory,
+        )
+    }
+
     private fun getStorageFile(): File? {
         return if (storageDir != null) {
             File(storageDir, "evair_digisoul.json")
         } else {
             null
         }
+    }
+
+    companion object {
+        val shared: EvairDigiSoulEngine by lazy { EvairDigiSoulEngine() }
     }
 }
