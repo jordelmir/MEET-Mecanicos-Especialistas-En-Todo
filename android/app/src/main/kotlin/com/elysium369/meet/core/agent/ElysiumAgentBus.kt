@@ -110,7 +110,9 @@ data class AgentEvent(
 
 // ─── Agent Bus (the router) ───
 
-class ElysiumAgentBus {
+class ElysiumAgentBus(
+    private val layaDecisionEngine: com.elysium369.meet.core.agent.laya.LayaDecisionEngine? = com.elysium369.meet.core.agent.laya.LayaDecisionEngine(),
+) {
 
     private val agents = mutableMapOf<AgentId, AgentRegistration>()
     private val eventListeners = mutableListOf<(AgentEvent) -> Unit>()
@@ -131,40 +133,10 @@ class ElysiumAgentBus {
 
     /**
      * Routes a request to the best matching agent.
-     * Priority: explicit toAgentId → domain match → capability match.
+     * Priority: explicit toAgentId → domain match → capability match (syntactic + Laya semantic).
      */
     fun route(request: AgentRequest): AgentRegistration? {
-        // Direct addressing
-        if (request.toAgentId != null) {
-            return agents[AgentId(request.toAgentId)]
-        }
-
-        // Domain-based routing
-        if (request.targetDomain != null) {
-            val domainAgents = agents.values
-                .filter { it.domain == request.targetDomain }
-                .sortedByDescending { it.priority }
-            if (domainAgents.isNotEmpty()) return domainAgents.first()
-        }
-
-        // Capability-based routing with calibrated intent scoring (Master Order Omega P0-C & §15)
-        val matches = agents.values.flatMap { reg ->
-            reg.capabilities.mapNotNull { cap ->
-                calculateMatchScore(request.intent, cap.intentPattern)?.let { (score, matchType) ->
-                    AgentIntentMatch(
-                        agent = reg,
-                        matchedCapability = cap,
-                        score = score,
-                        matchType = matchType,
-                    )
-                }
-            }
-        }.sortedWith(
-            compareByDescending<AgentIntentMatch> { it.score }
-                .thenByDescending { it.agent.priority }
-        )
-
-        return matches.firstOrNull()?.agent
+        return routeWithMatch(request)?.agent
     }
 
     /**
@@ -177,20 +149,59 @@ class ElysiumAgentBus {
             return AgentIntentMatch(agent, defaultCap, 1.0, "DIRECT")
         }
 
-        return agents.values.flatMap { reg ->
-            if (request.targetDomain != null && reg.domain != request.targetDomain) {
-                emptyList()
-            } else {
-                reg.capabilities.mapNotNull { cap ->
-                    calculateMatchScore(request.intent, cap.intentPattern)?.let { (score, matchType) ->
-                        AgentIntentMatch(reg, cap, score, matchType)
-                    }
+        // Domain-based routing filter
+        val eligibleAgents = if (request.targetDomain != null) {
+            agents.values.filter { it.domain == request.targetDomain }
+        } else {
+            agents.values.toList()
+        }
+
+        // 1. Syntactic match attempt
+        val syntacticMatches = eligibleAgents.flatMap { reg ->
+            reg.capabilities.mapNotNull { cap ->
+                calculateMatchScore(request.intent, cap.intentPattern)?.let { (score, matchType) ->
+                    AgentIntentMatch(reg, cap, score, matchType)
                 }
             }
         }.sortedWith(
             compareByDescending<AgentIntentMatch> { it.score }
                 .thenByDescending { it.agent.priority }
-        ).firstOrNull()
+        )
+
+        if (syntacticMatches.isNotEmpty()) {
+            return syntacticMatches.first()
+        }
+
+        // 2. Laya System 1 Semantic Match Fallback
+        if (layaDecisionEngine != null && request.intent.isNotBlank()) {
+            val candidateCapabilities = eligibleAgents.flatMap { reg ->
+                reg.capabilities.map { cap -> reg to cap }
+            }
+            if (candidateCapabilities.isNotEmpty()) {
+                val candidateOptions = candidateCapabilities.map { it.second.intentPattern }
+                val questions = listOf(
+                    com.elysium369.meet.core.agent.laya.LayaQuestion.Choice(
+                        name = "target_capability",
+                        options = candidateOptions
+                    )
+                )
+                val batch = layaDecisionEngine.evaluateSync(request.intent, questions)
+                val chosenPattern = batch.choice("target_capability")
+                if (chosenPattern != null && chosenPattern.confidence >= 0.50) {
+                    val found = candidateCapabilities.find { it.second.intentPattern == chosenPattern.value }
+                    if (found != null) {
+                        return AgentIntentMatch(
+                            agent = found.first,
+                            matchedCapability = found.second,
+                            score = chosenPattern.confidence,
+                            matchType = "LAYA_SYSTEM_ONE_SEMANTIC"
+                        )
+                    }
+                }
+            }
+        }
+
+        return null
     }
 
     private fun calculateMatchScore(inputIntent: String, pattern: String): Pair<Double, String>? {

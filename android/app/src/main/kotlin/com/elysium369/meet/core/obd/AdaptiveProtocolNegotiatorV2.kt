@@ -163,4 +163,47 @@ object AdaptiveProtocolNegotiatorV2 {
             enableAdaptiveTiming = enableAdaptiveTiming,
         )
     }
+
+    /**
+     * Compiles an intelligent, Laya AI-informed negotiation plan leveraging vehicle make,
+     * model, year, VIN, and adapter characteristics.
+     * Retains all deterministic physical fallbacks so communication can never fail.
+     */
+    fun compilePlanWithLaya(
+        adapterVersionString: String?,
+        context: com.elysium369.meet.core.agent.laya.VehicleNegotiationContext,
+        cachedSuccessfulProtocol: String? = null,
+        layaEngine: com.elysium369.meet.core.agent.laya.EcuConnectionLayaEngine = com.elysium369.meet.core.agent.laya.EcuConnectionLayaEngine(),
+    ): ProtocolNegotiationPlan {
+        val basePlan = compilePlan(adapterVersionString, cachedSuccessfulProtocol, context.year)
+        val layaStrategy = layaEngine.evaluateStrategy(adapterVersionString, context)
+
+        val layaCandidate = layaEngine.createCandidate(layaStrategy.preferredProtocolId, layaStrategy.targetEcuHeader)
+        val allCandidates = listOf(layaCandidate) + (basePlan.fallbackCandidates + basePlan.preferredCandidate).filter { it.protocolId != layaCandidate.protocolId }
+
+        val preferred = if (cachedSuccessfulProtocol != null) {
+            allCandidates.find { it.protocolId == cachedSuccessfulProtocol } ?: layaCandidate
+        } else {
+            layaCandidate
+        }
+        val fallbacks = allCandidates.filter { it.protocolId != preferred.protocolId }
+
+        val interDelay = maxOf(basePlan.interCommandDelayMs, layaStrategy.recommendedInterCommandDelayMs)
+        val probeSpeed = if (cachedSuccessfulProtocol != null) {
+            DiagnosticProbeSpeed.FAST_PATH_CACHED
+        } else {
+            layaStrategy.probeSpeed
+        }
+
+        Log.i(TAG, "Compiled Laya-informed negotiation plan: Preferred=${preferred.protocolId}, Rationale=${layaStrategy.rationale}")
+
+        return ProtocolNegotiationPlan(
+            adapterCompatibilityTier = basePlan.adapterCompatibilityTier,
+            probeSpeed = probeSpeed,
+            preferredCandidate = preferred,
+            fallbackCandidates = fallbacks,
+            interCommandDelayMs = interDelay,
+            enableAdaptiveTiming = basePlan.enableAdaptiveTiming && layaStrategy.enableAdaptiveTiming,
+        )
+    }
 }

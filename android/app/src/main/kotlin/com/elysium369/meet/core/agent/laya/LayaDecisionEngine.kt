@@ -60,6 +60,21 @@ class LayaDecisionEngine(
         LayaDecisionBatch(answers = localAnswers, latencyMs = elapsed)
     }
 
+    /**
+     * Synchronous in-process evaluation (< 1 ms latency).
+     * Runs directly on CPU/NPU without requiring a coroutine context.
+     * Ideal for protocol negotiation, quote auditing, route tracking, and agent bus routing.
+     */
+    fun evaluateSync(
+        state: String,
+        questions: List<LayaQuestion>,
+    ): LayaDecisionBatch {
+        val startEpoch = System.currentTimeMillis()
+        val localAnswers = localEvaluator.evaluate(state, questions)
+        val elapsed = System.currentTimeMillis() - startEpoch
+        return LayaDecisionBatch(answers = localAnswers, latencyMs = elapsed)
+    }
+
     private suspend fun executeRemote(
         state: String,
         questions: List<LayaQuestion>,
