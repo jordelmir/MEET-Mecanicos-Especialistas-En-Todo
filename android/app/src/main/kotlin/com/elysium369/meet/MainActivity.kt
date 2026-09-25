@@ -1100,6 +1100,12 @@ fun MeetApp(
                     onOpenMessages = { navController.navigate("messages?serviceVertical=universal") },
                 )
             }
+            composable("elysium_services") {
+                com.elysium369.meet.ui.screens.services.ElysiumServicesMarketplaceScreen(
+                    navController = navController,
+                    viewModel = obdViewModel
+                )
+            }
             composable("universal_activity/{serviceId}") { backStackEntry ->
                 val serviceId = backStackEntry.arguments?.getString("serviceId").orEmpty()
                 val service = com.elysium369.meet.core.services.UniversalServiceCatalog.getById(serviceId)

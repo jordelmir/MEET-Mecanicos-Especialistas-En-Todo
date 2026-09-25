@@ -51,7 +51,9 @@ object HomeModuleRegistry {
                 HomeModuleItem("ride", "Elysium Rides", "Transporte inteligente y conductor", MeetDestinations.RIDE_HOME, HomeSectionCategory.SERVICES, "ride_home"),
                 HomeModuleItem("legal_vanguard", "Legal Vanguard", "Abogados, bufetes y expediente protegido", MeetDestinations.LEGAL_VANGUARD, HomeSectionCategory.SERVICES, "legal_vanguard", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("elysium_properties", "Elysium Properties", "Property Passport, venta y alquiler", MeetDestinations.PROPERTIES, HomeSectionCategory.SERVICES, "elysium_properties", isHighlight = true, badgeText = "NUEVO"),
-                HomeModuleItem("fuel_rewards", "Fuel Rewards", "Wallet, campañas y Station OS", MeetDestinations.FUEL_REWARDS, HomeSectionCategory.SERVICES, "fuel_rewards", isHighlight = true, badgeText = "NUEVO")
+                HomeModuleItem("fuel_rewards", "Fuel Rewards", "Wallet, campañas y Station OS", MeetDestinations.FUEL_REWARDS, HomeSectionCategory.SERVICES, "fuel_rewards", isHighlight = true, badgeText = "NUEVO"),
+                HomeModuleItem("elysium_services", "Servicios Elysium", "Subasta dual, radar técnico y contra-ofertas", MeetDestinations.ELYSIUM_SERVICES, HomeSectionCategory.SERVICES, "elysium_services", isHighlight = true, badgeText = "NUEVO"),
+                HomeModuleItem("agent_store", "Agent Store", "IA especializada, agentes 3D y DigiSouls", MeetDestinations.AGENT_STORE, HomeSectionCategory.SERVICES, "agent_store", isHighlight = true, badgeText = "NUEVO")
             )
         )
 

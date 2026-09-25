@@ -536,6 +536,8 @@ fun HomeClassicScreen(
                 add(Triple("🚕", "Elysium Rides", MeetColors.neonGreen) to MeetDestinations.RIDE_HOME)
                 add(Triple("📚", "Elysium Aprende", Color(0xFFFFD700)) to MeetDestinations.LEARNING_HUB)
                 add(Triple("🛠️", "Servicios & Oficios", Color(0xFFC85CFF)) to "universal_services")
+                add(Triple("⚡", "Servicios Elysium", MeetColors.neonGreen) to MeetDestinations.ELYSIUM_SERVICES)
+                add(Triple("🤖", "Agent Store", MeetColors.cyberCyan) to MeetDestinations.AGENT_STORE)
                 add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
                 add(Triple("⚠️", "DTCs", MeetColors.hotMagenta) to "dtc")
                 add(Triple("🛡️", "Vanguard Perito", MeetColors.neonGreen) to "meet_perito")

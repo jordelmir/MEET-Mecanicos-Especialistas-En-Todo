@@ -58,6 +58,8 @@ object MeetDestinations {
     const val LEGAL_VANGUARD = "legal_vanguard"
     const val PROPERTIES = "elysium_properties"
     const val FUEL_REWARDS = "fuel_rewards"
+    const val ELYSIUM_SERVICES = "elysium_services"
+    const val AGENT_STORE = "agent_store"
 
     // SAFETY FOUNDATION V1
     const val SAFETY_HOME = "safety"
