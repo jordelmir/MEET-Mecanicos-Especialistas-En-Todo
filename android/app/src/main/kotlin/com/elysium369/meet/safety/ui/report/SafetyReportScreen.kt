@@ -414,6 +414,7 @@ private fun SourceRelation.emoji(): String = when (this) {
     SourceRelation.DOCUMENTARY -> "📄"
     SourceRelation.JOURNALISTIC -> "📰"
     SourceRelation.PUBLIC_RECORD -> "🏛️"
+    SourceRelation.INSTITUTIONAL -> "🏢"
     SourceRelation.UNKNOWN -> "❓"
 }
 
@@ -425,6 +426,7 @@ private fun SourceRelation.description(): String = when (this) {
     SourceRelation.DOCUMENTARY -> stringResource(R.string.safety_report_source_documentary_desc)
     SourceRelation.JOURNALISTIC -> stringResource(R.string.safety_report_source_journalistic_desc)
     SourceRelation.PUBLIC_RECORD -> stringResource(R.string.safety_report_source_public_desc)
+    SourceRelation.INSTITUTIONAL -> "Reporte emitido desde institución, autoridad pública o cuerpo de seguridad."
     SourceRelation.UNKNOWN -> stringResource(R.string.safety_report_source_unknown_desc)
 }
 

@@ -34,6 +34,7 @@ object CostaRicaGisDatabase {
         CONVENIENCE,
         MALL,
         HOSPITAL_CLINIC,
+        POLICE_FIRE_EMERGENCY,
         INSPECTION_DEKRA,
         AUTOMOTIVE_HUB,
         HARDWARE_STORE,
@@ -276,6 +277,16 @@ object CostaRicaGisDatabase {
             add(GisPlace("cr_hosp_sanrafael", "Hospital San Rafael de Alajuela", "Alajuela", "Alajuela", "Alajuela", GisCategory.HOSPITAL_CLINIC, 10.0125, -84.2189, listOf("hospital de alajuela", "hospital san rafael")))
             add(GisPlace("cr_hosp_maxperalta", "Hospital Max Peralta", "Cartago", "Cartago", "Oriental", GisCategory.HOSPITAL_CLINIC, 9.8645, -83.9212, listOf("hospital de cartago", "max peralta")))
             add(GisPlace("cr_hosp_sanvicente", "Hospital San Vicente de Paúl", "Heredia", "Heredia", "Heredia", GisCategory.HOSPITAL_CLINIC, 9.9956, -84.1245, listOf("hospital de heredia", "san vicente de paul")))
+
+            // ═══════════════════════════════════════════════════════════════
+            // ── 7B. REFUGIOS DE EMERGENCIA (FUERZA PÚBLICA Y BOMBEROS) ──
+            // ═══════════════════════════════════════════════════════════════
+            add(GisPlace("cr_emg_fp_sanjose", "Delegación Fuerza Pública San José Central", "San José", "San José", "Hospital", GisCategory.POLICE_FIRE_EMERGENCY, 9.9312, -84.0789, listOf("fuerza publica san jose", "policia san jose centro", "comisaria san jose")))
+            add(GisPlace("cr_emg_fp_escazu", "Delegación Fuerza Pública Escazú", "San José", "Escazú", "San Antonio", GisCategory.POLICE_FIRE_EMERGENCY, 9.9201, -84.1412, listOf("fuerza publica escazu", "policia escazu")))
+            add(GisPlace("cr_emg_fp_alajuela", "Delegación Fuerza Pública Alajuela Central", "Alajuela", "Alajuela", "Alajuela", GisCategory.POLICE_FIRE_EMERGENCY, 10.0150, -84.2140, listOf("fuerza publica alajuela", "policia alajuela")))
+            add(GisPlace("cr_emg_fp_cartago", "Delegación Fuerza Pública Cartago", "Cartago", "Cartago", "Occidental", GisCategory.POLICE_FIRE_EMERGENCY, 9.8650, -83.9200, listOf("fuerza publica cartago", "policia cartago")))
+            add(GisPlace("cr_emg_fp_heredia", "Delegación Fuerza Pública Heredia Central", "Heredia", "Heredia", "Heredia", GisCategory.POLICE_FIRE_EMERGENCY, 9.9970, -84.1190, listOf("fuerza publica heredia", "policia heredia")))
+            add(GisPlace("cr_emg_bomb_central", "Estación Central de Bomberos San José", "San José", "San José", "Merced", GisCategory.POLICE_FIRE_EMERGENCY, 9.9380, -84.0850, listOf("bomberos central", "estacion bomberos san jose")))
 
             // ═══════════════════════════════════════════════════════════════
             // ── 8. HUBS AUTOMOTRICES, REPUESTOS & AGENCIAS ──

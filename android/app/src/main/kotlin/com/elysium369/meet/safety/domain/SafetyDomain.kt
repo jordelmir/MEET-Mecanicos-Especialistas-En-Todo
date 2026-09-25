@@ -47,6 +47,7 @@ enum class SourceRelation {
     DOCUMENTARY,
     JOURNALISTIC,
     PUBLIC_RECORD,
+    INSTITUTIONAL,
     UNKNOWN,
 }
 

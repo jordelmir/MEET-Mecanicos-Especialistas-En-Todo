@@ -55,6 +55,7 @@ object ElysiumRouteCompanion {
                 CostaRicaGisDatabase.GisCategory.SUPERMARKET -> "Parqueo seguro y alto tránsito público visible."
                 CostaRicaGisDatabase.GisCategory.MALL -> "Centro comercial con vigilancia privada activa."
                 CostaRicaGisDatabase.GisCategory.HOSPITAL_CLINIC -> "Zona hospitalaria con seguridad institucional."
+                CostaRicaGisDatabase.GisCategory.POLICE_FIRE_EMERGENCY -> "Delegación o estación oficial de auxilio con protección institucional 24/7."
                 else -> "Punto de referencia urbano seguro y concurrido."
             }
             SafetyStagingZone(

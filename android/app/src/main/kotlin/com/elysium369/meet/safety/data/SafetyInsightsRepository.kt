@@ -60,11 +60,11 @@ data class SafetyObservatoryMetrics(
 
     /** Source breakdown as label→count pairs for chart rendering. */
     fun sourceBreakdown(): List<Pair<String, Long>> = listOf(
-        "Civil" to civil_source_count,
-        "Periodístico" to journalistic_source_count,
-        "Registro público" to public_record_source_count,
-        "Documental" to documentary_source_count,
-        "Institucional" to institutional_source_count,
+        "🛡️ Civil" to civil_source_count,
+        "📰 Periodístico" to journalistic_source_count,
+        "🏛️ Reg. Público" to public_record_source_count,
+        "📄 Documental" to documentary_source_count,
+        "🏢 Institucional" to institutional_source_count,
     ).filter { it.second > 0 }
 
     /** Victim breakdown by sex for bar chart. */

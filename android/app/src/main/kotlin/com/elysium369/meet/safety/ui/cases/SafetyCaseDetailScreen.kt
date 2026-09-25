@@ -343,17 +343,92 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                                     fontSize = 12.sp,
                                     color = MeetColors.textSecondary,
                                 )
+                                // Distinctive reporter source badges (Observatory taxonomy)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (claim.civilSourceCount > 0) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Color(0xFF00E5FF).copy(alpha = 0.15f),
+                                            border = BorderStroke(0.8.dp, Color(0xFF00E5FF).copy(alpha = 0.5f))
+                                        ) {
+                                            Text(
+                                                "🛡️ Civil: ${claim.civilSourceCount}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF00E5FF),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    if (claim.journalisticSourceCount > 0) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Color(0xFF69F0AE).copy(alpha = 0.15f),
+                                            border = BorderStroke(0.8.dp, Color(0xFF69F0AE).copy(alpha = 0.5f))
+                                        ) {
+                                            Text(
+                                                "📰 Periodístico: ${claim.journalisticSourceCount}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF69F0AE),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    if (claim.publicRecordSourceCount > 0) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Color(0xFFFFD700).copy(alpha = 0.15f),
+                                            border = BorderStroke(0.8.dp, Color(0xFFFFD700).copy(alpha = 0.5f))
+                                        ) {
+                                            Text(
+                                                "🏛️ Reg. Público: ${claim.publicRecordSourceCount}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFFFD700),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    if (claim.documentarySourceCount > 0) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Color(0xFFFF9100).copy(alpha = 0.15f),
+                                            border = BorderStroke(0.8.dp, Color(0xFFFF9100).copy(alpha = 0.5f))
+                                        ) {
+                                            Text(
+                                                "📄 Documental: ${claim.documentarySourceCount}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFFF9100),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                    if (claim.institutionalSourceCount > 0) {
+                                        Surface(
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = Color(0xFFB388FF).copy(alpha = 0.15f),
+                                            border = BorderStroke(0.8.dp, Color(0xFFB388FF).copy(alpha = 0.5f))
+                                        ) {
+                                            Text(
+                                                "🏢 Institucional: ${claim.institutionalSourceCount}",
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFFB388FF),
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
                                 Text(
-                                    stringResource(
-                                        R.string.safety_public_source_mix,
-                                        claim.civilSourceCount,
-                                        claim.journalisticSourceCount,
-                                        claim.publicRecordSourceCount,
-                                        claim.documentarySourceCount,
-                                        claim.institutionalSourceCount,
-                                    ),
-                                    fontSize = 11.sp,
-                                    color = MeetColors.cyberCyan.copy(alpha = 0.8f),
+                                    "🔒 Identidad protegida: Cero datos personales (PII) · Reportes cifrados AES-GCM",
+                                    fontSize = 10.sp,
+                                    color = MeetColors.textSecondary,
                                 )
                             }
                         }

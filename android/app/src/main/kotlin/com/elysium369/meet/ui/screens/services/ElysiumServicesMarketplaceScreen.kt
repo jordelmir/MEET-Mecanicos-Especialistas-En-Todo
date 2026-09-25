@@ -40,6 +40,10 @@ import com.elysium369.meet.core.agent.laya.EvairDigiSoulEngine
 import com.elysium369.meet.core.agent.laya.LayaDecisionEngine
 import com.elysium369.meet.core.agent.laya.LayaQuestion
 import com.elysium369.meet.core.agent.laya.LayaSpatialSearchEngine
+import com.elysium369.meet.core.agentstore.ui.Agent3dAvatarCanvas
+import com.elysium369.meet.core.reports.HashEngine
+import com.elysium369.meet.core.vehicle.VehicleEventType
+import com.elysium369.meet.core.vehicle.VehicleHistoryTimeline
 import com.elysium369.meet.data.local.entities.ServiceBidEntity
 import com.elysium369.meet.data.local.entities.ServiceRequestEntity
 import com.elysium369.meet.core.geo.*
@@ -50,6 +54,13 @@ import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import kotlinx.coroutines.launch
 import java.util.UUID
+import android.content.Intent
+import android.os.Bundle
+import android.speech.RecognitionListener
+import android.speech.RecognizerIntent
+import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 
 /**
  * ══════════════════════════════════════════════════════════════════════
@@ -114,9 +125,24 @@ fun ElysiumServicesMarketplaceScreen(
     // Dialog state
     var counterOfferDialogRequest by remember { mutableStateOf<ServiceRequestEntity?>(null) }
     var ratingDialogRequest by remember { mutableStateOf<ServiceRequestEntity?>(null) }
+    var completionCertificateData by remember { mutableStateOf<ServiceCompletionCertificateData?>(null) }
+    var emergencyHavenDialogOpen by remember { mutableStateOf(false) }
     var voiceSearchActive by remember { mutableStateOf(false) }
     var selectedViewMode by rememberSaveable { mutableStateOf("LIST") } // "LIST" or "MAP"
     var focusedMapRequest by remember { mutableStateOf<ServiceRequestEntity?>(null) }
+
+    // Multi-domain technical inspection state (Pillar 4)
+    var dtcCodeInput by rememberSaveable { mutableStateOf("") }
+    var mechanicalSystem by rememberSaveable { mutableStateOf("Motor / Inyección") }
+    var plumbingLocation by rememberSaveable { mutableStateOf("Baño Principal") }
+    var plumbingPipeSize by rememberSaveable { mutableStateOf("1/2 pulgada") }
+    var plumbingSeverity by rememberSaveable { mutableStateOf("Fuga continua") }
+    var locksmithType by rememberSaveable { mutableStateOf("Residencial alta seguridad") }
+    var locksmithIssue by rememberSaveable { mutableStateOf("Llave quebrada adentro") }
+    var electricalVoltage by rememberSaveable { mutableStateOf("110V Monofásica") }
+    var electricalIssue by rememberSaveable { mutableStateOf("Breaker se dispara") }
+    var towCondition by rememberSaveable { mutableStateOf("4 ruedas giran libremente") }
+    var towDestination by rememberSaveable { mutableStateOf("Taller Mecánico Especializado") }
 
     // Auto-evaluate Laya System 1 diagnostic when problem description changes
     LaunchedEffect(problemInput, activeCategory) {
@@ -224,6 +250,8 @@ fun ElysiumServicesMarketplaceScreen(
                     onSelectRequest = { focusedMapRequest = it },
                     userGps = gps,
                     isSpecialistMode = isSpecialistMode,
+                    activeCategory = activeCategory,
+                    onOpenEmergencyHaven = { emergencyHavenDialogOpen = true },
                     onCompleteRequest = { req -> ratingDialogRequest = req }
                 )
             } else {
@@ -366,7 +394,36 @@ fun ElysiumServicesMarketplaceScreen(
                                 maxLines = 3
                             )
 
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(8.dp))
+
+                            // ── Multi-domain Dynamic Technical Inspection (Pillar 4) ──
+                            MultiDomainInspectionFields(
+                                domainKey = activeCategory.domainKey,
+                                dtcCode = dtcCodeInput,
+                                onDtcCodeChange = { dtcCodeInput = it },
+                                mechanicalSystem = mechanicalSystem,
+                                onMechanicalSystemChange = { mechanicalSystem = it },
+                                plumbingLocation = plumbingLocation,
+                                onPlumbingLocationChange = { plumbingLocation = it },
+                                plumbingPipeSize = plumbingPipeSize,
+                                onPlumbingPipeSizeChange = { plumbingPipeSize = it },
+                                plumbingSeverity = plumbingSeverity,
+                                onPlumbingSeverityChange = { plumbingSeverity = it },
+                                locksmithType = locksmithType,
+                                onLocksmithTypeChange = { locksmithType = it },
+                                locksmithIssue = locksmithIssue,
+                                onLocksmithIssueChange = { locksmithIssue = it },
+                                electricalVoltage = electricalVoltage,
+                                onElectricalVoltageChange = { electricalVoltage = it },
+                                electricalIssue = electricalIssue,
+                                onElectricalIssueChange = { electricalIssue = it },
+                                towCondition = towCondition,
+                                onTowConditionChange = { towCondition = it },
+                                towDestination = towDestination,
+                                onTowDestinationChange = { towDestination = it }
+                            )
+
+                            Spacer(Modifier.height(10.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -395,10 +452,19 @@ fun ElysiumServicesMarketplaceScreen(
                                             return@Button
                                         }
                                         val price = priceOfferText.toDoubleOrNull() ?: 18000.0
+                                        val techSummary = when (activeCategory.domainKey) {
+                                            "AUTO_MECHANICAL" -> " [DTC: ${dtcCodeInput.ifBlank { "Sin DTC" }} | Sist: $mechanicalSystem]"
+                                            "PLUMBING" -> " [Ubicación: $plumbingLocation | Tubería: $plumbingPipeSize | $plumbingSeverity]"
+                                            "LOCKSMITH" -> " [Chapa: $locksmithType | $locksmithIssue]"
+                                            "ELECTRICAL" -> " [Voltaje: $electricalVoltage | $electricalIssue]"
+                                            "AUTO_TOW" -> " [Condición: $towCondition | Destino: $towDestination]"
+                                            else -> ""
+                                        }
+                                        val fullProblemDescription = "${activeCategory.name}: $problemInput$techSummary"
                                         viewModel.createServiceRequest(
                                             vehicleId = viewModel.selectedVehicle.value?.id ?: "V_COMMERCIAL",
-                                            problem = "${activeCategory.name}: $problemInput",
-                                            description = problemInput,
+                                            problem = fullProblemDescription,
+                                            description = "$problemInput$techSummary",
                                             location = locationInput,
                                             priority = "MEDIUM",
                                             priceOffer = price,
@@ -407,13 +473,14 @@ fun ElysiumServicesMarketplaceScreen(
                                             longitude = locationLon
                                         )
                                         problemInput = ""
-                                        Toast.makeText(context, "¡Solicitud publicada en la red con Escrow!", Toast.LENGTH_LONG).show()
+                                        dtcCodeInput = ""
+                                        Toast.makeText(context, "¡Solicitud técnica publicada en la red con Escrow!", Toast.LENGTH_LONG).show()
 
                                         // DigiSoul XP
                                         EvairDigiSoulEngine.shared.recordInteraction(
                                             action = "SERVICE_REQUEST_CREATED",
                                             xpGained = 30,
-                                            narrative = "Publicamos solicitud de ${activeCategory.name} con respaldo de precio justo."
+                                            narrative = "Publicamos solicitud técnica de ${activeCategory.name} con respaldo forense."
                                         )
                                     },
                                     modifier = Modifier
@@ -591,22 +658,91 @@ fun ElysiumServicesMarketplaceScreen(
         )
     }
 
-    // ── Dialog: Calificación Bidireccional Estilo Viajes ──
+    // ── Dialog: Calificación Bidireccional Estilo Viajes & Cierre Forense ──
     ratingDialogRequest?.let { req ->
         TwoWayRatingDialog(
             request = req,
             onDismiss = { ratingDialogRequest = null },
             onSubmitRating = { stars, praiseTags, reviewText ->
                 viewModel.completeMechanicRequest(req.requestId)
-                ratingDialogRequest = null
-                Toast.makeText(context, "¡Servicio completado! Calificación registrada ⭐ $stars", Toast.LENGTH_LONG).show()
 
-                // DigiSoul XP & Memory
+                // 1. Cierre Forense con Hash SHA-256 y Escrow Release (Pillar 1)
+                val epochMs = System.currentTimeMillis()
+                val certReportId = "rep_svc_${req.requestId.take(8)}_$epochMs"
+                val vehicleId = if (req.vehicleId.isNotBlank()) req.vehicleId else "veh_client_${req.requestId.take(8)}"
+                val rawCertPayload = "$certReportId|${req.requestId}|${req.priceOffer}|$stars|$epochMs|ESCROW_RELEASED"
+                val certHash = HashEngine.sha256Hex(rawCertPayload)
+                val verifierUrl = "https://meet.elysium369.cr/verify?id=$certReportId"
+                val qrMinimalPayload = "$certReportId|$certHash|$vehicleId|$epochMs|SERVICE_COMPLETION_REPORT|$verifierUrl"
+
+                // 2. Inyección inmutable en la historia del vehículo
+                viewModel.vehicleHistoryTimeline.addEvent(
+                    vehicleId = vehicleId,
+                    type = VehicleEventType.REPAIR_COMPLETED,
+                    title = "Servicio Especializado: ${req.problem.take(30)}",
+                    description = "Servicio completado satisfactoriamente. Calificación ⭐ $stars. Tags: ${praiseTags.joinToString()}. Escrow liberado: ₡${String.format("%,.0f", req.priceOffer)} CRC.",
+                    details = mapOf(
+                        "reportId" to certReportId,
+                        "integrityHash" to certHash,
+                        "escrowStatus" to "RELEASED",
+                        "priceOffer" to "${req.priceOffer}"
+                    ),
+                    actorName = "Especialista Certificado MEET",
+                    relatedReportId = certReportId
+                )
+
+                // 3. DigiSoul XP & Memoria de Agente (Pillar 5)
                 EvairDigiSoulEngine.shared.recordInteraction(
                     action = "SERVICE_COMPLETED_RATED",
-                    xpGained = 75,
-                    narrative = "Servicio completado con éxito con calificación de $stars estrellas. Tags: ${praiseTags.joinToString()}."
+                    xpGained = 150,
+                    narrative = "Servicio cerrado con certificación forense SHA-256 ($certHash). Calificación de $stars estrellas. Tags: ${praiseTags.joinToString()}."
                 )
+
+                completionCertificateData = ServiceCompletionCertificateData(
+                    reportId = certReportId,
+                    integrityHash = certHash,
+                    vehicleId = vehicleId,
+                    generatedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(epochMs)),
+                    reportType = "CERTIFICADO DE SERVICIO FORENSE",
+                    verifierUrl = verifierUrl,
+                    escrowStatus = "FONDOS LIBERADOS (RELEASED)",
+                    amountCrc = req.priceOffer,
+                    specialistName = "Especialista Certificado MEET",
+                    problemDescription = req.problem,
+                    ratingStars = stars,
+                    qrMinimalPayload = qrMinimalPayload
+                )
+
+                ratingDialogRequest = null
+                Toast.makeText(context, "¡Servicio completado! Certificado forense generado y fondos liberados.", Toast.LENGTH_LONG).show()
+            }
+        )
+    }
+
+    // ── Dialog: Certificado Forense de Cierre de Servicio ──
+    completionCertificateData?.let { cert ->
+        ServiceCompletionCertificateDialog(
+            certificate = cert,
+            onDismiss = { completionCertificateData = null }
+        )
+    }
+
+    // ── Dialog: Refugios Seguros Aura Sentinel ──
+    if (emergencyHavenDialogOpen) {
+        AuraSentinelEmergencyHavenDialog(
+            userGps = gps,
+            onDismiss = { emergencyHavenDialogOpen = false },
+            onSelectHaven = { havenPlace: CostaRicaGisDatabase.GisPlace ->
+                locationInput = havenPlace.name
+                locationLat = havenPlace.latitude
+                locationLon = havenPlace.longitude
+                emergencyHavenDialogOpen = false
+                AuraSentinelNotificationCoordinator.notifyEmergencyBeaconActivated(
+                    context = context,
+                    beaconId = UUID.randomUUID().toString().take(8),
+                    locationLabel = havenPlace.name
+                )
+                Toast.makeText(context, "Ruta de auxilio trazada hacia: ${havenPlace.name}", Toast.LENGTH_LONG).show()
             }
         )
     }
@@ -1366,33 +1502,181 @@ private fun VoiceSearchAssistantDialog(
     onDismiss: () -> Unit,
     onQueryRecognized: (String) -> Unit,
 ) {
-    var sampleSpeech by remember { mutableStateOf("Ocupo una grúa en Cartago centro") }
+    val context = LocalContext.current
+    var isListening by remember { mutableStateOf(false) }
+    var recognizedText by remember { mutableStateOf("") }
+    var statusMessage by remember { mutableStateOf("Toca el micrófono o selecciona una consulta...") }
+
+    var tts by remember { mutableStateOf<TextToSpeech?>(null) }
+    var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
+
+    DisposableEffect(Unit) {
+        tts = TextToSpeech(context) { status ->
+            if (status == TextToSpeech.SUCCESS) {
+                tts?.language = Locale("es", "CR")
+            }
+        }
+
+        if (SpeechRecognizer.isRecognitionAvailable(context)) {
+            val recognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        isListening = true
+                        statusMessage = "Escuchando en vivo... Habla con Laya"
+                    }
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {
+                        isListening = false
+                        statusMessage = "Procesando intención espacial..."
+                    }
+                    override fun onError(error: Int) {
+                        isListening = false
+                        statusMessage = "Audio no detectado. Toca de nuevo o usa un preset."
+                    }
+                    override fun onResults(results: Bundle?) {
+                        isListening = false
+                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        val text = matches?.firstOrNull() ?: ""
+                        if (text.isNotBlank()) {
+                            recognizedText = text
+                            statusMessage = "¡Entendido! “$text”"
+                            tts?.speak("Entendido. Ubicando servicio en Costa Rica.", TextToSpeech.QUEUE_FLUSH, null, "laya_resp")
+                            onQueryRecognized(text)
+                        }
+                    }
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                        matches?.firstOrNull()?.let {
+                            recognizedText = it
+                        }
+                    }
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+            }
+            speechRecognizer = recognizer
+        }
+
+        onDispose {
+            try {
+                speechRecognizer?.destroy()
+                tts?.stop()
+                tts?.shutdown()
+            } catch (_: Exception) {}
+        }
+    }
+
+    fun startListening() {
+        if (speechRecognizer != null) {
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-CR")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es-CR")
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            }
+            try {
+                speechRecognizer?.startListening(intent)
+            } catch (e: Exception) {
+                statusMessage = "No se pudo iniciar el reconocedor: ${e.message}"
+            }
+        } else {
+            statusMessage = "Reconocimiento no disponible en este dispositivo."
+        }
+    }
+
+    fun handleSelection(query: String) {
+        tts?.speak("Entendido. Ubicando servicio para $query", TextToSpeech.QUEUE_FLUSH, null, "laya_preset")
+        onQueryRecognized(query)
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier.fillMaxWidth(0.92f),
+            modifier = Modifier.fillMaxWidth(0.95f),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF071424)),
-            border = BorderStroke(1.dp, MeetColors.neonGreen)
+            border = BorderStroke(1.5.dp, MeetColors.cyberCyan)
         ) {
             Column(modifier = Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Box(
+                // 3D Avatar (Pillar 5)
+                Agent3dAvatarCanvas(
+                    avatarVisualType = "ORACLE",
+                    themeColor = MeetColors.cyberCyan,
                     modifier = Modifier
-                        .size(60.dp)
-                        .background(MeetColors.neonGreen.copy(alpha = 0.15f), CircleShape)
-                        .border(1.5.dp, MeetColors.neonGreen, CircleShape),
-                    contentAlignment = Alignment.Center
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Color(0x2200E5FF)),
+                    isInteractive = true,
+                    isPulsing = isListening
+                )
+
+                Spacer(Modifier.height(10.dp))
+                Text("ASISTENTE DE VOZ LAYA", color = Color.White, fontWeight = FontWeight.Black, fontSize = 16.sp)
+                Text(
+                    text = "Comprensión bidireccional de intención y geocodificación en Costa Rica",
+                    color = MeetColors.textSecondary,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // Microphone activation button
+                Surface(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clickable {
+                            if (isListening) {
+                                speechRecognizer?.stopListening()
+                                isListening = false
+                            } else {
+                                startListening()
+                            }
+                        },
+                    shape = CircleShape,
+                    color = if (isListening) MeetColors.neonGreen.copy(alpha = 0.25f) else MeetColors.cyberCyan.copy(alpha = 0.15f),
+                    border = BorderStroke(2.dp, if (isListening) MeetColors.neonGreen else MeetColors.cyberCyan)
                 ) {
-                    Icon(Icons.Default.Mic, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(32.dp))
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = if (isListening) Icons.Default.Mic else Icons.Default.MicNone,
+                            contentDescription = "Micrófono",
+                            tint = if (isListening) MeetColors.neonGreen else MeetColors.cyberCyan,
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = statusMessage,
+                    color = if (isListening) MeetColors.neonGreen else MeetColors.cyberCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+
+                if (recognizedText.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color(0x3300E5FF),
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan)
+                    ) {
+                        Text(
+                            text = "“$recognizedText”",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(14.dp))
-                Text("BÚSQUEDA POR VOZ CON LAYA", color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                Text("Di lo que necesitas y Laya ubicará el servicio más cercano", color = MeetColors.textSecondary, fontSize = 11.sp)
+                Text("O prueba una consulta táctica:", color = MeetColors.textSecondary, fontSize = 10.sp)
+                Spacer(Modifier.height(6.dp))
 
-                Spacer(Modifier.height(14.dp))
-
-                // Presets for quick voice testing
+                // Quick presets
                 listOf(
                     "Ocupo una grúa en Cartago centro",
                     "Taller mecánico cerca de San Pedro",
@@ -1403,24 +1687,32 @@ private fun VoiceSearchAssistantDialog(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 3.dp)
-                            .clickable {
-                                onQueryRecognized(preset)
-                            },
+                            .clickable { handleSelection(preset) },
                         shape = RoundedCornerShape(8.dp),
                         color = MeetColors.backgroundDark,
                         border = BorderStroke(0.5.dp, MeetColors.borderSubtle)
                     ) {
-                        Text(
-                            text = "“$preset”",
-                            color = MeetColors.cyberCyan,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(8.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🎙️", fontSize = 12.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "“$preset”",
+                                color = MeetColors.cyberCyan,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
 
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = onDismiss, shape = RoundedCornerShape(10.dp)) {
+                Spacer(Modifier.height(14.dp))
+                OutlinedButton(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("Cerrar", color = Color.White)
                 }
             }
@@ -1539,8 +1831,11 @@ private fun ElysiumServicesLiveMapRadar(
     onSelectRequest: (ServiceRequestEntity) -> Unit,
     userGps: ObdViewModel.GpsLocationInfo?,
     isSpecialistMode: Boolean,
+    activeCategory: ServiceCategoryItem,
+    onOpenEmergencyHaven: () -> Unit,
     onCompleteRequest: (ServiceRequestEntity) -> Unit,
 ) {
+    val context = LocalContext.current
     val activeRequest = focusedRequest
         ?: allRequests.firstOrNull { it.status == "ACCEPTED" }
         ?: allRequests.firstOrNull { it.status == "OPEN" }
@@ -1568,6 +1863,18 @@ private fun ElysiumServicesLiveMapRadar(
             destinationLongitude = specialistPoint.longitude,
             isClientWaiting = !isSpecialistMode
         )
+    }
+
+    // Heads-up proximity alert: Aura Sentinel dispatches notification when ETA <= 3 min (Pillar 3)
+    LaunchedEffect(companionState.isArrivingSoon, activeRequest?.requestId) {
+        if (companionState.isArrivingSoon && activeRequest != null && activeRequest.status == "ACCEPTED") {
+            AuraSentinelNotificationCoordinator.notifyArrivalImminent(
+                context = context,
+                requestId = activeRequest.requestId,
+                securityPin = activeRequest.requestId.takeLast(4).uppercase(),
+                etaMinutes = routeEstimate.etaMinutes
+            )
+        }
     }
 
     var selectedBottomTab by remember { mutableStateOf("STAGING") } // "STAGING" or "CHECKLIST"
@@ -1687,8 +1994,27 @@ private fun ElysiumServicesLiveMapRadar(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("⏱️", fontSize = 20.sp)
-                            Spacer(Modifier.width(8.dp))
+                            // 3D Avatar (Pillar 5)
+                            Agent3dAvatarCanvas(
+                                avatarVisualType = when (activeCategory.masterAgentName) {
+                                    "Aura Sentinel" -> "SENTINEL"
+                                    "Neo Concierge" -> "CONCIERGE"
+                                    else -> "TITAN"
+                                },
+                                themeColor = when (activeCategory.masterAgentName) {
+                                    "Aura Sentinel" -> MeetColors.warning
+                                    "Neo Concierge" -> MeetColors.cyberCyan
+                                    else -> MeetColors.neonGreen
+                                },
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0x3300E5FF)),
+                                isInteractive = false
+                            )
+
+                            Spacer(Modifier.width(10.dp))
+
                             Column {
                                 Text(
                                     text = "ETA: ${routeEstimate.etaMinutes} MIN",
@@ -1698,34 +2024,56 @@ private fun ElysiumServicesLiveMapRadar(
                                     letterSpacing = 0.5.sp
                                 )
                                 Text(
-                                    text = "${String.format("%.1f", routeEstimate.distanceKm)} KM · Velocidad: ${routeEstimate.estimatedSpeedKmh.toInt()} km/h",
+                                    text = "${String.format("%.1f", routeEstimate.distanceKm)} KM · Guía: ${activeCategory.masterAgentName}",
                                     color = MeetColors.textSecondary,
                                     fontSize = 11.sp
                                 )
                             }
                         }
 
-                        // Traffic chip
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = when (routeEstimate.trafficLevel) {
-                                LayaRouteEngine.TrafficLevel.FLUID -> MeetColors.neonGreen.copy(alpha = 0.2f)
-                                LayaRouteEngine.TrafficLevel.MODERATE -> MeetColors.warning.copy(alpha = 0.2f)
-                                else -> MeetColors.error.copy(alpha = 0.2f)
-                            },
-                            border = BorderStroke(1.dp, when (routeEstimate.trafficLevel) {
-                                LayaRouteEngine.TrafficLevel.FLUID -> MeetColors.neonGreen
-                                LayaRouteEngine.TrafficLevel.MODERATE -> MeetColors.warning
-                                else -> MeetColors.error
-                            })
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                text = routeEstimate.trafficLevel.label,
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
+                            // SOS Safe Haven Button
+                            Surface(
+                                modifier = Modifier.clickable { onOpenEmergencyHaven() },
+                                shape = RoundedCornerShape(8.dp),
+                                color = MeetColors.error.copy(alpha = 0.25f),
+                                border = BorderStroke(1.dp, MeetColors.error)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("🚨", fontSize = 10.sp)
+                                    Spacer(Modifier.width(3.dp))
+                                    Text("SOS", color = MeetColors.error, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                }
+                            }
+
+                            // Traffic chip
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = when (routeEstimate.trafficLevel) {
+                                    LayaRouteEngine.TrafficLevel.FLUID -> MeetColors.neonGreen.copy(alpha = 0.2f)
+                                    LayaRouteEngine.TrafficLevel.MODERATE -> MeetColors.warning.copy(alpha = 0.2f)
+                                    else -> MeetColors.error.copy(alpha = 0.2f)
+                                },
+                                border = BorderStroke(1.dp, when (routeEstimate.trafficLevel) {
+                                    LayaRouteEngine.TrafficLevel.FLUID -> MeetColors.neonGreen
+                                    LayaRouteEngine.TrafficLevel.MODERATE -> MeetColors.warning
+                                    else -> MeetColors.error
+                                })
+                            ) {
+                                Text(
+                                    text = routeEstimate.trafficLevel.label,
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
                         }
                     }
 
@@ -1941,6 +2289,531 @@ private fun ElysiumServicesLiveMapRadar(
                             Text("COMPLETAR TRABAJO & CALIFICAR", color = MeetColors.backgroundDark, fontWeight = FontWeight.Black, fontSize = 11.sp)
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ── Campos de Inspección Técnica Multidominio (Pillar 4) ──
+ */
+@Composable
+private fun MultiDomainInspectionFields(
+    domainKey: String,
+    dtcCode: String,
+    onDtcCodeChange: (String) -> Unit,
+    mechanicalSystem: String,
+    onMechanicalSystemChange: (String) -> Unit,
+    plumbingLocation: String,
+    onPlumbingLocationChange: (String) -> Unit,
+    plumbingPipeSize: String,
+    onPlumbingPipeSizeChange: (String) -> Unit,
+    plumbingSeverity: String,
+    onPlumbingSeverityChange: (String) -> Unit,
+    locksmithType: String,
+    onLocksmithTypeChange: (String) -> Unit,
+    locksmithIssue: String,
+    onLocksmithIssueChange: (String) -> Unit,
+    electricalVoltage: String,
+    onElectricalVoltageChange: (String) -> Unit,
+    electricalIssue: String,
+    onElectricalIssueChange: (String) -> Unit,
+    towCondition: String,
+    onTowConditionChange: (String) -> Unit,
+    towDestination: String,
+    onTowDestinationChange: (String) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDark),
+        border = BorderStroke(1.dp, MeetColors.borderSubtle)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("📋", fontSize = 14.sp)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = "PARÁMETROS TÉCNICOS ESPECÍFICOS",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.5.sp
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            when (domainKey) {
+                "AUTO_MECHANICAL", "BATTERY" -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = dtcCode,
+                            onValueChange = { onDtcCodeChange(it.uppercase()) },
+                            label = { Text("Código DTC (OBD)") },
+                            placeholder = { Text("Ej: P0300, P0420") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MeetColors.neonGreen,
+                                unfocusedBorderColor = MeetColors.borderSubtle
+                            )
+                        )
+                        OutlinedTextField(
+                            value = mechanicalSystem,
+                            onValueChange = onMechanicalSystemChange,
+                            label = { Text("Subsistema") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MeetColors.neonGreen,
+                                unfocusedBorderColor = MeetColors.borderSubtle
+                            )
+                        )
+                    }
+                }
+                "PLUMBING" -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = plumbingLocation,
+                            onValueChange = onPlumbingLocationChange,
+                            label = { Text("Ubicación") },
+                            placeholder = { Text("Cocina, Baño...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = plumbingPipeSize,
+                            onValueChange = onPlumbingPipeSizeChange,
+                            label = { Text("Diámetro Tubo") },
+                            placeholder = { Text("1/2\", 3/4\"...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                    }
+                    Spacer(Modifier.height(6.dp))
+                    OutlinedTextField(
+                        value = plumbingSeverity,
+                        onValueChange = onPlumbingSeverityChange,
+                        label = { Text("Condición / Gravedad") },
+                        placeholder = { Text("Goteo, rotura total, baja presión...") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(8.dp),
+                        singleLine = true
+                    )
+                }
+                "LOCKSMITH" -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = locksmithType,
+                            onValueChange = onLocksmithTypeChange,
+                            label = { Text("Tipo de Cerrojo") },
+                            placeholder = { Text("Vehicular, Multipunto...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = locksmithIssue,
+                            onValueChange = onLocksmithIssueChange,
+                            label = { Text("Problema") },
+                            placeholder = { Text("Llaves adentro, traba...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                    }
+                }
+                "ELECTRICAL" -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = electricalVoltage,
+                            onValueChange = onElectricalVoltageChange,
+                            label = { Text("Voltaje / Fase") },
+                            placeholder = { Text("110V, 220V Bifásico...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = electricalIssue,
+                            onValueChange = onElectricalIssueChange,
+                            label = { Text("Falla Eléctrica") },
+                            placeholder = { Text("Cortocircuito, breaker...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                    }
+                }
+                "AUTO_TOW" -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = towCondition,
+                            onValueChange = onTowConditionChange,
+                            label = { Text("Rodaje Vehículo") },
+                            placeholder = { Text("Neutro libre, bloqueado...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = towDestination,
+                            onValueChange = onTowDestinationChange,
+                            label = { Text("Destino Estimado") },
+                            placeholder = { Text("Taller, domicilio...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                    }
+                }
+                else -> {
+                    Text(
+                        text = "Especificación general guiada por inteligencia Elysium.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ── Modelo de Datos de Certificado de Servicio Forense (Pillar 1) ──
+ */
+data class ServiceCompletionCertificateData(
+    val reportId: String,
+    val integrityHash: String,
+    val vehicleId: String,
+    val generatedAt: String,
+    val reportType: String,
+    val verifierUrl: String,
+    val escrowStatus: String,
+    val amountCrc: Double,
+    val specialistName: String,
+    val problemDescription: String,
+    val ratingStars: Int,
+    val qrMinimalPayload: String,
+)
+
+/**
+ * ── Dialog: Certificado de Servicio Forense con Código QR & Escrow Liberado ──
+ */
+@Composable
+private fun ServiceCompletionCertificateDialog(
+    certificate: ServiceCompletionCertificateData,
+    onDismiss: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(0.96f),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF071424)),
+            border = BorderStroke(1.5.dp, MeetColors.neonGreen)
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(20.dp)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Header badge
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, MeetColors.neonGreen)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🛡️", fontSize = 14.sp)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "CERTIFICADO DE SERVICIO FORENSE",
+                            color = MeetColors.neonGreen,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = "CIERRE Y DESEMBOLSO DE ESCROW",
+                    color = Color.White,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 15.sp,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = "El servicio ha concluido exitosamente bajo custodia criptográfica.",
+                    color = MeetColors.textSecondary,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // Certificate details card
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDark),
+                    border = BorderStroke(1.dp, MeetColors.borderSubtle)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("ID Reporte:", color = MeetColors.textSecondary, fontSize = 10.sp)
+                            Text(certificate.reportId, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Fecha / Hora:", color = MeetColors.textSecondary, fontSize = 10.sp)
+                            Text(certificate.generatedAt, color = Color.White, fontSize = 10.sp)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Monto Liberado:", color = MeetColors.textSecondary, fontSize = 10.sp)
+                            Text("₡${String.format("%,.0f", certificate.amountCrc)} CRC", color = MeetColors.neonGreen, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Estado Custodia:", color = MeetColors.textSecondary, fontSize = 10.sp)
+                            Text(certificate.escrowStatus, color = MeetColors.neonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("Calificación:", color = MeetColors.textSecondary, fontSize = 10.sp)
+                            Text("⭐ ${certificate.ratingStars} / 5", color = Color(0xFFFFD700), fontSize = 10.sp, fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // SHA-256 Hash Display
+                Text("INTEGRIDAD MATEMÁTICA SHA-256:", color = MeetColors.textSecondary, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0x3300E5FF),
+                    border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f))
+                ) {
+                    Text(
+                        text = certificate.integrityHash,
+                        color = MeetColors.cyberCyan,
+                        fontSize = 9.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // Rule 4 QR Minimal Payload representation
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF040A12)),
+                    border = BorderStroke(1.dp, MeetColors.borderSubtle)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(10.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("📱", fontSize = 14.sp)
+                            Spacer(Modifier.width(6.dp))
+                            Text("PAYLOAD QR MINIMAL (REGLA 4 FORENSE)", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text = certificate.qrMinimalPayload,
+                            color = MeetColors.textSecondary,
+                            fontSize = 8.sp,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text("Verificable en: ${certificate.verifierUrl}", color = MeetColors.cyberCyan, fontSize = 9.sp)
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("CERRAR & GUARDAR EN HISTORIAL", color = MeetColors.backgroundDark, fontWeight = FontWeight.Black)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ── Dialog: Refugios Seguros y Auxilio Rápido Aura Sentinel ──
+ * Muestra estaciones de Fuerza Pública, Bomberos y Centros Médicos de Costa Rica.
+ */
+@Composable
+private fun AuraSentinelEmergencyHavenDialog(
+    userGps: ObdViewModel.GpsLocationInfo?,
+    onDismiss: () -> Unit,
+    onSelectHaven: (CostaRicaGisDatabase.GisPlace) -> Unit,
+) {
+    val havens = remember(userGps) {
+        val lat = userGps?.latitude ?: 9.9333
+        val lon = userGps?.longitude ?: -84.0833
+        CostaRicaGisDatabase.nearest(
+            latitude = lat,
+            longitude = lon,
+            category = CostaRicaGisDatabase.GisCategory.POLICE_FIRE_EMERGENCY,
+            limit = 8
+        )
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(0.95f),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF091422)),
+            border = BorderStroke(1.5.dp, MeetColors.error)
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(36.dp)
+                            .background(MeetColors.error.copy(alpha = 0.2f), CircleShape)
+                            .border(1.dp, MeetColors.error, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("🚨", fontSize = 18.sp)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "REFUGIOS SEGUROS AURA SENTINEL",
+                            color = Color.White,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 13.sp
+                        )
+                        Text(
+                            text = "Delegaciones Fuerza Pública y Bomberos más cercanas",
+                            color = MeetColors.textSecondary,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 320.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(havens) { (haven, distKm) ->
+                        val distanceKmFormatted = String.format("%.1f", distKm)
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onSelectHaven(haven) },
+                            shape = RoundedCornerShape(10.dp),
+                            color = MeetColors.backgroundDark,
+                            border = BorderStroke(1.dp, MeetColors.borderSubtle)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("🏛️", fontSize = 18.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = haven.name,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        text = "${haven.canton}, ${haven.province} · $distanceKmFormatted km",
+                                        color = MeetColors.cyberCyan,
+                                        fontSize = 10.sp
+                                    )
+                                    Text(
+                                        text = haven.displayLabel,
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 9.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                Icon(
+                                    Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Trazar ruta",
+                                    tint = MeetColors.neonGreen,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                ) {
+                    Text("Cancelar", color = Color.White)
                 }
             }
         }
