@@ -47,6 +47,10 @@ import com.elysium369.meet.ui.components.hud.HudFaceSelector
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import com.elysium369.meet.core.agent.anchor.AgentAnchorId
+import com.elysium369.meet.core.agent.anchor.agentAnchor
+import com.elysium369.meet.core.agent.evair.EvairTutorialEngine
+import com.elysium369.meet.ui.agent.evair.EvairLivingGuideOverlay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -217,8 +221,9 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val compactScanner = screenWidthDp < 400
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0),
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            contentWindowInsets = WindowInsets(0),
         topBar = {
             Column {
                 EliteTopAppBar(
@@ -321,11 +326,16 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                                 )
                             }
                             else -> {
-                                com.elysium369.meet.ui.components.EliteTextButton(
-                                    onClick = { navController.navigate("connect") },
-                                    text = if (isSpanish) "CONECTAR" else "CONNECT",
-                                    color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
-                                )
+                                Box(modifier = Modifier.agentAnchor(AgentAnchorId.SCANNER_CONNECT)) {
+                                    com.elysium369.meet.ui.components.EliteTextButton(
+                                        onClick = {
+                                            EvairTutorialEngine.default.notifyUserTappedAnchor(AgentAnchorId.SCANNER_CONNECT)
+                                            navController.navigate("connect")
+                                        },
+                                        text = if (isSpanish) "CONECTAR" else "CONNECT",
+                                        color = com.elysium369.meet.ui.theme.MeetColors.neonGreen
+                                    )
+                                }
                             }
                         }
                     }
@@ -369,7 +379,15 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
                 ) {
                     Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("DASHBOARD", color = if (selectedTab == 0) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
                     Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text(if (compactScanner) "POWER" else if (isSpanish) "RENDIMIENTO" else "PERFORMANCE", color = if (selectedTab == 1) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text(if (compactScanner) "DIAG" else if (isSpanish) "DIAGNÓSTICO" else "DIAGNOSTICS", color = if (selectedTab == 2) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
+                    Tab(
+                        selected = selectedTab == 2,
+                        onClick = {
+                            EvairTutorialEngine.default.notifyUserTappedAnchor(AgentAnchorId.SCANNER_TAB_DIAGNOSTIC)
+                            selectedTab = 2
+                        },
+                        modifier = Modifier.agentAnchor(AgentAnchorId.SCANNER_TAB_DIAGNOSTIC),
+                        text = { Text(if (compactScanner) "DIAG" else if (isSpanish) "DIAGNÓSTICO" else "DIAGNOSTICS", color = if (selectedTab == 2) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) }
+                    )
                     Tab(selected = selectedTab == 3, onClick = { selectedTab = 3 }, text = { Text(if (isSpanish) "SENSORES" else "SENSORS", color = if (selectedTab == 3) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
                     Tab(selected = selectedTab == 4, onClick = { selectedTab = 4 }, text = { Text(if (isSpanish) "HERRAM." else "TOOLS", color = if (selectedTab == 4) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
                     Tab(selected = selectedTab == 5, onClick = { selectedTab = 5 }, text = { Text(if (isSpanish) "MONIT." else "MONITORS", color = if (selectedTab == 5) com.elysium369.meet.ui.theme.MeetColors.neonGreen else MeetColors.textSecondary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelSmall, maxLines = 1) })
@@ -381,11 +399,13 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { 
+                    EvairTutorialEngine.default.notifyUserTappedAnchor(AgentAnchorId.SCANNER_ADD_PID)
                     navController.navigate("custom_pid")
                 },
                 containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark, 
                 shape = RoundedCornerShape(12.dp), 
                 modifier = Modifier
+                    .agentAnchor(AgentAnchorId.SCANNER_ADD_PID)
                     .border(1.dp, com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(12.dp))
                     .neonGlow(com.elysium369.meet.ui.theme.MeetColors.neonGreen, RoundedCornerShape(12.dp), minElevation = 4f, maxElevation = 12f)
             ) {
@@ -406,4 +426,8 @@ fun ScannerScreen(navController: NavController, viewModel: ObdViewModel) {
             }
         }
     }
+
+    // ── E V A I R   L I V I N G   G U I D E   O V E R L A Y ──
+    EvairLivingGuideOverlay()
+}
 }
