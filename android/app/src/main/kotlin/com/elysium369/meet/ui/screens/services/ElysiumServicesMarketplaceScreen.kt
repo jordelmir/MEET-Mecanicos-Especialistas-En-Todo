@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,6 +42,8 @@ import com.elysium369.meet.core.agent.laya.LayaQuestion
 import com.elysium369.meet.core.agent.laya.LayaSpatialSearchEngine
 import com.elysium369.meet.data.local.entities.ServiceBidEntity
 import com.elysium369.meet.data.local.entities.ServiceRequestEntity
+import com.elysium369.meet.core.geo.*
+import com.elysium369.meet.core.geo.runtime.CommonMapPanel
 import com.elysium369.meet.ride.map.LayaEnhancedPlaceSearchProvider
 import com.elysium369.meet.ride.map.RidePlaceSuggestion
 import com.elysium369.meet.ui.ObdViewModel
@@ -111,6 +115,8 @@ fun ElysiumServicesMarketplaceScreen(
     var counterOfferDialogRequest by remember { mutableStateOf<ServiceRequestEntity?>(null) }
     var ratingDialogRequest by remember { mutableStateOf<ServiceRequestEntity?>(null) }
     var voiceSearchActive by remember { mutableStateOf(false) }
+    var selectedViewMode by rememberSaveable { mutableStateOf("LIST") } // "LIST" or "MAP"
+    var focusedMapRequest by remember { mutableStateOf<ServiceRequestEntity?>(null) }
 
     // Auto-evaluate Laya System 1 diagnostic when problem description changes
     LaunchedEffect(problemInput, activeCategory) {
@@ -199,58 +205,92 @@ fun ElysiumServicesMarketplaceScreen(
         },
         containerColor = MeetColors.backgroundDeep
     ) { padding ->
-        LazyColumn(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { Spacer(Modifier.height(4.dp)) }
+            // View Mode Switcher: [ 📋 Solicitudes ] | [ 🗺️ Radar & Ruta en Vivo ]
+            ViewModeSelector(
+                selectedMode = selectedViewMode,
+                onSelectMode = { selectedViewMode = it },
+                activeAcceptedCount = allRequests.count { it.status == "ACCEPTED" }
+            )
 
-            // ── Section 1: Master Agent Advisory Banner ──
-            item {
-                AgentAdvisoryHeroCard(
-                    category = activeCategory,
-                    diagnosticHint = layaDiagnosticHint
+            if (selectedViewMode == "MAP") {
+                ElysiumServicesLiveMapRadar(
+                    allRequests = allRequests,
+                    focusedRequest = focusedMapRequest,
+                    onSelectRequest = { focusedMapRequest = it },
+                    userGps = gps,
+                    isSpecialistMode = isSpecialistMode,
+                    onCompleteRequest = { req -> ratingDialogRequest = req }
                 )
-            }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item { Spacer(Modifier.height(4.dp)) }
 
-            // ── Section 2: Spatial Search Bar (Costa Rica First + Voice) ──
-            item {
-                SpatialSearchBarCard(
-                    query = locationInput,
-                    onQueryChange = { newQuery ->
-                        locationInput = newQuery
-                        if (newQuery.length >= 2) {
-                            scope.launch {
-                                isSearchingPlaces = true
-                                searchSuggestions = placeSearchProvider.search(
-                                    query = newQuery,
-                                    biasLatitude = gps?.latitude ?: 9.9333,
-                                    biasLongitude = gps?.longitude ?: -84.0833,
-                                    limit = 5
-                                )
-                                isSearchingPlaces = false
-                            }
-                        } else {
-                            searchSuggestions = emptyList()
-                        }
-                    },
-                    onVoiceClick = { voiceSearchActive = true },
-                    suggestions = searchSuggestions,
-                    onSelectSuggestion = { suggestion ->
-                        locationInput = suggestion.displayLabel
-                        locationLat = suggestion.latitude
-                        locationLon = suggestion.longitude
-                        searchSuggestions = emptyList()
-                        Toast.makeText(context, "Ubicación fijada: ${suggestion.primaryLabel}", Toast.LENGTH_SHORT).show()
+                    // ── Section 1: Master Agent Advisory Banner ──
+                    item {
+                        AgentAdvisoryHeroCard(
+                            category = activeCategory,
+                            diagnosticHint = layaDiagnosticHint
+                        )
                     }
-                )
-            }
 
-            // ── Mode-Specific Flows ──
-            if (!isSpecialistMode) {
+                    // ── Section 2: Spatial Search Bar (Costa Rica First + Voice) ──
+                    item {
+                        SpatialSearchBarCard(
+                            query = locationInput,
+                            onQueryChange = { newQuery ->
+                                locationInput = newQuery
+                                if (newQuery.length >= 2) {
+                                    scope.launch {
+                                        isSearchingPlaces = true
+                                        searchSuggestions = placeSearchProvider.search(
+                                            query = newQuery,
+                                            biasLatitude = gps?.latitude ?: 9.9333,
+                                            biasLongitude = gps?.longitude ?: -84.0833,
+                                            limit = 5
+                                        )
+                                        isSearchingPlaces = false
+                                    }
+                                } else {
+                                    searchSuggestions = emptyList()
+                                }
+                            },
+                            onVoiceClick = { voiceSearchActive = true },
+                            suggestions = searchSuggestions,
+                            onSelectSuggestion = { suggestion ->
+                                locationInput = suggestion.displayLabel
+                                locationLat = suggestion.latitude
+                                locationLon = suggestion.longitude
+                                searchSuggestions = emptyList()
+                                Toast.makeText(context, "Ubicación fijada: ${suggestion.primaryLabel}", Toast.LENGTH_SHORT).show()
+                            },
+                            onSelectCategoryFilter = { catKeyword ->
+                                locationInput = catKeyword
+                                scope.launch {
+                                    isSearchingPlaces = true
+                                    searchSuggestions = placeSearchProvider.search(
+                                        query = catKeyword,
+                                        biasLatitude = gps?.latitude ?: 9.9333,
+                                        biasLongitude = gps?.longitude ?: -84.0833,
+                                        limit = 6
+                                    )
+                                    isSearchingPlaces = false
+                                }
+                            }
+                        )
+                    }
+
+                    // ── Mode-Specific Flows ──
+                    if (!isSpecialistMode) {
                 // ══════════════════════════════════════════════
                 //  C L I E N T   F L O W
                 // ══════════════════════════════════════════════
@@ -426,7 +466,11 @@ fun ElysiumServicesMarketplaceScreen(
                         ClientActiveRequestCard(
                             request = req,
                             viewModel = viewModel,
-                            onCompleteAndRate = { ratingDialogRequest = req }
+                            onCompleteAndRate = { ratingDialogRequest = req },
+                            onTrackOnMap = {
+                                focusedMapRequest = req
+                                selectedViewMode = "MAP"
+                            }
                         )
                     }
                 }
@@ -497,6 +541,11 @@ fun ElysiumServicesMarketplaceScreen(
                     items(openMarketplaceRequests, key = { it.requestId }) { req ->
                         SpecialistRequestItemCard(
                             request = req,
+                            userGps = gps,
+                            onViewOnMap = {
+                                focusedMapRequest = req
+                                selectedViewMode = "MAP"
+                            },
                             onTakeDirect = {
                                 viewModel.placeServiceBid(
                                     requestId = req.requestId,
@@ -518,6 +567,8 @@ fun ElysiumServicesMarketplaceScreen(
 
             item { Spacer(Modifier.height(24.dp)) }
         }
+    }
+}
     }
 
     // ── Dialog: Contraoferta del Especialista ──
@@ -656,7 +707,20 @@ private fun SpatialSearchBarCard(
     onVoiceClick: () -> Unit,
     suggestions: List<RidePlaceSuggestion>,
     onSelectSuggestion: (RidePlaceSuggestion) -> Unit,
+    onSelectCategoryFilter: (String) -> Unit = {},
 ) {
+    val quickPois = remember {
+        listOf(
+            "🛠️ DEKRA" to "dekra",
+            "⛽ Gasolineras" to "gasolinera",
+            "🛒 Supermercados" to "automercado",
+            "🏥 Hospitales" to "hospital",
+            "🔩 Repuestos" to "repuestos",
+            "🏬 Malls" to "multiplaza",
+            "🏢 COSEVI" to "cosevi"
+        )
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -688,8 +752,32 @@ private fun SpatialSearchBarCard(
                 }
             }
 
+            // Quick POI Discovery Chips (Costa Rica master GIS)
+            Spacer(Modifier.height(6.dp))
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(quickPois) { (label, keyword) ->
+                    Surface(
+                        modifier = Modifier.clickable { onSelectCategoryFilter(keyword) },
+                        shape = RoundedCornerShape(8.dp),
+                        color = MeetColors.backgroundDark,
+                        border = BorderStroke(0.5.dp, MeetColors.borderSubtle)
+                    ) {
+                        Text(
+                            text = label,
+                            color = MeetColors.cyberCyan,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
             if (suggestions.isNotEmpty()) {
-                HorizontalDivider(color = MeetColors.borderSubtle.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 4.dp))
+                HorizontalDivider(color = MeetColors.borderSubtle.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 6.dp))
                 suggestions.forEach { suggestion ->
                     Row(
                         modifier = Modifier
@@ -698,7 +786,7 @@ private fun SpatialSearchBarCard(
                             .padding(vertical = 8.dp, horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Place, contentDescription = null, tint = MeetColors.textSecondary, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Place, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(8.dp))
                         Column {
                             Text(suggestion.primaryLabel, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
@@ -716,6 +804,7 @@ private fun ClientActiveRequestCard(
     request: ServiceRequestEntity,
     viewModel: ObdViewModel,
     onCompleteAndRate: () -> Unit,
+    onTrackOnMap: () -> Unit = {},
 ) {
     val bids by viewModel.getBidsForRequest(request.requestId).collectAsState(initial = emptyList())
     val isAccepted = request.status == "ACCEPTED"
@@ -758,8 +847,83 @@ private fun ClientActiveRequestCard(
             Text(request.problem, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Text(request.location, color = MeetColors.textSecondary, fontSize = 11.sp)
 
-            // Security PIN if accepted (Aura Sentinel)
+            // Live ETA and Route Tracker if accepted
             if (isAccepted) {
+                val clientLat = if (request.latitude != 0.0) request.latitude else 9.9333
+                val clientLon = if (request.longitude != 0.0) request.longitude else -84.0833
+                val specialistOrigin = GeoPoint(clientLat + 0.016, clientLon + 0.014)
+                val routeEstimate = remember(request.requestId, clientLat, clientLon) {
+                    LayaRouteEngine.calculateRoute(
+                        origin = specialistOrigin,
+                        destination = GeoPoint(clientLat, clientLon)
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFF071B26),
+                    border = BorderStroke(1.dp, MeetColors.cyberCyan)
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("⏱️", fontSize = 16.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Column {
+                                    Text(
+                                        text = "ETA ESTIMADO: ${routeEstimate.etaMinutes} MIN",
+                                        color = MeetColors.cyberCyan,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                    Text(
+                                        text = "${String.format("%.1f", routeEstimate.distanceKm)} km · ${routeEstimate.trafficLevel.label}",
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = when (routeEstimate.trafficLevel) {
+                                    LayaRouteEngine.TrafficLevel.FLUID -> MeetColors.neonGreen.copy(alpha = 0.2f)
+                                    LayaRouteEngine.TrafficLevel.MODERATE -> MeetColors.warning.copy(alpha = 0.2f)
+                                    else -> MeetColors.error.copy(alpha = 0.2f)
+                                }
+                            ) {
+                                Text(
+                                    text = "${routeEstimate.estimatedSpeedKmh.toInt()} km/h",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = onTrackOnMap,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan.copy(alpha = 0.2f)),
+                            border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(vertical = 6.dp)
+                        ) {
+                            Icon(Icons.Default.Navigation, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("RASTREAR RUTA Y ESPECIALISTA EN MAPA", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
+                    }
+                }
+
+                // Security PIN if accepted (Aura Sentinel)
                 Spacer(Modifier.height(10.dp))
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
@@ -869,9 +1033,21 @@ private fun ClientActiveRequestCard(
 @Composable
 private fun SpecialistRequestItemCard(
     request: ServiceRequestEntity,
+    userGps: ObdViewModel.GpsLocationInfo? = null,
+    onViewOnMap: () -> Unit = {},
     onTakeDirect: () -> Unit,
     onCounterOffer: () -> Unit,
 ) {
+    val reqLat = if (request.latitude != 0.0) request.latitude else 9.9333
+    val reqLon = if (request.longitude != 0.0) request.longitude else -84.0833
+    val specialistOrigin = GeoPoint(userGps?.latitude ?: 9.9333, userGps?.longitude ?: -84.0833)
+    val reqEstimate = remember(request.requestId, specialistOrigin) {
+        LayaRouteEngine.calculateRoute(
+            origin = specialistOrigin,
+            destination = GeoPoint(reqLat, reqLon)
+        )
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -899,7 +1075,7 @@ private fun SpecialistRequestItemCard(
                 }
 
                 Text(
-                    text = "Oferta Cliente: ₡${String.format("%,.0f", request.priceOffer)} CRC",
+                    text = "Oferta: ₡${String.format("%,.0f", request.priceOffer)} CRC",
                     color = MeetColors.neonGreen,
                     fontWeight = FontWeight.Black,
                     fontSize = 13.sp
@@ -910,11 +1086,57 @@ private fun SpecialistRequestItemCard(
             Text(request.problem, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Text(request.location, color = MeetColors.textSecondary, fontSize = 11.sp)
 
+            Spacer(Modifier.height(8.dp))
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MeetColors.backgroundDark,
+                border = BorderStroke(0.5.dp, MeetColors.borderSubtle)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Navigation, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(13.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "${String.format("%.1f", reqEstimate.distanceKm)} km vial · ETA ~${reqEstimate.etaMinutes} min",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Text(
+                        text = reqEstimate.trafficLevel.label,
+                        color = when (reqEstimate.trafficLevel) {
+                            LayaRouteEngine.TrafficLevel.FLUID -> MeetColors.neonGreen
+                            LayaRouteEngine.TrafficLevel.MODERATE -> MeetColors.warning
+                            else -> MeetColors.error
+                        },
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
             Spacer(Modifier.height(14.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                IconButton(
+                    onClick = onViewOnMap,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .border(1.dp, MeetColors.cyberCyan, RoundedCornerShape(10.dp))
+                ) {
+                    Icon(Icons.Default.Map, contentDescription = "Ver en Radar", tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
+                }
+
                 OutlinedButton(
                     onClick = onCounterOffer,
                     modifier = Modifier.weight(1f),
@@ -929,7 +1151,7 @@ private fun SpecialistRequestItemCard(
 
                 Button(
                     onClick = onTakeDirect,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.weight(1.1f),
                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                     shape = RoundedCornerShape(10.dp)
                 ) {
@@ -1200,6 +1422,525 @@ private fun VoiceSearchAssistantDialog(
                 Spacer(Modifier.height(12.dp))
                 OutlinedButton(onClick = onDismiss, shape = RoundedCornerShape(10.dp)) {
                     Text("Cerrar", color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ── Selector de Modo de Vista (Solicitudes vs Radar en Vivo) ──
+ */
+@Composable
+private fun ViewModeSelector(
+    selectedMode: String,
+    onSelectMode: (String) -> Unit,
+    activeAcceptedCount: Int,
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = MeetColors.cardBackground,
+        border = BorderStroke(1.dp, MeetColors.borderSubtle)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            val isList = selectedMode == "LIST"
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onSelectMode("LIST") },
+                shape = RoundedCornerShape(9.dp),
+                color = if (isList) MeetColors.cyberCyan.copy(alpha = 0.22f) else Color.Transparent,
+                border = if (isList) BorderStroke(1.dp, MeetColors.cyberCyan) else null
+            ) {
+                Row(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.List,
+                        contentDescription = null,
+                        tint = if (isList) MeetColors.cyberCyan else MeetColors.textSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "SOLICITUDES",
+                        color = if (isList) MeetColors.cyberCyan else MeetColors.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = if (isList) FontWeight.Black else FontWeight.Bold
+                    )
+                }
+            }
+
+            val isMap = selectedMode == "MAP"
+            Surface(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onSelectMode("MAP") },
+                shape = RoundedCornerShape(9.dp),
+                color = if (isMap) MeetColors.neonGreen.copy(alpha = 0.22f) else Color.Transparent,
+                border = if (isMap) BorderStroke(1.dp, MeetColors.neonGreen) else null
+            ) {
+                Row(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Map,
+                        contentDescription = null,
+                        tint = if (isMap) MeetColors.neonGreen else MeetColors.textSecondary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "RADAR & RUTA EN VIVO",
+                        color = if (isMap) MeetColors.neonGreen else MeetColors.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = if (isMap) FontWeight.Black else FontWeight.Bold
+                    )
+                    if (activeAcceptedCount > 0) {
+                        Spacer(Modifier.width(6.dp))
+                        Surface(
+                            shape = CircleShape,
+                            color = MeetColors.neonGreen
+                        ) {
+                            Text(
+                                text = "$activeAcceptedCount",
+                                color = MeetColors.backgroundDark,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * ── Radar & Mapa en Vivo con Rutas Reales, ETA Dinámico y Refugios Seguros ──
+ */
+@Composable
+private fun ElysiumServicesLiveMapRadar(
+    allRequests: List<ServiceRequestEntity>,
+    focusedRequest: ServiceRequestEntity?,
+    onSelectRequest: (ServiceRequestEntity) -> Unit,
+    userGps: ObdViewModel.GpsLocationInfo?,
+    isSpecialistMode: Boolean,
+    onCompleteRequest: (ServiceRequestEntity) -> Unit,
+) {
+    val activeRequest = focusedRequest
+        ?: allRequests.firstOrNull { it.status == "ACCEPTED" }
+        ?: allRequests.firstOrNull { it.status == "OPEN" }
+
+    val clientLat = if (activeRequest != null && activeRequest.latitude != 0.0) activeRequest.latitude else (userGps?.latitude ?: 9.9333)
+    val clientLon = if (activeRequest != null && activeRequest.longitude != 0.0) activeRequest.longitude else (userGps?.longitude ?: -84.0833)
+    val clientPoint = GeoPoint(clientLat, clientLon)
+
+    val specialistLat = if (isSpecialistMode && userGps != null) userGps.latitude else (clientLat + 0.016)
+    val specialistLon = if (isSpecialistMode && userGps != null) userGps.longitude else (clientLon + 0.014)
+    val specialistPoint = GeoPoint(specialistLat, specialistLon)
+
+    val routeEstimate = remember(specialistPoint, clientPoint) {
+        LayaRouteEngine.calculateRoute(
+            origin = specialistPoint,
+            destination = clientPoint
+        )
+    }
+
+    val companionState = remember(clientPoint, specialistPoint, isSpecialistMode) {
+        ElysiumRouteCompanion.evaluateCompanionState(
+            currentLatitude = clientPoint.latitude,
+            currentLongitude = clientPoint.longitude,
+            destinationLatitude = specialistPoint.latitude,
+            destinationLongitude = specialistPoint.longitude,
+            isClientWaiting = !isSpecialistMode
+        )
+    }
+
+    var selectedBottomTab by remember { mutableStateOf("STAGING") } // "STAGING" or "CHECKLIST"
+
+    // Build CommonMapState
+    val mapMarkers = remember(activeRequest, allRequests, clientPoint, specialistPoint, companionState) {
+        val markers = mutableListOf<GeoMarker>()
+
+        // 1. Client / Vehicle marker
+        markers.add(
+            GeoMarker(
+                id = "client_vehicle",
+                role = GeoMarkerRole.DESTINATION,
+                point = clientPoint,
+                label = if (activeRequest != null) activeRequest.problem else "Tu Ubicación",
+                subtitle = if (activeRequest != null) "₡${String.format("%,.0f", activeRequest.priceOffer)} CRC" else "Costa Rica",
+                isHighlighted = true
+            )
+        )
+
+        // 2. Specialist marker
+        markers.add(
+            GeoMarker(
+                id = "specialist_live",
+                role = GeoMarkerRole.PROVIDER_LIVE,
+                point = specialistPoint,
+                label = if (isSpecialistMode) "Tu Posición (Especialista)" else "Especialista MEET",
+                subtitle = "ETA ~${routeEstimate.etaMinutes} min (${routeEstimate.trafficLevel.label})",
+                isHighlighted = true
+            )
+        )
+
+        // 3. Safe Staging Zones (refugios seguros de Costa Rica)
+        companionState.safeStagingZones.take(2).forEachIndexed { idx, zone ->
+            markers.add(
+                GeoMarker(
+                    id = "safe_staging_$idx",
+                    role = GeoMarkerRole.STORE_LOCATION,
+                    point = GeoPoint(zone.place.latitude, zone.place.longitude),
+                    label = "Zona Segura: ${zone.place.name}",
+                    subtitle = "${zone.distanceKm} km · ${zone.recommendationReason}"
+                )
+            )
+        }
+
+        // 4. Other open requests in the radar
+        allRequests.filter { it.requestId != activeRequest?.requestId && it.status == "OPEN" && it.latitude != 0.0 }.forEach { req ->
+            markers.add(
+                GeoMarker(
+                    id = "req_${req.requestId}",
+                    role = GeoMarkerRole.GENERIC_SERVICE,
+                    point = GeoPoint(req.latitude, req.longitude),
+                    label = "Solicitud: ${req.problem.take(20)}...",
+                    subtitle = "₡${String.format("%,.0f", req.priceOffer)} CRC"
+                )
+            )
+        }
+
+        markers
+    }
+
+    val mapRoutes = remember(routeEstimate) {
+        listOf(routeEstimate.geoRoute)
+    }
+
+    val cameraBounds = remember(clientPoint, specialistPoint) {
+        GeoBounds.fromPoints(listOf(clientPoint, specialistPoint)) ?: GeoBounds(
+            northLat = kotlin.math.max(clientPoint.latitude, specialistPoint.latitude) + 0.02,
+            southLat = kotlin.math.min(clientPoint.latitude, specialistPoint.latitude) - 0.02,
+            eastLng = kotlin.math.max(clientPoint.longitude, specialistPoint.longitude) + 0.02,
+            westLng = kotlin.math.min(clientPoint.longitude, specialistPoint.longitude) - 0.02
+        )
+    }
+
+    val mapState = remember(mapMarkers, mapRoutes, cameraBounds) {
+        CommonMapState(
+            markers = mapMarkers,
+            routes = mapRoutes,
+            cameraIntent = MapCameraIntent.FitBounds(cameraBounds, paddingDp = 64),
+            isInteractive = true,
+            showRecenterButton = true,
+            showTrafficOverlay = true
+        )
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Universal MapLibre Engine
+        CommonMapPanel(
+            state = mapState,
+            modifier = Modifier.fillMaxSize(),
+            userLocation = GeoPoint(userGps?.latitude ?: clientLat, userGps?.longitude ?: clientLon),
+            onMarkerClick = { markerId ->
+                if (markerId.startsWith("req_")) {
+                    val reqId = markerId.removePrefix("req_")
+                    allRequests.firstOrNull { it.requestId == reqId }?.let { onSelectRequest(it) }
+                }
+            }
+        )
+
+        // ── Floating HUD Header (ETA & Traffic & PIN) ──
+        Column(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xEA06111D)),
+                border = BorderStroke(1.5.dp, if (companionState.isArrivingSoon) MeetColors.warning else MeetColors.cyberCyan)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("⏱️", fontSize = 20.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "ETA: ${routeEstimate.etaMinutes} MIN",
+                                    color = if (companionState.isArrivingSoon) MeetColors.warning else MeetColors.cyberCyan,
+                                    fontSize = 17.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 0.5.sp
+                                )
+                                Text(
+                                    text = "${String.format("%.1f", routeEstimate.distanceKm)} KM · Velocidad: ${routeEstimate.estimatedSpeedKmh.toInt()} km/h",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        // Traffic chip
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = when (routeEstimate.trafficLevel) {
+                                LayaRouteEngine.TrafficLevel.FLUID -> MeetColors.neonGreen.copy(alpha = 0.2f)
+                                LayaRouteEngine.TrafficLevel.MODERATE -> MeetColors.warning.copy(alpha = 0.2f)
+                                else -> MeetColors.error.copy(alpha = 0.2f)
+                            },
+                            border = BorderStroke(1.dp, when (routeEstimate.trafficLevel) {
+                                LayaRouteEngine.TrafficLevel.FLUID -> MeetColors.neonGreen
+                                LayaRouteEngine.TrafficLevel.MODERATE -> MeetColors.warning
+                                else -> MeetColors.error
+                            })
+                        ) {
+                            Text(
+                                text = routeEstimate.trafficLevel.label,
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
+                    if (companionState.isArrivingSoon) {
+                        Spacer(Modifier.height(8.dp))
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(8.dp),
+                            color = MeetColors.warning.copy(alpha = 0.2f),
+                            border = BorderStroke(1.dp, MeetColors.warning)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("⚡", fontSize = 14.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = "¡LLEGADA INMINENTE! Especialista a menos de 3 minutos del vehículo.",
+                                    color = Color.White,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Consejo táctico: ${routeEstimate.tacticalAdvice}",
+                        color = MeetColors.textSecondary,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp
+                    )
+
+                    // Security PIN display (Aura Sentinel)
+                    if (activeRequest != null && activeRequest.status == "ACCEPTED") {
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "PIN AURA SENTINEL:",
+                                color = MeetColors.neonGreen,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MeetColors.neonGreen.copy(alpha = 0.2f),
+                                border = BorderStroke(1.dp, MeetColors.neonGreen)
+                            ) {
+                                Text(
+                                    text = activeRequest.requestId.takeLast(4).uppercase(),
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 2.sp,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Quick request selector chip row if multiple requests
+            if (allRequests.size > 1) {
+                Spacer(Modifier.height(6.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(allRequests) { req ->
+                        val isSelected = req.requestId == activeRequest?.requestId
+                        Surface(
+                            modifier = Modifier.clickable { onSelectRequest(req) },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MeetColors.cyberCyan else Color(0xCC06111D),
+                            border = BorderStroke(1.dp, if (isSelected) MeetColors.cyberCyan else MeetColors.borderSubtle)
+                        ) {
+                            Text(
+                                text = "${req.problem.take(16)}... (₡${req.priceOffer.toInt()})",
+                                color = if (isSelected) MeetColors.backgroundDark else Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Floating Bottom Panel (Safe Staging Zones & Safety Checklist) ──
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(14.dp)
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xF2081524)),
+                border = BorderStroke(1.dp, MeetColors.borderSubtle)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    // Tab Selector
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { selectedBottomTab = "STAGING" },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selectedBottomTab == "STAGING") MeetColors.cyberCyan.copy(alpha = 0.2f) else Color.Transparent,
+                            border = if (selectedBottomTab == "STAGING") BorderStroke(1.dp, MeetColors.cyberCyan) else null
+                        ) {
+                            Text(
+                                text = "🛡️ ZONAS SEGURAS",
+                                color = if (selectedBottomTab == "STAGING") MeetColors.cyberCyan else MeetColors.textSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+
+                        Surface(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { selectedBottomTab = "CHECKLIST" },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (selectedBottomTab == "CHECKLIST") MeetColors.neonGreen.copy(alpha = 0.2f) else Color.Transparent,
+                            border = if (selectedBottomTab == "CHECKLIST") BorderStroke(1.dp, MeetColors.neonGreen) else null
+                        ) {
+                            Text(
+                                text = "📋 PROTOCOLO AURA",
+                                color = if (selectedBottomTab == "CHECKLIST") MeetColors.neonGreen else MeetColors.textSecondary,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
+                    if (selectedBottomTab == "STAGING") {
+                        Text(
+                            text = "Puntos de espera recomendados en caso de inmovilización:",
+                            color = MeetColors.textSecondary,
+                            fontSize = 10.sp
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        companionState.safeStagingZones.take(2).forEach { zone ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("📍", fontSize = 12.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "${zone.place.name} (${zone.distanceKm} km)",
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = zone.recommendationReason,
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 9.sp
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        companionState.safetyChecklist.take(3).forEach { item ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("✓", color = MeetColors.neonGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    text = item,
+                                    color = Color.White,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
+
+                    if (activeRequest != null && activeRequest.status == "ACCEPTED") {
+                        Spacer(Modifier.height(10.dp))
+                        Button(
+                            onClick = { onCompleteRequest(activeRequest) },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MeetColors.backgroundDark, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("COMPLETAR TRABAJO & CALIFICAR", color = MeetColors.backgroundDark, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                        }
+                    }
                 }
             }
         }

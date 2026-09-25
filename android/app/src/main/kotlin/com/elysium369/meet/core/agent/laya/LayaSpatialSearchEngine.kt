@@ -48,48 +48,20 @@ class LayaSpatialSearchEngine(
         val confidence: Double,
     )
 
-    private val localGazetteer: List<LocalGeoEntity> = listOf(
-        // ── 7 Provinces ──
-        LocalGeoEntity("cr_prov_sj", "San José", "San José", "San José", "PROVINCE", 9.9333, -84.0833, listOf("chepe", "san jose centro", "capital")),
-        LocalGeoEntity("cr_prov_al", "Alajuela", "Alajuela", "Alajuela", "PROVINCE", 10.0167, -84.2167, listOf("la liga", "alajuela centro")),
-        LocalGeoEntity("cr_prov_ca", "Cartago", "Cartago", "Cartago", "PROVINCE", 9.8667, -83.9167, listOf("la vieja metropoli", "cartago centro")),
-        LocalGeoEntity("cr_prov_he", "Heredia", "Heredia", "Heredia", "PROVINCE", 9.9989, -84.1167, listOf("ciudad de las flores", "heredia centro")),
-        LocalGeoEntity("cr_prov_gu", "Guanacaste", "Guanacaste", "Liberia", "PROVINCE", 10.6333, -85.4333, listOf("liberia", "pampa")),
-        LocalGeoEntity("cr_prov_pu", "Puntarenas", "Puntarenas", "Puntarenas", "PROVINCE", 9.9763, -84.8384, listOf("puerto", "puntarenas centro")),
-        LocalGeoEntity("cr_prov_li", "Limón", "Limón", "Limón", "PROVINCE", 9.9907, -83.0360, listOf("puerto limon", "caribe")),
-
-        // ── Cantons & Urban Hubs (GAM & Beyond) ──
-        LocalGeoEntity("cr_escazu", "Escazú", "San José", "Escazú", "CANTON", 9.9194, -84.1394, listOf("san rafael de escazu", "guachipelin")),
-        LocalGeoEntity("cr_santa_ana", "Santa Ana", "San José", "Santa Ana", "CANTON", 9.9325, -84.1825, listOf("lindora", "pozor")),
-        LocalGeoEntity("cr_curridabat", "Curridabat", "San José", "Curridabat", "CANTON", 9.9167, -84.0333, listOf("pinares", "guayabos")),
-        LocalGeoEntity("cr_desamparados", "Desamparados", "San José", "Desamparados", "CANTON", 9.8975, -84.0675, listOf("desampa")),
-        LocalGeoEntity("cr_san_pedro", "San Pedro", "San José", "Montes de Oca", "CANTON", 9.9328, -84.0528, listOf("montes de oca", "fuente de la hispanidad")),
-        LocalGeoEntity("cr_tibas", "Tibás", "San José", "Tibás", "CANTON", 9.9575, -84.0833, listOf("san juan de tibas", "cinco esquinas")),
-        LocalGeoEntity("cr_moravia", "Moravia", "San José", "Moravia", "CANTON", 9.9633, -84.0483, listOf("san vicente de moravia")),
-        LocalGeoEntity("cr_guadalupe", "Guadalupe", "San José", "Goicoechea", "CANTON", 9.9478, -84.0567, listOf("goicoechea")),
-        LocalGeoEntity("cr_pavas", "Pavas", "San José", "San José", "CANTON", 9.9458, -84.1308, listOf("zona industrial pavas", "aeropuerto tobias bolaños")),
-        LocalGeoEntity("cr_la_union", "Tres Ríos", "Cartago", "La Unión", "CANTON", 9.9078, -83.9875, listOf("la union")),
-        LocalGeoEntity("cr_belen", "Belén", "Heredia", "Belén", "CANTON", 9.9806, -84.1878, listOf("san antonio de belen")),
-        LocalGeoEntity("cr_santo_domingo", "Santo Domingo", "Heredia", "Santo Domingo", "CANTON", 9.9833, -84.0833, listOf("domingo")),
-        LocalGeoEntity("cr_san_carlos", "Ciudad Quesada", "Alajuela", "San Carlos", "CANTON", 10.3239, -84.4286, listOf("san carlos")),
-        LocalGeoEntity("cr_perez_zeledon", "Pérez Zeledón", "San José", "Pérez Zeledón", "CANTON", 9.3739, -83.7089, listOf("san isidro de el general")),
-        LocalGeoEntity("cr_jaco", "Jacó", "Puntarenas", "Garabito", "LANDMARK", 9.6150, -84.6297, listOf("playa jaco", "garabito")),
-
-        // ── Automotive Hubs & Specialist Areas ──
-        LocalGeoEntity("cr_auto_uruca", "La Uruca (Agencias & Talleres)", "San José", "San José", "AUTOMOTIVE_HUB", 9.9525, -84.1031, listOf("talleres la uruca", "agencias", "repuestos uruca")),
-        LocalGeoEntity("cr_auto_paso_ancho", "Paso Ancho (Zona de Repuestos)", "San José", "San José", "AUTOMOTIVE_HUB", 9.9136, -84.0847, listOf("repuestos paso ancho", "calle de los repuestos")),
-        LocalGeoEntity("cr_auto_calle_blancos", "Calle Blancos (Servicios Industriales)", "San José", "Goicoechea", "AUTOMOTIVE_HUB", 9.9483, -84.0722, listOf("talleres calle blancos", "parque industrial")),
-        LocalGeoEntity("cr_auto_zapote", "Zapote (Rotonda & Comercios)", "San José", "San José", "AUTOMOTIVE_HUB", 9.9239, -84.0531, listOf("rotonda de las garantias", "casa presidencial")),
-
-        // ── Major Landmarks & Activity Centers ──
-        LocalGeoEntity("cr_lmk_sabana", "Parque Metropolitano La Sabana", "San José", "San José", "LANDMARK", 9.9358, -84.1028, listOf("estadio nacional", "la sabana", "museo de arte")),
-        LocalGeoEntity("cr_lmk_multiplaza", "Multiplaza Escazú", "San José", "Escazú", "LANDMARK", 9.9442, -84.1536, listOf("multiplaza", "guachipelin")),
-        LocalGeoEntity("cr_lmk_oxigeno", "Oxígeno Human Playground", "Heredia", "Heredia", "LANDMARK", 9.9886, -84.1331, listOf("oxigeno", "mall oxigeno")),
-        LocalGeoEntity("cr_lmk_citymall", "City Mall Alajuela", "Alajuela", "Alajuela", "LANDMARK", 10.0108, -84.2097, listOf("city mall", "aeropuerto sjo")),
-        LocalGeoEntity("cr_lmk_basilica", "Basílica de Los Ángeles", "Cartago", "Cartago", "LANDMARK", 9.8644, -83.9131, listOf("la basilica", "virgen de los angeles")),
-        LocalGeoEntity("cr_lmk_ucr", "Universidad de Costa Rica (UCR)", "San José", "Montes de Oca", "LANDMARK", 9.9372, -84.0506, listOf("sede rodrigo facio", "pretoria")),
-        LocalGeoEntity("cr_lmk_parquecentral", "Parque Central de San José", "San José", "San José", "LANDMARK", 9.9325, -84.0789, listOf("catedral metropolitana", "teatro nacional")),
-    )
+    private val localGazetteer: List<LocalGeoEntity> by lazy {
+        com.elysium369.meet.core.geo.CostaRicaGisDatabase.allPlaces.map { place ->
+            LocalGeoEntity(
+                id = place.id,
+                name = place.name,
+                province = place.province,
+                canton = place.canton,
+                category = place.category.name,
+                latitude = place.latitude,
+                longitude = place.longitude,
+                aliases = (place.aliases + listOfNotNull(place.brand, place.district.takeIf { it.isNotBlank() })).distinct()
+            )
+        }
+    }
 
     /**
      * Resolves and reranks place suggestions prioritizing Costa Rica and user GPS.
