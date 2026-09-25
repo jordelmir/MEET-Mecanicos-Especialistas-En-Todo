@@ -268,13 +268,15 @@ class IntelligenceEngine {
     fun projectDriver(
         scope: AnalyticsScope,
         driverId: String,
-        grossUnits: Long = 41_840L,
-        netUnits: Long = 34_500L,
-        trips: Int = 8,
-        totalKm: Double = 116.0,
-        paidKm: Double = 79.0,
-        onlineHours: Double = 6.3,
-        occupiedHours: Double = 4.8,
+        grossUnits: Long = 0L,
+        netUnits: Long = 0L,
+        payoutAvailableUnits: Long = 0L,
+        trips: Int = 0,
+        totalKm: Double = 0.0,
+        paidKm: Double = 0.0,
+        onlineHours: Double = 0.0,
+        occupiedHours: Double = 0.0,
+        trustAlertsCount: Int = 0,
     ): DriverIntelligenceProjection {
         require(scope.canAccess(targetOrgId = null, targetSubjectId = driverId)) {
             "Unauthorized access to driver analytics for subject $driverId"
@@ -301,7 +303,7 @@ class IntelligenceEngine {
         return DriverIntelligenceProjection(
             todayGrossEarnings = Money.ofCrc(grossUnits),
             todayNetEarnings = Money.ofCrc(netUnits),
-            payoutAvailable = Money.ofCrc(31_200L),
+            payoutAvailable = Money.ofCrc(payoutAvailableUnits),
             todayTripsCount = trips,
             totalKm = totalKm,
             paidKm = paidKm,
@@ -311,7 +313,7 @@ class IntelligenceEngine {
             utilizationPercent = utilization,
             revenuePerHour = revPerHour,
             revenuePerKm = revPerKm,
-            trustAlertsCount = 0,
+            trustAlertsCount = trustAlertsCount,
         )
     }
 
@@ -321,7 +323,17 @@ class IntelligenceEngine {
     fun projectFleet(
         scope: AnalyticsScope,
         targetFleetId: String,
-        fleetName: String = "Flota Vanguard Alfa",
+        fleetName: String = "Flota",
+        totalVehicles: Int = 0,
+        activeVehicles: Int = 0,
+        onlineDrivers: Int = 0,
+        tripsToday: Int = 0,
+        fleetGmvUnits: Long = 0L,
+        fleetEarningsUnits: Long = 0L,
+        driverEarningsUnits: Long = 0L,
+        fleetUtilizationPercent: Double = 0.0,
+        vehiclesRequiringMaintenance: Int = 0,
+        driversExpiringDocuments: Int = 0,
     ): FleetIntelligenceProjection {
         require(scope.canAccess(targetOrgId = targetFleetId, targetSubjectId = null)) {
             "Tenant isolation violation: Cannot access analytics for organization $targetFleetId"
@@ -330,16 +342,16 @@ class IntelligenceEngine {
         return FleetIntelligenceProjection(
             fleetId = targetFleetId,
             fleetName = fleetName,
-            totalVehicles = 42,
-            activeVehicles = 37,
-            onlineDrivers = 31,
-            tripsToday = 421,
-            fleetGmv = Money.ofCrc(1_842_300L),
-            fleetEarnings = Money.ofCrc(276_345L),
-            driverEarnings = Money.ofCrc(1_341_200L),
-            fleetUtilizationPercent = 82.3,
-            vehiclesRequiringMaintenance = 3,
-            driversExpiringDocuments = 2,
+            totalVehicles = totalVehicles,
+            activeVehicles = activeVehicles,
+            onlineDrivers = onlineDrivers,
+            tripsToday = tripsToday,
+            fleetGmv = Money.ofCrc(fleetGmvUnits),
+            fleetEarnings = Money.ofCrc(fleetEarningsUnits),
+            driverEarnings = Money.ofCrc(driverEarningsUnits),
+            fleetUtilizationPercent = fleetUtilizationPercent,
+            vehiclesRequiringMaintenance = vehiclesRequiringMaintenance,
+            driversExpiringDocuments = driversExpiringDocuments,
         )
     }
 
@@ -349,13 +361,14 @@ class IntelligenceEngine {
     fun projectPassenger(
         scope: AnalyticsScope,
         passengerId: String,
-        tripsCount: Int = 24,
-        totalKm: Double = 186.2,
-        totalHours: Double = 9.4,
-        spentUnits: Long = 84_420L,
-        tipsUnits: Long = 4_500L,
-        discountsUnits: Long = 6_200L,
+        tripsCount: Int = 0,
+        totalKm: Double = 0.0,
+        totalHours: Double = 0.0,
+        spentUnits: Long = 0L,
+        tipsUnits: Long = 0L,
+        discountsUnits: Long = 0L,
         refundsUnits: Long = 0L,
+        citiesVisitedCount: Int = 0,
     ): PassengerActivityProjection {
         require(scope.canAccess(targetOrgId = null, targetSubjectId = passengerId)) {
             "Unauthorized access to passenger activity for subject $passengerId"
@@ -377,7 +390,7 @@ class IntelligenceEngine {
             totalDiscountsReceived = Money.ofCrc(discountsUnits),
             totalRefundsReceived = Money.ofCrc(refundsUnits),
             estimatedCo2Kg = estimatedCo2,
-            citiesVisitedCount = 3,
+            citiesVisitedCount = citiesVisitedCount,
         )
     }
 
@@ -388,11 +401,17 @@ class IntelligenceEngine {
         scope: AnalyticsScope,
         mechanicId: String,
         mechanicName: String = "Técnico Especialista",
-        jobsCompleted: Int = 38,
-        laborUnits: Long = 1_450_000L,
-        partsUnits: Long = 820_000L,
-        billedHours: Double = 94.0,
-        reworkJobs: Int = 1,
+        jobsCompleted: Int = 0,
+        jobsReceivedCount: Int = 0,
+        jobsAcceptedCount: Int = 0,
+        laborUnits: Long = 0L,
+        partsUnits: Long = 0L,
+        billedHours: Double = 0.0,
+        reworkJobs: Int = 0,
+        customerRating: Double = 0.0,
+        repeatCustomersPercent: Double = 0.0,
+        cancellationRatePercent: Double = 0.0,
+        trustAlertsCount: Int = 0,
     ): MechanicBusinessProjection {
         require(scope.canAccess(targetOrgId = null, targetSubjectId = mechanicId)) {
             "Unauthorized access to mechanic analytics for subject $mechanicId"
@@ -406,8 +425,8 @@ class IntelligenceEngine {
         return MechanicBusinessProjection(
             mechanicId = mechanicId,
             mechanicName = mechanicName,
-            jobsReceivedCount = jobsCompleted + 4,
-            jobsAcceptedCount = jobsCompleted + 2,
+            jobsReceivedCount = if (jobsReceivedCount > 0) jobsReceivedCount else jobsCompleted,
+            jobsAcceptedCount = if (jobsAcceptedCount > 0) jobsAcceptedCount else jobsCompleted,
             jobsCompletedCount = jobsCompleted,
             totalRevenue = Money.ofCrc(totalUnits),
             laborRevenue = Money.ofCrc(laborUnits),
@@ -415,11 +434,11 @@ class IntelligenceEngine {
             averageTicket = avgTicket,
             billedHours = billedHours,
             revenuePerHour = revPerHour,
-            customerRating = 4.94,
-            repeatCustomersPercent = 42.0,
-            cancellationRatePercent = 4.2,
+            customerRating = customerRating,
+            repeatCustomersPercent = repeatCustomersPercent,
+            cancellationRatePercent = cancellationRatePercent,
             rework30dRatePercent = reworkRate,
-            trustAlertsCount = 0,
+            trustAlertsCount = trustAlertsCount,
         )
     }
 
@@ -429,15 +448,20 @@ class IntelligenceEngine {
     fun projectWorkshop(
         scope: AnalyticsScope,
         workshopOrgId: String,
-        workshopName: String = "Taller Central Vanguard",
-        totalBays: Int = 8,
-        occupiedBays: Int = 6,
-        activeJobs: Int = 7,
-        backlogJobs: Int = 3,
-        todayLaborUnits: Long = 980_000L,
-        todayPartsUnits: Long = 640_000L,
-        reworkJobsMonth: Int = 2,
-        totalJobsMonth: Int = 84,
+        workshopName: String = "Taller",
+        totalBays: Int = 0,
+        occupiedBays: Int = 0,
+        activeMechanicsCount: Int = 0,
+        activeJobs: Int = 0,
+        backlogJobs: Int = 0,
+        todayLaborUnits: Long = 0L,
+        todayPartsUnits: Long = 0L,
+        reworkJobsMonth: Int = 0,
+        totalJobsMonth: Int = 0,
+        averageRepairHours: Double = 0.0,
+        quoteAcceptedConversionPercent: Double = 0.0,
+        repeatCustomersPercent: Double = 0.0,
+        expiringCertificationsCount: Int = 0,
     ): WorkshopCommandCenterProjection {
         require(scope.canAccess(targetOrgId = workshopOrgId, targetSubjectId = null)) {
             "Tenant isolation violation: Cannot access workshop analytics for organization $workshopOrgId"
@@ -445,6 +469,7 @@ class IntelligenceEngine {
 
         val bayUtil = if (totalBays > 0) (occupiedBays.toDouble() / totalBays.toDouble()) * 100.0 else 0.0
         val totalRevenueUnits = todayLaborUnits + todayPartsUnits
+        val avgTicket = if (totalJobsMonth > 0) Money.ofCrc(totalRevenueUnits / totalJobsMonth) else Money.zero()
         val reworkRate = MetricsRegistry.calculateReworkRate(reworkJobsMonth, totalJobsMonth)
 
         return WorkshopCommandCenterProjection(
@@ -453,18 +478,18 @@ class IntelligenceEngine {
             totalBays = totalBays,
             occupiedBays = occupiedBays,
             bayUtilizationPercent = bayUtil,
-            activeMechanicsCount = 5,
+            activeMechanicsCount = activeMechanicsCount,
             activeJobsCount = activeJobs,
             backlogJobsCount = backlogJobs,
             todayRevenue = Money.ofCrc(totalRevenueUnits),
             laborRevenue = Money.ofCrc(todayLaborUnits),
             partsRevenue = Money.ofCrc(todayPartsUnits),
-            averageTicket = Money.ofCrc(185_000L),
-            averageRepairHours = 4.2,
-            quoteAcceptedConversionPercent = 78.5,
-            repeatCustomersPercent = 54.0,
+            averageTicket = avgTicket,
+            averageRepairHours = averageRepairHours,
+            quoteAcceptedConversionPercent = quoteAcceptedConversionPercent,
+            repeatCustomersPercent = repeatCustomersPercent,
             rework30dRatePercent = reworkRate,
-            expiringCertificationsCount = 1,
+            expiringCertificationsCount = expiringCertificationsCount,
         )
     }
 
@@ -475,14 +500,19 @@ class IntelligenceEngine {
         scope: AnalyticsScope,
         operatorOrOrgId: String,
         isOrganization: Boolean = false,
-        name: String = "Grúas y Rescate Costa Rica",
-        availableTrucks: Int = 6,
-        activeCalls: Int = 3,
-        completedCalls: Int = 18,
-        gmvUnits: Long = 620_000L,
-        earningsUnits: Long = 490_000L,
-        totalKm: Double = 420.0,
-        loadedKm: Double = 270.0,
+        name: String = "Grúas y Asistencia",
+        availableTrucks: Int = 0,
+        activeCalls: Int = 0,
+        completedCalls: Int = 0,
+        gmvUnits: Long = 0L,
+        earningsUnits: Long = 0L,
+        totalKm: Double = 0.0,
+        loadedKm: Double = 0.0,
+        revenuePerHourUnits: Long = 0L,
+        averageResponseEtaMinutes: Double = 0.0,
+        acceptanceRatePercent: Double = 0.0,
+        customerRating: Double = 0.0,
+        trustAlertsCount: Int = 0,
     ): TowCommandCenterProjection {
         val targetOrgId = if (isOrganization) operatorOrOrgId else null
         val targetSubjectId = if (!isOrganization) operatorOrOrgId else null
@@ -506,11 +536,11 @@ class IntelligenceEngine {
             loadedDistanceKm = loadedKm,
             loadedRatio = loadedRatio,
             revenuePerKm = revPerKm,
-            revenuePerHour = Money.ofCrc(14_500L),
-            averageResponseEtaMinutes = 18.5,
-            acceptanceRatePercent = 94.2,
-            customerRating = 4.91,
-            trustAlertsCount = 0,
+            revenuePerHour = Money.ofCrc(revenuePerHourUnits),
+            averageResponseEtaMinutes = averageResponseEtaMinutes,
+            acceptanceRatePercent = acceptanceRatePercent,
+            customerRating = customerRating,
+            trustAlertsCount = trustAlertsCount,
         )
     }
 }

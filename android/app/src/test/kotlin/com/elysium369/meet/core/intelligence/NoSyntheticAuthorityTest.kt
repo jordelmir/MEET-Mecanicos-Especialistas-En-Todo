@@ -86,4 +86,44 @@ class NoSyntheticAuthorityTest {
         assertTrue("Must detect DLQ critical anomaly", projection.anomalies.any { it.level == AnomalyLevel.CRITICAL && it.domain == "System" })
         assertTrue("Must detect Outbox lag anomaly", projection.anomalies.any { it.level == AnomalyLevel.WARNING && it.domain == "Outbox" })
     }
+
+    @Test
+    fun projectAllProjections_withoutTelemetry_returnHonestZeroesNeverSyntheticFixtures() {
+        val driverScope = AnalyticsScope(principalId = "driver-1", scopeType = ScopeType.PERSONAL, capabilities = setOf(ActorCapability.VIEW_PERSONAL_ANALYTICS, ActorCapability.DRIVE_RIDE))
+        val driverProj = engine.projectDriver(driverScope, "driver-1")
+        assertEquals(0L, driverProj.todayGrossEarnings.minorUnits)
+        assertEquals(0L, driverProj.todayNetEarnings.minorUnits)
+        assertEquals(0, driverProj.todayTripsCount)
+        assertEquals(0.0, driverProj.totalKm, 0.001)
+
+        val fleetScope = AnalyticsScope(principalId = "fleet-mgr", organizationId = "fleet-1", scopeType = ScopeType.FLEET, capabilities = setOf(ActorCapability.VIEW_ORGANIZATION_ANALYTICS))
+        val fleetProj = engine.projectFleet(fleetScope, "fleet-1")
+        assertEquals(0, fleetProj.totalVehicles)
+        assertEquals(0, fleetProj.activeVehicles)
+        assertEquals(0, fleetProj.tripsToday)
+        assertEquals(0L, fleetProj.fleetGmv.minorUnits)
+
+        val passengerScope = AnalyticsScope(principalId = "pax-1", scopeType = ScopeType.PASSENGER, capabilities = setOf(ActorCapability.VIEW_PERSONAL_ANALYTICS))
+        val paxProj = engine.projectPassenger(passengerScope, "pax-1")
+        assertEquals(0, paxProj.completedTripsCount)
+        assertEquals(0.0, paxProj.totalDistanceKm, 0.001)
+        assertEquals(0L, paxProj.totalSpent.minorUnits)
+
+        val mechScope = AnalyticsScope(principalId = "mech-1", scopeType = ScopeType.PERSONAL, capabilities = setOf(ActorCapability.VIEW_PERSONAL_ANALYTICS, ActorCapability.PROVIDE_REPAIR))
+        val mechProj = engine.projectMechanic(mechScope, "mech-1")
+        assertEquals(0, mechProj.jobsCompletedCount)
+        assertEquals(0L, mechProj.totalRevenue.minorUnits)
+
+        val wsScope = AnalyticsScope(principalId = "ws-owner", organizationId = "ws-1", scopeType = ScopeType.WORKSHOP, capabilities = setOf(ActorCapability.VIEW_ORGANIZATION_ANALYTICS))
+        val wsProj = engine.projectWorkshop(wsScope, "ws-1")
+        assertEquals(0, wsProj.totalBays)
+        assertEquals(0, wsProj.activeJobsCount)
+        assertEquals(0L, wsProj.todayRevenue.minorUnits)
+
+        val towScope = AnalyticsScope(principalId = "tow-1", scopeType = ScopeType.PERSONAL, capabilities = setOf(ActorCapability.VIEW_PERSONAL_ANALYTICS, ActorCapability.PROVIDE_TOW))
+        val towProj = engine.projectTow(towScope, "tow-1")
+        assertEquals(0, towProj.availableTrucksCount)
+        assertEquals(0, towProj.completedCallsCount)
+        assertEquals(0L, towProj.totalGmv.minorUnits)
+    }
 }
