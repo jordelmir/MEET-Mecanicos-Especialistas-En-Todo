@@ -178,6 +178,12 @@ tools/                           Verificadores y utilidades de release
 - [Comercio Local y Delivery Triangular V1](docs/commerce/MEET_LOCAL_COMMERCE_AND_DELIVERY_V1.md)
 - [Release 4.27.0 — Comercio Local, Delivery y Hub de Servicios Activos](docs/releases/2026-09-25-elysium-vanguard-ai-os-4.27.0-commerce-and-active-services.md)
 
+## Descarga y Releases
+
+- **Release v4.27.0 en GitHub:** [GitHub Release v4.27.0](https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/releases/tag/v4.27.0)
+- **Descarga Directa del APK (v4.27.0, build 61):** [app-debug.apk](https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/releases/download/v4.27.0/app-debug.apk)
+- **SHA-256:** `d7769a2fc547d603eaa9e5094cf9220b0f5b989b34e35d21c4b8362c5b208768`
+
 ## Límites de publicación
 
 No publiques un `app-debug.apk` como artefacto de producción. Una entrega
