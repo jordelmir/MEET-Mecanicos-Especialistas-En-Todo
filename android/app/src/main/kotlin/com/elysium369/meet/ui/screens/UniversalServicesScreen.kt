@@ -43,7 +43,6 @@ import com.elysium369.meet.ui.components.AccessStatusCard
 import com.elysium369.meet.ui.components.AccessStep
 import com.elysium369.meet.ui.screens.RideMapPanel
 import com.elysium369.meet.ui.theme.MeetColors
-import com.elysium369.meet.ui.util.WazeNavigationButton
 import java.util.UUID
 
 private const val UNIVERSAL_PREFIX = "universal:"
@@ -54,9 +53,6 @@ fun UniversalServicesScreen(
     viewModel: ObdViewModel,
     onBack: () -> Unit,
     onOpenMessages: () -> Unit = {},
-    onNavigateToActiveServices: () -> Unit = {},
-    onNavigateToHistory: () -> Unit = {},
-    onNavigateToProviderConfig: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val preferences = remember {
@@ -202,68 +198,6 @@ fun UniversalServicesScreen(
                 label = "univ-glow",
             )
 
-            // ── Barra Universal de Control: Activos, Historial & Configuración ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    onClick = onNavigateToActiveServices,
-                    shape = RoundedCornerShape(10.dp),
-                    color = MeetColors.neonGreen.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.6f)),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("⚡", fontSize = 14.sp)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Activos", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-
-                Surface(
-                    onClick = onNavigateToHistory,
-                    shape = RoundedCornerShape(10.dp),
-                    color = MeetColors.cyberCyan.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.6f)),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("📜", fontSize = 14.sp)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Historial", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-
-                Surface(
-                    onClick = onNavigateToProviderConfig,
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFFFFB300).copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, Color(0xFFFFB300).copy(alpha = 0.6f)),
-                    modifier = Modifier.weight(1.2f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("🛠️", fontSize = 14.sp)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Mis Servicios", color = Color(0xFFFFB300), fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                    }
-                }
-            }
-
             OutlinedTextField(
                 value = query,
                 onValueChange = { query = it },
@@ -385,20 +319,6 @@ fun UniversalServicesScreen(
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                 )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .padding(10.dp)
-                                    .align(Alignment.BottomEnd)
-                            ) {
-                                gps?.let { loc ->
-                                    WazeNavigationButton(
-                                        destinationLat = loc.latitude,
-                                        destinationLng = loc.longitude,
-                                        destinationLabel = loc.addressName ?: "Zona de Servicio",
-                                    )
-                                }
                             }
                         }
                     }
@@ -536,21 +456,7 @@ private fun ClientServiceRequestCard(viewModel: ObdViewModel, request: ServiceRe
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Oferta base: ₡${String.format("%,.0f", request.priceOffer)} · ${request.location}", color = MeetColors.cyberCyan, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                if (request.latitude != 0.0 && request.longitude != 0.0) {
-                    Spacer(Modifier.width(6.dp))
-                    WazeNavigationButton(
-                        destinationLat = request.latitude,
-                        destinationLng = request.longitude,
-                        destinationLabel = request.problem,
-                    )
-                }
-            }
+            Text("Oferta base: ₡${String.format("%,.0f", request.priceOffer)} · ${request.location}", color = MeetColors.cyberCyan, fontSize = 11.sp)
             if (request.description.isNotBlank()) {
                 Text(request.description, color = MeetColors.textSecondary, fontSize = 11.sp)
             }
@@ -664,21 +570,7 @@ private fun ProviderServiceBoard(
                 border = BorderStroke(1.dp, Color(0xFFC85CFF)),
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(request.problem, color = Color.White, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-                        if (request.latitude != 0.0 && request.longitude != 0.0) {
-                            Spacer(Modifier.width(6.dp))
-                            WazeNavigationButton(
-                                destinationLat = request.latitude,
-                                destinationLng = request.longitude,
-                                destinationLabel = request.problem,
-                            )
-                        }
-                    }
+                    Text(request.problem, color = Color.White, fontWeight = FontWeight.Black)
                     Text(request.location, color = MeetColors.cyberCyan, fontSize = 11.sp)
                     Text(request.description.take(180), color = MeetColors.textSecondary, fontSize = 11.sp)
                     OutlinedTextField(
