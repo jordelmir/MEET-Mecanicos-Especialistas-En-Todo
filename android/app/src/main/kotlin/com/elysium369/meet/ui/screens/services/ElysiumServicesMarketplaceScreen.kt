@@ -54,7 +54,6 @@ import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.navigation.MeetDestinations
 import com.elysium369.meet.ui.navigation.safeNavigate
 import com.elysium369.meet.ui.theme.MeetColors
-import com.elysium369.meet.ui.util.WazeNavigationButton
 import kotlinx.coroutines.launch
 import java.util.UUID
 import android.content.Intent
@@ -252,68 +251,6 @@ fun ElysiumServicesMarketplaceScreen(
                 onSelectMode = { selectedViewMode = it },
                 activeAcceptedCount = allRequests.count { it.status == "ACCEPTED" }
             )
-
-            // ── Barra Rápida de Servicios: Activos, Historial & Catálogo Proveedor ──
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    onClick = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
-                    shape = RoundedCornerShape(10.dp),
-                    color = MeetColors.neonGreen.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.6f)),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 7.dp, horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("⚡", fontSize = 13.sp)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Activos", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    }
-                }
-
-                Surface(
-                    onClick = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
-                    shape = RoundedCornerShape(10.dp),
-                    color = MeetColors.cyberCyan.copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.6f)),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 7.dp, horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("📜", fontSize = 13.sp)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Historial", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    }
-                }
-
-                Surface(
-                    onClick = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color(0xFFFFB300).copy(alpha = 0.15f),
-                    border = BorderStroke(1.dp, Color(0xFFFFB300).copy(alpha = 0.6f)),
-                    modifier = Modifier.weight(1.3f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 7.dp, horizontal = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text("🛠️", fontSize = 13.sp)
-                        Spacer(Modifier.width(4.dp))
-                        Text("Mis Servicios", color = Color(0xFFFFB300), fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                    }
-                }
-            }
 
             if (selectedViewMode == "MAP") {
                 ElysiumServicesLiveMapRadar(
@@ -1116,29 +1053,17 @@ private fun ClientActiveRequestCard(
                         }
 
                         Spacer(Modifier.height(8.dp))
-                        Row(
+                        Button(
+                            onClick = onTrackOnMap,
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan.copy(alpha = 0.2f)),
+                            border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(vertical = 6.dp)
                         ) {
-                            Button(
-                                onClick = onTrackOnMap,
-                                modifier = Modifier.weight(1.3f),
-                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan.copy(alpha = 0.2f)),
-                                border = BorderStroke(1.dp, MeetColors.cyberCyan),
-                                shape = RoundedCornerShape(8.dp),
-                                contentPadding = PaddingValues(vertical = 6.dp)
-                            ) {
-                                Icon(Icons.Default.Navigation, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(15.dp))
-                                Spacer(Modifier.width(6.dp))
-                                Text("RASTREAR EN MAPA", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                            }
-
-                            WazeNavigationButton(
-                                destinationLat = clientLat,
-                                destinationLng = clientLon,
-                                destinationLabel = request.problem,
-                            )
+                            Icon(Icons.Default.Navigation, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("RASTREAR RUTA Y ESPECIALISTA EN MAPA", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                 }
@@ -1356,12 +1281,6 @@ private fun SpecialistRequestItemCard(
                 ) {
                     Icon(Icons.Default.Map, contentDescription = "Ver en Radar", tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
                 }
-
-                WazeNavigationButton(
-                    destinationLat = reqLat,
-                    destinationLng = reqLon,
-                    destinationLabel = request.problem,
-                )
 
                 OutlinedButton(
                     onClick = onCounterOffer,
@@ -2125,18 +2044,6 @@ private fun ElysiumServicesLiveMapRadar(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            // 1-Click Waze Navigation Button
-                            val destLat = if (isSpecialistMode) clientPoint.latitude else specialistPoint.latitude
-                            val destLng = if (isSpecialistMode) clientPoint.longitude else specialistPoint.longitude
-                            val destLabel = if (isSpecialistMode) (activeRequest?.problem ?: "Cliente") else "Especialista MEET"
-                            if (destLat != 0.0 && destLng != 0.0) {
-                                WazeNavigationButton(
-                                    destinationLat = destLat,
-                                    destinationLng = destLng,
-                                    destinationLabel = destLabel,
-                                )
-                            }
-
                             // SOS Safe Haven Button
                             Surface(
                                 modifier = Modifier.clickable { onOpenEmergencyHaven() },
