@@ -154,7 +154,10 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
                     activeCall=receipt;mutableIncoming.value=null;mutableState.value=CallConnectionState.RINGING
                 }
                 CallTransportOutcome.Ringing(receipt.id)
-            } catch(c:CancellationException) { throw c }
+            } catch(c:CancellationException) {
+                synchronized(this) { if(owner==principalId && accountGeneration==accountEpoch) { closeMedia();mutableState.value=CallConnectionState.ENDED } }
+                throw c
+            }
             catch(_:Exception) {
                 synchronized(this) { if(owner==principalId && accountGeneration==accountEpoch) { closeMedia();mutableState.value=CallConnectionState.FAILED } }
                 CallTransportOutcome.Failed("CALL_AUTHORIZATION_REJECTED")
@@ -176,7 +179,10 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
             else { check(receipt.state=="DECLINED");mutableState.value=CallConnectionState.ENDED }
             }
             true
-        } catch(c:CancellationException) { throw c }
+        } catch(c:CancellationException) {
+            synchronized(this) { if(owner==principal && accountGeneration==accountEpoch) { closeMedia();mutableState.value=CallConnectionState.ENDED } }
+            throw c
+        }
         catch(_:Exception) { synchronized(this) { if(owner==principal && accountGeneration==accountEpoch) closeMedia() };false }
     }
     private suspend fun rpc(name:String,id:String):CommunicationCallWire = SupabaseModule.client.postgrest.rpc(name,buildJsonObject { put("p_call_id",id) }).decodeSingle()
