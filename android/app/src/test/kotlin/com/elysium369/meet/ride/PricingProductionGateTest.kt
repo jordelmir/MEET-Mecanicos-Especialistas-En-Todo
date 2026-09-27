@@ -93,7 +93,7 @@ class PricingProductionGateTest {
         val dbFile = projectFile("android/app/src/main/kotlin/com/elysium369/meet/data/local/MeetDatabase.kt").readText()
         val appModuleFile = projectFile("android/app/src/main/kotlin/com/elysium369/meet/di/AppModule.kt").readText()
 
-        assertTrue("MeetDatabase must be version 82 or higher", (Regex("version\\s*=\\s*(\\d+)").find(dbFile)?.groupValues?.get(1)?.toIntOrNull() ?: 0) >= 82)
+        assertTrue("MeetDatabase must be version 82 or higher", (Regex("""version\s*=\s*(\d+)""").find(dbFile)?.groupValues?.get(1)?.toIntOrNull() ?: 0) >= 82)
         assertTrue("MeetDatabase must include VehicleFinancialLedgerEntity", dbFile.contains("VehicleFinancialLedgerEntity::class"))
         assertTrue("AppModule must declare MIGRATION_81_82", appModuleFile.contains("val MIGRATION_81_82 = object : Migration(81, 82)"))
         assertTrue("AppModule must register MIGRATION_81_82", appModuleFile.contains("MIGRATION_81_82,"))
