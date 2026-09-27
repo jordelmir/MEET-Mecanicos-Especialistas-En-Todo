@@ -44,7 +44,9 @@ class RideLifecyclePersistenceContractTest {
         ).readText()
 
         assertTrue(viewModel.contains("type = RideCommandType.CANCEL"))
-        assertTrue(viewModel.contains("reasonCode = reason.name"))
+        assertTrue(viewModel.contains("reasonCode = safeReason.name"))
+        assertTrue(viewModel.contains("reason !in RideCancellationPolicy.reasonsFor(role)"))
+        assertTrue(viewModel.contains("RideCancellationPolicy.isDetailValid(safeReason, detail)"))
         assertTrue(viewModel.contains("expectedVersion: Long = request.serverVersion"))
         assertFalse(viewModel.contains("rideDao.cancelActiveRequest("))
         assertTrue(gateway.contains("\"ride_cancel_trip_v2\""))
