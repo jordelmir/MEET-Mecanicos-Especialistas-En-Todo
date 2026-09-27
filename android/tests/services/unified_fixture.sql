@@ -4,8 +4,8 @@ create role authenticated;
 create role service_role;
 create function auth.role() returns text language sql stable as $$ select current_user::text $$;
 create table public.user_profiles(id uuid primary key,auth_user_id uuid);
-create table public.provider_profiles(id uuid primary key,user_profile_id uuid,provider_type text,is_active boolean,is_verified boolean,status text);
-create table public.service_definitions(id text primary key);
+create table public.provider_profiles(id uuid primary key,user_profile_id uuid,provider_type text,is_active boolean,is_verified boolean,status text,business_name text default 'Proveedor Test');
+create table public.service_definitions(id text primary key,domain text,display_name text,supported_modalities text[],risk_tier text);
 create table if not exists public.universal_service_requests (
     id uuid primary key default gen_random_uuid(),
     client_id uuid not null references auth.users(id) on delete restrict,

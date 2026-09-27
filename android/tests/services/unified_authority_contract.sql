@@ -4,8 +4,8 @@ insert into auth.users(id,email) values
 ('22222222-2222-4222-8222-222222222222','service_provider@test.invalid'),
 ('33333333-3333-4333-8333-333333333333','service_other@test.invalid');
 insert into public.user_profiles(id,auth_user_id) values('22222222-2222-4222-8222-222222222222','22222222-2222-4222-8222-222222222222');
-insert into public.provider_profiles values('22222222-2222-4222-8222-222222222222','22222222-2222-4222-8222-222222222222','service_provider',true,true,'active');
-insert into public.service_definitions values('plumbing');
+insert into public.provider_profiles(id,user_profile_id,provider_type,is_active,is_verified,status) values('22222222-2222-4222-8222-222222222222','22222222-2222-4222-8222-222222222222','service_provider',true,true,'active');
+insert into public.service_definitions(id) values('plumbing') on conflict(id) do nothing;
 insert into public.universal_service_requests(id,client_id,service_definition_id,modality,title,description,offered_price_minor,currency)
 values('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','11111111-1111-4111-8111-111111111111','plumbing','PHYSICAL','Plomería','Reparación de tubería',10000,'CRC');
 insert into public.universal_service_offers(id,request_id,provider_id,price_minor,currency)
@@ -54,3 +54,12 @@ do $$ declare denied boolean; begin
  exception when insufficient_privilege then denied:=true;end;assert denied;
 end $$;
 reset role;
+
+do $$ declare profile jsonb; begin
+ perform set_config('request.jwt.claim.sub','11111111-1111-4111-8111-111111111111',true);
+ profile:=public.universal_service_provider_summary_v1('22222222-2222-4222-8222-222222222222');
+ assert profile->>'name'='Proveedor Test';
+ assert (profile->>'completed')::bigint=1 and (profile->>'reviews')::bigint=1;
+ assert (profile->>'rating')::numeric=5 and profile->>'balance_minor' is null;
+ assert jsonb_array_length(public.universal_service_provider_summaries_v1(array['22222222-2222-4222-8222-222222222222'::uuid]))=1;
+end $$;

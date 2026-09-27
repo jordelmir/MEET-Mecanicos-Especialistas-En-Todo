@@ -1,5 +1,9 @@
 package com.elysium369.meet.communications
 
+import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
+import dagger.hilt.android.qualifiers.ApplicationContext
 import com.elysium369.meet.data.remote.SupabaseModule
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.postgrest.postgrest
@@ -50,7 +54,7 @@ data class CommunicationCallWire(
  * This is encrypted transport, not a claim of server-blind or forward-secret calls.
  */
 @Singleton
-class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeLiveAudioEngine, private val legacy:ElysiumLiveKitCallTransport):CallAudioTransport {
+class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeLiveAudioEngine, private val legacy:ElysiumLiveKitCallTransport, @ApplicationContext private val context:Context):CallAudioTransport {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private val mutex=Mutex()
     private val mutableState=MutableStateFlow(CallConnectionState.IDLE)
@@ -65,6 +69,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
     private var mediaJob:Job?=null
     private var mediaChannel:RealtimeChannel?=null
     @Volatile private var activeCall:CommunicationCallWire?=null
+    @Volatile private var foregroundCallId:String?=null
     private var audioStarted=false
     @Volatile private var mediaGeneration=0L
 
@@ -117,6 +122,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
     override suspend fun connectAudio(conversationId:String,principalId:String):CallTransportOutcome = mutex.withLock {
         legacyTeardown?.join()
         if(activeCall!=null || mediaJob?.isActive==true) return@withLock CallTransportOutcome.Failed("CALL_BUSY")
+        if(owner!=null && owner!=principalId) return@withLock CallTransportOutcome.Failed("ACCOUNT_CHANGED")
         val epoch=accountGeneration
         val principal=owner
         legacyMode.value=true
@@ -138,6 +144,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
             if(activeCall!=null || mediaJob?.isActive==true) return@withLock CallTransportOutcome.Failed("CALL_BUSY")
             mutableState.value=CallConnectionState.REQUESTING_AUTHORIZATION
             try {
+                startForegroundCall(callId)
                 val receipt=SupabaseModule.client.postgrest.rpc("communication_start_call_v1",buildJsonObject {
                     put("p_conversation_id",conversationId);put("p_call_id",callId)
                 }).decodeSingle<CommunicationCallWire>()
@@ -149,7 +156,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
                 CallTransportOutcome.Ringing(receipt.id)
             } catch(c:CancellationException) { throw c }
             catch(_:Exception) {
-                synchronized(this) { if(owner==principalId && accountGeneration==accountEpoch) mutableState.value=CallConnectionState.FAILED }
+                synchronized(this) { if(owner==principalId && accountGeneration==accountEpoch) { closeMedia();mutableState.value=CallConnectionState.FAILED } }
                 CallTransportOutcome.Failed("CALL_AUTHORIZATION_REJECTED")
             }
         }
@@ -160,6 +167,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
         val accountEpoch=accountGeneration
         if(SupabaseModule.client.auth.currentUserOrNull()?.id!=principal) return@withLock false
         try {
+            if(accept) startForegroundCall(request.id)
             val receipt=SupabaseModule.client.postgrest.rpc("communication_answer_call_v1",buildJsonObject { put("p_call_id",request.id);put("p_accept",accept) }).decodeSingle<CommunicationCallWire>()
             synchronized(this) {
             if(owner!=principal || accountGeneration!=accountEpoch || SupabaseModule.client.auth.currentUserOrNull()?.id!=principal) return@withLock false
@@ -169,7 +177,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
             }
             true
         } catch(c:CancellationException) { throw c }
-        catch(_:Exception) { false }
+        catch(_:Exception) { synchronized(this) { if(owner==principal && accountGeneration==accountEpoch) closeMedia() };false }
     }
     private suspend fun rpc(name:String,id:String):CommunicationCallWire = SupabaseModule.client.postgrest.rpc(name,buildJsonObject { put("p_call_id",id) }).decodeSingle()
     @Synchronized
@@ -231,7 +239,10 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
                 chunks.close()
                 synchronized(this@ElysiumCallTransport) {
                     if(startedHere && mediaGeneration==generation) audioEngine.stop()
-                    if(mediaGeneration==generation) audioStarted=false
+                    if(mediaGeneration==generation) {
+                        audioStarted=false
+                        if(foregroundCallId==call.id) { foregroundCallId=null;context.stopService(Intent(context,CommunicationCallForegroundService::class.java)) }
+                    }
                 }
                 withContext(NonCancellable) { runCatching { channel.unsubscribe() } }
             }
@@ -244,12 +255,25 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
         if(audioStarted) audioEngine.stop()
         audioStarted=false
         mediaChannel=null
+        foregroundCallId=null
+        context.stopService(Intent(context,CommunicationCallForegroundService::class.java))
     }
-    override suspend fun end() = mutex.withLock {
+    @Synchronized
+    private fun startForegroundCall(callId:String) {
+        foregroundCallId=callId
+        ContextCompat.startForegroundService(context,Intent(context,CommunicationCallForegroundService::class.java).putExtra(CommunicationCallForegroundService.CALL_ID,callId))
+    }
+    fun isCurrentForegroundLease(callId:String):Boolean = foregroundCallId==callId && owner==SupabaseModule.client.auth.currentUserOrNull()?.id
+    fun finishForegroundCall(callId:String) { scope.launch { endForCall(callId) } }
+    override suspend fun end() = endForCall(null)
+    private suspend fun endForCall(expectedCall:String?) = mutex.withLock {
+        if(expectedCall!=null && foregroundCallId!=expectedCall) return@withLock
+
         if(legacyMode.value) { legacy.end();return@withLock }
         val accountEpoch=accountGeneration
         val principal=owner
         val call=activeCall ?: mutableIncoming.value
+        closeMedia()
         try { if(call!=null) runCatching { rpc("communication_end_call_v1",call.id) } }
         finally { synchronized(this) { if(accountGeneration==accountEpoch && owner==principal) { closeMedia();activeCall=null;mutableIncoming.value=null;mutableState.value=CallConnectionState.ENDED } } }
     }

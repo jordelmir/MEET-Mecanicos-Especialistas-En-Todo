@@ -24,7 +24,7 @@ import com.elysium369.meet.core.agent.ui.*
 @Serializable private data class ServiceDefinitionWire(val id:String,val domain:String,@SerialName("display_name") val name:String,@SerialName("supported_modalities") val modalities:List<String>)
 @Serializable private data class ServiceRequestWire(val id:String,@SerialName("client_id") val client:String,@SerialName("assigned_provider_id") val provider:String?=null,@SerialName("service_definition_id") val definition:String,val modality:String,val title:String,val description:String,@SerialName("location_label") val location:String?=null,@SerialName("offered_price_minor") val price:Long,@SerialName("final_price_minor") val finalPrice:Long?=null,val currency:String,val state:String,val version:Long)
 @Serializable private data class ServiceOfferWire(val id:String,@SerialName("request_id") val request:String,@SerialName("provider_id") val provider:String,@SerialName("price_minor") val price:Long,val currency:String,val state:String)
-@Serializable private data class ProviderSummary(val completed:Long=0,val reviews:Long=0,val rating:Double?=null,@SerialName("balance_minor") val balance:Long?=null,val eligible:Boolean=false)
+@Serializable private data class ProviderSummary(@SerialName("provider_id") val providerId:String?=null,val name:String?=null,val completed:Long=0,val reviews:Long=0,val rating:Double?=null,@SerialName("balance_minor") val balance:Long?=null,val eligible:Boolean=false)
 
 /** Both historical entry points share this server-authoritative client/provider experience. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,6 +39,8 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
  var definitions by remember(actor) { mutableStateOf(emptyList<ServiceDefinitionWire>()) }
  var requests by remember(actor) { mutableStateOf(emptyList<ServiceRequestWire>()) }
  var offers by remember(actor) { mutableStateOf(emptyList<ServiceOfferWire>()) }
+ var query by remember(actor) { mutableStateOf("") }
+ var providerSummaries by remember(actor) { mutableStateOf(emptyMap<String,ProviderSummary>()) }
  var summary by remember(actor) { mutableStateOf(ProviderSummary()) }
  var error by remember(actor) { mutableStateOf<String?>(null) }
  var busy by remember(actor) { mutableStateOf(false) }
@@ -70,7 +72,12 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
   // Request-scoped queries prevent unrelated proposals from hiding a user's offers.
   for(row in mine.filter { it.state=="OPEN" }) proposals+=client.postgrest["universal_service_offers"].select { filter { eq("request_id",row.id) } }.decodeList<ServiceOfferWire>()
   val stats=client.postgrest.rpc("universal_service_provider_summary_v1",buildJsonObject { put("p_provider_id",owner) }).decodeSingle<ProviderSummary>()
+  val summaries=mutableListOf<ProviderSummary>()
+  for(ids in proposals.map { it.provider }.distinct().chunked(100)) {
+   summaries+=client.postgrest.rpc("universal_service_provider_summaries_v1",buildJsonObject {put("p_provider_ids",JsonArray(ids.map(::JsonPrimitive))) }).decodeList<ProviderSummary>()
+  }
   check(client.auth.currentUserOrNull()?.id==owner)
+  providerSummaries=summaries.mapNotNull { entry -> entry.providerId?.let { it to entry } }.toMap()
   definitions=catalog;requests=rows;offers=proposals;summary=stats;error=null
  }
  fun action(block:suspend ()->Unit) {
@@ -93,8 +100,8 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
   LazyColumn(Modifier.fillMaxSize().padding(padding),contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
    item {
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-     FilterChip(selected=!providerMode,onClick={providerMode=false},label={Text("Necesito un servicio")})
-     FilterChip(selected=providerMode,onClick={providerMode=true},label={Text("Ofrezco servicios")})
+     FilterChip(modifier=Modifier.weight(1f),selected=!providerMode,onClick={providerMode=false},label={Text("Necesito un servicio")})
+     FilterChip(modifier=Modifier.weight(1f),selected=providerMode,onClick={providerMode=true},label={Text("Ofrezco servicios")})
     }
     if(providerMode) {
      Text(if(summary.eligible) "Proveedor verificado" else "Registra y verifica tu perfil para ofrecer servicios.")
@@ -114,7 +121,8 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
     if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
     Row { TextButton(onClick={history=false}){Text("Activos")};TextButton(onClick={history=true}){Text("Historial")};TextButton(onClick={action { }},enabled=!busy){Text("Actualizar")} }
    }
-   if(!providerMode && !history) items(definitions,key={"definition:${it.id}"}) { definition ->
+   if(!providerMode && !history) item { OutlinedTextField(query,{query=it},modifier=Modifier.fillMaxWidth().agentTextInput(AgentUiControlId("services.search"),"Buscar servicio u oficio",AgentTextFieldRole.SEARCH,readValue={query},writeValue={query=it}),label={Text("Buscar servicio u oficio")}) }
+   if(!providerMode && !history) items(definitions.filter { query.isBlank() || (it.name+" "+it.domain).contains(query.trim(),ignoreCase=true) },key={"definition:${it.id}"}) { definition ->
     OutlinedButton(onClick={selectedDefinition=definition;modality=definition.modalities.firstOrNull().orEmpty();draftId=UUID.randomUUID().toString()},modifier=Modifier.fillMaxWidth(),enabled=!busy){Text("${definition.domain} · ${definition.name}")}
    }
    val visible=requests.filter { r -> (if(providerMode) r.provider==actor || r.state=="OPEN" && r.client!=actor else r.client==actor) && (if(history) r.state in setOf("COMPLETED","CANCELLED","DISPUTED") else r.state !in setOf("COMPLETED","CANCELLED","DISPUTED")) }
@@ -127,6 +135,10 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
      if(providerMode && r.state=="OPEN" && summary.eligible) Button(onClick={bidTarget=r;price=""},enabled=!busy){Text("Enviar propuesta")}
      if(r.client==actor && r.state=="OPEN") {
       offers.filter { it.request==r.id && it.state=="PENDING" }.forEach { offer ->
+       val publicProfile=providerSummaries[offer.provider]
+       Text(publicProfile?.name ?: "Proveedor sin perfil público disponible")
+       Text(publicProfile?.let { "${it.completed} trabajos · ${it.reviews} calificaciones" } ?: "Métricas no disponibles")
+       Text(publicProfile?.rating?.let { "★ %.1f / 5".format(it) } ?: "Aún sin calificaciones")
        Text("Propuesta: ${offer.price} ${offer.currency}")
        Button(modifier=Modifier.serviceAction("accept.${offer.id}","Aceptar propuesta",!busy,AgentUiSensitivity.FINANCIAL){transition(r,"ACCEPT",offer.id)},onClick={transition(r,"ACCEPT",offer.id)},enabled=!busy){Text("Aceptar propuesta")}
       }

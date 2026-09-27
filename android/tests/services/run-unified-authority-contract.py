@@ -12,5 +12,9 @@ root=pathlib.Path(__file__).resolve().parents[3]
 folder=pathlib.Path(__file__).resolve().parent
 migration=(root/'supabase/migrations/20260927001000_unified_service_transition_authority.sql').read_text()
 migration=migration.removeprefix('begin;').removesuffix('\n').removesuffix('commit;')
+profiles=(root/'supabase/migrations/20260927002000_unified_service_public_profiles.sql').read_text()
+migration+=profiles.removeprefix('begin;').removesuffix('\n').removesuffix('commit;')
+catalog=(root/'supabase/migrations/20260927003000_unified_service_catalog_continuity.sql').read_text()
+migration+=catalog.removeprefix('begin;').removesuffix('\n').removesuffix('commit;')
 sql=(folder/'unified_fixture.sql').read_text()+migration+(folder/'unified_authority_contract.sql').read_text()+'\nrollback;\n'
 subprocess.run(['psql','-h','/tmp','-p','5432','-d',a.database,'-v','ON_ERROR_STOP=1'],input=sql,text=True,check=True)

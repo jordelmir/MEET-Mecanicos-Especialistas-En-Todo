@@ -13,3 +13,5 @@ Compilación inicial de nueva pantalla: exitosa. Compilación/release final y pr
 Pendiente de prueba física end-to-end con cuentas cliente/proveedor verificadas y recarga SINPE real aprobada. No declarar 100% producción basándose solamente en esta prueba SQL o compilación.
 
 Última validación de código: 48 pruebas seleccionadas sin fallos, incluidas dos pruebas de aislamiento premium entre cuentas. La entrega release sigue en preparación hasta firma/R8/escaneo/checksums y GitHub.
+
+Actualización: migraciones 20260927002000 y 20260927003000 aplicadas en el servidor. Perfiles públicos agregan nombre, trabajos y calificaciones; el saldo solo se devuelve al propietario. El catálogo conserva 38 definiciones existentes sin sobrescribir configuración del servidor. Contrato transaccional mantenido pasa con ambas migraciones, incluyendo privacidad de saldo.
