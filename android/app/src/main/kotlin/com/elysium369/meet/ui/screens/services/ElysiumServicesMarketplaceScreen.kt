@@ -139,7 +139,7 @@ fun ElysiumServicesMarketplaceScreen(
 
     // Provider profile & constitutional wallet state (5% platform fee)
     val userProfiles by viewModel.userProviderProfiles.collectAsState()
-    val activeProfile = userProfiles.firstOrNull { it.isActive }
+    val activeProfile = userProfiles.firstOrNull { it.isActive && it.userId == viewModel.activePrincipal.value?.id }
     val profileData = remember(activeProfile) {
         if (activeProfile != null && activeProfile.specialties.isNotBlank()) {
             ProviderServiceProfileData.fromJsonString(activeProfile.specialties)

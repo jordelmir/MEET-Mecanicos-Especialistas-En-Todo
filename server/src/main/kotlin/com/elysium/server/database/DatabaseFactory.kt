@@ -50,7 +50,7 @@ object DatabaseFactory {
             this.idleTimeout = config.idleTimeoutMs
             this.maxLifetime = config.maxLifetimeMs
             this.poolName = "ElysiumPostgresPool"
-            
+
             // Optimization properties
             addDataSourceProperty("cachePrepStmts", "true")
             addDataSourceProperty("prepStmtCacheSize", "250")

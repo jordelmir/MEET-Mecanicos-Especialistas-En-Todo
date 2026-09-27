@@ -54,7 +54,7 @@ class PostgresOutboxRepository(
                 created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
 
-            CREATE INDEX IF NOT EXISTS idx_elysium_outbox_pending 
+            CREATE INDEX IF NOT EXISTS idx_elysium_outbox_pending
                 ON elysium_outbox_events (next_attempt_at_epoch_ms, outbox_id)
                 WHERE published_at_epoch_ms IS NULL AND dead_lettered_at_epoch_ms IS NULL;
         """.trimIndent()

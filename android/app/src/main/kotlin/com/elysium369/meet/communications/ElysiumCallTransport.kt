@@ -60,6 +60,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
     val incoming:StateFlow<CommunicationCallWire?> = mutableIncoming.asStateFlow()
     @Volatile private var owner:String?=null
     @Volatile private var accountGeneration=0L
+    @Volatile private var legacyTeardown:Job?=null
     private var polling:Job?=null
     private var mediaJob:Job?=null
     private var mediaChannel:RealtimeChannel?=null
@@ -73,7 +74,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
         val accountChanged = owner != principal
         if (accountChanged && legacyMode.value) {
             legacyMode.value = false
-            scope.launch { legacy.end() }
+            legacyTeardown=scope.launch { legacy.end() }
         }
         accountGeneration++
         polling?.cancel(); closeMedia();activeCall=null;mutableIncoming.value=null
@@ -113,12 +114,21 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
             }
         }
     }
-    override suspend fun connectAudio(conversationId:String,principalId:String):CallTransportOutcome {
-        if(activeCall!=null || mediaJob?.isActive==true) return CallTransportOutcome.Failed("CALL_BUSY")
+    override suspend fun connectAudio(conversationId:String,principalId:String):CallTransportOutcome = mutex.withLock {
+        legacyTeardown?.join()
+        if(activeCall!=null || mediaJob?.isActive==true) return@withLock CallTransportOutcome.Failed("CALL_BUSY")
+        val epoch=accountGeneration
+        val principal=owner
         legacyMode.value=true
-        return legacy.connectAudio(conversationId,principalId)
+        val outcome=legacy.connectAudio(conversationId,principalId)
+        if(accountGeneration!=epoch || owner!=principal) {
+            legacy.end()
+            return@withLock CallTransportOutcome.Failed("ACCOUNT_CHANGED")
+        }
+        outcome
     }
     override suspend fun connectAudio(conversationId:String,principalId:String,callId:String):CallTransportOutcome {
+        legacyTeardown?.join()
         if(legacy.state.value in setOf(CallConnectionState.ACTIVE,CallConnectionState.CONNECTING,CallConnectionState.REQUESTING_AUTHORIZATION)) return CallTransportOutcome.Failed("CALL_BUSY")
         legacyMode.value=false
         if(SupabaseModule.client.auth.currentUserOrNull()?.id!=principalId) return CallTransportOutcome.AuthenticationRequired

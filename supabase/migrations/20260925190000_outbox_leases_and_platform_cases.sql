@@ -42,7 +42,7 @@ alter table public.elysium_outbox_events add column if not exists next_attempt_a
 alter table public.elysium_outbox_events add column if not exists dead_lettered_at_epoch_ms bigint;
 alter table public.elysium_outbox_events add column if not exists last_error_code text;
 
-create index if not exists idx_elysium_outbox_pending 
+create index if not exists idx_elysium_outbox_pending
     on public.elysium_outbox_events (next_attempt_at_epoch_ms, outbox_id)
     where published_at_epoch_ms is null and dead_lettered_at_epoch_ms is null;
 
