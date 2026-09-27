@@ -110,6 +110,7 @@ fun MessagesScreen(
     val selected by viewModel.selectedConversation.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
+    val speakerEnabled by viewModel.speakerEnabled.collectAsStateWithLifecycle()
     val callState by viewModel.callState.collectAsStateWithLifecycle()
     val incomingCall by viewModel.incomingCall.collectAsStateWithLifecycle()
     var answeringCall by remember { mutableStateOf(false) }
@@ -199,7 +200,14 @@ fun MessagesScreen(
                 }
             }
             if(callState in setOf(CallConnectionState.RINGING,CallConnectionState.CONNECTING,CallConnectionState.ACTIVE)) {
+                OutlinedButton({ viewModel.setSpeakerEnabled(!speakerEnabled) }, enabled = callState == CallConnectionState.ACTIVE) {
+                    Text(if(speakerEnabled) "Altavoz activado · cambiar a auricular" else "Auricular · activar altavoz")
+                }
                 HonestBanner(when(callState) { CallConnectionState.ACTIVE -> "Audio conectado";CallConnectionState.RINGING -> "Llamando · esperando respuesta";else -> "Conectando audio" })
+            }
+
+            if (callState == CallConnectionState.FAILED) {
+                HonestBanner("No se pudo conectar el audio. La llamada terminó; puedes volver a intentarlo.")
             }
 
             if (selected?.canRespondToRequest == true) {

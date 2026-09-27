@@ -38,6 +38,10 @@ class CommunicationViewModel @Inject constructor(
     val conversations: StateFlow<List<ConversationSummary>> = repository.conversations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val callState: StateFlow<CallConnectionState> = repository.callState
+    val speakerEnabled = repository.speakerEnabled
+    fun setSpeakerEnabled(enabled:Boolean) {
+        if (!repository.setSpeakerEnabled(enabled)) notice.value = "Esta salida de audio no está disponible en el dispositivo."
+    }
     val incomingCall = repository.incomingCall
     val identity: StateFlow<ElysiumIdentityProfile?> = repository.identity
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -294,7 +298,7 @@ class CommunicationViewModel @Inject constructor(
                 is StartCallOutcome.Failed ->
                     "No se pudo establecer la llamada Elysium (${outcome.safeCode})."
                 is StartCallOutcome.Ready -> "Conectando el audio de Elysium."
-                is StartCallOutcome.Ringing -> "Llamando; esperando que la otra persona acepte."
+                is StartCallOutcome.Ringing -> null
             }
         }
     }
@@ -303,7 +307,7 @@ class CommunicationViewModel @Inject constructor(
         if(accept && voiceNoteState.value is VoiceNoteRecordingState.Recording) { notice.value="Detén la nota de voz antes de aceptar la llamada.";return }
         viewModelScope.launch {
             val confirmed=runCatching { repository.answerCall(accept) }.getOrDefault(false)
-            notice.value=if(!confirmed) "No se pudo confirmar la respuesta de llamada." else if(accept) "Conectando audio." else "Llamada rechazada."
+            notice.value=if(!confirmed) "No se pudo confirmar la respuesta de llamada." else if(accept) null else "Llamada rechazada."
         }
     }
 

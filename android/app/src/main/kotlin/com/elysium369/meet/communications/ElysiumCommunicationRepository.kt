@@ -38,6 +38,8 @@ class ElysiumCommunicationRepository @Inject constructor(
     private val aliasMatcher: DeviceAliasMatcher,
     @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
 ) {
+    val speakerEnabled = callTransport.speakerEnabled
+    fun setSpeakerEnabled(enabled:Boolean):Boolean = callTransport.setSpeakerEnabled(enabled)
     val callState = callTransport.state
     val incomingCall = callTransport.incoming
     val conversations: Flow<List<ConversationSummary>> =
