@@ -1,8 +1,8 @@
 # CONVERGENCE CONSTITUTION — ELYSIUM VANGUARD & MEET
 
-**Status:** AUTHORITATIVE & INVIOLABLE  
-**Effective Date:** 2026-09-25  
-**Version:** 1.0.0-GENESIS  
+**Status:** AUTHORITATIVE & INVIOLABLE
+**Effective Date:** 2026-09-25
+**Version:** 1.0.0-GENESIS
 **Authority:** Jor (Architect & Founder) & Google Antigravity + Mavis + Codex
 
 ---

@@ -11,3 +11,5 @@ Prueba mantenida: `python3 android/tests/services/run-unified-authority-contract
 Compilación inicial de nueva pantalla: exitosa. Compilación/release final y pruebas físicas deben registrarse por artefacto. Las métricas corresponden al flujo canónico, no incluyen como verdad operaciones locales históricas. CRC es la moneda soportada por esta cartera; no se promete conversión global. Compras premium sin integración de tienda real no generan compra pendiente ni permisos.
 
 Pendiente de prueba física end-to-end con cuentas cliente/proveedor verificadas y recarga SINPE real aprobada. No declarar 100% producción basándose solamente en esta prueba SQL o compilación.
+
+Última validación de código: 48 pruebas seleccionadas sin fallos, incluidas dos pruebas de aislamiento premium entre cuentas. La entrega release sigue en preparación hasta firma/R8/escaneo/checksums y GitHub.

@@ -1,7 +1,7 @@
 # EVAIR LIVING COMPANION INTEGRATION SPECIFICATION
 
-**Status:** IMPLEMENTED & VERIFIED  
-**Architecture Layer:** Android Client (Jetpack Compose) + Coroutine Voice Bus  
+**Status:** IMPLEMENTED — PHYSICAL AND COMPLETE UI COVERAGE VERIFICATION PENDING
+**Architecture Layer:** Android Client (Jetpack Compose) + Coroutine Voice Bus
 **Reference Implementations:**
 - `ElysiumLivingCompanionOverlay.kt`
 - `EvairInteractionOrchestrator.kt`

@@ -1,11 +1,11 @@
 # ELYSIUM VANGUARD — MASTER ORDER GENESIS: IMPLEMENTATION & CONVERGENCE REPORT
 
-**Document ID:** `EV-GENESIS-2026-09-25`  
-**Status:** IMPLEMENTED, CONVERGED & PRODUCTION-VERIFIED  
-**Architect:** Jor (Founder & Lead Architect)  
-**Engineering Agents:** Google Antigravity + Codex + Mavis  
-**Baseline Git Commit:** `e4c379ddb00b275e390908232b8a70f83b0a0f81`  
-**Target Release:** 4.27.0 (Build 61) | Room Schema 84  
+**Document ID:** `EV-GENESIS-2026-09-25`
+**Status:** IMPLEMENTATION CHECKPOINT — PRODUCTION VERIFICATION INCOMPLETE
+**Architect:** Jor (Founder & Lead Architect)
+**Engineering Agents:** Google Antigravity + Codex + Mavis
+**Baseline Git Commit:** `e4c379ddb00b275e390908232b8a70f83b0a0f81`
+**Target Release:** 4.28.0 (Build 62) | Room Schema 86
 
 ---
 
@@ -14,20 +14,20 @@
 In accordance with the supreme operating principle:
 > **"Todo en uno. Siempre a más, nunca a menos. Al máximo nivel de la humanidad."**
 
-The **ELYSIUM VANGUARD MASTER ORDER GENESIS** has achieved total convergence across all operational planes. The disconnected stubs, in-memory workers, duplicate speech recognition threads, and synthetic fallback coordinates have been completely eliminated. 
+This report describes an implementation checkpoint, not certification of every domain in production. The 2026-09-27 audit found remaining historical local service workflows, incomplete paid-agent purchase integration and missing two-device voice-call evidence. Current evidence and limits are recorded in `android/docs/ascension/`; successful unit tests do not prove all physical journeys.
 
 The canonical, immutable chain of truth is now active:
 $$\text{HUMAN} \to \text{VOICE / TEXT} \to \text{EVAIR} \to \text{INTERACTION ORCHESTRATOR} \to \text{DETERMINISTIC FAST PATH / LAYA} \to \text{STRUCTURED INTENT} \to \text{PLAN} \to \text{POLICY ENGINE} \to \text{CAPABILITY} \to \text{DOMAIN SERVICE} \to \text{AUTHORITATIVE COMMAND} \to \text{SERVER} \to \text{EVIDENCE} \to \text{PROJECTION} \to \text{UI}$$
 
 ---
 
-## 2. Core Directives Implemented & Verified
+## 2. Implementation inventory and reported verification
 
 ### A. Production Outbox Infrastructure (Server & DB)
 - **`PostgresOutboxRepository.kt`**: Implemented real PostgreSQL outbox storage utilizing `FOR UPDATE SKIP LOCKED` row-level locks, cryptographic lease tokens (`UUID.randomUUID()`), lease timeouts (30s), automatic table creation (`elysium_outbox_events`), and dead-letter queue (`DLQ`) transitions upon retry budget exhaustion.
 - **`ProductionDomainEventPublisher.kt`**: Implemented real domain event dispatcher routing events through `RealtimeSessionRegistry` across aggregate, domain, and principal channels.
 - **`OutboxWorker.kt` & `Application.kt`**: Stripped all default in-memory and no-op parameters. Production startup connects via HikariCP pool and enforces real PostgreSQL outbox execution.
-- **Verification**: Executed `./gradlew test` on `server/` with **100% GREEN** passes (`ProductionOutboxInfrastructureTest`).
+- **Verification**: Executed `./gradlew test` on `server/` with reported passes (not a complete production certificate) (`ProductionOutboxInfrastructureTest`).
 
 ### B. EVAIR Companion Overlay & Single Mic Authority
 - **Single Microphone Capture**: Removed redundant `SpeechRecognizer` and `RecognitionListener` from `ElysiumLivingCompanionOverlay.kt`, eradicating the `SpeechRecognizer.ERROR_RECOGNIZER_BUSY` (code 8) failure mode.
@@ -87,7 +87,7 @@ Created `android/app/src/test/kotlin/com/elysium369/meet/truth/GoldenJourneyTrut
 
 ## 4. Verification & Integrity Confirmation
 
-- **Backend Unit Tests:** `./gradlew test` (in `server/`) passed with 100% green.
+- **Backend Unit Tests:** `./gradlew test` (in `server/`) was reported passing in the original checkpoint; recheck the current commit in CI.
 - **Cross-Runtime Parity:** `tests/parity/ci-verify.sh` verified.
 - **Zero Dual-Microphone Leaks:** No secondary `SpeechRecognizer` in overlay.
-- **Zero Fake Coordinates:** All geographic queries are authoritatively resolved.
+- **Geographic authority:** audit remaining historical workflows; do not treat the new canonical service flow as proof that every old workflow is free of fabricated coordinates.
