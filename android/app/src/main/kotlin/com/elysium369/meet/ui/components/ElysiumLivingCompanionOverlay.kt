@@ -352,10 +352,10 @@ fun ElysiumLivingCompanionOverlay(
                             counterPrice = targetRide.priceOffer,
                             currency = targetRide.currency,
                             estArrivalMin = 8,
-                            message = "Aceptado por comando de voz"
+                            message = "Oferta solicitada por voz"
                         )
-                        val resp = "¡Aceptando el viaje de ${targetRide.passengerName}! Oferta de ₡${targetRide.priceOffer.toInt()} enviada."
-                        speechBubbleText = "✓ Viaje de ${targetRide.passengerName} aceptado."
+                        val resp = "Solicité enviar tu oferta a ${targetRide.passengerName}. Espera la confirmación y la aceptación del pasajero."
+                        speechBubbleText = "Oferta pendiente de confirmación."
                         tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_accept_name")
                         return
                     } else {
@@ -374,10 +374,10 @@ fun ElysiumLivingCompanionOverlay(
                         counterPrice = singleRide.priceOffer,
                         currency = singleRide.currency,
                         estArrivalMin = 8,
-                        message = "Aceptado por comando de voz"
+                        message = "Oferta solicitada por voz"
                     )
-                    val resp = "¡Viaje de ${singleRide.passengerName} aceptado! En camino a recoger al pasajero."
-                    speechBubbleText = "✓ Viaje de ${singleRide.passengerName} aceptado."
+                    val resp = "Solicité enviar tu oferta a ${singleRide.passengerName}. El pasajero debe aceptarla."
+                    speechBubbleText = "Oferta pendiente de confirmación."
                     tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_accept_single")
                     return
                 } else if (openRides.size > 1) {
@@ -398,9 +398,9 @@ fun ElysiumLivingCompanionOverlay(
             if (query.contains("llegué") || query.contains("ya llegue") || query.contains("estoy en el punto")) {
                 val ride = activeRide
                 if (ride != null) {
-                    AiAutomationBridge.dispatchAction(AiAction.AdvanceRideStatus(ride.requestId, "ARRIVED"))
-                    val resp = "Notificando al pasajero que has llegado al punto de recogida."
-                    speechBubbleText = "📍 Chofer en el punto de recogida."
+                    obdViewModel.updateRideStatus(ride.requestId, "ARRIVED")
+                    val resp = "Solicité el siguiente paso del viaje. Espera la confirmación del servidor antes de anunciar tu llegada."
+                    speechBubbleText = "Llegada pendiente de confirmación."
                     tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_arrived")
                     return
                 }
@@ -408,9 +408,9 @@ fun ElysiumLivingCompanionOverlay(
             if (query.contains("pasajero a bordo") || query.contains("iniciar viaje") || query.contains("comenzar viaje")) {
                 val ride = activeRide
                 if (ride != null) {
-                    AiAutomationBridge.dispatchAction(AiAction.AdvanceRideStatus(ride.requestId, "IN_PROGRESS"))
-                    val resp = "Abordaje verificado. Viaje iniciado hacia el destino."
-                    speechBubbleText = "🚗 Viaje en curso."
+                    navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.RIDE_HOME)
+                    val resp = "Ingresa el PIN del pasajero en Viajes para verificar el abordaje. El viaje todavía no se ha iniciado."
+                    speechBubbleText = "Verifica el PIN en Viajes."
                     tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_in_progress")
                     return
                 }
@@ -418,9 +418,9 @@ fun ElysiumLivingCompanionOverlay(
             if (query.contains("completar viaje") || query.contains("terminar viaje") || query.contains("finalizar viaje")) {
                 val ride = activeRide
                 if (ride != null) {
-                    AiAutomationBridge.dispatchAction(AiAction.AdvanceRideStatus(ride.requestId, "COMPLETED"))
-                    val resp = "¡Viaje completado exitosamente! Aplicando comisión oficial del 5%."
-                    speechBubbleText = "✅ Viaje completado."
+                    obdViewModel.updateRideStatus(ride.requestId, "COMPLETED")
+                    val resp = "Solicité finalizar el viaje. Espera la confirmación del servidor."
+                    speechBubbleText = "Finalización pendiente de confirmación."
                     tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_completed")
                     return
                 }

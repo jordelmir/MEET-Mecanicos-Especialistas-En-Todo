@@ -45,6 +45,13 @@ fun VehicleFormScreen(
     viewModel: ObdViewModel,
     vehicleId: String? = null
 ) {
+    val principal by viewModel.activePrincipal.collectAsState()
+    key(principal.id) { OwnedVehicleFormScreen(navController,viewModel,vehicleId) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OwnedVehicleFormScreen(navController: NavController,viewModel: ObdViewModel,vehicleId: String?) {
     val lang by viewModel.language.collectAsState()
     
     // Translation helper

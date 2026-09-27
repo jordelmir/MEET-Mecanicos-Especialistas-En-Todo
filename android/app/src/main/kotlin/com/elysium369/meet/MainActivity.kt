@@ -1546,77 +1546,34 @@ fun MeetApp(
                         )
                     }
 
-                    val isDriverRole = isDriverMode || (req.assignedDriverId != null && req.assignedDriverId == obdViewModel.currentUserId)
+                    val isDriverRole = req.assignedDriverId != null && req.assignedDriverId == obdViewModel.currentUserId
 
                     val driverLoc = when {
-                        parsedState == com.elysium369.meet.ride.domain.RideState.ARRIVED -> {
-                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
-                                latitude = req.pickupLatitude,
-                                longitude = req.pickupLongitude,
-                                accuracy = req.pickupAccuracy.takeIf { it in 1f..100f } ?: 5f,
-                                timestamp = now,
-                                receivedAt = now,
-                                sequenceId = 1L,
-                                source = "ARRIVED_CONFIRMED"
-                            )
-                        }
                         currentGps != null && isDriverRole -> {
                             com.elysium369.meet.ui.screens.ride.RideLocationPoint(
                                 latitude = currentGps!!.latitude,
                                 longitude = currentGps!!.longitude,
                                 accuracy = currentGps!!.accuracy.coerceIn(1f, 100f),
-                                timestamp = now,
-                                receivedAt = now,
-                                sequenceId = 1L,
+                                timestamp = currentGps!!.timestamp,
+                                receivedAt = currentGps!!.timestamp,
+                                sequenceId = currentGps!!.timestamp,
                                 source = "DRIVER_DEVICE_GPS"
-                            )
-                        }
-                        currentGps != null -> {
-                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
-                                latitude = currentGps!!.latitude,
-                                longitude = currentGps!!.longitude,
-                                accuracy = currentGps!!.accuracy.coerceIn(1f, 100f),
-                                timestamp = now,
-                                receivedAt = now,
-                                sequenceId = 1L,
-                                source = "GPS_TRACKING"
-                            )
-                        }
-                        req.pickupLatitude != 0.0 -> {
-                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
-                                latitude = req.pickupLatitude,
-                                longitude = req.pickupLongitude,
-                                accuracy = 10f,
-                                timestamp = now,
-                                receivedAt = now,
-                                sequenceId = 1L,
-                                source = "PICKUP_ORIGIN"
                             )
                         }
                         else -> null
                     }
 
-                    val passengerLoc = currentGps?.let { gps ->
+                    val passengerLoc = currentGps?.takeIf { req.passengerId == obdViewModel.currentUserId }?.let { gps ->
                         com.elysium369.meet.ui.screens.ride.RideLocationPoint(
                             latitude = gps.latitude,
                             longitude = gps.longitude,
                             accuracy = gps.accuracy.coerceIn(1f, 100f),
-                            timestamp = now,
-                            receivedAt = now,
-                            sequenceId = 1L,
+                            timestamp = currentGps!!.timestamp,
+                            receivedAt = currentGps!!.timestamp,
+                            sequenceId = currentGps!!.timestamp,
                             source = "PASSENGER_DEVICE_GPS"
                         )
-                    } ?: if (req.pickupLatitude != 0.0) {
-                        com.elysium369.meet.ui.screens.ride.RideLocationPoint(
-                            latitude = req.pickupLatitude,
-                            longitude = req.pickupLongitude,
-                            accuracy = req.pickupAccuracy.coerceIn(1f, 100f),
-                            timestamp = now,
-                            receivedAt = now,
-                            sequenceId = 1L,
-                            source = "PICKUP_COORDINATES"
-                        )
-                    } else null
+                    }
 
                     com.elysium369.meet.ui.screens.ride.ActiveRideViewState(
                         rideId = req.requestId,

@@ -149,16 +149,20 @@ object SupabaseManager {
 }
 
 @Singleton
-class VehicleRepository @Inject constructor(
-    private val vehicleDao: VehicleDao
+class VehicleRepository internal constructor(
+    private val vehicleDao: VehicleDao,
+    private val principalKernel: com.elysium369.meet.identity.ActivePrincipalProvider,
 ) {
+    @Inject constructor(vehicleDao: VehicleDao, principalKernel: ActivePrincipalKernel) :
+        this(vehicleDao, principalKernel as com.elysium369.meet.identity.ActivePrincipalProvider)
     fun getVehiclesForUser(userId: String): Flow<List<Vehicle>> {
         return vehicleDao.getAllVehiclesForUser(userId).map { entities ->
-            entities.map { it.toDomain() }
+            if (principalKernel.current().id != userId) emptyList() else entities.filter { it.userId == userId }.map { it.toDomain() }
         }
     }
 
     suspend fun syncVehiclesFromCloud(userId: String): RemoteResult<Int> {
+        if (principalKernel.current().id != userId || SupabaseManager.client.auth.currentUserOrNull()?.id != userId) return RemoteResult.Unauthorized
         return try {
             val cloudVehicles = SupabaseManager.client.postgrest["cloud_vehicles"]
                 .select {
@@ -168,6 +172,11 @@ class VehicleRepository @Inject constructor(
                 }.decodeList<CloudVehicle>()
             
             cloudVehicles.forEach { vehicle ->
+                if (principalKernel.current().id != userId || SupabaseManager.client.auth.currentUserOrNull()?.id != userId) return RemoteResult.Unauthorized
+                if (vehicle.user_id != userId) return RemoteResult.Forbidden(code = "USER_MISMATCH", message = "Vehicle owner mismatch")
+                val existing = vehicleDao.getVehicleById(vehicle.id)
+                if (existing != null && existing.userId != userId) return RemoteResult.Forbidden(code = "USER_MISMATCH", message = "Vehicle owner mismatch")
+                if (principalKernel.current().id != userId) return RemoteResult.Unauthorized
                 vehicleDao.insertVehicle(vehicle.toLocalVehicle().toEntity())
             }
             RemoteResult.Success(cloudVehicles.size)
@@ -186,20 +195,29 @@ class VehicleRepository @Inject constructor(
     }
 
     suspend fun getVehicleById(userId: String, id: String): Vehicle? {
-        return vehicleDao.getVehicleByIdForUser(userId, id)?.toDomain()
+        if (principalKernel.current().id != userId) return null
+        val row = vehicleDao.getVehicleByIdForUser(userId, id)
+        return row?.takeIf { it.userId == userId && principalKernel.current().id == userId }?.toDomain()
     }
 
     suspend fun getVehicleByVin(userId: String, vin: String): Vehicle? {
         val cleanVin = vin.trim().uppercase()
         if (cleanVin.isBlank() || cleanVin == "N/A" || cleanVin == "NOT_READ") return null
-        return vehicleDao.getVehicleByVinForUser(userId, cleanVin)?.toDomain()
+        if (principalKernel.current().id != userId) return null
+        val row = vehicleDao.getVehicleByVinForUser(userId, cleanVin)
+        return row?.takeIf { it.userId == userId && principalKernel.current().id == userId }?.toDomain()
     }
     
     suspend fun insertVehicle(vehicle: Vehicle): RemoteResult<Unit> {
-        // Save locally
+        val owner = principalKernel.current().id
+        if (vehicle.user_id != owner) return RemoteResult.Forbidden(code = "USER_MISMATCH", message = "Vehicle owner mismatch")
+        val existing = vehicleDao.getVehicleById(vehicle.id)
+        if (principalKernel.current().id != owner || (existing != null && existing.userId != owner)) return RemoteResult.Forbidden(code = "USER_MISMATCH", message = "Vehicle owner mismatch")
         vehicleDao.insertVehicle(vehicle.toEntity())
         
-        // Sync to cloud
+        // A guest owns a valid local vehicle; cloud synchronization remains pending.
+        if (!principalKernel.current().isAuthenticated) return RemoteResult.TransportFailure(code = "LOCAL_ONLY", message = "Guardado en este dispositivo; sincronización pendiente")
+        if (principalKernel.current().id != owner) return RemoteResult.Unauthorized
         return try {
             val authenticatedUserId = SupabaseManager.client.auth.currentUserOrNull()?.id
             if (authenticatedUserId != vehicle.user_id) {
@@ -218,17 +236,21 @@ class VehicleRepository @Inject constructor(
     }
 
     suspend fun deleteVehicle(vehicle: Vehicle): RemoteResult<Unit> {
-        // Delete locally
-        vehicleDao.deleteVehicle(vehicle.toEntity())
-        
-        // Delete from cloud
+        val owner = principalKernel.current().id
+        if (vehicle.user_id != owner) return RemoteResult.Forbidden(code = "USER_MISMATCH", message = "Vehicle owner mismatch")
+        val existing = vehicleDao.getVehicleByIdForUser(owner, vehicle.id) ?: return RemoteResult.Forbidden(code = "NOT_OWNED", message = "Vehicle not owned by active account")
+        if (principalKernel.current().id != owner) return RemoteResult.Unauthorized
+        if (!principalKernel.current().isAuthenticated) { vehicleDao.deleteVehicle(existing);return RemoteResult.Success(Unit) }
+        if (SupabaseManager.client.auth.currentUserOrNull()?.id != owner) return RemoteResult.Unauthorized
         return try {
             SupabaseManager.client.postgrest["cloud_vehicles"].delete {
                 filter {
                     eq("id", vehicle.id)
-                    eq("user_id", vehicle.user_id)
+                    eq("user_id", owner)
                 }
             }
+            if (principalKernel.current().id != owner) return RemoteResult.Unauthorized
+            vehicleDao.deleteVehicle(existing)
             RemoteResult.Success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("VehicleRepository", "Failed to delete vehicle from cloud", e)

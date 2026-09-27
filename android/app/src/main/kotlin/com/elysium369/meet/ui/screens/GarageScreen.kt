@@ -51,14 +51,17 @@ fun GarageScreen(
     navController: NavController,
     viewModel: ObdViewModel
 ) {
-    val activeVehicle by viewModel.selectedVehicle.collectAsState()
-    val vehicles by viewModel.vehicles.collectAsState()
+    val principal by viewModel.activePrincipal.collectAsState()
+    val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val storedVehicles by viewModel.vehicles.collectAsState()
+    val activeVehicle = selectedVehicle?.takeIf { it.user_id == principal.id }
+    val vehicles = storedVehicles.filter { it.user_id == principal.id }
     val isDeleting by viewModel.isDeletingVehicle.collectAsState()
     val isReadingVinId by viewModel.isReadingVin.collectAsState()
     val vinFeedback by viewModel.vinReadFeedback.collectAsState()
 
     // Confirmation dialog state
-    var vehicleToDelete by remember { mutableStateOf<Vehicle?>(null) }
+    var vehicleToDelete by remember(principal.id) { mutableStateOf<Vehicle?>(null) }
 
     Scaffold(
         topBar = {
@@ -122,7 +125,6 @@ fun GarageScreen(
                     modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    item { if(showArtwork) Spacer(Modifier.height(160.dp)) }
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(

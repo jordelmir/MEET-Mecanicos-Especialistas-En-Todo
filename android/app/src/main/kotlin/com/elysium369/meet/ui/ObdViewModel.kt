@@ -7551,7 +7551,9 @@ class ObdViewModel @Inject constructor(
         plate: String,
         vin: String?
     ) {
+        val ownerAtRequest=activePrincipalKernel.current().id
         viewModelScope.launch {
+            if(activePrincipalKernel.current().id!=ownerAtRequest) return@launch
             val displacement = engineDisplacement.replace(Regex("[^0-9]"), "").toIntOrNull() ?: 0
             val enginePart = listOf(engineDisplacement, engineTech).filter { it.isNotBlank() }.joinToString(" ")
             val transPart = listOf(transmission, transmissionType).filter { it.isNotBlank() }.joinToString(" - ")
@@ -7559,7 +7561,7 @@ class ObdViewModel @Inject constructor(
 
             val vehicle = Vehicle(
                 id = UUID.randomUUID().toString(),
-                user_id = currentProviderUserId(),
+                user_id = ownerAtRequest,
                 year = year.toIntOrNull() ?: 2024,
                 make = make,
                 model = model,
@@ -7581,6 +7583,8 @@ class ObdViewModel @Inject constructor(
                         "Vehicle $make $model saved successfully."
                     )
                 }
+                is com.elysium369.meet.core.remote.RemoteResult.Forbidden,
+                is com.elysium369.meet.core.remote.RemoteResult.Unauthorized -> return@launch
                 else -> {
                     voiceFeedbackManager.speak(
                         "Vehículo guardado localmente; sincronización remota pendiente.",
@@ -7591,7 +7595,7 @@ class ObdViewModel @Inject constructor(
             }
 
             // Fix: Call selectVehicle to ensure persistence of the selected ID
-            selectVehicle(vehicle, ActiveVehicleChangeReason.USER_CREATED)
+            if(activePrincipalKernel.current().id==ownerAtRequest) selectVehicle(vehicle, ActiveVehicleChangeReason.USER_CREATED)
         }
     }
 
@@ -9269,6 +9273,7 @@ class ObdViewModel @Inject constructor(
                 dumpAiStateSnapshot()
             }
             is com.elysium369.meet.automation.AiAction.InjectGps -> {
+                if (!BuildConfig.DEBUG) return
                 _currentGpsLocation.value = GpsLocationInfo(
                     latitude = action.latitude,
                     longitude = action.longitude,
