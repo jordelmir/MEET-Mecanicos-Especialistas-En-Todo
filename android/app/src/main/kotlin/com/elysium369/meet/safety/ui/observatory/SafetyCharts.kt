@@ -37,9 +37,9 @@ import com.elysium369.meet.ui.theme.MeetColors
 // ═══════════════════════════════════════════════════════════════════
 
 object ObservatoryColors {
-    val background = Color(0xFF0D0D1A)
-    val cardSurface = Color(0xFF14142B)
-    val cardBorder = Color(0xFF232342)
+    val background: Color get() = MeetColors.backgroundDeep
+    val cardSurface: Color get() = MeetColors.cardBackground
+    val cardBorder: Color get() = MeetColors.borderSubtle
 
     val accentRed = Color(0xFFFF4444)
     val accentAmber = Color(0xFFFFB74D)
@@ -133,7 +133,7 @@ fun ObservatoryPieChart(
         border = BorderStroke(1.dp, ObservatoryColors.cardBorder),
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Black, color = MeetColors.textPrimary)
             Spacer(Modifier.height(14.dp))
 
             Row(
@@ -186,7 +186,7 @@ fun ObservatoryPieChart(
                             text = "${total.toLong()}",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Black,
-                            color = Color.White,
+                            color = MeetColors.textPrimary,
                         )
                         Text(
                             text = "TOTAL",
@@ -220,7 +220,7 @@ fun ObservatoryPieChart(
                             Text(
                                 label,
                                 fontSize = 11.sp,
-                                color = Color.White,
+                                color = MeetColors.textPrimary,
                                 modifier = Modifier.weight(1f),
                             )
                             Text(
@@ -260,7 +260,7 @@ fun ObservatoryBarChart(
         border = BorderStroke(1.dp, ObservatoryColors.cardBorder),
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Black, color = MeetColors.textPrimary)
             Spacer(Modifier.height(14.dp))
             data.forEachIndexed { index, (label, value) ->
                 Row(
@@ -294,7 +294,7 @@ fun ObservatoryBarChart(
                         value.toString(),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MeetColors.textPrimary,
                         modifier = Modifier.width(36.dp),
                         textAlign = TextAlign.End,
                     )
@@ -336,7 +336,7 @@ fun ResolutionTimeChart(
         border = BorderStroke(1.dp, ObservatoryColors.cardBorder),
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White)
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Black, color = MeetColors.textPrimary)
             Spacer(Modifier.height(4.dp))
             Text(
                 "Promedio de días desde reporte hasta resolución documentada",

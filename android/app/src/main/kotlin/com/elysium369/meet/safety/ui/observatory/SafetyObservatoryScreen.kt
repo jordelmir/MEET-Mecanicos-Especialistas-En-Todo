@@ -54,7 +54,7 @@ fun SafetyObservatoryScreen(
                             stringResource(R.string.safety_observatory_title),
                             fontWeight = FontWeight.Black,
                             fontSize = 17.sp,
-                            color = Color.White,
+                            color = MeetColors.textPrimary,
                         )
                         Text(
                             stringResource(R.string.safety_observatory_subtitle),
@@ -68,7 +68,7 @@ fun SafetyObservatoryScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.safety_back),
-                            tint = Color.White,
+                            tint = MeetColors.textPrimary,
                         )
                     }
                 },
@@ -131,8 +131,8 @@ fun SafetyObservatoryScreen(
                                 color = MeetColors.textSecondary,
                             )
                             val tfColors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
+                                focusedTextColor = MeetColors.textPrimary,
+                                unfocusedTextColor = MeetColors.textPrimary,
                                 focusedBorderColor = ObservatoryColors.accentCyan,
                                 unfocusedBorderColor = ObservatoryColors.cardBorder,
                                 focusedLabelColor = ObservatoryColors.accentCyan,
@@ -277,7 +277,7 @@ fun SafetyObservatoryScreen(
                                 Text(coverage.name, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary)
                             }
                             Spacer(Modifier.height(6.dp))
-                            Text(coverageLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(coverageLabel, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 stringResource(R.string.safety_observatory_coverage_desc),

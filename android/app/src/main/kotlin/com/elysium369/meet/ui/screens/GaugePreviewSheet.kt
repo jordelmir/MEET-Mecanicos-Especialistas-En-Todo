@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.components.AnimatedNeonGlyph
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
@@ -59,8 +60,8 @@ fun GaugePreviewSheet(
     val previewGauge = remember(config, listing.name, listing.id) {
         config?.toPreviewGauge(listing.id ?: "preview", listing.name)
     }
-    val accentCyan = Color(0xFF00FFCC)
-    val accentPurple = Color(0xFF7C4DFF)
+    val accentCyan = MeetColors.electricBlue
+    val accentPurple = MeetColors.hotMagenta
 
     val inf = rememberInfiniteTransition(label = "preview")
     val glowPulse by inf.animateFloat(
@@ -173,13 +174,13 @@ fun GaugePreviewSheet(
                                 .align(Alignment.TopEnd)
                                 .padding(8.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF00E676).copy(alpha = 0.2f))
-                                .border(0.5.dp, Color(0xFF00E676).copy(alpha = 0.4f), RoundedCornerShape(8.dp))
+                                .background(MeetColors.neonGreen.copy(alpha = 0.2f))
+                                .border(0.5.dp, MeetColors.neonGreen.copy(alpha = 0.4f), RoundedCornerShape(8.dp))
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
                                 "👁️ PREVIEW GRATIS",
-                                color = Color(0xFF00E676),
+                                color = MeetColors.neonGreen,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Black
                             )
@@ -294,7 +295,7 @@ fun GaugePreviewSheet(
                                 onClick = { config?.let { onApply(it) } },
                                 modifier = Modifier.fillMaxWidth().height(52.dp),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color(0xFF00E676)
+                                    containerColor = MeetColors.neonGreen
                                 ),
                                 shape = RoundedCornerShape(14.dp)
                             ) {

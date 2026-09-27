@@ -398,9 +398,9 @@ fun ScannerDashboardTab(
                         .background(
                             Brush.horizontalGradient(
                                 colors = listOf(
-                                    Color(0xFF00E5FF),
-                                    Color(0xFF00B0FF),
-                                    Color(0xFF2979FF)
+                                    MeetColors.electricBlue,
+                                    MeetColors.cyberCyan,
+                                    MeetColors.hotMagenta
                                 )
                             )
                         )
@@ -1136,7 +1136,7 @@ private fun GaugeCard(
                     Text(
                         "FULLSCREEN",
                         modifier = Modifier.scale(selPulse),
-                        color = Color(0xFF00E5FF),
+                        color = MeetColors.electricBlue,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.Monospace,
@@ -1158,7 +1158,7 @@ private fun GaugeCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .border(2.dp, Color(0xFF00E5FF).copy(alpha = glowPulse * 0.8f), RoundedCornerShape(16.dp))
+                    .border(2.dp, MeetColors.electricBlue.copy(alpha = glowPulse * 0.8f), RoundedCornerShape(16.dp))
             )
         }
 

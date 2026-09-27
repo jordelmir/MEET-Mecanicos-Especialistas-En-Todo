@@ -135,6 +135,9 @@ class VoiceCommandManager(
         }
     }
 
+    fun startListening() = startCopilot()
+    fun stopListening() = stopCopilot()
+
     private fun destroyRecognizer() {
         try {
             speechRecognizer?.destroy()
@@ -444,6 +447,14 @@ class VoiceCommandManager(
         Log.w("VoiceCommand", "SpeechRecognizer error: $message ($error)")
         isRecognizerActive = false
 
+        VoiceInteractionBus.default.emit(
+            VoiceTranscriptEvent.Failure(
+                utteranceId = System.currentTimeMillis().toString(),
+                code = error,
+                message = message
+            )
+        )
+
         // Loop restart
         if (isListening && !voiceFeedbackManager.isSpeaking.value) {
             val retryDelay = if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 500L else 300L
@@ -462,6 +473,14 @@ class VoiceCommandManager(
         val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         if (!matches.isNullOrEmpty()) {
             val spokenText = matches[0]
+            val scores = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
+            VoiceInteractionBus.default.emit(
+                VoiceTranscriptEvent.Final(
+                    utteranceId = System.currentTimeMillis().toString(),
+                    text = spokenText,
+                    confidence = scores?.firstOrNull()?.takeIf { it >= 0f }
+                )
+            )
             processSpokenText(spokenText)
         }
         isRecognizerActive = false
@@ -479,7 +498,14 @@ class VoiceCommandManager(
     override fun onPartialResults(partialResults: Bundle?) {
         val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
         if (!matches.isNullOrEmpty()) {
-            val text = matches[0].lowercase().trim()
+            val partialText = matches[0]
+            VoiceInteractionBus.default.emit(
+                VoiceTranscriptEvent.Partial(
+                    utteranceId = System.currentTimeMillis().toString(),
+                    text = partialText
+                )
+            )
+            val text = partialText.lowercase().trim()
             val hasWakeWord = text.contains("elysium") || text.contains("elísium")
             
             // Check if wake-word is newly heard to play the beep and wake up early

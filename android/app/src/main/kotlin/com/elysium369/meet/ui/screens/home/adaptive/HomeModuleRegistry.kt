@@ -86,6 +86,22 @@ object HomeModuleRegistry {
         }
         map[HomeSectionCategory.PROFESSIONAL]?.addAll(proList)
 
+        // ── AUDIO ──
+        map[HomeSectionCategory.AUDIO]?.addAll(
+            listOf(
+                HomeModuleItem("equalizer", "Ecualizador", "Ajustes de frecuencia y bandas", "audio_equalizer", HomeSectionCategory.AUDIO, "equalizer"),
+                HomeModuleItem("playlist", "Reproducción", "Listas de reproducción y audio", "audio_playlist", HomeSectionCategory.AUDIO, "playlist"),
+                HomeModuleItem("fm", "Sintonizador FM", "Radio FM y bandas", "audio_fm", HomeSectionCategory.AUDIO, "fm")
+            )
+        )
+
+        // ── SUPREME BASS (Neon Integration) ──
+        map[HomeSectionCategory.SUPREME_BASS]?.addAll(
+            listOf(
+                HomeModuleItem("supreme_bass", "SupremeBass Neon", "Control de audio y boost 100–400%", MeetDestinations.SUPREME_BASS, HomeSectionCategory.SUPREME_BASS, "bass_boost", isHighlight = true)
+            )
+        )
+
         // ── SAFETY ──
         map[HomeSectionCategory.SAFETY]?.addAll(
             listOf(

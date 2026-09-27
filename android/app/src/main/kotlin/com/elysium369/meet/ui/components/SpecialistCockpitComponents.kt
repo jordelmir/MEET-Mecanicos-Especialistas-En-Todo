@@ -59,14 +59,14 @@ fun SpecialistRoleBanner(
             .graphicsLayer {
                 shadowElevation = 8.dp.toPx()
             },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF081220)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(
             1.dp,
             Brush.horizontalGradient(
                 listOf(
                     if (isSpecialistMode) accentColor.copy(alpha = 0.8f) else MeetColors.cyberCyan.copy(alpha = 0.5f),
-                    if (isSpecialistMode) Color(0xFFC85CFF).copy(alpha = 0.6f) else MeetColors.electricBlue.copy(alpha = 0.5f),
+                    if (isSpecialistMode) MeetColors.hotMagenta.copy(alpha = 0.6f) else MeetColors.electricBlue.copy(alpha = 0.5f),
                 ),
             ),
         ),
@@ -158,11 +158,11 @@ fun SpecialistProfileHeroCard(
     businessName: String,
     ownerName: String,
     phone: String,
-    rating: Double = 4.95,
-    reviewsCount: Int = 148,
-    totalJobs: Int = 236,
-    acceptanceRatePercent: Double = 99.1,
-    isVerified: Boolean = true,
+    rating: Double = 0.0,
+    reviewsCount: Int = 0,
+    totalJobs: Int = 0,
+    acceptanceRatePercent: Double = 0.0,
+    isVerified: Boolean = false,
     isOnline: Boolean = true,
     onToggleOnline: (Boolean) -> Unit,
     onEditProfile: () -> Unit,
@@ -193,7 +193,7 @@ fun SpecialistProfileHeroCard(
                 shadowElevation = 16.dp.toPx()
                 cameraDistance = 16f * density
             },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF091424)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(
             1.5.dp,
@@ -246,7 +246,7 @@ fun SpecialistProfileHeroCard(
                                 }
                                 .clip(CircleShape)
                                 .background(if (isOnline) MeetColors.neonGreen else MeetColors.textMuted)
-                                .border(2.dp, Color(0xFF091424), CircleShape),
+                                .border(2.dp, MeetColors.cardBackground, CircleShape),
                         )
                     }
 
@@ -338,7 +338,7 @@ fun SpecialistProfileHeroCard(
                             checkedThumbColor = Color.Black,
                             checkedTrackColor = accentColor,
                             uncheckedThumbColor = MeetColors.textSecondary,
-                            uncheckedTrackColor = Color(0xFF1E293B),
+                            uncheckedTrackColor = MeetColors.cardBackgroundLighter,
                         ),
                     )
                 }
@@ -346,7 +346,7 @@ fun SpecialistProfileHeroCard(
 
             // Row 2: Four Key Performance Indicators (KPIs)
             Surface(
-                color = Color(0xFF060E18),
+                color = MeetColors.backgroundDark,
                 shape = RoundedCornerShape(14.dp),
                 border = BorderStroke(1.dp, Color(0x22FFFFFF)),
                 modifier = Modifier.fillMaxWidth(),
@@ -360,15 +360,15 @@ fun SpecialistProfileHeroCard(
                 ) {
                     SpecialistMetricItem(
                         label = "REPUTACIÓN",
-                        value = "★ ${String.format("%.1f", rating)}",
+                        value = if (reviewsCount > 0) "★ ${String.format("%.1f", rating)}" else "Sin datos",
                         subValue = "$reviewsCount res.",
                         valueColor = Color(0xFFFFD700),
                     )
                     Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color(0x22FFFFFF)))
                     SpecialistMetricItem(
                         label = "ACEPTACIÓN",
-                        value = "${String.format("%.1f", acceptanceRatePercent)}%",
-                        subValue = "Óptima",
+                        value = if (acceptanceRatePercent > 0) "${String.format("%.1f", acceptanceRatePercent)}%" else "Sin datos",
+                        subValue = if (acceptanceRatePercent > 0) "Registrada" else "No capturada",
                         valueColor = MeetColors.neonGreen,
                     )
                     Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color(0x22FFFFFF)))
@@ -383,7 +383,7 @@ fun SpecialistProfileHeroCard(
                         label = "GARANTÍA",
                         value = "100%",
                         subValue = "Escrow Activo",
-                        valueColor = Color(0xFFC85CFF),
+                        valueColor = MeetColors.hotMagenta,
                     )
                 }
             }
@@ -483,7 +483,7 @@ fun SpecialistEarningsHeroCard(
                 shadowElevation = 14.dp.toPx()
                 cameraDistance = 16f * density
             },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF071B1E)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.3.dp, accentColor.copy(alpha = 0.75f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
@@ -608,7 +608,7 @@ fun SpecialistOperationalMetricsRow(
             value = if (escrowGuaranteed) "100%" else "Básico",
             subtitle = "Pagos Protegidos",
             icon = "🛡️",
-            tint = Color(0xFFC85CFF),
+            tint = MeetColors.hotMagenta,
             modifier = Modifier.weight(1f),
         )
     }
@@ -625,7 +625,7 @@ private fun OperationalKpiCard(
 ) {
     Card(
         modifier = modifier.graphicsLayer { shadowElevation = 6.dp.toPx() },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF091322)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, tint.copy(alpha = 0.35f)),
     ) {
@@ -721,7 +721,7 @@ fun SpecialistEditProfileDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFFC85CFF),
+                        focusedBorderColor = MeetColors.hotMagenta,
                         unfocusedBorderColor = MeetColors.borderSubtle,
                     ),
                 )
@@ -744,7 +744,7 @@ fun SpecialistEditProfileDialog(
                 Text("CANCELAR", color = MeetColors.textSecondary, fontSize = 11.sp)
             }
         },
-        containerColor = Color(0xFF0C1626),
+        containerColor = MeetColors.backgroundDark,
         shape = RoundedCornerShape(18.dp),
     )
 }
@@ -764,7 +764,7 @@ fun SpecialistWalletCard(
                 shadowElevation = 14.dp.toPx()
                 cameraDistance = 16f * density
             },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF071422)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(
             1.4.dp,
@@ -823,7 +823,7 @@ fun SpecialistWalletCard(
 
             // Hero Balances Card
             Surface(
-                color = Color(0xFF040A12),
+                color = MeetColors.backgroundDeep,
                 shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(1.dp, Color(0x22FFFFFF)),
                 modifier = Modifier.fillMaxWidth(),
@@ -860,7 +860,7 @@ fun SpecialistWalletCard(
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF132838),
+                            color = MeetColors.cardBackgroundLighter,
                             border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.6f)),
                         ) {
                             Column(
@@ -899,7 +899,7 @@ fun SpecialistWalletCard(
             ) {
                 Surface(
                     modifier = Modifier.weight(1f),
-                    color = Color(0xFF0A1828),
+                    color = MeetColors.cardBackground,
                     shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
                 ) {
@@ -911,7 +911,7 @@ fun SpecialistWalletCard(
                 }
                 Surface(
                     modifier = Modifier.weight(1f),
-                    color = Color(0xFF0A1828),
+                    color = MeetColors.cardBackground,
                     shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
                 ) {
@@ -923,7 +923,7 @@ fun SpecialistWalletCard(
                 }
                 Surface(
                     modifier = Modifier.weight(1f),
-                    color = Color(0xFF0A1828),
+                    color = MeetColors.cardBackground,
                     shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
                 ) {
@@ -937,7 +937,7 @@ fun SpecialistWalletCard(
 
             // SINPE Móvil Reference Box
             Surface(
-                color = Color(0xFF0A1624),
+                color = MeetColors.backgroundDark,
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
                 modifier = Modifier.fillMaxWidth(),
@@ -1019,7 +1019,7 @@ fun SpecialistWalletCard(
                             else -> "PENDIENTE TRUST CENTER ⏳" to MeetColors.warning
                         }
                         Surface(
-                            color = Color(0xFF050D18),
+                            color = MeetColors.backgroundDeep,
                             shape = RoundedCornerShape(10.dp),
                             border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f)),
                             modifier = Modifier.fillMaxWidth(),
@@ -1139,7 +1139,7 @@ fun SpecialistSinpeTopupDialog(
             ) {
                 // Official SINPE Móvil Banner
                 Surface(
-                    color = Color(0xFF101E30),
+                    color = MeetColors.cardBackground,
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth(),
@@ -1222,7 +1222,7 @@ fun SpecialistSinpeTopupDialog(
                     listOf(5_000, 10_000, 20_000, 50_000).forEach { amt ->
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = if (amountInput == amt.toString()) MeetColors.neonGreen.copy(alpha = 0.25f) else Color(0xFF142436),
+                            color = if (amountInput == amt.toString()) MeetColors.neonGreen.copy(alpha = 0.25f) else MeetColors.cardBackgroundLighter,
                             border = BorderStroke(1.dp, if (amountInput == amt.toString()) MeetColors.neonGreen else Color(0x33FFFFFF)),
                             modifier = Modifier
                                 .weight(1f)
@@ -1348,7 +1348,7 @@ fun SpecialistSinpeTopupDialog(
                 Text("CANCELAR", color = MeetColors.textSecondary, fontSize = 11.sp)
             }
         },
-        containerColor = Color(0xFF0A1524),
+        containerColor = MeetColors.backgroundDark,
         shape = RoundedCornerShape(20.dp),
     )
 }

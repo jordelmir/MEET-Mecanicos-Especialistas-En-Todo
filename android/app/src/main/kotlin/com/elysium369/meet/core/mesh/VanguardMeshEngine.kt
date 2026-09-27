@@ -210,6 +210,7 @@ class VanguardMeshEngine {
     private val peers = mutableListOf<MeshPeer>()
     private val messageStore = mutableListOf<MeshMessage>()
     private val deliveredIds = mutableSetOf<String>()
+    private val seenIds = mutableSetOf<String>()
 
     // ─── Node Lifecycle ───
 
@@ -259,8 +260,8 @@ class VanguardMeshEngine {
 
     /**
      * Sends a direct encrypted message to a specific recipient.
-     * If recipient is nearby: deliver directly via Wi-Fi Direct.
-     * If not: store in custody for relay.
+     * Stores intent in local custody. Actual transport and signed receipts live in
+     * CommunicationNearbyTransport; this model must never claim a radio delivery.
      */
     fun sendDirectMessage(
         recipientFingerprint: String,
@@ -276,22 +277,10 @@ class VanguardMeshEngine {
             payloadSizeBytes = encryptedPayload.length,
         )
 
-        // Check if recipient is a nearby peer
-        val nearbyRecipient = peers.firstOrNull {
-            it.fingerprint == recipientFingerprint &&
-                it.connectionState == PeerConnectionState.DATA_CHANNEL
-        }
-
-        if (nearbyRecipient != null) {
-            // Direct delivery
-            deliveredIds.add(message.messageId)
-        } else {
-            // Store for relay
-            messageStore.add(message)
-            localNode = localNode?.copy(
-                messagesInCustody = messageStore.count { it.isDeliverable },
-            )
-        }
+        // This legacy custody model has no transport receipt. Presence is never delivery.
+        messageStore.add(message)
+        seenIds.add(message.messageId)
+        localNode = localNode?.copy(messagesInCustody = messageStore.count { it.isDeliverable })
 
         return message
     }
@@ -326,7 +315,7 @@ class VanguardMeshEngine {
         val node = localNode ?: return RelayDecision.REJECTED_NOT_INITIALIZED
 
         // Already delivered?
-        if (message.messageId in deliveredIds) {
+        if (message.messageId in seenIds) {
             return RelayDecision.DUPLICATE
         }
 
@@ -342,16 +331,16 @@ class VanguardMeshEngine {
 
         // Is this message for us?
         if (message.recipientFingerprint == node.nodeId.publicKeyFingerprint) {
-            deliveredIds.add(message.messageId)
+            seenIds.add(message.messageId)
+            // Local model receipt is not a signed radio ACK and cannot increase delivery statistics.
             return RelayDecision.DELIVERED_TO_SELF
         }
 
         // Accept for relay — track ID to prevent duplicate acceptance
-        deliveredIds.add(message.messageId)
+        seenIds.add(message.messageId)
         val forwarded = message.forwarded()
         messageStore.add(forwarded)
         localNode = localNode?.copy(
-            messagesRelayed = (localNode?.messagesRelayed ?: 0) + 1,
             messagesInCustody = messageStore.count { it.isDeliverable },
         )
         return RelayDecision.ACCEPTED

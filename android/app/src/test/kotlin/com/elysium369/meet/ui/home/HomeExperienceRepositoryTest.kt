@@ -83,10 +83,10 @@ class HomeExperienceRepositoryTest {
     }
 
     @Test
-    fun testDefaultExperienceIsClassic() {
+    fun testDefaultExperiencePreservesCurrentArtwork() {
         val repository = DefaultHomeExperienceRepository(fakeContext)
-        assertEquals(HomeExperience.CLASSIC, repository.getExperience())
-        assertEquals(HomeExperience.CLASSIC, repository.selectedExperience.value)
+        assertEquals(HomeExperience.VANGUARD, repository.getExperience())
+        assertEquals(HomeExperience.VANGUARD, repository.selectedExperience.value)
     }
 
     @Test
@@ -94,7 +94,7 @@ class HomeExperienceRepositoryTest {
         val repository = DefaultHomeExperienceRepository(fakeContext)
         repository.setExperience(HomeExperience.ADAPTIVE)
 
-        assertEquals("ADAPTIVE", fakePrefs.getString("meet_home_experience_v1", null))
+        assertEquals("ADAPTIVE", fakePrefs.getString("meet_home_experience_v2", null))
         assertEquals(HomeExperience.ADAPTIVE, repository.selectedExperience.value)
     }
 
@@ -104,5 +104,21 @@ class HomeExperienceRepositoryTest {
         val repository = DefaultHomeExperienceRepository(fakeContext)
 
         assertEquals(HomeExperience.ADAPTIVE, repository.getExperience())
+    }
+    @Test
+    fun legacyClassicMigratesToCurrentArtworkButClassicCanBeSaved() {
+        fakePrefs.edit().putString("meet_home_experience_v1", "CLASSIC").commit()
+        val repository = DefaultHomeExperienceRepository(fakeContext)
+        assertEquals(HomeExperience.VANGUARD, repository.getExperience())
+        repository.setExperience(HomeExperience.CLASSIC)
+        assertEquals(HomeExperience.CLASSIC, DefaultHomeExperienceRepository(fakeContext).getExperience())
+    }
+
+    @Test
+    fun allThreeExperiencesSurviveRepositoryRecreation() {
+        HomeExperience.entries.forEach { experience ->
+            DefaultHomeExperienceRepository(fakeContext).setExperience(experience)
+            assertEquals(experience, DefaultHomeExperienceRepository(fakeContext).getExperience())
+        }
     }
 }

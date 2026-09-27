@@ -29,11 +29,15 @@ class DefaultHomeExperienceRepository @Inject constructor(
 
     private fun loadInitialExperience(): HomeExperience {
         val stored = prefs.getString(KEY_HOME_EXPERIENCE, null)
-        return when (stored) {
-            HomeExperience.ADAPTIVE.name -> HomeExperience.ADAPTIVE
-            HomeExperience.CLASSIC.name -> HomeExperience.CLASSIC
-            else -> HomeExperience.CLASSIC // Mandatory default
+        if (stored != null) {
+            return HomeExperience.entries.firstOrNull { it.name == stored } ?: HomeExperience.VANGUARD
         }
+        // v1 Classic was the image-backed experience. Preserve its appearance on upgrade.
+        val migrated = if (prefs.getString("meet_home_experience_v1", null) == "ADAPTIVE") {
+            HomeExperience.ADAPTIVE
+        } else HomeExperience.VANGUARD
+        prefs.edit().putString(KEY_HOME_EXPERIENCE, migrated.name).apply()
+        return migrated
     }
 
     override fun setExperience(experience: HomeExperience) {
@@ -47,6 +51,6 @@ class DefaultHomeExperienceRepository @Inject constructor(
 
     companion object {
         private const val PREFS_NAME = "meet_prefs"
-        private const val KEY_HOME_EXPERIENCE = "meet_home_experience_v1"
+        private const val KEY_HOME_EXPERIENCE = "meet_home_experience_v2"
     }
 }

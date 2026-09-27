@@ -23,6 +23,9 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
 
+import com.elysium369.meet.core.agentstore.domain.AgentPurchaseCoordinator
+import com.elysium369.meet.core.agentstore.domain.PurchaseOutcome
+
 data class AgentStoreItemUi(
     val manifest: AgentManifest,
     val isOwned: Boolean,
@@ -33,6 +36,7 @@ data class AgentStoreItemUi(
 class AgentStoreViewModel @Inject constructor(
     private val catalogRepository: AgentCatalogRepository,
     private val entitlementRepository: AgentEntitlementRepository,
+    private val purchaseCoordinator: AgentPurchaseCoordinator,
     @ApplicationContext private val context: Context,
 ) : ViewModel(), TextToSpeech.OnInitListener {
 
@@ -153,13 +157,27 @@ class AgentStoreViewModel @Inject constructor(
         }
     }
 
+    private val _purchaseState = MutableStateFlow<PurchaseOutcome?>(null)
+    val purchaseState: StateFlow<PurchaseOutcome?> = _purchaseState.asStateFlow()
+
     fun purchaseAndUnlock(agent: AgentManifest) {
         viewModelScope.launch {
-            val entitlement = agent.requiredEntitlement
-            if (entitlement != null) {
-                entitlementRepository.grantEntitlement(entitlement)
+            val productId = agent.commerce?.storeProductId ?: "agent_${agent.id}"
+            val outcome = purchaseCoordinator.purchase(agent.id, productId)
+            _purchaseState.value = outcome
+            when (outcome) {
+                is PurchaseOutcome.Verified -> {
+                    entitlementRepository.refresh()
+                    equipAgent(agent)
+                }
+                is PurchaseOutcome.Pending -> {
+                    // Purchase is pending authoritative backend processing
+                    entitlementRepository.refresh()
+                }
+                else -> {
+                    // Cancelled or Rejected: do not grant or equip
+                }
             }
-            equipAgent(agent)
         }
     }
 

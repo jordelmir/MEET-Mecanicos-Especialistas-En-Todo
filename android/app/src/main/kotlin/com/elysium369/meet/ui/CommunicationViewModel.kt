@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -37,6 +38,7 @@ class CommunicationViewModel @Inject constructor(
     val conversations: StateFlow<List<ConversationSummary>> = repository.conversations
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
     val callState: StateFlow<CallConnectionState> = repository.callState
+    val incomingCall = repository.incomingCall
     val identity: StateFlow<ElysiumIdentityProfile?> = repository.identity
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
     val privacy: StateFlow<CommunicationPrivacySettings> = repository.privacy
@@ -56,12 +58,73 @@ class CommunicationViewModel @Inject constructor(
         .flatMapLatest { id -> id?.let(repository::observeMessages) ?: flowOf(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    val nearbyStatus = repository.nearbyStatus
+    val nearbyPeers = repository.nearbyPeers
+    val nearbyInvitations = repository.nearbyInvitations
+    fun startNearby() { repository.startNearby() }
+    fun nearbyPermissionDenied() { notice.value="Permite dispositivos cercanos para conectar los teléfonos." }
+    fun stopNearby() { repository.stopNearby() }
+    fun connectNearby(id:String) { repository.connectNearby(id) }
+    fun answerNearby(id:String,accept:Boolean) { repository.answerNearby(id,accept) }
+    suspend fun refreshNearby() { repository.flushNearby() }
+
+    override fun onCleared() { repository.stopNearby(); super.onCleared() }
+
+    val onlineStatus = repository.onlineStatus
+    val pairingQr = MutableStateFlow<String?>(null)
+
+    suspend fun refreshOnline() { repository.synchronizeOnline() }
+
+    fun createPairingQr() {
+        viewModelScope.launch {
+            pairingQr.value = runCatching { repository.issuePairingQr() }.getOrElse {
+                notice.value = "No se pudo crear el QR. Inicia sesión y registra tu identidad; requiere servidor disponible."
+                null
+            }
+        }
+    }
+
+    fun respondToRequest(accept: Boolean) {
+        val id = selectedConversationId.value ?: return
+        viewModelScope.launch {
+            notice.value = if (repository.respondToRequest(id,accept)) {
+                if (accept) "Conversación aceptada en el servidor." else "Solicitud rechazada en el servidor."
+            } else "No se pudo confirmar la respuesta con el servidor."
+        }
+    }
+
+    fun openContact(contact:ElysiumContact) {
+        viewModelScope.launch {
+            val id=repository.contactConversation(contact.principalId)
+            if(id!=null) selectedConversationId.value=id
+            else notice.value="No hay conversación aceptada disponible. Sincroniza o vincula el contacto mediante QR."
+        }
+    }
+
+    fun dismissPairingQr() { pairingQr.value = null }
+
+    fun scanPairingQr(value: String) {
+        viewModelScope.launch {
+            runCatching { repository.consumePairingQr(value) }.onSuccess { id ->
+                selectedConversationId.value = id
+                notice.value = "Vínculo confirmado por el servidor."
+            }.onFailure { notice.value = "QR no válido, vencido o servidor no disponible. No se confirmó el vínculo." }
+        }
+    }
+
     val notice = MutableStateFlow<String?>(null)
     val searchOutcome = MutableStateFlow<ContactSearchOutcome?>(null)
     val searchInProgress = MutableStateFlow(false)
 
     init {
         viewModelScope.launch { repository.initializeSocialDefaults() }
+        viewModelScope.launch {
+            var previousOwner:String?=null
+            repository.identity.collect { profile ->
+                if(previousOwner!=null && previousOwner!=profile.principalId) { selectedConversationId.value=null;imageTarget=null;voiceNoteRecorder.cancel() }
+                previousOwner=profile.principalId
+            }
+        }
     }
 
     fun selectConversation(id: String?) {
@@ -146,8 +209,9 @@ class CommunicationViewModel @Inject constructor(
         viewModelScope.launch {
             when (repository.sendText(id, text, replyToEventId)) {
                 is SendMessageOutcome.SentLocally -> {
-                    notice.value = "Guardado de forma segura en este dispositivo; transporte remoto pendiente."
+                    notice.value = "Guardado en la cola de envío. La marca del mensaje mostrará la confirmación del servidor."
                     onAccepted()
+                    repository.flushNearby()
                 }
                 SendMessageOutcome.WaitingForAuthorizedParticipant ->
                     notice.value = "La conversación se habilitará cuando exista otro participante autorizado."
@@ -158,7 +222,27 @@ class CommunicationViewModel @Inject constructor(
         }
     }
 
+    private var imageTarget: Pair<String,String>? = null
+    fun beginImageSelection(): Boolean {
+        val conversation=selectedConversationId.value ?: return false
+        val owner=identity.value?.principalId ?: return false
+        imageTarget=conversation to owner
+        return true
+    }
+    fun sendImage(uri: android.net.Uri) {
+        val target=imageTarget ?: return
+        imageTarget=null
+        if(selectedConversationId.value!=target.first || identity.value?.principalId!=target.second) {
+            notice.value="Cambió la cuenta o conversación; selecciona la imagen nuevamente."; return
+        }
+        viewModelScope.launch {
+            val outcome=runCatching { repository.sendImage(target.first,uri,target.second) }.getOrNull()
+            notice.value=if(outcome is SendMessageOutcome.SentLocally) "Imagen cifrada en la cola de envío." else "No se pudo preparar la imagen. Selecciona una imagen de hasta 12 MiB en una conversación aceptada."
+        }
+    }
+
     fun startVoiceNote() {
+        if(callState.value in setOf(CallConnectionState.ACTIVE,CallConnectionState.CONNECTING,CallConnectionState.RINGING)) { notice.value="Finaliza la llamada antes de grabar una nota.";return }
         val id = selectedConversationId.value ?: return
         if (!voiceNoteRecorder.start(id)) notice.value = "No se pudo iniciar la grabación."
     }
@@ -169,9 +253,12 @@ class CommunicationViewModel @Inject constructor(
             return
         }
         viewModelScope.launch {
-            when (repository.sendVoiceNote(draft.conversationId, draft, replyToEventId)) {
+            val outcome=runCatching { repository.sendVoiceNote(draft.conversationId,draft,replyToEventId) }.getOrElse {
+                notice.value="No se pudo preparar la nota de voz. Conservé el archivo; intenta una grabación más corta.";return@launch
+            }
+            when (outcome) {
                 is SendMessageOutcome.SentLocally ->
-                    notice.value = "Nota de voz guardada localmente; transporte remoto pendiente."
+                    notice.value = "Nota de voz cifrada en la cola de envío; consulta la confirmación de entrega."
                 SendMessageOutcome.WaitingForAuthorizedParticipant -> {
                     draft.file.delete()
                     notice.value = "Espera a un participante autorizado antes de enviar audio."
@@ -191,6 +278,7 @@ class CommunicationViewModel @Inject constructor(
     }
 
     fun startCall() {
+        if(voiceNoteState.value is VoiceNoteRecordingState.Recording) { notice.value="Detén la nota de voz antes de llamar.";return }
         val id = selectedConversationId.value ?: return
         viewModelScope.launch {
             val outcome = repository.startAudioCall(id)
@@ -205,8 +293,17 @@ class CommunicationViewModel @Inject constructor(
                     "La llamada fue bloqueada porque el servidor no usa una conexión segura."
                 is StartCallOutcome.Failed ->
                     "No se pudo establecer la llamada Elysium (${outcome.safeCode})."
-                is StartCallOutcome.Ready -> "Llamada Elysium conectada."
+                is StartCallOutcome.Ready -> "Conectando el audio de Elysium."
+                is StartCallOutcome.Ringing -> "Llamando; esperando que la otra persona acepte."
             }
+        }
+    }
+
+    fun answerCall(accept:Boolean) {
+        if(accept && voiceNoteState.value is VoiceNoteRecordingState.Recording) { notice.value="Detén la nota de voz antes de aceptar la llamada.";return }
+        viewModelScope.launch {
+            val confirmed=runCatching { repository.answerCall(accept) }.getOrDefault(false)
+            notice.value=if(!confirmed) "No se pudo confirmar la respuesta de llamada." else if(accept) "Conectando audio." else "Llamada rechazada."
         }
     }
 

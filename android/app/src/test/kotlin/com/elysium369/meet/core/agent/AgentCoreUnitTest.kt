@@ -7,8 +7,14 @@ import com.elysium369.meet.core.agent.capability.CapabilityId
 import com.elysium369.meet.core.agent.capability.CapabilityRegistry
 import com.elysium369.meet.core.agent.capability.emissions.EmissionsCapabilityInput
 import com.elysium369.meet.core.agent.capability.emissions.EmissionsSpecialistCapability
-import com.elysium369.meet.core.agent.capability.mechanic.MasterMechanicCapability
-import com.elysium369.meet.core.agent.capability.mechanic.MechanicDiagnosisInput
+import com.elysium369.meet.core.agent.capability.mechanic.*
+import com.elysium369.meet.core.agentstore.data.AgentEntitlementRepository
+import com.elysium369.meet.core.agentstore.domain.AgentEntitlementGateway
+import com.elysium369.meet.core.agentstore.domain.EntitlementSnapshot
+import com.elysium369.meet.domain.diagnostics.DeterministicVehicleEvidenceGraphRepository
+import com.elysium369.meet.domain.diagnostics.VehicleEvidenceGraph
+import com.elysium369.meet.domain.diagnostics.VehicleEvidenceGraphProjectionInput
+import com.elysium369.meet.domain.diagnostics.VehicleEvidenceProjectionProvider
 import com.elysium369.meet.core.agent.context.AgentContextSnapshot
 import com.elysium369.meet.core.agent.domain.AgentInput
 import com.elysium369.meet.core.agent.domain.InputSource
@@ -155,6 +161,58 @@ class AgentCoreUnitTest {
 
     @Test
     fun masterMechanicCapability_neverInventsDTCsAndRequiresPhysicalVerification() = runBlocking {
+        // --- Build a properly-wired capability with test doubles ---
+        var testDtcs: List<ObservedDtc> = emptyList()
+
+        val testEvidenceProvider = object : DiagnosticEvidenceProvider {
+            override suspend fun capture(vehicleId: String): Result<DiagnosticEvidenceSnapshot> {
+                return Result.success(
+                    DiagnosticEvidenceSnapshot(
+                        vehicleId = vehicleId,
+                        bindingId = "binding_test",
+                        dtcs = testDtcs,
+                    )
+                )
+            }
+        }
+
+        val testGateway = object : AgentEntitlementGateway {
+            override fun currentPrincipalId(): String = "user-123"
+            override suspend fun fetchAuthoritativeEntitlements(): Result<EntitlementSnapshot> =
+                Result.success(EntitlementSnapshot("user-123", setOf("agent.master_mechanic"), System.currentTimeMillis(), 1L))
+        }
+        val testEntitlementRepo = AgentEntitlementRepository(testGateway)
+        testEntitlementRepo.refresh()
+
+        val testProjectionProvider = object : VehicleEvidenceProjectionProvider {
+            override suspend fun load(vehicleId: String, bindingId: String): VehicleEvidenceGraphProjectionInput =
+                VehicleEvidenceGraphProjectionInput(vehicleId, bindingId, emptyList(), emptyList())
+        }
+
+        val testReasoning = object : DiagnosticReasoningEngine {
+            override fun rank(evidence: DiagnosticEvidenceSnapshot, graph: VehicleEvidenceGraph): List<DiagnosticHypothesis> {
+                if (evidence.dtcs.isEmpty()) return emptyList()
+                return evidence.dtcs.map {
+                    DiagnosticHypothesis(
+                        id = "hyp_${it.code}",
+                        title = "Hypothesis for ${it.code}",
+                        probability = 0.8,
+                        supportingEvidenceIds = setOf(it.code),
+                        contradictingEvidenceIds = emptySet(),
+                        nextDiscriminatingTest = null,
+                    )
+                }
+            }
+        }
+
+        val wiredCapability = MasterMechanicCapability(
+            evidenceProvider = testEvidenceProvider,
+            graphRepository = DeterministicVehicleEvidenceGraphRepository,
+            projectionProvider = testProjectionProvider,
+            reasoning = testReasoning,
+            entitlementRepository = testEntitlementRepo,
+        )
+
         val context = AgentExecutionContext(
             principalId = "user-123",
             userEntitlements = setOf("agent.master_mechanic"),
@@ -162,14 +220,16 @@ class AgentCoreUnitTest {
         )
 
         // 1. Without DTCs in buffer -> honest unavailable
-        val emptyResult = mechanicCapability.execute(MechanicDiagnosisInput(emptyList()), context)
+        testDtcs = emptyList()
+        val emptyResult = wiredCapability.execute(MechanicDiagnosisInput(), context)
         assertTrue(emptyResult is AgentResult.Success)
         val emptyOutput = (emptyResult as AgentResult.Success).data
         assertTrue(emptyOutput.findings.isEmpty())
         assertTrue(emptyOutput.summary.contains("OBD no disponible o ningún código"))
 
         // 2. With real P0420 -> detailed symptoms with mandatory physical verification
-        val dtcResult = mechanicCapability.execute(MechanicDiagnosisInput(listOf("P0420")), context)
+        testDtcs = listOf(ObservedDtc("P0420", "ACTIVE", "Catalyst Efficiency"))
+        val dtcResult = wiredCapability.execute(MechanicDiagnosisInput(specificDtcQuery = "P0420"), context)
         assertTrue(dtcResult is AgentResult.Success)
         val dtcOutput = (dtcResult as AgentResult.Success).data
         assertEquals(1, dtcOutput.findings.size)

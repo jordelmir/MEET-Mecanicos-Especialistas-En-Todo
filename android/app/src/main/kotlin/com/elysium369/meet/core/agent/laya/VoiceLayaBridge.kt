@@ -52,7 +52,7 @@ class VoiceLayaBridge(
         // 3. Format concise voice-friendly response (avoiding robotic long paragraphs)
         val voiceTextEs = when {
             assistantResponse.isEmergency -> {
-                "Protocolo de emergencia activado. Enlazando al 911 de Costa Rica y compartiendo tu ubicación satelital."
+                "Si estás en peligro, llama al 911 de Costa Rica. Puedo abrir el Centro de Seguridad; todavía no se ha realizado una llamada ni compartido tu ubicación."
             }
             topDoc != null && assistantResponse.domain in listOf("automotive", "emissions", "legal_cr") -> {
                 "${assistantResponse.text.substringBefore("\n\n")}. Según la referencia técnica: ${topDoc.content.take(160)}."
@@ -63,7 +63,7 @@ class VoiceLayaBridge(
         }
 
         val voiceTextEn = when {
-            assistantResponse.isEmergency -> "Emergency protocol activated. Connecting to 911 and sharing your location."
+            assistantResponse.isEmergency -> "If you are in danger, call 911 in Costa Rica. I can open the Safety Center; no call has been made and your location has not been shared."
             else -> voiceTextEs // Fallback to localized Spanish for CR market
         }
 

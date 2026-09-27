@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.theme.MeetColors
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -68,7 +69,7 @@ import java.util.Locale
 private object MechanicColors {
     val darkBackground = Color(0xFF0A0E1A)
     val cardBackground = Color(0xFF121829)
-    val cyanAccent = Color(0xFF00E5FF)
+    val cyanAccent: Color get() = MeetColors.electricBlue
     val orangeAccent = Color(0xFFFF6D00)
     val greenAccent = Color(0xFF00E676)
     val redAccent = Color(0xFFFF1744)
@@ -383,7 +384,7 @@ private fun ClientWorkspaceView(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1728)),
                 border = BorderStroke(
                     1.2.dp,
-                    Brush.horizontalGradient(listOf(MechanicColors.cyanAccent.copy(alpha = 0.6f), Color(0xFF3D5AFE).copy(alpha = 0.6f)))
+                    Brush.horizontalGradient(listOf(MechanicColors.cyanAccent.copy(alpha = 0.6f), MeetColors.cyberCyan.copy(alpha = 0.6f)))
                 ),
                 shape = RoundedCornerShape(18.dp),
                 modifier = Modifier

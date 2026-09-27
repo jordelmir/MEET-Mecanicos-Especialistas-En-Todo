@@ -54,7 +54,7 @@ class HomeExperienceViewModel @Inject constructor(
             is HomeExperienceUiState.Ready -> state.selected
             else -> repository.getExperience()
         }
-        val next = if (current == HomeExperience.CLASSIC) HomeExperience.ADAPTIVE else HomeExperience.CLASSIC
+        val next = HomeExperience.entries[(current.ordinal + 1) % HomeExperience.entries.size]
         switchExperience(next)
     }
 

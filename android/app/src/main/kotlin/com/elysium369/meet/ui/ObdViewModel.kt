@@ -1489,8 +1489,23 @@ class ObdViewModel @Inject constructor(
     }
 
     fun cancelServiceRequest(requestId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            val req = marketplaceDao.getRequestById(requestId)
             marketplaceDao.markServiceCancelled(requestId)
+            // Reembolso constitucional: si el especialista asignado pagó la comisión del 5%, se le reembolsa
+            val mechanicId = req?.assignedMechanicId
+            if (req != null && !mechanicId.isNullOrBlank()) {
+                val providerProfile = providerProfileDao.getProfile(mechanicId)
+                    ?: providerProfileDao.getProfilesForUser(mechanicId).firstOrNull()?.firstOrNull()
+                if (providerProfile != null && providerProfile.specialties.isNotBlank()) {
+                    runCatching {
+                        val profile = com.elysium369.meet.provider.domain.models.ProviderServiceProfileData.fromJsonString(providerProfile.specialties)
+                        val fee = profile.calculateFee(req.priceOffer.toLong())
+                        val refunded = profile.withTopUp(fee, "REFUND-$requestId")
+                        providerProfileDao.updateSpecialties(providerProfile.profileId, refunded.toJsonString(), System.currentTimeMillis())
+                    }.onFailure { Log.w("ObdViewModel", "Service cancellation refund failed", it) }
+                }
+            }
         }
     }
 
@@ -2444,6 +2459,20 @@ class ObdViewModel @Inject constructor(
                     mapOf("is_active" to false, "deleted_at" to System.currentTimeMillis().toString())
                 ) { filter { eq("profile_id", profileId) } }
             }.onFailure { Log.w("ObdViewModel", "Provider delete: Supabase sync failed", it) }
+        }
+    }
+
+    /** Update specialties JSON (including wallet balance and transactions) for a provider profile */
+    fun updateProviderProfileSpecialties(profileId: String, specialtiesJson: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            providerProfileDao.updateSpecialties(profileId, specialtiesJson, now)
+            refreshProviderRoles()
+            runCatching {
+                SupabaseManager.client.postgrest["provider_profiles"].update(
+                    mapOf("specialties" to specialtiesJson, "updated_at" to now.toString())
+                ) { filter { eq("profile_id", profileId) } }
+            }.onFailure { Log.w("ObdViewModel", "Provider specialties: Supabase sync failed", it) }
         }
     }
 
@@ -10657,38 +10686,16 @@ class ObdViewModel @Inject constructor(
     fun cancellationCommands(requestId: String) = rideCommandRepository.cancellationCommands(requestId)
 
     fun localCancelStuckRide(requestId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: return@launch
-            rideCommandRepository.cancelPublicationCommands(requestId)
-            rideCommandRepository.cancelStuckPendingPublication(requestId)
-            rideDao.markRequestCancelledLocally(requestId)
-            rideDao.clearActiveRideSelectionsForRide(requestId)
-            applyActiveRide(null)
-            _rideVerificationNotice.emit("Viaje local cancelado.")
-            val queued = reportRideCommandEnqueue(
-                rideCommandRepository.enqueue(
-                    envelope = rideCommandEnvelope(requestId, 0L, RideCommandType.CANCEL),
-                    payload = RideCommandPayload(reasonCode = RideCancellationReason.DUPLICATE_OR_ACCIDENTAL.name),
-                ),
-                acceptedMessage = "Cancelación registrada.",
-            )
-            if (queued) RideCommandSyncWorker.enqueueNow(context)
-        }
+        cancelRide(requestId,RideCancellationReason.DUPLICATE_OR_ACCIDENTAL,null,"PASSENGER")
     }
 
     fun clearAllStuckRides() {
         viewModelScope.launch(Dispatchers.IO) {
-            val principal = activePrincipalKernel.current().id
-            val myPassengerId = currentRideActorId.ifBlank { principal }
-            rideDao.cancelUnpublishedRidesForPassenger(myPassengerId)
-            selectedRideRequestId?.let { rideDao.clearActiveRideSelectionsForRide(it) }
-            val roleKey = com.elysium369.meet.ride.domain.RideRoleContextPolicy
-                .selectionOwnerKey(principal, _rideDriverMode.value)
-            if (roleKey != null) {
-                rideDao.clearActiveRideSelection(roleKey)
-            }
-            applyActiveRide(null)
-            _rideVerificationNotice.emit("Viajes activos restablecidos.")
+            val actor=currentRideActorId
+            val requests=rideDao.getRequestsByPassenger(actor).first()
+            requests.filter { it.serverVersion==0L && it.status in setOf("PENDING_PUBLICATION","OPEN") }
+                .forEach { localCancelStuckRide(it.requestId) }
+            _rideVerificationNotice.emit("Cancelaciones solicitadas; pendientes de confirmación del servidor.")
         }
     }
 
@@ -10722,9 +10729,7 @@ class ObdViewModel @Inject constructor(
                 return@launch
             }
             // If already completed or cancelled, release local pointer immediately:
-            if (request.status in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED") ||
-                request.serverState in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED")
-            ) {
+            if (com.elysium369.meet.ride.domain.RideAuthorityEvidence.isTerminalSnapshot(request.serverState,request.serverVersion)) {
                 rideDao.clearActiveRideSelectionsForRide(requestId)
                 applyActiveRide(null)
                 _rideVerificationNotice.emit("El servicio ya se encuentra finalizado o cancelado.")
@@ -10732,12 +10737,7 @@ class ObdViewModel @Inject constructor(
             }
             // If still in PENDING_PUBLICATION (version 0):
             if (request.serverVersion == 0L || request.status == "PENDING_PUBLICATION") {
-                rideCommandRepository.cancelPublicationCommands(requestId)
-                rideCommandRepository.cancelStuckPendingPublication(requestId)
-                rideDao.markRequestCancelledLocally(requestId)
-                rideDao.clearActiveRideSelectionsForRide(requestId)
-                applyActiveRide(null)
-                _rideVerificationNotice.emit("Viaje cancelado exitosamente.")
+                _rideVerificationNotice.emit("Cancelación guardada; pendiente de confirmación del servidor.")
                 rideCommandRepository.enqueue(
                     envelope = rideCommandEnvelope(
                         requestId = requestId,

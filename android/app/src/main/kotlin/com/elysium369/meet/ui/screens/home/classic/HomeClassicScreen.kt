@@ -2,6 +2,8 @@ package com.elysium369.meet.ui.screens.home.classic
 
 import com.elysium369.meet.ui.navigation.MeetDestinations
 import com.elysium369.meet.ui.navigation.safeNavigate
+import com.elysium369.meet.core.agent.ui.agentAction
+import com.elysium369.meet.core.agent.ui.AgentUiControlId
 import android.content.Context
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -47,6 +49,7 @@ import com.elysium369.meet.ui.screens.home.components.HomeExperiencePreviewBanne
 fun HomeClassicScreen(
     navController: NavController,
     viewModel: ObdViewModel,
+    experience: HomeExperience = HomeExperience.VANGUARD,
     onSelectExperience: (HomeExperience) -> Unit = {},
     onPreviewExperience: (HomeExperience) -> Unit = {},
     isPreview: Boolean = false,
@@ -113,7 +116,7 @@ fun HomeClassicScreen(
 
     if (showExperienceDialog) {
         HomeExperienceSelectionDialog(
-            currentExperience = HomeExperience.CLASSIC,
+            currentExperience = experience,
             onDismiss = { showExperienceDialog = false },
             onSelectExperience = onSelectExperience,
             onPreviewExperience = onPreviewExperience
@@ -121,22 +124,25 @@ fun HomeClassicScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        com.elysium369.meet.ui.components.ElysiumArtworkBackground()
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .verticalScroll(scrollState),
+                .verticalScroll(scrollState, overscrollEffect = null),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Preview Banner if in preview mode
             if (isPreview) {
                 HomeExperiencePreviewBanner(
-                    previewExperience = HomeExperience.CLASSIC,
+                    previewExperience = experience,
                     onCommit = onCommitPreview,
                     onCancel = onCancelPreview
                 )
             }
+
+            if (experience != HomeExperience.CLASSIC) ElysiumVanguardHeader()
 
             // ── Hero Header ──
             AnimatedEntrance(0) {
@@ -147,24 +153,17 @@ fun HomeClassicScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
+                            if(experience==HomeExperience.CLASSIC) {
+                                Text("ELYSIUM",style=MaterialTheme.typography.headlineLarge,color=MeetColors.neonGreen,fontWeight=FontWeight.Black)
+                                Text("VANGUARD AI OS",style=MaterialTheme.typography.titleMedium,color=MeetColors.secondary)
+                                Spacer(Modifier.height(8.dp))
+                            }
                             Text(
                                 greeting,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MeetColors.textSecondary
                             )
                             Spacer(Modifier.height(2.dp))
-                            Text(
-                                text = buildAnnotatedString {
-                                    withStyle(SpanStyle(color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = if (compactHeader) 20.sp else 28.sp)) {
-                                        append(if (compactHeader) "ELYSIUM\n" else "ELYSIUM ")
-                                    }
-                                    withStyle(SpanStyle(color = MeetColors.electricBlue, fontWeight = FontWeight.Bold, fontSize = if (compactHeader) 15.sp else 20.sp)) {
-                                        append("VANGUARD AI OS")
-                                    }
-                                },
-                                softWrap = true,
-                                maxLines = 2,
-                            )
                             // Role badge
                             val roleLabel = when (userProfile) {
                                 "owner" -> "Dueño de carro"
@@ -198,7 +197,7 @@ fun HomeClassicScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             HomeExperienceSwitcherHeaderButton(
-                                currentExperience = HomeExperience.CLASSIC,
+                                currentExperience = experience,
                                 onClick = { showExperienceDialog = true }
                             )
 
@@ -432,12 +431,12 @@ fun HomeClassicScreen(
             AnimatedEntrance(4) {
                 EliteCard(
                     glowColor = when (obdState) {
-                        ObdState.CONNECTED -> MeetColors.neonGreen
+                        ObdState.CONNECTED -> MeetColors.success
                         ObdState.ERROR -> MeetColors.error
                         else -> null
                     },
                     borderColor = when (obdState) {
-                        ObdState.CONNECTED -> MeetColors.neonGreen.copy(alpha = 0.2f)
+                        ObdState.CONNECTED -> MeetColors.success.copy(alpha = 0.2f)
                         ObdState.ERROR -> MeetColors.error.copy(alpha = 0.2f)
                         else -> MeetColors.borderSubtle
                     },
@@ -452,7 +451,7 @@ fun HomeClassicScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                             val statusColor = when (obdState) {
-                                ObdState.CONNECTED -> MeetColors.neonGreen
+                                ObdState.CONNECTED -> MeetColors.success
                                 ObdState.ERROR -> MeetColors.error
                                 ObdState.CONNECTING, ObdState.NEGOTIATING -> MeetColors.warning
                                 else -> MeetColors.textMuted
@@ -529,13 +528,13 @@ fun HomeClassicScreen(
 
             val actions = buildList {
                 add(Triple("🛡️", "Elysium Seguridad", MeetColors.warning) to MeetDestinations.SAFETY_HOME)
-                add(Triple("💬", "Mensajes", MeetColors.cyberCyan) to "messages")
+                add(Triple("🔊", "SupremeBass Neon", MeetColors.cyberCyan) to MeetDestinations.SUPREME_BASS)
+                add(Triple("💬", "Mensajes", MeetColors.cyberCyan) to MeetDestinations.MESSAGES)
                 add(Triple("⚖️", "Legal Vanguard", MeetColors.warning) to "legal_vanguard")
                 add(Triple("🏠", "Properties", MeetColors.neonGreen) to "elysium_properties")
                 add(Triple("⛽", "Fuel Rewards", MeetColors.cyberCyan) to "fuel_rewards")
                 add(Triple("🚕", "Elysium Rides", MeetColors.neonGreen) to MeetDestinations.RIDE_HOME)
                 add(Triple("📚", "Elysium Aprende", Color(0xFFFFD700)) to MeetDestinations.LEARNING_HUB)
-                add(Triple("🛠️", "Servicios & Oficios", Color(0xFFC85CFF)) to "universal_services")
                 add(Triple("⚡", "Servicios Elysium", MeetColors.neonGreen) to MeetDestinations.ELYSIUM_SERVICES)
                 add(Triple("🤖", "Agent Store", MeetColors.cyberCyan) to MeetDestinations.AGENT_STORE)
                 add(Triple("⚡", "Scanner", MeetColors.neonGreen) to "scanner")
@@ -568,7 +567,7 @@ fun HomeClassicScreen(
                 }
                 add(Triple("🌱", "Mi Actividad", MeetColors.neonGreen) to "unified_activity")
                 add(Triple("📊", "Driver Center", MeetColors.neonGreen) to "driver_command_center")
-                add(Triple("🔧", "Técnico BI", Color(0xFF00E5FF)) to "mechanic_business")
+                add(Triple("🔧", "Técnico BI", MeetColors.secondary) to "mechanic_business")
                 add(Triple("🏭", "Taller B2B", Color(0xFFFFB300)) to "workshop_command_center")
                 add(Triple("🏗️", "Grúas BI", Color(0xFFFF5252)) to "tow_command_center")
                 add(Triple("🏢", "Flota B2B", MeetColors.cyberCyan) to "fleet_command_center")
@@ -684,10 +683,11 @@ private fun QuickActionCard(
         shape = RoundedCornerShape(14.dp),
         onClick = onClick,
         modifier = modifier
-            .height(68.dp)
+            .heightIn(min = if(com.elysium369.meet.ui.home.LocalHomeExperience.current==HomeExperience.CLASSIC) 68.dp else 88.dp)
+            .agentAction(AgentUiControlId("home.quick.$iconKey"), label, route = "home", onActivate = onClick)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 14.dp).fillMaxSize(),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = if(com.elysium369.meet.ui.home.LocalHomeExperience.current==HomeExperience.CLASSIC) 8.dp else 16.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {

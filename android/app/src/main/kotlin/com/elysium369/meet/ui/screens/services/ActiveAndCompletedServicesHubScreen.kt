@@ -446,7 +446,7 @@ fun ActiveAndCompletedServicesHubScreen(
                         fontSize = 14.sp
                     )
                     Text(
-                        "La unidad y el estado del servicio serán liberados de inmediato sin penalización.",
+                        "La cancelación se confirmará con el servidor. Los cargos dependen del estado y de las reglas aplicables.",
                         color = MeetColors.neonGreen,
                         fontSize = 12.sp
                     )
@@ -467,7 +467,7 @@ fun ActiveAndCompletedServicesHubScreen(
                                 actorRole = if (isDriverMode) "DRIVER" else "PASSENGER"
                             )
                         }
-                        Toast.makeText(context, "Viaje cancelado de forma segura.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Cancelación solicitada; pendiente de confirmación.", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
                 ) {
@@ -1253,6 +1253,7 @@ private fun ActiveTechnicalServiceCard(
             Text("Requerimiento: ${request.problem}", color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
             Text("Ubicación: ${request.location}", color = Color.LightGray, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
+            val feeEst = maxOf(1L, (request.priceOffer.toLong() * 500L) / 10000L)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1264,25 +1265,35 @@ private fun ActiveTechnicalServiceCard(
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    "Comisión 5%: ₡${"%,d".format(feeEst)}",
+                    color = Color.LightGray,
+                    fontSize = 11.sp
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (request.latitude != 0.0 && request.longitude != 0.0) {
+                    WazeNavigationButton(
+                        destinationLat = request.latitude,
+                        destinationLng = request.longitude,
+                        destinationLabel = request.problem,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                OutlinedButton(
+                    onClick = onCancel,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252)),
+                    border = BorderStroke(1.dp, Color(0xFFFF5252)),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    if (request.latitude != 0.0 && request.longitude != 0.0) {
-                        WazeNavigationButton(
-                            destinationLat = request.latitude,
-                            destinationLng = request.longitude,
-                            destinationLabel = request.problem
-                        )
-                    }
-                    OutlinedButton(
-                        onClick = onCancel,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252)),
-                        border = BorderStroke(1.dp, Color(0xFFFF5252)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Cancelar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
+                    Text("Cancelar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

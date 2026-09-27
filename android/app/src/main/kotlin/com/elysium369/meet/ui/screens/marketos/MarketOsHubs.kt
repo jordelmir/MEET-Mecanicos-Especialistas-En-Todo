@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens.marketos
 
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -34,9 +35,9 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScannerOptions
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 
 private data class MarketPalette(val ink: Color, val surface: Color, val accent: Color, val warm: Color)
-private val LegalPalette = MarketPalette(Color(0xFF050C18), Color(0xFF0D192B), Color(0xFFD8B464), Color(0xFFFFF7E2))
-private val PropertyPalette = MarketPalette(Color(0xFF07110F), Color(0xFF10201B), Color(0xFF41D89B), Color(0xFFF4EFE4))
-private val FuelPalette = MarketPalette(Color(0xFF090D12), Color(0xFF141B22), Color(0xFFFFB423), Color(0xFF50D9F5))
+private val LegalPalette: MarketPalette get() = MarketPalette(MeetColors.backgroundDeep, MeetColors.cardBackground, MeetColors.hotMagenta, MeetColors.textPrimary)
+private val PropertyPalette: MarketPalette get() = MarketPalette(MeetColors.backgroundDeep, MeetColors.cardBackground, MeetColors.neonGreen, MeetColors.textPrimary)
+private val FuelPalette: MarketPalette get() = MarketPalette(MeetColors.backgroundDeep, MeetColors.cardBackground, MeetColors.cyberCyan, MeetColors.electricBlue)
 
 @Composable
 fun LegalVanguardHub(

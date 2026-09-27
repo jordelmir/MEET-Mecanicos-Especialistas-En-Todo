@@ -496,17 +496,17 @@ fun RideMapPanel(
                     .size(48.dp)
                     .zIndex(20f)
                     .border(
-                        BorderStroke(1.5.dp, ComposeColor(0xFF00E5FF)),
+                        BorderStroke(1.5.dp, com.elysium369.meet.ui.theme.MeetColors.secondary),
                         CircleShape,
                     ),
                 shape = CircleShape,
                 containerColor = ComposeColor(0xFF07131E).copy(alpha = 0.94f),
-                contentColor = ComposeColor(0xFF00E5FF),
+                contentColor = com.elysium369.meet.ui.theme.MeetColors.secondary,
             ) {
                 ComposeIcon(
                     imageVector = Icons.Default.MyLocation,
                     contentDescription = "Centrar en mi ubicación GPS",
-                    tint = ComposeColor(0xFF00E5FF),
+                    tint = com.elysium369.meet.ui.theme.MeetColors.secondary,
                     modifier = Modifier.size(26.dp),
                 )
             }
@@ -570,7 +570,7 @@ private fun MapControlButton(
         modifier = Modifier.size(46.dp),
         shape = CircleShape,
         containerColor = ComposeColor(0xFF07131E).copy(alpha = 0.94f),
-        contentColor = ComposeColor(0xFF00E5FF),
+        contentColor = com.elysium369.meet.ui.theme.MeetColors.secondary,
     ) {
         Text(label, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge)
     }

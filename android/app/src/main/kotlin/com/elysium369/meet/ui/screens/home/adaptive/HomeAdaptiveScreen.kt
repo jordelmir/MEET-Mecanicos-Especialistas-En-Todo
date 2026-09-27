@@ -1,5 +1,8 @@
 package com.elysium369.meet.ui.screens.home.adaptive
 
+import com.elysium369.meet.core.agent.ui.agentAction
+import com.elysium369.meet.core.agent.ui.AgentUiControlId
+
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -119,11 +122,12 @@ fun HomeAdaptiveScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        com.elysium369.meet.ui.components.ElysiumArtworkBackground()
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .verticalScroll(scrollState),
+                .verticalScroll(scrollState, overscrollEffect = null),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Preview Banner if in preview mode
@@ -134,6 +138,8 @@ fun HomeAdaptiveScreen(
                     onCancel = onCancelPreview
                 )
             }
+
+            ElysiumVanguardHeader()
 
             // ── Hero Header ──
             Row(
@@ -302,7 +308,7 @@ fun HomeAdaptiveScreen(
                 EliteCard(
                     glowColor = MeetColors.neonGreen,
                     borderColor = MeetColors.neonGreen.copy(alpha = 0.5f),
-                    backgroundColor = Color(0xFF0C1524),
+                    backgroundColor = MeetColors.cardBackground,
                     shape = RoundedCornerShape(16.dp),
                     onClick = { navController.safeNavigate(MeetDestinations.RIDE_PASSENGER_REQUEST) },
                     modifier = Modifier.fillMaxWidth()
@@ -388,7 +394,7 @@ fun HomeAdaptiveScreen(
                 EliteCard(
                     glowColor = MeetColors.electricBlue,
                     borderColor = MeetColors.electricBlue.copy(alpha = 0.5f),
-                    backgroundColor = Color(0xFF0C1524),
+                    backgroundColor = MeetColors.cardBackground,
                     shape = RoundedCornerShape(16.dp),
                     onClick = { navController.safeNavigate(MeetDestinations.RIDE_DRIVER_MODE) },
                     modifier = Modifier.fillMaxWidth()
@@ -450,9 +456,9 @@ fun HomeAdaptiveScreen(
 
             // ── Vehicle & Connection Hero Card ──
             EliteCard(
-                glowColor = if (obdState == ObdState.CONNECTED) MeetColors.neonGreen else MeetColors.electricBlue,
-                borderColor = if (obdState == ObdState.CONNECTED) MeetColors.neonGreen.copy(alpha = 0.4f) else MeetColors.electricBlue.copy(alpha = 0.3f),
-                backgroundColor = Color(0xFF0C1524),
+                glowColor = if (obdState == ObdState.CONNECTED) MeetColors.success else MeetColors.electricBlue,
+                borderColor = if (obdState == ObdState.CONNECTED) MeetColors.success.copy(alpha = 0.4f) else MeetColors.electricBlue.copy(alpha = 0.3f),
+                backgroundColor = MeetColors.cardBackground,
                 shape = RoundedCornerShape(16.dp),
                 onClick = { navController.safeNavigate(MeetDestinations.GARAGE) },
                 modifier = Modifier.fillMaxWidth()
@@ -489,7 +495,7 @@ fun HomeAdaptiveScreen(
                         // OBD Connection Pill
                         val isConnected = obdState == ObdState.CONNECTED
                         val statusColor = when (obdState) {
-                            ObdState.CONNECTED -> MeetColors.neonGreen
+                            ObdState.CONNECTED -> MeetColors.success
                             ObdState.CONNECTING -> MeetColors.warning
                             ObdState.ERROR -> MeetColors.error
                             else -> MeetColors.textMuted
@@ -675,7 +681,7 @@ private fun AdaptiveActionCard(
     EliteCard(
         glowColor = glowColor,
         borderColor = borderColor,
-        backgroundColor = Color(0xFF0F172A),
+        backgroundColor = MeetColors.cardBackground,
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -753,10 +759,12 @@ private fun AdaptiveModuleTile(
     EliteCard(
         glowColor = tileGlow,
         borderColor = tileBorder,
-        backgroundColor = Color(0xFF09121F),
+        backgroundColor = MeetColors.cardBackground,
         shape = RoundedCornerShape(10.dp),
         onClick = onClick,
-        modifier = modifier.height(68.dp)
+        modifier = modifier.height(68.dp).agentAction(
+            AgentUiControlId("home.command.${module.destination}"), module.title,
+            route = "home", onActivate = onClick)
     ) {
         Row(
             modifier = Modifier

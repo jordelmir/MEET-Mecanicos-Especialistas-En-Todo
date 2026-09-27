@@ -29,6 +29,32 @@ enum class AutonomyMode {
     PROHIBITED,      // Autonomous action strictly prohibited
 }
 
+enum class RemediationOutcome {
+    PROPOSED,
+    EXECUTED,
+    FAILED,
+    MANUAL_REQUIRED,
+}
+
+enum class ReconciliationState {
+    DETECTED,
+    ANALYZING,
+    REMEDIATING,
+    RECONCILED,
+    QUARANTINED,
+    ESCALATED_MANUAL,
+}
+
+@Serializable
+data class ObservedMetric(
+    val metricName: String,
+    val value: Double,
+    val unit: String,
+    val observedAtEpochMs: Long = System.currentTimeMillis(),
+    val threshold: Double? = null,
+    val isAnomalous: Boolean = false,
+)
+
 @Serializable
 data class OperationCase(
     val id: String = UUID.randomUUID().toString(),
@@ -36,6 +62,8 @@ data class OperationCase(
     val domain: String, // "SRE", "FINANCE", "SECURITY", "TRUST", "SUPPORT"
     val severity: CaseSeverity,
     val state: CaseState = CaseState.OPEN,
+    val reconciliationState: ReconciliationState = ReconciliationState.DETECTED,
+    val remediationOutcome: RemediationOutcome = RemediationOutcome.PROPOSED,
     val title: String,
     val whatHappened: String,
     val whatAutomationDid: String,
@@ -43,6 +71,8 @@ data class OperationCase(
     val whatRemainsUncertain: String,
     val requestedOwnerAction: String,
     val consequenceOfInaction: String,
+    val observedMetric: ObservedMetric? = null,
+    val evidenceSnapshotJson: String = "{}",
     val moneyExposure: Money? = null,
     val eventCount: Int = 1,
     val occurredAtEpochMs: Long = System.currentTimeMillis(),

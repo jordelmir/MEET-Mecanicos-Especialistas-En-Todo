@@ -87,11 +87,15 @@ fun GarageScreen(
         },
         containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { padding ->
+        val showArtwork=com.elysium369.meet.ui.home.LocalHomeExperience.current!=com.elysium369.meet.ui.home.HomeExperience.CLASSIC
         Box(modifier = Modifier.fillMaxSize()) {
+            com.elysium369.meet.ui.components.ElysiumArtworkBackground(automotive = true)
             if (vehicles.isEmpty()) {
                 // Empty State
                 Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if(showArtwork) Spacer(Modifier.height(160.dp))
+                        Spacer(Modifier.height(16.dp))
                         MeetSectionIcon(
                             key = "garage",
                             contentDescription = "Garage",
@@ -118,6 +122,7 @@ fun GarageScreen(
                     modifier = Modifier.padding(padding).fillMaxSize().padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    item { if(showArtwork) Spacer(Modifier.height(160.dp)) }
                     item {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(

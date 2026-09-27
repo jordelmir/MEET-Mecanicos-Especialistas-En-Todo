@@ -75,14 +75,8 @@ fun UniversalActivityWorkflowScreen(
     onOpenMessages: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val preferences = remember {
-        context.getSharedPreferences("elysium_universal_services", Context.MODE_PRIVATE)
-    }
-    val clientId = remember {
-        preferences.getString("client_id", null) ?: UUID.randomUUID().toString().also {
-            preferences.edit { putString("client_id", it) }
-        }
-    }
+    val principal by viewModel.activePrincipal.collectAsState()
+    val clientId = principal?.id.orEmpty()
 
     val allRequests by viewModel.serviceRequests.collectAsState()
     val profiles by viewModel.userProviderProfiles.collectAsState()
@@ -449,7 +443,7 @@ fun UniversalActivityWorkflowScreen(
                         item {
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
-                                border = BorderStroke(1.dp, Color(0xFFC85CFF).copy(alpha = 0.5f)),
+                                border = BorderStroke(1.dp, MeetColors.hotMagenta.copy(alpha = 0.5f)),
                                 shape = RoundedCornerShape(16.dp),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 10.dp),
                             ) {
@@ -470,23 +464,23 @@ fun UniversalActivityWorkflowScreen(
                                         colors = OutlinedTextFieldDefaults.colors(
                                             focusedTextColor = Color.White,
                                             unfocusedTextColor = Color.White,
-                                            focusedBorderColor = Color(0xFFC85CFF),
+                                            focusedBorderColor = MeetColors.hotMagenta,
                                             unfocusedBorderColor = MeetColors.borderSubtle,
                                         ),
                                     )
 
                                     OutlinedButton(
                                         onClick = { showDestPinPicker = true },
-                                        border = BorderStroke(1.dp, Color(0xFFC85CFF)),
+                                        border = BorderStroke(1.dp, MeetColors.hotMagenta),
                                         shape = RoundedCornerShape(10.dp),
                                         modifier = Modifier.fillMaxWidth().height(42.dp),
                                     ) {
-                                        Icon(Icons.Default.PinDrop, null, modifier = Modifier.size(16.dp), tint = Color(0xFFC85CFF))
+                                        Icon(Icons.Default.PinDrop, null, modifier = Modifier.size(16.dp), tint = MeetColors.hotMagenta)
                                         Spacer(Modifier.width(8.dp))
                                         Text(
                                             if (destPoint == null) "FIJAR DESTINO CON PIN" else "DESTINO FIJADO · CAMBIAR PIN",
                                             fontSize = 11.sp,
-                                            color = Color(0xFFC85CFF),
+                                            color = MeetColors.hotMagenta,
                                             fontWeight = FontWeight.Bold,
                                         )
                                     }
@@ -605,7 +599,7 @@ fun UniversalActivityWorkflowScreen(
                         item {
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFF181528)),
-                                border = BorderStroke(1.dp, Color(0xFFC85CFF).copy(alpha = 0.6f)),
+                                border = BorderStroke(1.dp, MeetColors.hotMagenta.copy(alpha = 0.6f)),
                                 shape = RoundedCornerShape(16.dp),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
                             ) {
@@ -617,7 +611,7 @@ fun UniversalActivityWorkflowScreen(
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             "🛠️ Combo Llave en Mano (Material + Instalación)",
-                                            color = Color(0xFFC85CFF),
+                                            color = MeetColors.hotMagenta,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Black,
                                         )
@@ -992,7 +986,7 @@ private fun UniversalActivityAdminPanel(
     profiles: List<com.elysium369.meet.data.local.entities.ProviderProfileEntity>,
     context: Context,
 ) {
-    val myProfile = profiles.firstOrNull { it.isActive }
+    val myProfile = profiles.firstOrNull { it.isActive && it.userId == viewModel.activePrincipal.value?.id }
     val specialistId = myProfile?.profileId ?: "elysium_${service.id}"
     var isOnline by remember { mutableStateOf(true) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -1055,18 +1049,18 @@ private fun UniversalActivityAdminPanel(
                 businessName = adminName,
                 ownerName = adminName,
                 phone = adminPhone,
-                rating = myProfile?.rating ?: 4.97,
-                reviewsCount = 168,
-                totalJobs = 214,
-                acceptanceRatePercent = 99.4,
-                isVerified = myProfile?.verified ?: true,
+                rating = myProfile?.rating ?: 0.0,
+                reviewsCount = 0,
+                totalJobs = myProfile?.totalJobs ?: 0,
+                acceptanceRatePercent = 0.0,
+                isVerified = myProfile?.verified ?: false,
                 isOnline = isOnline,
                 onToggleOnline = { isOnline = it },
                 onEditProfile = { showEditProfileDialog = true },
                 accentColor = MeetColors.neonGreen,
                 secondaryColor = MeetColors.cyberCyan,
                 icon = service.icon,
-                levelTitle = "ESPECIALISTA CERTIFICADO ELYSIUM",
+                levelTitle = if (myProfile?.verified == true) "PROVEEDOR VERIFICADO" else "PENDIENTE DE VERIFICACIÓN",
             )
         }
 
@@ -1312,7 +1306,7 @@ private fun ProviderActivityBidCard(
 
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0xDD0D1B2A)),
-        border = BorderStroke(1.dp, Color(0xFFC85CFF).copy(alpha = 0.6f)),
+        border = BorderStroke(1.dp, MeetColors.hotMagenta.copy(alpha = 0.6f)),
         shape = RoundedCornerShape(16.dp),
     ) {
         Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

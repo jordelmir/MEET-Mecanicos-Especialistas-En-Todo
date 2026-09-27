@@ -23,8 +23,8 @@ import kotlin.math.*
  *  ──────────────────────────────────────────────────────────────
  *  Renderizador de Personajes 3D/Pseudo-volumétricos vivos:
  *  - 🐉 Dragón Carmesí Místico (Draco Ignis): Cuernos 3D, alas, ojos flamígeros, llamas.
- *  - ⚡ Criatura Eléctrica Estilo Pokémon (Volt Sparky): Orejitas, mejillas rojas eléctricas, cola rayo.
- *  - 💥 Guerrero Saiyajin SSJ4 (Ki Carmesí): Cabello salvaje, delineado rojo, ojos dorados, aura de Ki.
+ *  - ⚡ Espíritu Voltaico (Volt Aether): Orejas cinemáticas, núcleo electrodinámico y chispa continua.
+ *  - 🛡️ Titan Vanguard (Guardián Primordial): Aura cinemática de impacto, armadura carmesí y óptica dorada.
  *  - 🤖 Cyber Mecha Titan: Casco acorazado con visor LED y hombreras blindadas.
  *  - 🌌 Laya Valquiria Celestial: Halo holográfico, cabello fluido y tiara cuántica.
  *  - ✨ EVAIR Living Spirit: Espíritu guía con rostro expresivo y alitas de plasma.
@@ -127,11 +127,11 @@ fun Agent3dAvatarCanvas(
                 "DRAGON", "DRACO", "DRAGON_IGNIS" -> {
                     drawDragonCharacter(center, dynamicRadius, themeColor, azimuthRad, elevationRad, wavePhase)
                 }
-                "POKEMON_VOLT", "VOLT", "POKEMON", "SPARKY" -> {
-                    drawPokemonVoltCharacter(center, dynamicRadius, themeColor, azimuthRad, elevationRad, wavePhase)
+                "VOLT_AETHER", "VOLT", "SPARKY" -> {
+                    drawVoltAetherCharacter(center, dynamicRadius, themeColor, azimuthRad, elevationRad, wavePhase)
                 }
-                "SAIYAN_SSJ4", "SSJ4", "GOKU", "SAIYAN", "TACTICAL_SHIELD" -> {
-                    drawSaiyanSsj4Character(center, dynamicRadius, themeColor, azimuthRad, elevationRad, wavePhase)
+                "TITAN_VANGUARD", "TITAN", "VANGUARD_SENTINEL", "TACTICAL_SHIELD" -> {
+                    drawTitanVanguardCharacter(center, dynamicRadius, themeColor, azimuthRad, elevationRad, wavePhase)
                 }
                 "CYBER_MECHA", "TITAN", "TITAN_EXOSKELETON", "MECHA" -> {
                     drawCyberMechaCharacter(center, dynamicRadius, themeColor, azimuthRad, elevationRad, wavePhase)
@@ -256,9 +256,9 @@ private fun DrawScope.drawDragonCharacter(
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// 2. CRIATURA ELÉCTRICA ESTILO POKÉMON (VOLT SPARKY)
+// 2. ESPÍRITU VOLTAICO (VOLT AETHER)
 // ══════════════════════════════════════════════════════════════════════
-private fun DrawScope.drawPokemonVoltCharacter(
+private fun DrawScope.drawVoltAetherCharacter(
     center: Offset,
     radius: Float,
     themeColor: Color,
@@ -375,9 +375,9 @@ private fun DrawScope.drawPokemonVoltCharacter(
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// 3. GUERRERO DEL KI CARMESÍ (GOKU SSJ4)
+// 3. TITAN VANGUARD (GUARDIÁN PRIMORDIAL)
 // ══════════════════════════════════════════════════════════════════════
-private fun DrawScope.drawSaiyanSsj4Character(
+private fun DrawScope.drawTitanVanguardCharacter(
     center: Offset,
     radius: Float,
     themeColor: Color,
@@ -390,7 +390,7 @@ private fun DrawScope.drawSaiyanSsj4Character(
         center.y - sin(elevationRad) * radius * 0.12f
     )
 
-    // A. Super Saiyan 4 Ki Aura Flames (Double Layer: Red + Gold)
+    // A. Kinetic Inherent Shield Flames (Double Layer: Red + Gold)
     for (layer in 0..1) {
         val auraColor = if (layer == 0) Color(0xFFFFD700).copy(alpha = 0.45f) else Color(0xFFFF1744).copy(alpha = 0.65f)
         val auraScale = if (layer == 0) 1.25f else 1.10f
@@ -407,7 +407,7 @@ private fun DrawScope.drawSaiyanSsj4Character(
         drawPath(auraPath, auraColor)
     }
 
-    // B. Brown Saiyan Tail wagging on the side
+    // B. Kinetic Anchor Tail wagging on the side
     val tailPath = Path().apply {
         val tailBob = sin(wavePhase * 2f) * radius * 0.15f
         moveTo(headOffset.x - radius * 0.35f, headOffset.y + radius * 0.55f)
@@ -419,14 +419,14 @@ private fun DrawScope.drawSaiyanSsj4Character(
     }
     drawPath(tailPath, Color(0xFF6D4C41), style = Stroke(width = radius * 0.16f))
 
-    // C. Crimson Fur Shoulders (SSJ4 iconic body)
+    // C. Crimson Vanguard Armor Plates
     drawOval(
         brush = Brush.verticalGradient(listOf(Color(0xFFD50000), Color(0xFF880E4F))),
         topLeft = Offset(headOffset.x - radius * 0.55f, headOffset.y + radius * 0.35f),
         size = Size(radius * 1.1f, radius * 0.45f)
     )
 
-    // D. Wild Spiky SSJ4 Black & Crimson Hair (Front and Back Layers)
+    // D. Wild Spiky Cybernetic Crest (Front and Back Layers)
     val hairSpikes = listOf(
         Pair(Offset(-0.45f, -0.65f), Offset(-0.85f, -0.95f)),
         Pair(Offset(-0.25f, -0.75f), Offset(-0.45f, -1.25f)),
@@ -459,7 +459,7 @@ private fun DrawScope.drawSaiyanSsj4Character(
     drawPath(facePath, Color(0xFFFFCC80))
     drawPath(facePath, Color(0xFF8D6E63), style = Stroke(1.8f))
 
-    // F. SSJ4 Crimson Eye-Shadow Masks & Golden Eyes
+    // F. Crimson Optical Mask & Golden Sensory Lenses
     val eyeSpread = radius * 0.16f
     val eyeY = headOffset.y - radius * 0.02f
     // Crimson eye surrounds

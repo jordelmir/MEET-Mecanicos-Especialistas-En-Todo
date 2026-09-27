@@ -60,7 +60,7 @@ import java.util.*
 private object TowTruckColors {
     val darkBackground = Color(0xFF0A0E1A)
     val cardBackground = Color(0xFF121829)
-    val cyanAccent = Color(0xFF00E5FF)
+    val cyanAccent: Color get() = MeetColors.electricBlue
     val orangeAccent = Color(0xFFFF6D00)
     val greenAccent = Color(0xFF00E676)
     val redAccent = Color(0xFFFF1744)
@@ -394,7 +394,7 @@ private fun ClientWorkspaceView(
                     .clip(RoundedCornerShape(18.dp))
                     .background(
                         Brush.horizontalGradient(
-                            listOf(Color(0xFF00E5FF).copy(alpha = 0.18f), Color(0xFF1E3A8A).copy(alpha = 0.28f)),
+                            listOf(MeetColors.electricBlue.copy(alpha = 0.18f), Color(0xFF1E3A8A).copy(alpha = 0.28f)),
                         ),
                     )
                     .border(1.5.dp, Brush.horizontalGradient(listOf(TowTruckColors.cyanAccent, TowTruckColors.orangeAccent)), RoundedCornerShape(18.dp))
@@ -636,7 +636,7 @@ private fun ClientWorkspaceView(
                                         }
                                         .clip(RoundedCornerShape(14.dp))
                                         .background(
-                                            if (isSelected) Brush.verticalGradient(listOf(Color(0xFF00E5FF).copy(alpha = 0.28f), Color(0xFF05152A)))
+                                            if (isSelected) Brush.verticalGradient(listOf(MeetColors.electricBlue.copy(alpha = 0.28f), Color(0xFF05152A)))
                                             else Brush.verticalGradient(listOf(Color(0xFF141D30), Color(0xFF0B101C)))
                                         )
                                         .border(

@@ -57,22 +57,18 @@ fun UniversalServicesScreen(
     onNavigateToActiveServices: () -> Unit = {},
     onNavigateToHistory: () -> Unit = {},
     onNavigateToProviderConfig: () -> Unit = {},
+    onOpenAdvancedMarketplace: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val preferences = remember {
-        context.getSharedPreferences("elysium_universal_services", Context.MODE_PRIVATE)
-    }
-    val clientId = remember {
-        preferences.getString("client_id", null) ?: UUID.randomUUID().toString().also {
-            preferences.edit { putString("client_id", it) }
-        }
-    }
+    val principal by viewModel.activePrincipal.collectAsState()
+    val clientId = principal?.id.orEmpty()
     val allRequests by viewModel.serviceRequests.collectAsState()
     val profiles by viewModel.userProviderProfiles.collectAsState()
     val gps by viewModel.currentGpsLocation.collectAsState()
     val myProfile = profiles.firstOrNull {
         com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType) ==
             com.elysium369.meet.core.services.kernel.ProviderType.SERVICE_PROVIDER &&
+            it.userId == clientId &&
             it.isActive &&
             it.verified
     }
@@ -110,8 +106,8 @@ fun UniversalServicesScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("ELYSIUM · SERVICIOS Y FERRETERÍA", color = Color.White, fontWeight = FontWeight.Black)
-                        Text("Subastas de materiales · Mano de obra · Combos llave en mano", color = MeetColors.cyberCyan, fontSize = 10.sp)
+                        Text("SERVICIOS ELYSIUM", color = Color.White, fontWeight = FontWeight.Black)
+                        Text("Servicios y oficios · Materiales · Profesionales", color = MeetColors.cyberCyan, fontSize = 10.sp)
                     }
                 },
                 navigationIcon = {
@@ -202,6 +198,15 @@ fun UniversalServicesScreen(
                 label = "univ-glow",
             )
 
+            Text(
+                if (providerMode) "Ofreces servicios con tu perfil verificado. Comisión constitucional del 5% mediante saldo."
+                else "Encuentra un servicio, compara propuestas y consulta tu historial.",
+                color = Color.White, fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+            OutlinedButton(onClick = onOpenAdvancedMarketplace, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
+                Text("Cotizaciones, contraofertas y saldo")
+            }
             // ── Barra Universal de Control: Activos, Historial & Configuración ──
             Row(
                 modifier = Modifier
@@ -327,7 +332,7 @@ fun UniversalServicesScreen(
                         border = BorderStroke(
                             1.5.dp,
                             Brush.horizontalGradient(
-                                listOf(MeetColors.cyberCyan, Color(0xFFC85CFF))
+                                listOf(MeetColors.cyberCyan, MeetColors.hotMagenta)
                             )
                         ),
                         shape = RoundedCornerShape(20.dp),
@@ -363,7 +368,7 @@ fun UniversalServicesScreen(
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = "RADAR ELYSIUM · SERVICIOS Y FERRETERÍAS EN VIVO",
+                                    text = "RADAR SERVICIOS ELYSIUMS EN VIVO",
                                     color = Color.White,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
@@ -376,7 +381,7 @@ fun UniversalServicesScreen(
                                     .align(Alignment.BottomStart)
                                     .clip(RoundedCornerShape(10.dp))
                                     .background(Color(0xF006121F))
-                                    .border(1.dp, Color(0xFFC85CFF).copy(alpha = 0.6f), RoundedCornerShape(10.dp))
+                                    .border(1.dp, MeetColors.hotMagenta.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
                                     .padding(horizontal = 8.dp, vertical = 4.dp),
                             ) {
                                 Text(
@@ -407,7 +412,7 @@ fun UniversalServicesScreen(
                 item {
                     Text(
                         "SUBASTA DUAL: FERRETERÍAS VENDEN MATERIALES + PLOMEROS/ELECTRICISTAS OFRECEN COLOCARLOS",
-                        color = Color(0xFFC85CFF),
+                        color = MeetColors.hotMagenta,
                         fontWeight = FontWeight.Black,
                         fontSize = 10.sp,
                         lineHeight = 15.sp,
@@ -466,7 +471,7 @@ private fun UniversalServiceCard(service: UniversalServiceDefinition, onClick: (
         colors = CardDefaults.cardColors(containerColor = Color(0xEE0B1728)),
         border = BorderStroke(
             1.2.dp,
-            Brush.horizontalGradient(listOf(MeetColors.cyberCyan.copy(alpha = 0.6f), Color(0xFFC85CFF).copy(alpha = 0.5f)))
+            Brush.horizontalGradient(listOf(MeetColors.cyberCyan.copy(alpha = 0.6f), MeetColors.hotMagenta.copy(alpha = 0.5f)))
         ),
         shape = RoundedCornerShape(18.dp),
     ) {
@@ -496,7 +501,7 @@ private fun UniversalServiceCard(service: UniversalServiceDefinition, onClick: (
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Icon(Icons.Default.ChevronRight, null, tint = Color(0xFFC85CFF))
+            Icon(Icons.Default.ChevronRight, null, tint = MeetColors.hotMagenta)
         }
     }
 }
@@ -661,7 +666,7 @@ private fun ProviderServiceBoard(
             var offerText by remember(request.requestId) { mutableStateOf(request.priceOffer.toLong().toString()) }
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xCC0A1726)),
-                border = BorderStroke(1.dp, Color(0xFFC85CFF)),
+                border = BorderStroke(1.dp, MeetColors.hotMagenta),
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
                     Row(

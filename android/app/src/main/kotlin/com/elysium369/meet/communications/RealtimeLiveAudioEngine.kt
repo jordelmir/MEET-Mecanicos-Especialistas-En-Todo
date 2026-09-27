@@ -60,7 +60,7 @@ class RealtimeLiveAudioEngine @Inject constructor(
         scope: CoroutineScope,
         onAudioChunk: (ByteArray) -> Unit,
     ): Boolean {
-        if (isRecording.get()) return true
+        if (isRecording.get()) return false
 
         return runCatching {
             val minRecordBufferSize = AudioRecord.getMinBufferSize(

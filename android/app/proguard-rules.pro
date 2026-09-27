@@ -2,6 +2,27 @@
 # MEET / Elysium Vanguard — ProGuard / R8 rules (Play Store release)
 # ══════════════════════════════════════════════════════════════════════════════
 
+# Production diagnostics must use structured, redacted evidence instead of Logcat.
+-assumenosideeffects class android.util.Log {
+    public static *** v(...);
+    public static *** d(...);
+    public static *** i(...);
+    public static *** w(...);
+    public static *** e(...);
+    public static *** wtf(...);
+    public static *** println(...);
+}
+-assumenosideeffects class java.lang.Throwable {
+    public void printStackTrace(...);
+}
+-assumenosideeffects interface org.slf4j.Logger {
+    public void trace(...);
+    public void debug(...);
+    public void info(...);
+    public void warn(...);
+    public void error(...);
+}
+
 # ── Hilt / Dagger ────────────────────────────────────────────────────────────
 -keep class dagger.hilt.** { *; }
 -keep class javax.inject.** { *; }
@@ -102,5 +123,3 @@
 -keepclassmembers class com.elysium369.meet.diagnostic.** { *; }
 -keep class com.elysium369.meet.data.supabase.** { *; }
 -keepclassmembers class com.elysium369.meet.data.supabase.** { *; }
-
-

@@ -52,8 +52,8 @@ android {
         targetSdk = 36
         // Navigation continuity: retained auth graph, ordered back stack and
         // saveable transactional drafts across recreation.
-        versionCode = 61
-        versionName = "4.27.0"
+        versionCode = 62
+        versionName = "4.28.0"
 
         ndk {
             abiFilters.addAll(listOf("arm64-v8a"))
@@ -74,6 +74,18 @@ android {
         val supabaseKey = (project.findProperty("ELYSIUM_SUPABASE_KEY") as String?)
             ?: localProps.getProperty("ELYSIUM_SUPABASE_KEY")
             ?: localProps.getProperty(legacySupabaseApiKey, "")
+        // Only a public client key belongs in an APK. Never echo rejected values.
+        if (supabaseKey.isNotBlank()) {
+            val publicLegacyKey = runCatching {
+                val parts = supabaseKey.split('.')
+                require(parts.size == 3)
+                val payload = String(Base64.getUrlDecoder().decode(parts[1]), Charsets.UTF_8)
+                Regex("\\\"role\\\"\\s*:\\s*\\\"anon\\\"").containsMatchIn(payload)
+            }.getOrDefault(false)
+            require(supabaseKey.startsWith("sb_publishable_") || publicLegacyKey) {
+                "Android requires a public Supabase client key; privileged credentials are forbidden."
+            }
+        }
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
         // Public HTTPS endpoint only. LiveKit API secrets and participant tokens
@@ -308,7 +320,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    
+
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 
@@ -332,10 +344,10 @@ dependencies {
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     kapt("androidx.room:room-compiler:2.8.4")
-    
+
     // Coil
     implementation("io.coil-kt:coil-compose:2.5.0")
-    
+
     // Supabase
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.2.3")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.2.3")
@@ -347,7 +359,7 @@ dependencies {
     implementation("io.ktor:ktor-client-okhttp")
     implementation("io.ktor:ktor-client-core")
     implementation("io.ktor:ktor-client-content-negotiation")
-    
+
     // Ktor Server (Embedded — for LiveLink WebSocket)
     implementation("io.ktor:ktor-server-core")
     implementation("io.ktor:ktor-server-cio")
@@ -355,13 +367,16 @@ dependencies {
     implementation("io.ktor:ktor-server-content-negotiation")
     implementation("io.ktor:ktor-serialization-kotlinx-json")
     implementation("io.ktor:ktor-server-cors")
-    
+
     // Kotlin Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
-    
+
+    // DataStore Preferences (Elysium Theme Engine persistence)
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
+
     // Google Fonts
     implementation("androidx.compose.ui:ui-text-google-fonts:1.6.1")
-    
+
     // MPAndroidChart
     implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 
@@ -376,6 +391,7 @@ dependencies {
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+    implementation("com.google.android.gms:play-services-nearby:19.5.0")
     // Bundled on-device face detector: liveness blink works offline and stores no face template.
     implementation("com.google.mlkit:face-detection:16.1.7")
 

@@ -71,7 +71,7 @@ fun SafetyMapScreen(
                             stringResource(R.string.safety_map_vanguard_title),
                             fontWeight = FontWeight.Black,
                             fontSize = 17.sp,
-                            color = Color.White,
+                            color = MeetColors.textPrimary,
                         )
                         Text(
                             stringResource(R.string.safety_map_vanguard_subtitle),
@@ -82,7 +82,7 @@ fun SafetyMapScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.safety_public_back), tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.safety_public_back), tint = MeetColors.textPrimary)
                     }
                 },
                 actions = {
@@ -105,7 +105,7 @@ fun SafetyMapScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SafetyMetricCard(stringResource(R.string.safety_map_visible_points), state.pointCount.toString(), MeetColors.cyberCyan, Modifier.weight(1f))
                 SafetyMetricCard(stringResource(R.string.safety_map_my_reports), state.privatePoints.size.toString(), MeetColors.neonGreen, Modifier.weight(1f))
-                SafetyMetricCard(stringResource(R.string.safety_map_public_points), state.points.size.toString(), Color.White, Modifier.weight(1f))
+                SafetyMetricCard(stringResource(R.string.safety_map_public_points), state.points.size.toString(), MeetColors.textPrimary, Modifier.weight(1f))
             }
 
             // Search Bar
@@ -127,8 +127,8 @@ fun SafetyMapScreen(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MeetColors.cyberCyan,
                     unfocusedBorderColor = MeetColors.borderSubtle,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = MeetColors.textPrimary,
+                    unfocusedTextColor = MeetColors.textPrimary,
                 ),
             )
 
@@ -211,7 +211,7 @@ fun SafetyMapScreen(
                                         stringResource(R.string.safety_private_report_status, point.serverState ?: point.syncState),
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 13.sp,
-                                        color = Color.White,
+                                        color = MeetColors.textPrimary,
                                     )
                                     Text("Reporte personal cifrado", fontSize = 11.sp, color = MeetColors.textSecondary)
                                 }
@@ -237,7 +237,7 @@ fun SafetyMapScreen(
                                 }
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
-                                    Text(point.label, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = Color.White)
+                                    Text(point.label, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MeetColors.textPrimary)
                                     Text(point.category.replace("_", " "), fontSize = 11.sp, color = catColor)
                                 }
                                 Text("${point.independentSourceCount} fuentes", fontSize = 11.sp, color = MeetColors.cyberCyan)
@@ -275,7 +275,7 @@ fun SafetyMapScreen(
                                 verticalArrangement = Arrangement.Top,
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
-                                Text(stringResource(R.string.safety_map_no_public_points), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text(stringResource(R.string.safety_map_no_public_points), color = MeetColors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
                     }
@@ -300,7 +300,7 @@ fun SafetyMapScreen(
             containerColor = MeetColors.cardBackground,
         ) {
             Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(R.string.safety_private_report_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(stringResource(R.string.safety_private_report_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
                 Text(stringResource(R.string.safety_private_report_status, point.serverState ?: point.syncState), color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
                 Text(stringResource(R.string.safety_private_report_date, safetyPublicDate(point.occurredAt)), color = MeetColors.textSecondary)
                 Text(stringResource(R.string.safety_private_report_notice), style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
@@ -341,7 +341,7 @@ private fun PublicPointDetail(point: SafetyPublicPointEntity, region: String, ho
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text(point.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(point.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
                     Text(point.category.replace("_", " "), fontSize = 12.sp, color = catColor, fontWeight = FontWeight.SemiBold)
                 }
             }
@@ -365,7 +365,7 @@ private fun PublicPointDetail(point: SafetyPublicPointEntity, region: String, ho
             Text(stringResource(R.string.safety_public_geo_detail, point.geoDisclosure, point.locationAccuracyMeters?.toString() ?: stringResource(R.string.safety_public_unknown)), color = MeetColors.textSecondary, fontSize = 12.sp)
         }
         item {
-            Text(stringResource(R.string.safety_public_sources_count, point.independentSourceCount), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(stringResource(R.string.safety_public_sources_count, point.independentSourceCount), color = MeetColors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
         item {
             Text(

@@ -22,6 +22,14 @@ data class ResolvedPlace(
     val isAuthoritativeSavedPlace: Boolean = false,
 )
 
+sealed interface PlaceResolutionResult {
+    data class Resolved(val place: ResolvedPlace) : PlaceResolutionResult
+    data class Ambiguous(val query: String, val candidates: List<ResolvedPlace>) : PlaceResolutionResult
+    data class NotFound(val query: String) : PlaceResolutionResult
+    data class ProviderUnavailable(val reason: String) : PlaceResolutionResult
+    data class PermissionDenied(val reason: String) : PlaceResolutionResult
+}
+
 @Serializable
 data class RidePreviewRequest(
     val principalId: String,
@@ -33,12 +41,15 @@ data class RidePreviewRequest(
 @Serializable
 data class RidePreviewQuote(
     val quoteId: String = UUID.randomUUID().toString(),
+    val quoteVersion: String = "CR_METRO_V3_2026",
     val pickupPlace: ResolvedPlace,
     val destinationPlace: ResolvedPlace,
     val estimatedDistanceMeters: Long,
     val estimatedDurationSeconds: Long,
     val offeredFareMinor: Long,
     val currency: String = "CRC",
+    val isHeuristicEstimate: Boolean = true,
+    val expiresAtEpochMs: Long = System.currentTimeMillis() + 300_000L,
     val confirmationToken: String,
     val quoteTimestampEpochMs: Long = System.currentTimeMillis(),
 )
@@ -86,27 +97,35 @@ class RideApplicationService @Inject constructor(
         // Destination / query resolution
         val queryTrimmed = query?.trim().orEmpty()
         if (queryTrimmed.isNotBlank()) {
-            return resolveGeocodingQuery(queryTrimmed)
+            return when (val res = resolveGeocodingQuery(queryTrimmed)) {
+                is PlaceResolutionResult.Resolved -> res.place
+                else -> null
+            }
         }
         return null
     }
 
     /**
-     * Resolves a destination query into coordinates and formatted address.
+     * Resolves a destination query into coordinates and formatted address, or null if not found.
+     * Eliminates arbitrary coordinate fallbacks (§40, §43).
      */
-    fun resolveDestination(destinationQuery: String): ResolvedPlace {
-        return resolveGeocodingQuery(destinationQuery.trim())
+    fun resolveDestination(destinationQuery: String): ResolvedPlace? {
+        return when (val res = resolveGeocodingQuery(destinationQuery.trim())) {
+            is PlaceResolutionResult.Resolved -> res.place
+            else -> null
+        }
     }
 
     /**
      * Calculates an authoritative quote and generates a confirmation token.
+     * Returns null if pickup or destination cannot be resolved with certainty.
      */
     fun generatePreviewQuote(
         principalId: String,
         request: RidePreviewRequest,
     ): RidePreviewQuote? {
         val pickup = resolvePickup(principalId, request.pickupAlias, request.pickupQuery) ?: return null
-        val destination = resolveDestination(request.destinationQuery)
+        val destination = resolveDestination(request.destinationQuery) ?: return null
 
         // Calculate approximate distance using Haversine
         val distanceMeters = calculateHaversineDistanceMeters(
@@ -121,15 +140,30 @@ class RideApplicationService @Inject constructor(
         val distanceFare = (distanceKm * 650.0).toLong()
         val totalFareMinor = (baseFare + distanceFare).coerceAtLeast(1500L)
 
-        val confirmationToken = generateConfirmationToken(principalId, pickup, destination, totalFareMinor)
+        val quoteId = UUID.randomUUID().toString()
+        val quoteVersion = "CR_METRO_V3_2026"
+        val expiresAtEpochMs = System.currentTimeMillis() + 300_000L
+        val confirmationToken = generateConfirmationToken(
+            principalId = principalId,
+            quoteId = quoteId,
+            quoteVersion = quoteVersion,
+            expiresAtEpochMs = expiresAtEpochMs,
+            pickup = pickup,
+            destination = destination,
+            fare = totalFareMinor,
+        )
 
         return RidePreviewQuote(
+            quoteId = quoteId,
+            quoteVersion = quoteVersion,
             pickupPlace = pickup,
             destinationPlace = destination,
             estimatedDistanceMeters = distanceMeters,
             estimatedDurationSeconds = durationSeconds,
             offeredFareMinor = totalFareMinor,
             currency = "CRC",
+            isHeuristicEstimate = true,
+            expiresAtEpochMs = expiresAtEpochMs,
             confirmationToken = confirmationToken,
         )
     }
@@ -176,7 +210,7 @@ class RideApplicationService @Inject constructor(
         return when (val result = commandBus.enqueue(command)) {
             RideCommandEnqueueResult.Enqueued -> RideBookingResult.Success(
                 rideId = rideId,
-                message = "Viaje solicitado con éxito. Tu conductor estará en camino pronto.",
+                message = "Solicitud enviada. Esperando confirmación autoritativa del servidor...",
             )
             RideCommandEnqueueResult.AlreadyQueued -> RideBookingResult.AlreadyQueued(
                 rideId = rideId,
@@ -188,33 +222,35 @@ class RideApplicationService @Inject constructor(
         }
     }
 
-    private fun resolveGeocodingQuery(query: String): ResolvedPlace {
+    fun resolveGeocodingQuery(query: String): PlaceResolutionResult {
         val lower = query.lowercase().trim()
+        if (lower.isBlank()) return PlaceResolutionResult.NotFound(query)
         return when {
-            lower.contains("multiplaza") -> ResolvedPlace(
-                label = "Multiplaza Escazú",
-                address = "Multiplaza Escazú, Autopista Próspero Fernández, Guachipelín, San José",
-                latitude = 9.9439,
-                longitude = -84.1504,
+            lower.contains("multiplaza") -> PlaceResolutionResult.Resolved(
+                ResolvedPlace(
+                    label = "Multiplaza Escazú",
+                    address = "Multiplaza Escazú, Autopista Próspero Fernández, Guachipelín, San José",
+                    latitude = 9.9439,
+                    longitude = -84.1504,
+                )
             )
-            lower.contains("aeropuerto") || lower.contains("sjo") -> ResolvedPlace(
-                label = "Aeropuerto Internacional Juan Santamaría (SJO)",
-                address = "Alajuela, Costa Rica",
-                latitude = 10.0022,
-                longitude = -84.2115,
+            lower.contains("aeropuerto") || lower.contains("sjo") -> PlaceResolutionResult.Resolved(
+                ResolvedPlace(
+                    label = "Aeropuerto Internacional Juan Santamaría (SJO)",
+                    address = "Alajuela, Costa Rica",
+                    latitude = 10.0022,
+                    longitude = -84.2115,
+                )
             )
-            lower.contains("san pedro") || lower.contains("ucr") -> ResolvedPlace(
-                label = "Universidad de Costa Rica (UCR)",
-                address = "San Pedro, Montes de Oca, San José",
-                latitude = 9.9358,
-                longitude = -84.0511,
+            lower.contains("san pedro") || lower.contains("ucr") -> PlaceResolutionResult.Resolved(
+                ResolvedPlace(
+                    label = "Universidad de Costa Rica (UCR)",
+                    address = "San Pedro, Montes de Oca, San José",
+                    latitude = 9.9358,
+                    longitude = -84.0511,
+                )
             )
-            else -> ResolvedPlace(
-                label = query,
-                address = "$query, San José, Costa Rica",
-                latitude = 9.9333,
-                longitude = -84.0833,
-            )
+            else -> PlaceResolutionResult.NotFound(query)
         }
     }
 
@@ -234,11 +270,14 @@ class RideApplicationService @Inject constructor(
 
     private fun generateConfirmationToken(
         principalId: String,
+        quoteId: String,
+        quoteVersion: String,
+        expiresAtEpochMs: Long,
         pickup: ResolvedPlace,
         destination: ResolvedPlace,
         fare: Long,
     ): String {
-        val raw = "$principalId:${pickup.latitude},${pickup.longitude}:${destination.latitude},${destination.longitude}:$fare"
+        val raw = "$principalId:$quoteId:$quoteVersion:$expiresAtEpochMs:${pickup.latitude},${pickup.longitude}:${destination.latitude},${destination.longitude}:$fare"
         return MessageDigest.getInstance("SHA-256")
             .digest(raw.toByteArray(Charsets.UTF_8))
             .joinToString("") { "%02x".format(it.toInt() and 0xff) }

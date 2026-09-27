@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.ui.navigation.backOrHome
 
 import com.elysium369.meet.ui.components.AnimatedNeonGlyph
@@ -95,8 +96,8 @@ fun GaugeMarketplaceScreen(
         infiniteRepeatable(tween(3000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "headerGlow"
     )
-    val accentCyan = Color(0xFF00FFCC)
-    val accentPurple = Color(0xFF7C4DFF)
+    val accentCyan = MeetColors.electricBlue
+    val accentPurple = MeetColors.hotMagenta
     val isPurchaseFlowBusy =
         isBillingProcessing ||
             purchaseTarget != null ||
@@ -290,17 +291,17 @@ fun GaugeMarketplaceScreen(
                                 .background(
                                     Brush.horizontalGradient(
                                         colors = listOf(
-                                            Color(0xFF00C853).copy(alpha = 0.15f),
-                                            Color(0xFF00E676).copy(alpha = 0.1f)
+                                            MeetColors.neonGreenDim.copy(alpha = 0.15f),
+                                            MeetColors.neonGreen.copy(alpha = 0.1f)
                                         )
                                     )
                                 )
-                                .border(1.dp, Color(0xFF00E676).copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                                .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 "💎 ${formatUsdFromCents(uiState.creatorEarningsCents)}",
-                                color = Color(0xFF00E676),
+                                color = MeetColors.neonGreen,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold
                             )

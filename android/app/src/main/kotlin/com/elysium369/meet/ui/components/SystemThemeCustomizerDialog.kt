@@ -1,6 +1,5 @@
 package com.elysium369.meet.ui.components
 
-import android.content.Context
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -14,6 +13,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -22,9 +22,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.elysium.theme.*
+import kotlinx.coroutines.launch
 import com.elysium369.meet.ui.theme.ThemeColors
-import com.elysium369.meet.ui.theme.ColorEntry
-import com.elysium369.meet.ui.theme.ColorCategory
 
 // ═══════════════════════════════════════════════════════
 // CUSTOMIZER TARGETS FOR SYSTEM THEME
@@ -43,17 +43,74 @@ private enum class SystemColorTarget(val label: String, val icon: String) {
 
 @Composable
 fun SystemThemeCustomizerDialog(
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    route: String = "home",
+    initialScope: ThemeScope = ThemeScope.GLOBAL,
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val storedConfig by ElysiumThemeRepository.config.collectAsState()
+    val persistenceFailure by ElysiumThemeRepository.failure.collectAsState()
     var selectedTarget by remember { mutableStateOf(SystemColorTarget.PRIMARY) }
-
-    // Read current target color state dynamically
-    val currentTargetColor = when (selectedTarget) {
-        SystemColorTarget.PRIMARY -> MeetColors.neonGreen
-        SystemColorTarget.SECONDARY -> MeetColors.electricBlue
-        SystemColorTarget.TERTIARY -> MeetColors.cyberCyan
-        SystemColorTarget.QUATERNARY -> MeetColors.hotMagenta
+    var scope by remember(route, initialScope) { mutableStateOf(initialScope) }
+    val domain = ElysiumPaletteResolver.domain(route)
+    val scopeTarget = when (scope) {
+        ThemeScope.GLOBAL -> "global"
+        ThemeScope.DOMAIN -> domain
+        ThemeScope.ROUTE -> route
+    }
+    var draft by remember(route, initialScope) {
+        mutableStateOf(ElysiumThemeRepository.config.value.overrideFor(initialScope,
+            when (initialScope) {
+                ThemeScope.GLOBAL -> "global"
+                ThemeScope.DOMAIN -> domain
+                ThemeScope.ROUTE -> route
+            }))
+    }
+    var saving by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
+    var dirty by remember { mutableStateOf(false) }
+    val previewConfig = storedConfig.withOverride(scope, scopeTarget, draft)
+    // An ancestor editor displays that ancestor's palette, without descendant overrides.
+    val resolved = when (scope) {
+        ThemeScope.GLOBAL -> ElysiumPaletteResolver.resolve(previewConfig.copy(domains = emptyMap(), routes = emptyMap()), domain, route)
+        ThemeScope.DOMAIN -> ElysiumPaletteResolver.resolve(previewConfig.copy(routes = emptyMap()), domain, route)
+        ThemeScope.ROUTE -> ElysiumPaletteResolver.resolve(previewConfig, domain, route)
+    }
+    fun color(index: Int) = Color(resolved.channel(index)!!.toInt())
+    val currentTargetColor = color(selectedTarget.ordinal)
+    val cancel = {
+        if (!saving) {
+            ElysiumThemeRepository.preview(null)
+            onDismiss()
+        }
+    }
+    fun edit(next: ElysiumPaletteOverride) {
+        if (saving) return
+        draft = next
+        dirty = true
+        saveError = null
+    }
+    fun selectScope(next: ThemeScope, copyPalette: Boolean = false) {
+        if (!saving && (!dirty || copyPalette)) {
+            scope = next
+            val target = when (next) {
+                ThemeScope.GLOBAL -> "global"
+                ThemeScope.DOMAIN -> domain
+                ThemeScope.ROUTE -> route
+            }
+            draft = if (copyPalette) resolved else storedConfig.overrideFor(next, target)
+            dirty = copyPalette
+            saveError = null
+        }
+    }
+    LaunchedEffect(storedConfig, scope, scopeTarget, dirty) {
+        if (!dirty) draft = storedConfig.overrideFor(scope, scopeTarget)
+    }
+    LaunchedEffect(previewConfig) { ElysiumThemeRepository.preview(previewConfig) }
+    DisposableEffect(Unit) {
+        ElysiumThemeRepository.initialize(context)
+        onDispose { ElysiumThemeRepository.preview(null) }
     }
 
     val inf = rememberInfiniteTransition(label = "systemCustomizer")
@@ -64,7 +121,7 @@ fun SystemThemeCustomizerDialog(
     )
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { cancel() },
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Box(
@@ -75,9 +132,9 @@ fun SystemThemeCustomizerDialog(
                 .background(
                     Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFF070B14),
-                            Color(0xFF050810),
-                            Color(0xFF03050A)
+                            MeetColors.backgroundDark,
+                            MeetColors.backgroundDeep,
+                            MeetColors.backgroundDeep
                         )
                     )
                 )
@@ -93,7 +150,7 @@ fun SystemThemeCustomizerDialog(
                     RoundedCornerShape(24.dp)
                 )
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 // ══════════════════════════════════════
                 // HEADER
                 // ══════════════════════════════════════
@@ -105,9 +162,10 @@ fun SystemThemeCustomizerDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        "🎨 Colores del Sistema",
-                        color = Color.White,
-                        fontSize = 20.sp,
+                        "Identidad visual",
+                        modifier = Modifier.weight(1f),
+                        color = MeetColors.textPrimary,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Black,
                         fontFamily = FontFamily.SansSerif
                     )
@@ -118,7 +176,7 @@ fun SystemThemeCustomizerDialog(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(Color(0x22FF1744))
                                 .clickable {
-                                    MeetColors.reset(context)
+                                    edit(ElysiumPaletteOverride())
                                 }
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
@@ -128,13 +186,13 @@ fun SystemThemeCustomizerDialog(
                             ) {
                                 AnimatedNeonGlyph(
                                     glyph = "↻",
-                                    contentDescription = "Reset",
+                                    contentDescription = "Restablecer",
                                     tint = Color(0xFFFF1744),
                                     fontSize = 14.sp,
                                     modifier = Modifier.size(18.dp),
                                 )
                                 Text(
-                                    "Reset",
+                                    "Restablecer",
                                     color = Color(0xFFFF1744),
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold
@@ -147,7 +205,7 @@ fun SystemThemeCustomizerDialog(
                                 .size(36.dp)
                                 .clip(CircleShape)
                                 .background(Color(0x33FFFFFF))
-                                .clickable { onDismiss() },
+                                .clickable(enabled = !saving) { cancel() },
                             contentAlignment = Alignment.Center
                         ) {
                             AnimatedNeonGlyph(
@@ -170,7 +228,38 @@ fun SystemThemeCustomizerDialog(
                     fontFamily = FontFamily.SansSerif
                 )
 
-                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    ThemeScope.entries.forEach { candidate ->
+                        FilterChip(
+                            selected = scope == candidate,
+                            onClick = { selectScope(candidate) },
+                            enabled = !saving && (!dirty || scope == candidate),
+                            label = { Text(when (candidate) {
+                                ThemeScope.GLOBAL -> "Global"
+                                ThemeScope.DOMAIN -> "Dominio"
+                                ThemeScope.ROUTE -> "Pantalla"
+                            }, fontSize = 11.sp) },
+                        )
+                    }
+                }
+                Text(
+                    when (scope) {
+                        ThemeScope.GLOBAL -> "Toda la aplicación; respeta excepciones de dominio y pantalla."
+                        ThemeScope.DOMAIN -> "Dominio: $domain; respeta excepciones de pantalla."
+                        ThemeScope.ROUTE -> "Solo esta pantalla: $route"
+                    },
+                    color = MeetColors.textSecondary, fontSize = 10.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+                if (dirty) Text(
+                    "Borrador sin guardar. Guarda o cancela antes de cambiar de alcance.",
+                    color = MeetColors.textMuted, fontSize = 10.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                )
+                Spacer(Modifier.height(8.dp))
 
                 // ══════════════════════════════════════
                 // REAL-TIME PREVIEW WINDOW (Masculine & Premium)
@@ -189,20 +278,20 @@ fun SystemThemeCustomizerDialog(
                         Row(verticalAlignment = Alignment.Bottom) {
                             Text(
                                 "ELYSIUM",
-                                color = MeetColors.neonGreen,
+                                color = color(0),
                                 fontWeight = FontWeight.Black,
                                 fontSize = 16.sp
                             )
                             Spacer(Modifier.width(4.dp))
                             Text(
                                 "VANGUARD",
-                                color = MeetColors.electricBlue,
+                                color = color(1),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp
                             )
                         }
                         
-                        // Fake buttons preview
+                        // Button appearance preview
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                             modifier = Modifier.fillMaxWidth()
@@ -213,7 +302,7 @@ fun SystemThemeCustomizerDialog(
                                     .weight(1f)
                                     .height(30.dp)
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(MeetColors.neonGreen),
+                                    .background(color(0)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text("IR AL SCANNER", color = MeetColors.backgroundDeep, fontSize = 8.sp, fontWeight = FontWeight.Black)
@@ -225,29 +314,29 @@ fun SystemThemeCustomizerDialog(
                                     .weight(1f)
                                     .height(30.dp)
                                     .clip(RoundedCornerShape(6.dp))
-                                    .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.6f), RoundedCornerShape(6.dp)),
+                                    .border(1.dp, color(0).copy(alpha = 0.6f), RoundedCornerShape(6.dp)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("CONECTAR", color = MeetColors.neonGreen, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                Text("CONECTAR", color = color(0), fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
-                        // Fake Bottom navigation preview
+                        // Navigation appearance preview
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(28.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF070B14))
+                                .background(MeetColors.backgroundDark)
                                 .padding(horizontal = 8.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            FakeNavItem("Inicio", MeetColors.neonGreen, isSelected = true)
-                            FakeNavItem("Scanner", MeetColors.cyberCyan, isSelected = false)
+                            FakeNavItem("Inicio", color(0), isSelected = true)
+                            FakeNavItem("Scanner", color(2), isSelected = false)
                             FakeNavItem("DTCs", MeetColors.error, isSelected = false)
-                            FakeNavItem("Garage", MeetColors.electricBlue, isSelected = false)
-                            FakeNavItem("PRO", MeetColors.hotMagenta, isSelected = false)
+                            FakeNavItem("Garage", color(1), isSelected = false)
+                            FakeNavItem("PRO", color(3), isSelected = false)
                         }
                     }
                 }
@@ -266,10 +355,10 @@ fun SystemThemeCustomizerDialog(
                     SystemColorTarget.entries.forEach { target ->
                         val isSelected = target == selectedTarget
                         val targetColor = when (target) {
-                            SystemColorTarget.PRIMARY -> MeetColors.neonGreen
-                            SystemColorTarget.SECONDARY -> MeetColors.electricBlue
-                            SystemColorTarget.TERTIARY -> MeetColors.cyberCyan
-                            SystemColorTarget.QUATERNARY -> MeetColors.hotMagenta
+                            SystemColorTarget.PRIMARY -> color(0)
+                            SystemColorTarget.SECONDARY -> color(1)
+                            SystemColorTarget.TERTIARY -> color(2)
+                            SystemColorTarget.QUATERNARY -> color(3)
                         }
                         Box(
                             modifier = Modifier
@@ -306,6 +395,14 @@ fun SystemThemeCustomizerDialog(
 
                 Spacer(Modifier.height(8.dp))
 
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    TextButton(enabled = !saving, onClick = { edit(draft.withChannel(selectedTarget.ordinal, null)) }) {
+                        Text(if (scope == ThemeScope.GLOBAL) "Predeterminado" else "Heredar canal", fontSize = 11.sp)
+                    }
+                    TextButton(enabled = !saving, onClick = {
+                        edit(draft.withChannel(selectedTarget.ordinal, ElysiumPaletteResolver.defaults.channel(selectedTarget.ordinal)))
+                    }) { Text("Restablecer canal", fontSize = 11.sp) }
+                }
                 // Divider line
                 Box(
                     Modifier
@@ -324,7 +421,7 @@ fun SystemThemeCustomizerDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
+                        .heightIn(max = 240.dp)
                         .verticalScroll(scrollState)
                         .padding(horizontal = 16.dp)
                 ) {
@@ -346,7 +443,7 @@ fun SystemThemeCustomizerDialog(
                         }
 
                         // Swatches grid (rows of 6)
-                        val columns = 6
+                        val columns = ((LocalConfiguration.current.screenWidthDp * 0.92f - 32f) / 46f).toInt().coerceIn(2, 6)
                         category.colors.chunked(columns).forEach { rowColors ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -357,12 +454,10 @@ fun SystemThemeCustomizerDialog(
                                         color = entry.color,
                                         isSelected = entry.color.toArgb() == currentTargetColor.toArgb(),
                                         onClick = {
-                                            when (selectedTarget) {
-                                                SystemColorTarget.PRIMARY -> MeetColors.updateNeonGreen(entry.color, context)
-                                                SystemColorTarget.SECONDARY -> MeetColors.updateElectricBlue(entry.color, context)
-                                                SystemColorTarget.TERTIARY -> MeetColors.updateCyberCyan(entry.color, context)
-                                                SystemColorTarget.QUATERNARY -> MeetColors.updateHotMagenta(entry.color, context)
-                                            }
+                                            if (!saving) edit(draft.withChannel(
+                                                selectedTarget.ordinal,
+                                                entry.color.toArgb().toLong() and 0xFFFFFFFFL,
+                                            ))
                                         }
                                     )
                                 }
@@ -375,6 +470,32 @@ fun SystemThemeCustomizerDialog(
                         }
                     }
                     Spacer(Modifier.height(24.dp))
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    TextButton(enabled = !saving, onClick = { selectScope(ThemeScope.DOMAIN, copyPalette = true) }) {
+                        Text("Aplicar al dominio", fontSize = 10.sp)
+                    }
+                    TextButton(enabled = !saving, onClick = { selectScope(ThemeScope.GLOBAL, copyPalette = true) }) {
+                        Text("Aplicar a global", fontSize = 10.sp)
+                    }
+                }
+                (saveError ?: persistenceFailure)?.let { message ->
+                    Text(message, color = MeetColors.error, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 16.dp))
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.End) {
+                    TextButton(enabled = !saving, onClick = { cancel() }) { Text("Cancelar") }
+                    Button(enabled = !saving, onClick = {
+                        saving = true
+                        coroutineScope.launch {
+                            if (ElysiumThemeRepository.save(scope, scopeTarget, draft)) {
+                                ElysiumThemeRepository.preview(null)
+                                onDismiss()
+                            } else {
+                                saveError = ElysiumThemeRepository.failure.value ?: "No se pudo guardar el tema. Inténtalo otra vez."
+                                saving = false
+                            }
+                        }
+                    }) { Text(if (saving) "Guardando…" else "Guardar alcance") }
                 }
             }
         }
@@ -391,11 +512,11 @@ private fun FakeNavItem(label: String, color: Color, isSelected: Boolean) {
             modifier = Modifier
                 .size(8.dp)
                 .clip(CircleShape)
-                .background(if (isSelected) color else Color(0xFF3D4E63))
+                .background(if (isSelected) color else MeetColors.textMuted)
         )
         Text(
             label,
-            color = if (isSelected) color else Color(0xFF3D4E63),
+            color = if (isSelected) color else MeetColors.textMuted,
             fontSize = 6.sp,
             fontWeight = FontWeight.Bold
         )

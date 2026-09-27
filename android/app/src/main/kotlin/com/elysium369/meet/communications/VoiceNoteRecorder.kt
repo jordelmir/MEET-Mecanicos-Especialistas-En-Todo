@@ -23,13 +23,14 @@ sealed interface VoiceNoteRecordingState {
     data class Failed(val safeCode: String) : VoiceNoteRecordingState
 }
 
-data class VoiceNoteDraft(val conversationId: String, val file: File, val durationMs: Long)
+data class VoiceNoteDraft(val conversationId: String, val file: File, val durationMs: Long, val ownerPrincipalId:String)
 
 /** Application-scoped recorder: destination disposal is not a stop command. */
 @Singleton
 class VoiceNoteRecorder @Inject constructor(
     @ApplicationContext private val context: Context,
     private val operationsRegistry: ActiveOperationsRegistry,
+    private val principalKernel:com.elysium369.meet.identity.ActivePrincipalKernel,
 ) {
     private val mutableState = MutableStateFlow<VoiceNoteRecordingState>(VoiceNoteRecordingState.Idle)
     val state: StateFlow<VoiceNoteRecordingState> = mutableState.asStateFlow()
@@ -37,11 +38,13 @@ class VoiceNoteRecorder @Inject constructor(
     private var outputFile: File? = null
     private var startedAtEpochMs: Long = 0L
     private var conversationId: String? = null
+    private var ownerPrincipalId:String?=null
 
     @Synchronized
     fun start(conversationId: String): Boolean {
         require(conversationId.isNotBlank())
         if (recorder != null) return true
+        val capturedOwner = principalKernel.current().id
         return runCatching {
             val directory = File(context.filesDir, "communication_voice_notes").apply { mkdirs() }
             val file = File(directory, "voice-${UUID.randomUUID()}.m4a")
@@ -52,15 +55,20 @@ class VoiceNoteRecorder @Inject constructor(
             next.setAudioSource(MediaRecorder.AudioSource.MIC)
             next.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             next.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            next.setAudioEncodingBitRate(96_000)
-            next.setAudioSamplingRate(44_100)
+            next.setAudioEncodingBitRate(24_000)
+            next.setAudioSamplingRate(16_000)
             next.setOutputFile(file.absolutePath)
             next.prepare()
             next.start()
+            if (principalKernel.current().id != capturedOwner) {
+                runCatching { next.stop() }; next.release(); file.delete()
+                return@runCatching false
+            }
             recorder = next
             outputFile = file
             startedAtEpochMs = System.currentTimeMillis()
             this.conversationId = conversationId
+            ownerPrincipalId=capturedOwner
             mutableState.value = VoiceNoteRecordingState.Recording(conversationId, startedAtEpochMs)
             operationsRegistry.upsert(
                 ActiveOperation(
@@ -88,6 +96,7 @@ class VoiceNoteRecorder @Inject constructor(
         val active = recorder ?: return null
         val file = outputFile
         val targetConversationId = conversationId
+        val targetOwner=ownerPrincipalId
         val duration = (System.currentTimeMillis() - startedAtEpochMs).coerceAtLeast(0L)
         return runCatching {
             active.stop()
@@ -97,9 +106,9 @@ class VoiceNoteRecorder @Inject constructor(
             conversationId = null
             mutableState.value = VoiceNoteRecordingState.Idle
             operationsRegistry.complete(OPERATION_ID)
-            if (targetConversationId == null) null else file
+            if (targetConversationId == null || targetOwner==null || principalKernel.current().id!=targetOwner) null else file
                 ?.takeIf { it.isFile && it.length() > 0L }
-                ?.let { VoiceNoteDraft(targetConversationId, it, duration) }
+                ?.let { VoiceNoteDraft(targetConversationId, it, duration,targetOwner) }
         }.getOrElse {
             release(deleteOutput = true)
             mutableState.value = VoiceNoteRecordingState.Failed("RECORDER_STOP_FAILED")
@@ -117,6 +126,7 @@ class VoiceNoteRecorder @Inject constructor(
         if (deleteOutput) runCatching { outputFile?.delete() }
         outputFile = null
         conversationId = null
+        ownerPrincipalId=null
         startedAtEpochMs = 0L
         mutableState.value = VoiceNoteRecordingState.Idle
         operationsRegistry.complete(OPERATION_ID)

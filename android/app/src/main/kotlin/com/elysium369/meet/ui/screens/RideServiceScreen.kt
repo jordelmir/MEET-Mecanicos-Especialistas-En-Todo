@@ -8,6 +8,9 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import com.elysium369.meet.core.agent.ui.AgentTextFieldRole
+import com.elysium369.meet.core.agent.ui.AgentUiControlId
+import com.elysium369.meet.core.agent.ui.agentTextInput
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -1412,7 +1415,7 @@ fun PassengerDashboard(
         Column(modifier = Modifier.fillMaxSize()) {
             TabRow(
                 selectedTabIndex = passengerModeTab,
-                containerColor = Color(0xFF0F172A),
+                containerColor = MeetColors.cardBackground,
                 contentColor = MeetColors.cyberCyan,
                 indicator = { tabPositions ->
                     val indicatorColor = when (passengerModeTab) {
@@ -2725,7 +2728,7 @@ fun PassengerDashboard(
                             contentAlignment = Alignment.Center,
                         ) {
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                                colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
                                 border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
                                 shape = RoundedCornerShape(20.dp),
                                 modifier = Modifier.fillMaxWidth(),
@@ -2963,7 +2966,7 @@ private fun RideFareModeSelector(
                 RideFareMode.entries.forEach { mode ->
                     val active = selected == mode
                     val accent = if (mode == RideFareMode.OPEN_BID) {
-                        Color(0xFFBE35FF)
+                        MeetColors.hotMagenta
                     } else {
                         MeetColors.neonGreen
                     }
@@ -3530,7 +3533,7 @@ fun DriverDashboard(
         Column(modifier = Modifier.fillMaxSize()) {
         TabRow(
             selectedTabIndex = driverModeTab,
-            containerColor = Color(0xFF0F172A),
+            containerColor = MeetColors.cardBackground,
             contentColor = MeetColors.cyberCyan,
             indicator = { tabPositions ->
                 val indicatorColor = when (driverModeTab) {
@@ -4017,7 +4020,7 @@ fun DriverDashboard(
                         contentAlignment = Alignment.Center,
                     ) {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                            colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
                             border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
                             shape = RoundedCornerShape(20.dp),
                             modifier = Modifier.fillMaxWidth(),
@@ -4505,7 +4508,7 @@ fun FleetKpiBox(
     accentColor: Color
 ) {
     Surface(
-        color = Color(0xFF0F172A),
+        color = MeetColors.cardBackground,
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
         modifier = modifier
@@ -4599,7 +4602,7 @@ fun FleetMogulUnitCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Surface(
-                color = Color(0xFF0F172A),
+                color = MeetColors.cardBackground,
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -9506,9 +9509,7 @@ private fun AuthoritativeRideCancellationDialog(
     val currentRequest = request
     LaunchedEffect(currentRequest?.serverState, currentRequest?.syncState, currentRequest?.status) {
         if (currentRequest == null ||
-            currentRequest.serverState in setOf("CANCELLED", "COMPLETED") ||
-            currentRequest.syncState == "LOCAL_CANCELLED" ||
-            currentRequest.status in setOf("CANCELLED", "COMPLETED")
+            com.elysium369.meet.ride.domain.RideAuthorityEvidence.isTerminalSnapshot(currentRequest.serverState,currentRequest.serverVersion)
         ) {
             delay(300L)
             onDismiss()

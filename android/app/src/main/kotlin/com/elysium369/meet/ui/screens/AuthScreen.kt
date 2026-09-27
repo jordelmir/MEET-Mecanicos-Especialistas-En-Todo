@@ -1,5 +1,7 @@
 package com.elysium369.meet.ui.screens
 
+import androidx.compose.material.icons.filled.Palette
+
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -40,6 +42,14 @@ fun AuthScreen(
     recoverySessionReady: Boolean = false,
     onRecoveryComplete: () -> Unit = {},
 ) {
+    var showVisualStudio by remember { mutableStateOf(false) }
+    if (showVisualStudio) {
+        com.elysium369.meet.ui.components.SystemThemeCustomizerDialog(
+            onDismiss = { showVisualStudio = false },
+            route = "auth",
+            initialScope = com.elysium369.meet.ui.elysium.theme.ThemeScope.ROUTE,
+        )
+    }
     val context = LocalContext.current
     var mode by remember(initialMode) { mutableStateOf(initialMode) }
     var email by remember { mutableStateOf("") }
@@ -262,22 +272,14 @@ fun AuthScreen(
                         .padding(22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(MeetColors.neonGreen.copy(alpha = 0.12f))
-                            .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.32f), CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        MeetSectionIcon(
-                            key = "scanner",
-                            contentDescription = "Elysium",
-                            tint = MeetColors.neonGreen,
-                            size = 38.dp,
-                            fallbackGlyph = "EV"
-                        )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        IconButton(onClick = { showVisualStudio = true }) {
+                            Icon(androidx.compose.material.icons.Icons.Default.Palette,
+                                contentDescription = "Personalizar esta pantalla", tint = MeetColors.secondary)
+                        }
                     }
+                    if(com.elysium369.meet.ui.home.LocalHomeExperience.current!=com.elysium369.meet.ui.home.HomeExperience.CLASSIC)
+                        com.elysium369.meet.ui.components.ElysiumBrandLogo(Modifier.size(112.dp), hero = true)
 
                     Spacer(modifier = Modifier.height(18.dp))
 
@@ -288,7 +290,7 @@ fun AuthScreen(
                         fontWeight = FontWeight.Black
                     )
                     Text(
-                        "Vanguard OBD2 Scanner",
+                        "Vanguard AI OS · OBD2 · Mobility",
                         color = MeetColors.cyberCyan.copy(alpha = 0.78f),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,

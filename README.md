@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Android-4.27.0%20%7C%20code%2061-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
-  <img src="https://img.shields.io/badge/Room-schema%2084-39FF14?style=flat-square" alt="Room schema" />
+  <img src="https://img.shields.io/badge/Android-4.28.0%20%7C%20code%2062-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
+  <img src="https://img.shields.io/badge/Room-schema%2086-39FF14?style=flat-square" alt="Room schema" />
   <img src="https://img.shields.io/badge/Architecture-offline--first-7F52FF?style=flat-square" alt="Offline first" />
 </p>
 
@@ -19,13 +19,19 @@ La regla del producto es simple: no se presenta una intención local, una
 estimación o un dato de demostración como un hecho físico o una confirmación
 del servidor.
 
-## Estado del código en este checkpoint
+## Estado del código en este checkpoint (Genesis Convergence)
 
-- **Android:** `versionName 4.27.0`, `versionCode 61`.
-- **Web/package:** `4.27.0`.
-- **Persistencia local:** Room schema `84`, con migración `MIGRATION_83_84` y esquema
-  `84.json` exportado en el repositorio (tabla `commerce_orders` para pedidos triangulares de pulperías,
-  sodas y comercios locales con estados de preparación, mensajero y PIN de entrega).
+- **Android:** `versionName 4.28.0`, `versionCode 62`.
+- **Contrato de versión del paquete:** `4.28.0` (sin cambios funcionales web en esta ronda).
+- **Elysium Vanguard Master Order Genesis:**
+  - **Infraestructura de Outbox en Producción:** `PostgresOutboxRepository` conectado en `Application.kt` con bloqueo a nivel de fila `FOR UPDATE SKIP LOCKED`, leases criptográficos atómicos y DLQ. Prohibición estricta de stubs en memoria fuera de tests.
+  - **EVAIR Living Companion & Instant Shift:** Acompañante vivo persistente con canal único de audio (`VoiceInteractionBus.default`), eliminando fugas `ERROR_RECOGNIZER_BUSY`. Teletransportación instantánea 3D al botón objetivo mediante comandos `"SECCIÓN <nombre>"` y `"SELECCIONA <nombre>"`, compresión cuántica (`0.18f`), pulso de iluminación y ejecución determinista.
+  - **Control Plane Semántico de UI:** Cobertura de controles interactivos instrumentados con `Modifier.agentAction` y `Modifier.agentTextInput`. Blindaje de campos confidenciales (`AgentUiSensitivity.SECRET` para PINs/claves) que deniegan inspección o inyección por voz.
+  - **Resolución de lugares:** el flujo nuevo de servicios no fabrica precios ni ubicaciones; las herramientas históricas todavía requieren auditoría independiente. Lugares no resolubles devuelven estrictamente `PlaceResolutionResult.NotFound`. Cotizaciones versionadas con TTL (`CR_METRO_V3_2026`).
+  - **Suite de Verdad & Release Gate:** `GoldenJourneyTruthSuite` (5 tests de verdad obligatorios) y `AgentUiCoverageReleaseGate` integrados; distinguir sus pruebas automatizadas de recorridos físicos y verificación de producción.
+  - **Paridad Cross-Runtime Parity:** Paridad byte-a-byte exacta de firmas SHA-256 entre TypeScript, Kotlin y PostgreSQL en `ci-verify.sh`.
+- **Persistencia local:** Room schema `86`, con cadena de migraciones incluida `MIGRATION_85_86` y esquemas exportados. Mensajes se aíslan por cuenta y conservan proyección y cola local.
+- **Servicios Elysium unificados:** ambas entradas históricas abren la misma experiencia cliente/proveedor con estados autorizados, métricas/calificaciones reales y comisión del 5% idempotente mediante saldo.
 - **Navegación 1-Click con Waze (`WazeNavigationButton`):**
   - Protocolo nativo `waze://?ll=lat,lng&navigate=yes` integrado en todas las tarjetas de servicios (viajes, misiones courier, rescate técnico y radar en vivo).
   - Fallback automático en cascada: Geo Intent (Google Maps / navegador vehicular) y Waze Live Map Web.
@@ -188,9 +194,9 @@ tools/                           Verificadores y utilidades de release
 
 ## Descarga y Releases
 
-- **Release v4.27.0 en GitHub:** [GitHub Release v4.27.0](https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/releases/tag/v4.27.0)
-- **Descarga Directa del APK (v4.27.0, build 61):** [app-debug.apk](https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/releases/download/v4.27.0/app-debug.apk)
-- **SHA-256:** `d7769a2fc547d603eaa9e5094cf9220b0f5b989b34e35d21c4b8362c5b208768`
+[**DESCARGAR ELYSIUM PARA ANDROID**](https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/releases/download/v4.28.0/elysium-v4.28.0-android.apk)
+
+Entrega 4.28.0 para pruebas internas. Consultar [release y SHA256SUMS](https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/releases/tag/v4.28.0) para comprobar publicación y archivos. La evidencia y límites de servicios/mensajes están en `android/docs/ascension/`.
 
 ## Límites de publicación
 

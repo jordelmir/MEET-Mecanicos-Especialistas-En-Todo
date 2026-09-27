@@ -1,0 +1,10 @@
+{
+  "artifact": "app-debug.apk",
+  "sha256": "a63973dfa735190915e1dfac76eefeef822d593cfcdfbea4ef6db8c38df71815",
+  "findings": [
+    "DEBUGGABLE_MANIFEST",
+    "EMBEDDED_PRIVATE_VALUE:MINIMAX_API_KEY_DEBUG",
+    "PRIVATE_PEM_REQUIRES_REVIEW"
+  ],
+  "scope": "Manifest and bounded secret scan of DEX, native libraries, assets and raw resources; not a complete security audit."
+}

@@ -5035,6 +5035,89 @@ object AppModule {
         }
     }
 
+    val MIGRATION_85_86 = object : Migration(85, 86) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE communication_events_v86 (
+                    eventId TEXT NOT NULL,
+                    conversationId TEXT NOT NULL,
+                    ownerPrincipalId TEXT NOT NULL,
+                    senderPrincipalId TEXT NOT NULL,
+                    senderDeviceId TEXT NOT NULL,
+                    eventType TEXT NOT NULL,
+                    localCiphertextBase64 TEXT NOT NULL,
+                    localNonceBase64 TEXT NOT NULL,
+                    remoteEnvelopeJson TEXT,
+                    replyToEventId TEXT,
+                    syncState TEXT NOT NULL,
+                    serverSequence INTEGER,
+                    createdAtEpochMs INTEGER NOT NULL,
+                    receivedAtEpochMs INTEGER,
+                    PRIMARY KEY(eventId, ownerPrincipalId),
+                    FOREIGN KEY(conversationId, ownerPrincipalId)
+                        REFERENCES communication_conversations(conversationId, ownerPrincipalId)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+            """.trimIndent())
+            db.execSQL("INSERT INTO communication_events_v86 SELECT * FROM communication_events")
+            db.execSQL("DROP TABLE communication_events")
+            db.execSQL("ALTER TABLE communication_events_v86 RENAME TO communication_events")
+            db.execSQL("CREATE INDEX index_communication_events_conversationId_ownerPrincipalId_createdAtEpochMs ON communication_events(conversationId,ownerPrincipalId,createdAtEpochMs)")
+            db.execSQL("CREATE INDEX index_communication_events_ownerPrincipalId_syncState ON communication_events(ownerPrincipalId,syncState)")
+            db.execSQL("CREATE UNIQUE INDEX index_communication_events_conversationId_ownerPrincipalId_serverSequence ON communication_events(conversationId,ownerPrincipalId,serverSequence)")
+            db.execSQL("CREATE INDEX index_communication_events_conversationId_ownerPrincipalId ON communication_events(conversationId,ownerPrincipalId)")
+        }
+    }
+
+    val MIGRATION_84_85 = object : Migration(84, 85) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `eaos_operation_cases` (
+                    `case_id` TEXT NOT NULL,
+                    `correlation_id` TEXT NOT NULL,
+                    `domain` TEXT NOT NULL,
+                    `severity` TEXT NOT NULL,
+                    `state` TEXT NOT NULL,
+                    `reconciliation_state` TEXT NOT NULL,
+                    `remediation_outcome` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `what_happened` TEXT NOT NULL,
+                    `what_automation_did` TEXT NOT NULL,
+                    `evidence_summary` TEXT NOT NULL,
+                    `what_remains_uncertain` TEXT NOT NULL,
+                    `requested_owner_action` TEXT NOT NULL,
+                    `consequence_of_inaction` TEXT NOT NULL,
+                    `observed_metric_json` TEXT,
+                    `evidence_snapshot_json` TEXT NOT NULL DEFAULT '{}',
+                    `money_exposure_minor` INTEGER,
+                    `money_exposure_currency` TEXT,
+                    `event_count` INTEGER NOT NULL DEFAULT 1,
+                    `occurred_at_epoch_ms` INTEGER NOT NULL,
+                    `resolved_at_epoch_ms` INTEGER,
+                    `resolution_reason` TEXT,
+                    PRIMARY KEY(`case_id`)
+                )
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `eaos_correlated_incidents` (
+                    `incident_id` TEXT NOT NULL,
+                    `correlation_key` TEXT NOT NULL,
+                    `domain` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `severity` TEXT NOT NULL,
+                    `event_count` INTEGER NOT NULL,
+                    `first_seen_epoch_ms` INTEGER NOT NULL,
+                    `last_seen_epoch_ms` INTEGER NOT NULL,
+                    `is_auto_remediated` INTEGER NOT NULL DEFAULT 0,
+                    `active_case_id` TEXT,
+                    PRIMARY KEY(`incident_id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_eaos_operation_cases_state` ON `eaos_operation_cases` (`state`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_eaos_correlated_incidents_key` ON `eaos_correlated_incidents` (`correlation_key`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -5106,6 +5189,8 @@ object AppModule {
             MIGRATION_81_82,
             MIGRATION_82_83,
             MIGRATION_83_84,
+            MIGRATION_84_85,
+            MIGRATION_85_86,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

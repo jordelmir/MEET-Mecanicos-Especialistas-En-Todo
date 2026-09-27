@@ -112,7 +112,7 @@ fun ElysiumAnimatedDialog(
                         shadowElevation = 24f
                         cameraDistance = 12f * density
                     },
-                colors = CardDefaults.cardColors(containerColor = Color(0xF00B1728)),
+                colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground.copy(alpha = 0.94f)),
                 shape = RoundedCornerShape(24.dp),
                 border = androidx.compose.foundation.BorderStroke(
                     1.5.dp,
@@ -426,7 +426,7 @@ fun ElysiumToastBar(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xF00D1B30),
+                containerColor = MeetColors.cardBackground.copy(alpha = 0.94f),
             ),
             shape = RoundedCornerShape(16.dp),
             border = androidx.compose.foundation.BorderStroke(

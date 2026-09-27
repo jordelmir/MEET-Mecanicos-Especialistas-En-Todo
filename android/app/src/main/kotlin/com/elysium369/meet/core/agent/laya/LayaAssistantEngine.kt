@@ -186,11 +186,11 @@ class LayaAssistantEngine(
     ): Pair<String, List<AssistantAction>> {
         // Priority 1: Emergency & Safety Intervention
         if (isEmergency) {
-            val text = "⚠️ PROTOCOLO DE EMERGENCIA ACTIVADO: Tu seguridad es la prioridad absoluta. " +
-                "Mantén la calma. Puedes presionar el botón de abajo para llamar de inmediato al 911 de Costa Rica " +
-                "o activar el monitoreo Guardian para emitir una alerta cifrada con tus coordenadas satelitales."
+            val text = "⚠️ POSIBLE EMERGENCIA: Tu seguridad es la prioridad. " +
+                "Si estás en peligro, llama al 911 de Costa Rica. Puedes abrir el Centro de Seguridad " +
+                "para revisar las opciones disponibles. No se ha realizado una llamada ni enviado una alerta o ubicación."
             val actions = listOf(
-                AssistantAction("action_911", "🚨 Llamar al 911", ActionType.SAFETY_CENTER),
+                AssistantAction("action_911", "🚨 Abrir opciones de emergencia", ActionType.SAFETY_CENTER),
                 AssistantAction("action_guardian", "🛡️ Abrir Centro de Seguridad", ActionType.SAFETY_CENTER),
                 AssistantAction("action_share", "📍 Compartir Ubicación", ActionType.SHARE_LOCATION),
             )

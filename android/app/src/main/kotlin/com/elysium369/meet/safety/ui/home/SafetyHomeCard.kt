@@ -71,7 +71,7 @@ fun SafetyHomeCard(
                             "ELYSIUM SEGURIDAD",
                             fontWeight = FontWeight.Black,
                             fontSize = 15.sp,
-                            color = Color.White,
+                            color = MeetColors.textPrimary,
                             letterSpacing = 1.sp,
                         )
                         Text(

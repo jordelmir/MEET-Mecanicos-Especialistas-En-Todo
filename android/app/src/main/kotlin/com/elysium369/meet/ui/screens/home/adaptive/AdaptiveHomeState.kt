@@ -51,7 +51,9 @@ enum class HomeSectionCategory(val title: String, val glyph: String) {
     SERVICES("SERVICIOS & RED DE ASISTENCIA", "🛠️"),
     TOOLS("HERRAMIENTAS AVANZADAS", "🔬"),
     PROFESSIONAL("ELYSIUM VANGUARD AI OS PRO & FLOTA", "👑"),
-    SAFETY("SEGURIDAD", "🛡️")
+    SAFETY("SEGURIDAD", "🛡️"),
+    AUDIO("AUDIO", "🎵"),
+    SUPREME_BASS("SUPREME BASS", "🔊")
 }
 
 data class HomeModuleItem(
