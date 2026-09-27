@@ -97,7 +97,7 @@ class AutonomousOperationsTest {
         // 3. Financial inquiry
         val noMoneyProblem = engine.answerOwnerQuery("¿Hay dinero descuadrado?", null)
         assertTrue(noMoneyProblem.contains("No se registran discrepancias no resueltas en los casos de operación analizados"))
-        assertFalse(noMoneyProblem.contains("100% conciliado"))
+        org.junit.Assert.assertFalse(noMoneyProblem.contains("100% conciliado"))
 
         engine.evaluateFinancialIntegrity(1, Money.ofCrc(12_500L))
         val moneyProblem = engine.answerOwnerQuery("¿Hay dinero descuadrado?", null)
