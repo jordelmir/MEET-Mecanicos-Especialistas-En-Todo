@@ -149,7 +149,8 @@ class LayaDeepIntelligenceTest {
 
         assertTrue(response.isEmergency)
         assertTrue(response.spokenAnswerEs.contains("911"))
-        assertTrue(response.spokenAnswerEs.contains("emergencia"))
+        assertTrue(response.spokenAnswerEs.contains("todavía no se ha realizado una llamada"))
+        assertTrue(response.spokenAnswerEs.contains("ni compartido tu ubicación"))
     }
 
     // ─── 4. VEHICLE EPISODIC MEMORY TESTS ───

@@ -66,15 +66,15 @@ class VanguardMeshEngineTest {
     }
 
     @Test
-    fun `send direct message to connected peer delivers immediately`() {
+    fun `connected peer presence cannot synthesize delivery acknowledgment`() {
         val engine = engine()
         engine.onPeerDiscovered(MeshPeer(
             "eph-bob", "fp-bob",
             connectionState = PeerConnectionState.DATA_CHANNEL,
         ))
         engine.sendDirectMessage("fp-bob", "encrypted-hello")
-        assertEquals(1, engine.meshStats().totalDelivered)
-        assertEquals(0, engine.meshStats().messagesInCustody)
+        assertEquals(0, engine.meshStats().totalDelivered)
+        assertEquals(1, engine.meshStats().messagesInCustody)
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -105,7 +105,8 @@ class VanguardMeshEngineTest {
         )
         val decision = engine.onRelayMessageReceived(msg)
         assertEquals(RelayDecision.ACCEPTED, decision)
-        assertEquals(1, engine.meshStats().totalRelayed)
+        assertEquals(0, engine.meshStats().totalRelayed)
+        assertEquals(1, engine.meshStats().messagesInCustody)
     }
 
     @Test

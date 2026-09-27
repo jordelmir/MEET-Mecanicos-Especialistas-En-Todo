@@ -85,7 +85,7 @@ class AutonomousOperationsTest {
     fun conversationalOwnerAgent_answersActionableQuestionsAccurately() {
         // 1. When operating completely cleanly
         val cleanAnswer = engine.answerOwnerQuery("¿Qué necesita mi atención?", null)
-        assertTrue(cleanAnswer.contains("Elysium opera con total normalidad autónoma"))
+        assertTrue(cleanAnswer.contains("Elysium opera con normalidad autónoma"))
 
         // 2. Introduce an SRE DLQ emergency
         engine.evaluateSreHealth(outboxLagSeconds = 10L, deadLetterCount = 1, apiAvailabilityPercent = 99.9)

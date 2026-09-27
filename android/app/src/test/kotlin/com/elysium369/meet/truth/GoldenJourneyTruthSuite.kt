@@ -221,6 +221,7 @@ class GoldenJourneyTruthSuite {
             snapshot = AgentUiControlSnapshot(
                 id = AgentUiControlId("security.boarding_pin"),
                 label = "PIN de abordaje secreto",
+                focused = true,
                 kind = AgentUiControlKind.TEXT_FIELD,
                 role = AgentTextFieldRole.SECRET,
                 sensitivity = AgentUiSensitivity.SECRET,
