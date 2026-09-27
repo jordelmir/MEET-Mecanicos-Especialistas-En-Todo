@@ -84,7 +84,12 @@ fun CommonMapPanel(
 
     var mapInstance by remember { mutableStateOf<MapLibreMap?>(null) }
     var mapViewInstance by remember { mutableStateOf<MapView?>(null) }
-    var lastRenderedState by remember { mutableStateOf<CommonMapState?>(null) }
+    val interaction = remember { MapInteractionPolicy() }
+    var gestureRevision by remember { mutableStateOf(0) }
+    var lastCameraKey: Any? by remember { mutableStateOf(null) }
+    val iconCache = remember { mutableMapOf<Pair<GeoMarkerRole, Boolean>, Icon>() }
+    val renderKey = state.visualKey()
+    val cameraKey = renderKey.cameraIntent to (renderKey.markers.map { it.point.latitude to it.point.longitude } to renderKey.routes.map { route -> route.points.map { it.latitude to it.longitude } })
 
     DisposableEffect(lifecycle, mapViewInstance) {
         val mapView = mapViewInstance ?: return@DisposableEffect onDispose {}
@@ -99,8 +104,15 @@ fun CommonMapPanel(
             }
         }
         lifecycle.addObserver(observer)
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) mapView.onStart()
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) mapView.onResume()
         onDispose {
             lifecycle.removeObserver(observer)
+            if (!mapView.isDestroyed) {
+                mapView.onPause()
+                mapView.onStop()
+                mapView.onDestroy()
+            }
         }
     }
 
@@ -110,9 +122,11 @@ fun CommonMapPanel(
             factory = { ctx ->
                 MapLibre.getInstance(ctx)
                 MapView(ctx).apply {
+                    onCreate(null)
                     mapViewInstance = this
                     getMapAsync { map ->
                         mapInstance = map
+                        bindSmoothMapGestures(this, map, interaction) { gestureRevision++ }
                         map.uiSettings.isScrollGesturesEnabled = true
                         map.uiSettings.isZoomGesturesEnabled = true
                         map.uiSettings.isRotateGesturesEnabled = true
@@ -128,18 +142,24 @@ fun CommonMapPanel(
                         }
                         map.setStyle(styleUrl) {
                             val current = latestState
-                            renderCommonMap(ctx, map, current, markerIds)
-                            lastRenderedState = current
+                            if (interaction.shouldRender(current.visualKey())) {
+                            renderCommonMap(ctx, map, current, markerIds, iconCache, moveCamera = !interaction.userOwnsCamera)
+                            interaction.rendered(current.visualKey())
+                            lastCameraKey = current.visualKey().cameraIntent to (current.markers.map { it.point.latitude to it.point.longitude } to current.routes.map { route -> route.points.map { it.latitude to it.longitude } })
+                            }
                             onMapReady?.invoke(map)
                         }
                     }
                 }
             },
             update = {
+                gestureRevision // Reconcile deferred projections once native inertia finishes.
                 mapInstance?.let { map ->
-                    if (map.style != null && lastRenderedState != state) {
-                        renderCommonMap(context, map, state, markerIds)
-                        lastRenderedState = state
+                    if (map.style != null && interaction.shouldRender(renderKey)) {
+                        val moveCamera = !interaction.userOwnsCamera && lastCameraKey != cameraKey
+                        renderCommonMap(context, map, state, markerIds, iconCache, moveCamera)
+                        interaction.rendered(renderKey)
+                        if (moveCamera) lastCameraKey = cameraKey
                     }
                 }
             }
@@ -148,6 +168,7 @@ fun CommonMapPanel(
         if (state.showRecenterButton) {
             FloatingActionButton(
                 onClick = {
+                    interaction.recenter()
                     onRecenterRequested?.invoke()
                     mapInstance?.let { map ->
                         val target = resolveCommonUserCoordinates(context, userLocation, state)
@@ -231,6 +252,8 @@ private fun renderCommonMap(
     map: MapLibreMap,
     state: CommonMapState,
     markerIds: MutableMap<Long, String>,
+    iconCache: MutableMap<Pair<GeoMarkerRole, Boolean>, Icon>,
+    moveCamera: Boolean,
 ) {
     markerIds.clear()
     map.clear()
@@ -261,7 +284,7 @@ private fun renderCommonMap(
 
     // Render Markers
     state.markers.forEach { marker ->
-        val icon = createCommonMarkerIcon(context, iconFactory, marker.role, marker.isHighlighted)
+        val icon = iconCache.getOrPut(marker.role to marker.isHighlighted) { createCommonMarkerIcon(context, iconFactory, marker.role, marker.isHighlighted) }
         val accuracyText = marker.point.accuracyMeters?.let { "±${it.toInt()}m" } ?: ""
         val renderedMarker = map.addMarker(
             MarkerOptions()
@@ -274,7 +297,7 @@ private fun renderCommonMap(
     }
 
     // Camera Positioning
-    when (val intent = state.cameraIntent) {
+    if (moveCamera) when (val intent = state.cameraIntent) {
         is MapCameraIntent.CenterOn -> {
             map.animateCamera(
                 CameraUpdateFactory.newLatLngZoom(
@@ -379,3 +402,12 @@ private fun createCommonMarkerIcon(
 
     return iconFactory.fromBitmap(bitmap)
 }
+
+private fun CommonMapState.visualKey(): CommonMapState = copy(
+    markers = markers.map { it.copy(point = it.point.copy(capturedAtEpochMs = 0)) },
+    routes = routes.map { it.copy(points = it.points.map { p -> p.copy(capturedAtEpochMs = 0) }) },
+    cameraIntent = when (val intent = cameraIntent) {
+        is MapCameraIntent.CenterOn -> intent.copy(point = intent.point.copy(capturedAtEpochMs = 0, accuracyMeters = null))
+        else -> intent
+    },
+)
