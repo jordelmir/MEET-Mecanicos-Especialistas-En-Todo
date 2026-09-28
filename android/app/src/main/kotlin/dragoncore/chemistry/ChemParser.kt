@@ -26,12 +26,14 @@ class ChemParser {
         var refinedFormula = formula
         while (matcherGroup.find()) {
             val content = matcherGroup.group(1)
-            val multiplier = matcherGroup.group(2).toInt()
+            val multiplier = matcherGroup.group(2)?.toIntOrNull() ?: continue
             val subCounts = parseFormula(content ?: "")
             subCounts.forEach { (el, count) ->
                 counts[el] = (counts[el] ?: 0) + (count * multiplier)
             }
-            refinedFormula = refinedFormula.replace(matcherGroup.group(0), "")
+            matcherGroup.group(0)?.let { matched ->
+                refinedFormula = refinedFormula.replace(matched, "")
+            }
         }
 
         // Luego procesamos elementos directos
