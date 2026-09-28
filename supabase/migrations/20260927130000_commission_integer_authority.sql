@@ -319,6 +319,6 @@ BEGIN
 
     RETURN v_response;
 END;
-$function$
+$function$;
 
 commit;
