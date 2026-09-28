@@ -73,8 +73,10 @@ fun UniversalActivityWorkflowScreen(
     viewModel: ObdViewModel,
     onNavigateBack: () -> Unit,
     onOpenMessages: () -> Unit = {},
+    onPrepareRequest: ((com.elysium369.meet.ui.screens.services.ServicesRequestDraft) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val openAuthoritativeServices = com.elysium369.meet.ui.screens.services.LocalServiceOnlineAction.current
     val principal by viewModel.activePrincipal.collectAsState()
     val clientId = principal?.id.orEmpty()
 
@@ -849,7 +851,7 @@ fun UniversalActivityWorkflowScreen(
                                 }
 
                                 Text(
-                                    text = "Protección Elysium Escrow: Tu pago permanece custodiado y solo se libera cuando confirmes la entrega satisfactoria.",
+                                    text = "La publicación y el cierre se confirman en línea. La custodia de fondos requiere comprobación del servidor; este formulario no confirma un pago.",
                                     color = MeetColors.textMuted,
                                     fontSize = 10.sp,
                                 )
@@ -887,22 +889,17 @@ fun UniversalActivityWorkflowScreen(
                                             emptyList()
                                         }
 
-                                        viewModel.createServiceRequest(
-                                            vehicleId = "$UNIVERSAL_PREFIX$clientId",
-                                            problem = title,
-                                            description = taskDescription.ifBlank { "Solicitud de servicio estándar para ${service.name}." },
-                                            location = serviceLocationAddress.ifBlank { "${servicePoint?.latitude ?: 0.0},${servicePoint?.longitude ?: 0.0}" },
-                                            priority = if (urgency == "URGENTE") "HIGH" else "MEDIUM",
-                                            latitude = servicePoint?.latitude ?: 0.0,
-                                            longitude = servicePoint?.longitude ?: 0.0,
-                                            priceOffer = price,
-                                            serviceCategory = service.domain,
-                                            serviceMetadata = metadata,
-                                            dtcCodes = relevantDtcs,
-                                        )
-
-                                        viewModel.voiceFeedbackManager.guideHardwareAndTradesStatus("REQUEST_PUBLISHED", materialName = service.name)
-                                        Toast.makeText(context, "Solicitud de ${service.name} publicada en el radar de especialistas.", Toast.LENGTH_LONG).show()
+                                        if (onPrepareRequest != null) {
+                                            onPrepareRequest(com.elysium369.meet.ui.screens.services.ServicesRequestDraft(
+                                                definitionId = service.id, title = title,
+                                                description = taskDescription.ifBlank { "Solicitud de servicio para ${service.name}." } + "\n" + metadata,
+                                                location = serviceLocationAddress.ifBlank { servicePoint?.let { "${it.latitude},${it.longitude}" }.orEmpty() },
+                                                priceCrc = price.toLong(), modality = selectedModality.name,
+                                                latitude = servicePoint?.latitude, longitude = servicePoint?.longitude,
+                                            ))
+                                        } else {
+                                            Toast.makeText(context, "Abre Servicios en línea para publicar y confirmar con el servidor.", Toast.LENGTH_LONG).show()
+                                        }
                                         taskDescription = ""
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
@@ -911,7 +908,7 @@ fun UniversalActivityWorkflowScreen(
                                     enabled = (offerPriceText.toDoubleOrNull() ?: 0.0) > 0,
                                 ) {
                                     Text(
-                                        text = "🚀 PUBLICAR SOLICITUD DE ${service.name.take(20).uppercase()}",
+                                        text = "CONTINUAR SOLICITUD DE ${service.name.take(20).uppercase()}",
                                         color = Color.Black,
                                         fontWeight = FontWeight.Black,
                                         fontSize = 13.sp,
@@ -986,7 +983,10 @@ private fun UniversalActivityAdminPanel(
     profiles: List<com.elysium369.meet.data.local.entities.ProviderProfileEntity>,
     context: Context,
 ) {
-    val myProfile = profiles.firstOrNull { it.isActive && it.userId == viewModel.activePrincipal.value?.id }
+    val openAuthoritativeServices = com.elysium369.meet.ui.screens.services.LocalServiceOnlineAction.current
+    val prepareOffer = com.elysium369.meet.ui.screens.services.LocalServiceOfferDraft.current
+    val activePrincipal by viewModel.activePrincipal.collectAsState()
+    val myProfile = profiles.firstOrNull { it.isActive && it.userId == activePrincipal?.id }
     val specialistId = myProfile?.profileId ?: "elysium_${service.id}"
     var isOnline by remember { mutableStateOf(true) }
     var showEditProfileDialog by remember { mutableStateOf(false) }
@@ -1207,17 +1207,8 @@ private fun UniversalActivityAdminPanel(
                     providerPhone = myProfile?.phone.orEmpty(),
                     providerId = myProfile?.profileId,
                     onSendBid = { price, hours, warranty, message ->
-                        viewModel.placeServiceBid(
-                            requestId = request.requestId,
-                            price = price,
-                            estimatedHours = hours,
-                            warrantyDays = warranty,
-                            message = message,
-                            providerPhone = myProfile?.phone.orEmpty(),
-                            providerName = myProfile?.businessName.orEmpty().ifBlank { "Especialista ${service.adminRoleName}" },
-                            providerId = myProfile?.profileId,
-                        )
-                        Toast.makeText(context, "Cotización de ₡${price.toInt()} enviada al cliente.", Toast.LENGTH_SHORT).show()
+                        prepareOffer(com.elysium369.meet.ui.screens.services.ServicesOfferDraft(price.toLong(),hours,warranty,message))
+                        openAuthoritativeServices("Cotización histórica preparada: ₡$price · $hours horas · garantía $warranty días · $message. Envíala desde una solicitud en línea; todavía no se ha publicado ni cobrado saldo.")
                     },
                 )
             }
@@ -1290,6 +1281,7 @@ private fun ProviderActivityBidCard(
     onSendBid: (price: Double, hours: Double, warrantyDays: Int, note: String) -> Unit,
 ) {
     val context = LocalContext.current
+    val openAuthoritativeServices = com.elysium369.meet.ui.screens.services.LocalServiceOnlineAction.current
     var bidPriceText by remember(request.requestId) {
         mutableStateOf(request.priceOffer.toLong().toString())
     }
@@ -1409,6 +1401,7 @@ private fun ActivityClientRequestCard(
     request: ServiceRequestEntity,
     context: Context,
 ) {
+    val openAuthoritativeServices = com.elysium369.meet.ui.screens.services.LocalServiceOnlineAction.current
     val bids by viewModel.getBidsForRequest(request.requestId).collectAsState(initial = emptyList())
     val materialBids = bids.filter { it.shopName.contains("Ferreter", true) || it.message.contains("material", true) || it.message.contains("tubo", true) }
     val laborBids = bids.filter { it.shopName.contains("Plomer", true) || it.shopName.contains("Electr", true) || it.shopName.contains("Instal", true) || it.message.contains("mano de obra", true) || it.message.contains("colocar", true) }
@@ -1459,7 +1452,7 @@ private fun ActivityClientRequestCard(
                     Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("⭐ COMBO LLAVE EN MANO (Material + Instalador)", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 11.sp)
-                            Text("-5% Ahorro", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                            Text("Descuento propuesto", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                         }
                         Text("• Ferretería: ${bestMaterial.shopName} (₡${String.format("%,.0f", bestMaterial.price)})", color = Color.White, fontSize = 10.sp)
                         Text("• Especialista: ${bestLabor.shopName} (₡${String.format("%,.0f", bestLabor.price)})", color = Color.White, fontSize = 10.sp)
@@ -1467,12 +1460,8 @@ private fun ActivityClientRequestCard(
                             Text("Total Combo: ₡${String.format("%,.0f", comboPrice)}", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 13.sp)
                             Button(
                                 onClick = {
-                                    viewModel.acceptBid(request.requestId, bestMaterial.bidId, context)
-                                    viewModel.acceptBid(request.requestId, bestLabor.bidId, context)
-                                    viewModel.voiceFeedbackManager.speak(
-                                        es = "Combo llave en mano aceptado con ferretería e instalador.",
-                                        en = "Turnkey combo accepted.",
-                                    )
+                                    openAuthoritativeServices("El combo de materiales e instalación requiere dos órdenes autorizadas por servidor. Ninguna oferta ha sido aceptada todavía.")
+
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black),
                                 shape = RoundedCornerShape(8.dp),
@@ -1508,11 +1497,8 @@ private fun ActivityClientRequestCard(
                             if (request.status == "OPEN") {
                                 Button(
                                     onClick = {
-                                        viewModel.acceptBid(request.requestId, bid.bidId, context)
-                                        viewModel.voiceFeedbackManager.speak(
-                                            es = "Oferta de ${bid.shopName} aceptada.",
-                                            en = "Offer accepted.",
-                                        )
+                                        openAuthoritativeServices("Oferta histórica pendiente de confirmación del servidor. No se ha asignado el servicio.")
+
                                     },
                                     shape = RoundedCornerShape(8.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.electricBlue),

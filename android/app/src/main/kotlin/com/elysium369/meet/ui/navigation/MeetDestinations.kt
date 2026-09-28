@@ -63,6 +63,8 @@ object MeetDestinations {
     const val SERVICES_COMPLETED = "services_completed"
     const val PROVIDER_SERVICES_CONFIG = "provider_services_config"
     const val AGENT_STORE = "agent_store"
+    const val DRAGON_CALC = "dragon_calc"
+    const val NEXUS_CONTROL = "elysium_nexxus_control"
 
     // SUPREME BASS (Neon Integration)
     const val SUPREME_BASS = "supreme_bass"

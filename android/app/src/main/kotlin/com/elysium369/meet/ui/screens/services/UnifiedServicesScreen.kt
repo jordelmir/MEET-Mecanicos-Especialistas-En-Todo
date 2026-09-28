@@ -23,13 +23,13 @@ import com.elysium369.meet.core.agent.ui.*
 
 @Serializable private data class ServiceDefinitionWire(val id:String,val domain:String,@SerialName("display_name") val name:String,@SerialName("supported_modalities") val modalities:List<String>)
 @Serializable private data class ServiceRequestWire(val id:String,@SerialName("client_id") val client:String,@SerialName("assigned_provider_id") val provider:String?=null,@SerialName("service_definition_id") val definition:String,val modality:String,val title:String,val description:String,@SerialName("location_label") val location:String?=null,@SerialName("offered_price_minor") val price:Long,@SerialName("final_price_minor") val finalPrice:Long?=null,val currency:String,val state:String,val version:Long)
-@Serializable private data class ServiceOfferWire(val id:String,@SerialName("request_id") val request:String,@SerialName("provider_id") val provider:String,@SerialName("price_minor") val price:Long,val currency:String,val state:String)
+@Serializable private data class ServiceOfferWire(val id:String,@SerialName("request_id") val request:String,@SerialName("provider_id") val provider:String,@SerialName("price_minor") val price:Long,val currency:String,val state:String,@SerialName("eta_minutes") val etaMinutes:Int?=null,@SerialName("warranty_days") val warrantyDays:Int=0,val scope:JsonObject=buildJsonObject {})
 @Serializable private data class ProviderSummary(@SerialName("provider_id") val providerId:String?=null,val name:String?=null,val completed:Long=0,val reviews:Long=0,val rating:Double?=null,@SerialName("balance_minor") val balance:Long?=null,val eligible:Boolean=false)
 
 /** Both historical entry points share this server-authoritative client/provider experience. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:()->Unit,onProviderConfig:()->Unit,onAdvanced:()->Unit,onServiceMessages:(String)->Unit) {
+fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:()->Unit,onProviderConfig:()->Unit,onAdvanced:()->Unit,onServiceMessages:(String)->Unit,requestDraft:ServicesRequestDraft?=null,onDraftConsumed:()->Unit={},offerDraft:ServicesOfferDraft?=null,onOfferDraftConsumed:()->Unit={}) {
  val principal by viewModel.activePrincipal.collectAsState()
  val actor=principal?.id
  val scope=rememberCoroutineScope()
@@ -51,6 +51,10 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
  var location by remember(actor) { mutableStateOf("") }
  var price by remember(actor) { mutableStateOf("") }
  var modality by remember(actor) { mutableStateOf("") }
+ var offerHours by remember(actor) { mutableStateOf("1") }
+ var warrantyDays by remember(actor) { mutableStateOf("0") }
+ var offerNote by remember(actor) { mutableStateOf("") }
+ var requestIntake by remember(actor) { mutableStateOf<JsonObject>(buildJsonObject {}) }
  var transferAmount by remember(actor) { mutableStateOf("") }
  var transferId by remember(actor) { mutableStateOf(UUID.randomUUID().toString()) }
  var draftId by remember(actor) { mutableStateOf(UUID.randomUUID().toString()) }
@@ -93,6 +97,19 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
  fun transition(request:ServiceRequestWire,command:String,offer:String?=null)=action {
   client.postgrest.rpc("universal_service_transition_v1",buildJsonObject { put("p_request_id",request.id);put("p_action",command);if(offer!=null)put("p_offer_id",offer) })
  }
+ LaunchedEffect(offerDraft) {
+  offerDraft?.let { providerMode=true;price=it.priceCrc.toString();offerHours=it.hours.toString();warrantyDays=it.warrantyDays.toString();offerNote=it.note }
+ }
+ LaunchedEffect(requestDraft,definitions) {
+  val draft=requestDraft ?: return@LaunchedEffect
+  if(definitions.isEmpty()) return@LaunchedEffect
+  val definition=definitions.firstOrNull { it.id==draft.definitionId }
+  if(definition==null) { error="Este servicio todavía no está habilitado en el catálogo del servidor. Tu formulario no se ha publicado.";return@LaunchedEffect }
+  providerMode=false;selectedDefinition=definition;title=draft.title;description=draft.description;location=draft.location
+  price=draft.priceCrc.toString();modality=draft.modality.takeIf { it in definition.modalities } ?: definition.modalities.firstOrNull().orEmpty()
+  requestIntake=buildJsonObject { put("detailed_specification",draft.description);draft.latitude?.let {put("latitude",it)};draft.longitude?.let {put("longitude",it)} }
+  draftId=UUID.randomUUID().toString();onDraftConsumed()
+ }
  LaunchedEffect(actor,pages) {
   while(true) { try { refresh() } catch(c:CancellationException) { throw c } catch(_:Exception) { error="Servicios en línea no disponibles. Inicia sesión y vuelve a intentar." };delay(10000) }
  }
@@ -108,13 +125,8 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
      Text("${summary.completed} trabajos completados · ${summary.reviews} calificaciones")
      Text(summary.rating?.let { "Calificación: %.1f / 5".format(it) } ?: "Aún sin calificaciones")
      Text(summary.balance?.let { "Saldo: ₡$it CRC" } ?: "Saldo aún no habilitado")
-     OutlinedTextField(transferAmount,{transferAmount=it},label={Text("Pasar saldo aprobado a servicios (CRC)")})
-     Button(enabled=!busy && summary.eligible && (transferAmount.toLongOrNull() ?: 0)>0,onClick={action {
-      client.postgrest.rpc("universal_service_wallet_transfer_v1",buildJsonObject {put("p_transfer_id",transferId);put("p_amount_minor",requireNotNull(transferAmount.toLongOrNull()))})
-      transferId=UUID.randomUUID().toString();transferAmount=""
-     }}){Text("Transferir mi saldo aprobado")}
-     Text("Primero solicita la recarga SINPE y espera su aprobación. La transferencia mueve saldo; no lo duplica.")
-     Text("Comisión constitucional: 5% del precio acordado, cobrada una vez al aceptar la oferta.")
+     Text("Tu cuenta de comisiones es compartida por todos los servicios. Recarga mediante SINPE y espera la validación del comprobante.")
+     Text("Comisión constitucional: 5% del precio acordado: se reserva al aceptar y se cobra una vez al completar el servicio.")
      OutlinedButton(onClick=onProviderConfig){Text("Mi perfil y configuración")}
     } else Text("Compara propuestas. El proveedor inicia el trabajo y tú confirmas su finalización.")
     error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
@@ -132,14 +144,15 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
      Text(r.title,style=MaterialTheme.typography.titleMedium);Text(r.description);r.location?.let { Text(it) }
      Text("${r.finalPrice ?: r.price} ${r.currency} · ${r.state}")
      if(r.provider!=null && actor in listOf(r.client,r.provider)) TextButton(onClick={onServiceMessages(r.id)}){Text("Mensajes de este servicio")}
-     if(providerMode && r.state=="OPEN" && summary.eligible) Button(onClick={bidTarget=r;price=""},enabled=!busy){Text("Enviar propuesta")}
+     if(providerMode && r.state=="OPEN" && summary.eligible) Button(onClick={bidTarget=r;if(offerDraft==null) {price="";offerHours="1";warrantyDays="0";offerNote=""}},enabled=!busy){Text("Enviar propuesta")}
      if(r.client==actor && r.state=="OPEN") {
       offers.filter { it.request==r.id && it.state=="PENDING" }.forEach { offer ->
        val publicProfile=providerSummaries[offer.provider]
        Text(publicProfile?.name ?: "Proveedor sin perfil público disponible")
        Text(publicProfile?.let { "${it.completed} trabajos · ${it.reviews} calificaciones" } ?: "Métricas no disponibles")
        Text(publicProfile?.rating?.let { "★ %.1f / 5".format(it) } ?: "Aún sin calificaciones")
-       Text("Propuesta: ${offer.price} ${offer.currency}")
+       Text("Propuesta: ${offer.price} ${offer.currency} · ${offer.etaMinutes?.let { "$it min" } ?: "Duración no capturada"} · Garantía ${offer.warrantyDays} días")
+       offer.scope["note"]?.jsonPrimitive?.contentOrNull?.let { Text(it) }
        Button(modifier=Modifier.serviceAction("accept.${offer.id}","Aceptar propuesta",!busy,AgentUiSensitivity.FINANCIAL){transition(r,"ACCEPT",offer.id)},onClick={transition(r,"ACCEPT",offer.id)},enabled=!busy){Text("Aceptar propuesta")}
       }
       TextButton(modifier=Modifier.serviceAction("cancel.${r.id}","Cancelar solicitud",!busy){transition(r,"CANCEL")},onClick={transition(r,"CANCEL")},enabled=!busy){Text("Cancelar solicitud")}
@@ -164,21 +177,37 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
    OutlinedTextField(price,{price=it},modifier=Modifier.agentTextInput(AgentUiControlId("services.price"),"Presupuesto",readValue={price},writeValue={price=it},route="elysium_services"),label={Text("Presupuesto en CRC (colones enteros)")})
    d.modalities.forEach { option -> FilterChip(selected=modality==option,onClick={modality=option},label={Text(option)}) }
   }},dismissButton={TextButton(onClick={selectedDefinition=null},enabled=!busy){Text("Volver")}},confirmButton={Button(enabled=!busy && title.trim().length in 3..160 && description.trim().length in 10..5000 && (price.toLongOrNull() ?: 0)>0 && location.isNotBlank(),onClick={action {
-   try { client.postgrest["universal_service_requests"].insert(buildJsonObject { put("id",draftId);put("client_id",requireNotNull(actor));put("service_definition_id",d.id);put("modality",modality);put("title",title.trim());put("description",description.trim());put("location_label",location.trim());put("offered_price_minor",requireNotNull(price.toLongOrNull()));put("currency","CRC") }) } catch(c:CancellationException) { throw c } catch(e:Exception) {
+   try { client.postgrest["universal_service_requests"].insert(buildJsonObject { put("id",draftId);put("client_id",requireNotNull(actor));put("service_definition_id",d.id);put("modality",modality);put("title",title.trim());put("description",description.trim());put("intake",requestIntake);put("location_label",location.trim());put("offered_price_minor",requireNotNull(price.toLongOrNull()));put("currency","CRC") }) } catch(c:CancellationException) { throw c } catch(e:Exception) {
     val existing=client.postgrest["universal_service_requests"].select { filter {eq("id",draftId);eq("client_id",requireNotNull(actor))} }.decodeList<ServiceRequestWire>().singleOrNull()
     if(existing==null || existing.definition!=d.id || existing.modality!=modality || existing.title!=title.trim() || existing.description!=description.trim() || existing.location!=location.trim() || existing.price!=price.toLongOrNull() || existing.currency!="CRC") throw e
    }
    selectedDefinition=null;title="";description="";location="";price=""
   }}){Text("Publicar solicitud")}})
  }
- bidTarget?.let { r -> AlertDialog(onDismissRequest={if(!busy)bidTarget=null},title={Text("Propuesta para ${r.title}")},text={OutlinedTextField(price,{price=it},modifier=Modifier.agentTextInput(AgentUiControlId("services.price"),"Presupuesto",readValue={price},writeValue={price=it},route="elysium_services"),label={Text("Precio en ${r.currency}")})},dismissButton={TextButton(onClick={bidTarget=null},enabled=!busy){Text("Volver")}},confirmButton={Button(enabled=!busy && (price.toLongOrNull() ?: 0)>0,onClick={action {
-  try { client.postgrest["universal_service_offers"].insert(buildJsonObject {put("request_id",r.id);put("provider_id",requireNotNull(actor));put("price_minor",requireNotNull(price.toLongOrNull()));put("currency",r.currency) }) }
+ bidTarget?.let { r -> AlertDialog(onDismissRequest={if(!busy)bidTarget=null},title={Text("Propuesta para ${r.title}")},text={Column { OutlinedTextField(price,{price=it},modifier=Modifier.agentTextInput(AgentUiControlId("services.price"),"Presupuesto",readValue={price},writeValue={price=it},route="elysium_services"),label={Text("Precio en ${r.currency}")})
+ OutlinedTextField(offerHours,{offerHours=it},label={Text("Duración estimada en horas")})
+ OutlinedTextField(warrantyDays,{warrantyDays=it},label={Text("Garantía en días")})
+ OutlinedTextField(offerNote,{offerNote=it},label={Text("Alcance, materiales y nota")})
+ }},dismissButton={TextButton(onClick={bidTarget=null},enabled=!busy){Text("Volver")}},confirmButton={Button(enabled=!busy && (price.toLongOrNull() ?: 0)>0 && (offerHours.toDoubleOrNull()?.takeIf { it.isFinite() } ?: -1.0) in 0.0..720.0 && (warrantyDays.toIntOrNull() ?: -1) in 0..3650,onClick={action {
+  try { client.postgrest["universal_service_offers"].insert(servicesOfferPayload(r.id,requireNotNull(actor),requireNotNull(price.toLongOrNull()),r.currency,requireNotNull(offerHours.toDoubleOrNull()),requireNotNull(warrantyDays.toIntOrNull()),offerNote)) }
   catch(c:CancellationException) { throw c } catch(e:Exception) {
    val existing=client.postgrest["universal_service_offers"].select {filter {eq("request_id",r.id);eq("provider_id",requireNotNull(actor))}}.decodeList<ServiceOfferWire>().singleOrNull()
-   if(existing==null || existing.price!=price.toLongOrNull() || existing.currency!=r.currency) throw e
-  };bidTarget=null
+   if(existing==null || existing.price!=price.toLongOrNull() || existing.currency!=r.currency || existing.etaMinutes!=(offerHours.toDoubleOrNull()?.times(60)?.toInt()) || existing.warrantyDays!=warrantyDays.toIntOrNull() || existing.scope["note"]?.jsonPrimitive?.contentOrNull!=offerNote.trim()) throw e
+  };bidTarget=null;onOfferDraftConsumed()
  }}){Text("Enviar propuesta")}}) }
 }
 
 private fun Modifier.serviceAction(id:String,label:String,enabled:Boolean=true,sensitivity:AgentUiSensitivity=AgentUiSensitivity.NORMAL,action:()->Unit):Modifier =
  agentAction(AgentUiControlId("services.$id"),label,route="elysium_services",enabled=enabled,sensitivity=sensitivity,onActivate=action)
+
+/** Payload validation is shared with the offer form; authority and charging remain on the server. */
+internal fun servicesOfferPayload(request:String,provider:String,price:Long,currency:String,hours:Double,warranty:Int,note:String):JsonObject {
+ require(request.isNotBlank() && provider.isNotBlank())
+ require(price>0 && hours.isFinite() && hours in 0.0..720.0 && warranty in 0..3650)
+ require(currency.matches(Regex("[A-Z]{3}")) && note.length<=5000)
+ return buildJsonObject {
+  put("request_id",request);put("provider_id",provider);put("price_minor",price);put("currency",currency)
+  put("eta_minutes",(hours*60).toInt());put("warranty_days",warranty)
+  put("scope",buildJsonObject {put("note",note.trim())})
+ }
+}

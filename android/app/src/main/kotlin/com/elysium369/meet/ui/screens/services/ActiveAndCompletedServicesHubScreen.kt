@@ -73,6 +73,7 @@ fun ActiveAndCompletedServicesHubScreen(
     navController: NavController,
     viewModel: ObdViewModel,
     initialTab: Int = 0,
+    includeRides: Boolean = true,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -82,7 +83,8 @@ fun ActiveAndCompletedServicesHubScreen(
     var selectedCategoryFilter by rememberSaveable { mutableStateOf("TODOS") }
 
     // Reactivos de Viajes
-    val userRides by viewModel.rideRequests.collectAsState(initial = emptyList())
+    val allUserRides by viewModel.rideRequests.collectAsState(initial = emptyList())
+    val userRides = if (includeRides) allUserRides else emptyList()
     val activeRideRequest by viewModel.activeRideRequest.collectAsState(initial = null)
     val openRideRequests by viewModel.openRideRequests.collectAsState(initial = emptyList())
     val isDriverMode by viewModel.rideDriverMode.collectAsState(initial = false)
@@ -121,7 +123,7 @@ fun ActiveAndCompletedServicesHubScreen(
                             letterSpacing = 0.5.sp,
                         )
                         Text(
-                            text = if (isProviderMode) "Modo Prestador (Chofer / Repartidor / Comercio)" else "Modo Cliente (Mis Solicitudes y Pedidos)",
+                            text = if (isProviderMode) "Modo Prestador (Profesional / Repartidor / Comercio)" else "Modo Cliente (Mis Solicitudes y Pedidos)",
                             fontSize = 11.sp,
                             color = if (isProviderMode) MeetColors.neonGreen else MeetColors.cyberCyan,
                         )
@@ -134,7 +136,7 @@ fun ActiveAndCompletedServicesHubScreen(
                 },
                 actions = {
                     // Botón para limpiar viajes trabados de emergencia
-                    IconButton(onClick = {
+                    if (includeRides) IconButton(onClick = {
                         viewModel.clearAllStuckRides()
                         Toast.makeText(context, "Viajes pendientes limpiados", Toast.LENGTH_SHORT).show()
                     }) {
@@ -304,7 +306,7 @@ fun ActiveAndCompletedServicesHubScreen(
                         "RIDES" to "🚗 Viajes",
                         "COMMERCE" to "🏪 Pulperías & Sodas",
                         "TECHNICAL" to "🔧 Mecánica & Grúas"
-                    )
+                    ).filter { includeRides || it.first != "RIDES" }
                     items(filterOptions) { (key, label) ->
                         FilterChip(
                             selected = selectedCategoryFilter == key,
@@ -329,8 +331,8 @@ fun ActiveAndCompletedServicesHubScreen(
                         isProviderMode = isProviderMode,
                         filter = selectedCategoryFilter,
                         userRides = userRides,
-                        activeRide = activeRideRequest,
-                        openRides = openRideRequests,
+                        activeRide = if (includeRides) activeRideRequest else null,
+                        openRides = if (includeRides) openRideRequests else emptyList(),
                         serviceRequests = serviceRequests,
                         activeCommerceOrders = activeCommerceOrders,
                         courierMissions = courierMissions,

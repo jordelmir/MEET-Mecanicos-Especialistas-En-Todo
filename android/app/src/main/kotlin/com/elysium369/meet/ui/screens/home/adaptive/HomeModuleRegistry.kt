@@ -61,6 +61,8 @@ object HomeModuleRegistry {
         map[HomeSectionCategory.TOOLS]?.addAll(
             listOf(
                 HomeModuleItem("ai_copilot", "IA Especialista", "Diagnóstico guiado por inteligencia", MeetDestinations.AI, HomeSectionCategory.TOOLS, "ai", isHighlight = true),
+                HomeModuleItem("dragon_calc", "DragonCalc Elysium", "Calculadora científica y simbólica", MeetDestinations.DRAGON_CALC, HomeSectionCategory.TOOLS, "dragon_calc", isHighlight = true),
+                HomeModuleItem("nexxus_control", "Elysium Nexxus Control", "Control de dispositivos, IR y Bluetooth", MeetDestinations.NEXUS_CONTROL, HomeSectionCategory.TOOLS, "nexxus_control", isHighlight = true),
                 HomeModuleItem("engine_3d", "Motor 3D Interactivo", "Visor tridimensional de componentes", MeetDestinations.ENGINE_3D, HomeSectionCategory.TOOLS, "engine_3d"),
                 HomeModuleItem("hud", "Modo HUD", "Proyección en parabrisas", MeetDestinations.HUD, HomeSectionCategory.TOOLS, "hud"),
                 HomeModuleItem("protocol", "Protocolos", "Detección y parámetros de bus", MeetDestinations.PROTOCOL_LEARNING, HomeSectionCategory.TOOLS, "protocol_learning"),

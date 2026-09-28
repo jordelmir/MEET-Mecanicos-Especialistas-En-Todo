@@ -844,14 +844,17 @@ fun SpecialistWalletCard(
                             letterSpacing = 0.5.sp,
                         )
                         Text(
-                            text = "₡${String.format("%,.0f", walletState.balanceCrc)}",
+                            text = "₡${String.format("%,d", walletState.balanceCrc)}",
                             color = accentColor,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = (-0.5).sp,
                         )
+                        walletState.promotionalAvailableCrc?.let { Text("Promocional para comisiones: ₡$it", fontSize = 10.sp) }
+                        walletState.fundedAvailableCrc?.let { Text("Recargas disponibles: ₡$it", fontSize = 10.sp) }
+                        walletState.reservedCrc?.let { Text("Reservado en servicios: ₡$it", fontSize = 10.sp) }
                         Text(
-                            text = "100% disponible para operar y respaldar servicios",
+                            text = "Saldo disponible para respaldar comisiones; requiere confirmación del servidor",
                             color = MeetColors.textMuted,
                             fontSize = 8.sp,
                         )
@@ -868,13 +871,13 @@ fun SpecialistWalletCard(
                                 horizontalAlignment = Alignment.End,
                             ) {
                                 Text(
-                                    text = "REGALO BIENVENIDA",
+                                    text = "CRÉDITO INICIAL ELEGIBLE",
                                     color = MeetColors.cyberCyan,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Black,
                                 )
                                 Text(
-                                    text = "₡15,000 REGALADOS",
+                                    text = "₡5.000 · una sola vez",
                                     color = Color.White,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Black,
@@ -883,7 +886,7 @@ fun SpecialistWalletCard(
                         }
 
                         Text(
-                            text = "Por Jorge Del Valle / Elysium",
+                            text = "Solo para comisiones · requiere validación",
                             color = MeetColors.textMuted,
                             fontSize = 8.sp,
                         )
@@ -1033,7 +1036,7 @@ fun SpecialistWalletCard(
                             ) {
                                 Column {
                                     Text(
-                                        text = "₡${String.format("%,.0f", topup.amountCrc)} · Ref: ${topup.referenceNumber}",
+                                        text = "₡${String.format("%,d", topup.amountCrc)} · Ref: ${topup.referenceNumber}",
                                         color = Color.White,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
@@ -1069,7 +1072,7 @@ fun SpecialistSinpeTopupDialog(
     specialistId: String,
     serviceVertical: String,
     onDismiss: () -> Unit,
-    onTopupSubmitted: (amountCrc: Double, reference: String) -> Unit = { _, _ -> },
+    onTopupSubmitted: (amountCrc: Long, reference: String) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -1300,13 +1303,13 @@ fun SpecialistSinpeTopupDialog(
             }
         },
         confirmButton = {
-            val amountNum = amountInput.toDoubleOrNull() ?: 0.0
+            val amountNum = amountInput.toLongOrNull() ?: 0L
             Button(
                 onClick = {
                     if (amountNum > 0) {
                         isSubmitting = true
                         coroutineScope.launch {
-                            SpecialistWalletStore.submitTopup(
+                            val submitted = SpecialistWalletStore.submitTopup(
                                 context = context,
                                 specialistId = specialistId,
                                 serviceVertical = serviceVertical,
@@ -1319,14 +1322,14 @@ fun SpecialistSinpeTopupDialog(
                             onTopupSubmitted(amountNum, detectedRef)
                             android.widget.Toast.makeText(
                                 context,
-                                "Recarga de ₡${String.format("%,.0f", amountNum)} enviada a revisión en Trust Center.",
+                                if (submitted.status == "PENDING_REVIEW") "Comprobante recibido por el servidor; pendiente de validación." else "Comprobante guardado en este dispositivo; envío al servidor pendiente.",
                                 android.widget.Toast.LENGTH_LONG,
                             ).show()
                             onDismiss()
                         }
                     }
                 },
-                enabled = !isSubmitting && (amountInput.toDoubleOrNull() ?: 0.0) > 0,
+                enabled = !isSubmitting && (amountInput.toLongOrNull() ?: 0L) > 0,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MeetColors.neonGreen,
                     contentColor = Color.Black,

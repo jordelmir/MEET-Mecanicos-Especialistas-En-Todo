@@ -1,6 +1,11 @@
 package com.elysium369.meet.core.wallet
 
 import android.content.Context
+import com.elysium369.meet.data.remote.SupabaseModule
+import io.github.jan.supabase.gotrue.auth
+import com.elysium369.meet.ride.domain.AmountMinor
+import com.elysium369.meet.ride.domain.BasisPoints
+import com.elysium369.meet.ride.domain.CommissionCalculator
 import androidx.core.content.edit
 import com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway
 import com.elysium369.meet.ride.data.remote.RideWalletTopup
@@ -9,6 +14,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
@@ -32,7 +38,7 @@ data class SpecialistTopup(
     val id: String,
     val specialistId: String,
     val serviceVertical: String,
-    val amountCrc: Double,
+    val amountCrc: Long,
     val referenceNumber: String,
     val senderPhoneOrName: String? = null,
     val proofLocalPath: String? = null,
@@ -45,30 +51,53 @@ data class SpecialistTopup(
 data class SpecialistWalletState(
     val specialistId: String,
     val serviceVertical: String,
-    val balanceCrc: Double = 0.0,
-    val starterGiftCrc: Double = 0.0,
-    val commissionPercent: Double = 0.0,
-    val totalEarningsCrc: Double = 0.0,
-    val totalCommissionsPaidCrc: Double = 0.0,
+    val balanceCrc: Long = 0,
+    val starterGiftCrc: Long = 0,
+    val promotionalAvailableCrc: Long? = null,
+    val fundedAvailableCrc: Long? = null,
+    val reservedCrc: Long? = null,
+    val commissionPercent: Int = 5,
+    val totalEarningsCrc: Long = 0,
+    val totalCommissionsPaidCrc: Long = 0,
     val completedJobsCount: Int = 0,
     val topups: List<SpecialistTopup> = emptyList(),
 )
 
 data class JobCommissionSplit(
-    val grossCrc: Double,
-    val commissionRate: Double = 0.0,
-    val platformFeeCrc: Double = grossCrc * commissionRate,
-    val specialistNetCrc: Double = grossCrc - platformFeeCrc,
-)
+    val grossCrc: Long,
+    val commissionBasisPoints: Int = 500,
+) {
+    val platformFeeCrc: Long = CommissionCalculator.calculate(
+        AmountMinor.of(grossCrc), BasisPoints.of(commissionBasisPoints),
+    ).value
+    val specialistNetCrc: Long = Math.subtractExact(grossCrc, platformFeeCrc)
+}
 
 object SpecialistWalletStore {
     const val SINPE_PHONE = "63194029"
     const val SINPE_RECIPIENT_NAME = "Jorge David Del Valle Miranda"
     const val SINPE_EMAIL = "jordelmir@gmail.com"
 
+    private fun ownerNamespace(): String = SupabaseModule.client.auth.currentUserOrNull()?.id ?: "GUEST"
+
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = false }
     private val memoryFlows = mutableMapOf<String, MutableStateFlow<SpecialistWalletState>>()
     private val scope = CoroutineScope(Dispatchers.IO)
+
+    init {
+        scope.launch {
+            SupabaseModule.client.auth.sessionStatus.collect {
+                val owner = ownerNamespace()
+                synchronized(memoryFlows) {
+                    memoryFlows.forEach { (key, flow) ->
+                        if (!key.startsWith("${owner}_")) {
+                            flow.value = SpecialistWalletState(flow.value.specialistId, flow.value.serviceVertical)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Get or create a reactive StateFlow for a specialist wallet.
@@ -78,7 +107,7 @@ object SpecialistWalletStore {
         specialistId: String,
         serviceVertical: String = "ALL",
     ): StateFlow<SpecialistWalletState> {
-        val key = "${specialistId}_$serviceVertical"
+        val key = "${ownerNamespace()}_${specialistId}_$serviceVertical"
         synchronized(memoryFlows) {
             return memoryFlows.getOrPut(key) {
                 val initialState = loadState(context, specialistId, serviceVertical)
@@ -91,21 +120,25 @@ object SpecialistWalletStore {
      * Synchronize the local projection with the authoritative Supabase ledger.
      */
     fun syncWithTrustCenter(context: Context, specialistId: String, serviceVertical: String = "ALL") {
+        val owner = ownerNamespace()
+        if (owner == "GUEST") return
         scope.launch {
             runCatching {
+                check(ownerNamespace() == owner)
                 PlatformTrustCenterGateway.ensureStarterCredit()
                 val remoteBal = PlatformTrustCenterGateway.walletBalance()
                 val remoteTopups = PlatformTrustCenterGateway.loadOwnWalletTopups()
+                check(ownerNamespace() == owner)
 
                 val current = getWalletFlow(context, specialistId, serviceVertical).value
-                val combinedBalance = remoteBal.availableMinor.toDouble()
+                val combinedBalance = remoteBal.availableMinor
 
                 val mappedRemoteTopups = remoteTopups.map { rt ->
                     SpecialistTopup(
                         id = rt.id,
                         specialistId = specialistId,
                         serviceVertical = serviceVertical,
-                        amountCrc = rt.amountMinor.toDouble(),
+                        amountCrc = rt.amountMinor,
                         referenceNumber = rt.transferReference ?: "SINPE-${rt.id.take(8)}",
                         senderPhoneOrName = rt.senderPhone,
                         status = rt.status,
@@ -121,8 +154,12 @@ object SpecialistWalletStore {
                     context,
                     current.copy(
                         balanceCrc = combinedBalance,
+                        promotionalAvailableCrc = remoteBal.promotionalAvailableMinor,
+                        fundedAvailableCrc = remoteBal.fundedAvailableMinor,
+                        reservedCrc = remoteBal.reservedMinor,
                         topups = mergedTopups,
-                    )
+                    ),
+                    expectedOwner = owner,
                 )
             }
         }
@@ -135,11 +172,14 @@ object SpecialistWalletStore {
         context: Context,
         specialistId: String,
         serviceVertical: String,
-        amountCrc: Double,
+        amountCrc: Long,
         referenceNumber: String,
         senderPhoneOrName: String?,
         proofFile: File?,
     ): SpecialistTopup {
+        require(amountCrc > 0) { "INVALID_AMOUNT" }
+        val owner = ownerNamespace()
+        check(owner != "GUEST") { "AUTH_REQUIRED" }
         val topupId = UUID.randomUUID().toString()
         val topup = SpecialistTopup(
             id = topupId,
@@ -149,30 +189,44 @@ object SpecialistWalletStore {
             referenceNumber = referenceNumber.ifBlank { "SINPE-${System.currentTimeMillis().toString().takeLast(6)}" },
             senderPhoneOrName = senderPhoneOrName,
             proofLocalPath = proofFile?.absolutePath,
-            status = "PENDING_REVIEW",
+            status = "QUEUED_LOCAL",
             submittedAtEpochMs = System.currentTimeMillis(),
         )
 
         // 1. Persist in local specialist wallet
         val current = getWalletFlow(context, specialistId, serviceVertical).value
         val updatedTopups = listOf(topup) + current.topups.filterNot { it.id == topup.id }
-        updateState(context, current.copy(topups = updatedTopups))
+        updateState(context, current.copy(topups = updatedTopups), expectedOwner = owner)
 
         // 2. Also record into global pending topups queue for Trust Center review
-        recordInGlobalTrustQueue(context, topup)
+        recordInGlobalTrustQueue(context, topup, owner)
 
-        // 3. Attempt Supabase upload if available
+        // A receipt becomes pending server review only after an authenticated ACK.
         if (proofFile != null && proofFile.exists()) {
-            runCatching {
+            val remoteId = runCatching {
+                check(ownerNamespace() == owner)
                 PlatformTrustCenterGateway.submitWalletTopup(
                     localProof = proofFile.absolutePath,
-                    amountMinor = amountCrc.toLong(),
+                    amountMinor = amountCrc,
                     senderPhone = senderPhoneOrName,
                     transferReference = referenceNumber,
                 )
+            }.getOrNull()
+            if (remoteId != null && ownerNamespace() == owner) {
+                val confirmed = topup.copy(id = remoteId, status = "PENDING_REVIEW")
+                val latest = getWalletFlow(context, specialistId, serviceVertical).value
+                updateState(context, latest.copy(topups = listOf(confirmed) + latest.topups.filterNot { it.id in setOf(topupId, remoteId) }), expectedOwner = owner)
+                synchronized(memoryFlows) {
+                    check(ownerNamespace() == owner) { "ACCOUNT_CHANGED" }
+                    saveGlobalTopups(
+                        context,
+                        listOf(confirmed) + getAllGlobalTopups(context, owner).filterNot { it.id in setOf(topupId, remoteId) },
+                        owner,
+                    )
+                }
+                return confirmed
             }
         }
-
         return topup
     }
 
@@ -184,7 +238,7 @@ object SpecialistWalletStore {
         context: Context,
         specialistId: String,
         serviceVertical: String,
-        grossCrc: Double,
+        grossCrc: Long,
     ): JobCommissionSplit {
         val split = JobCommissionSplit(grossCrc = grossCrc)
         return split
@@ -199,35 +253,19 @@ object SpecialistWalletStore {
         approved: Boolean,
         decisionReason: String,
     ) {
-        val pendingList = getAllGlobalTopups(context)
-        val target = pendingList.firstOrNull { it.id == topupId } ?: return
-
-        val newStatus = if (approved) "APPROVED" else "REJECTED"
-        val updatedTarget = target.copy(
-            status = newStatus,
-            decisionReason = decisionReason,
-        )
-
-        // Update in global queue
-        val updatedGlobal = pendingList.map { if (it.id == topupId) updatedTarget else it }
-        saveGlobalTopups(context, updatedGlobal)
-
-        // Update in specific specialist wallet
-        val specWallet = getWalletFlow(context, target.specialistId, target.serviceVertical).value
-        val updatedTopups = specWallet.topups.map { if (it.id == topupId) updatedTarget else it }
-        updateState(
-            context,
-            specWallet.copy(
-                topups = updatedTopups,
-            )
-        )
+        error("SERVER_RECONCILIATION_REQUIRED")
     }
 
     /**
      * Retrieve all topups across all specialists for Trust Center display.
      */
     fun getAllGlobalTopups(context: Context): List<SpecialistTopup> {
-        val prefs = context.getSharedPreferences("meet_trust_center_global_topups", Context.MODE_PRIVATE)
+        return getAllGlobalTopups(context, ownerNamespace())
+    }
+
+    private fun getAllGlobalTopups(context: Context, expectedOwner: String): List<SpecialistTopup> {
+        check(ownerNamespace() == expectedOwner) { "ACCOUNT_CHANGED" }
+        val prefs = context.getSharedPreferences("meet_trust_center_topups_v2_$expectedOwner", Context.MODE_PRIVATE)
         val raw = prefs.getString("topups_json", null) ?: return emptyList()
         return runCatching { json.decodeFromString<List<SpecialistTopup>>(raw) }.getOrDefault(emptyList())
     }
@@ -241,7 +279,7 @@ object SpecialistWalletStore {
             RideWalletTopup(
                 id = st.id,
                 driverId = "${st.serviceVertical}:${st.specialistId}",
-                amountMinor = st.amountCrc.toLong(),
+                amountMinor = st.amountCrc,
                 currency = "CRC",
                 senderPhone = st.senderPhoneOrName,
                 transferReference = st.referenceNumber,
@@ -254,7 +292,7 @@ object SpecialistWalletStore {
     }
 
     private fun loadState(context: Context, specialistId: String, serviceVertical: String): SpecialistWalletState {
-        val prefs = context.getSharedPreferences("elysium_wallet_${specialistId}_$serviceVertical", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("elysium_wallet_v2_${ownerNamespace()}_${specialistId}_$serviceVertical", Context.MODE_PRIVATE)
         val raw = prefs.getString("wallet_json", null)
         if (raw != null) {
             val parsed = runCatching { json.decodeFromString<SpecialistWalletState>(raw) }.getOrNull()
@@ -269,27 +307,32 @@ object SpecialistWalletStore {
         )
     }
 
-    private fun updateState(context: Context, state: SpecialistWalletState) {
-        val key = "${state.specialistId}_${state.serviceVertical}"
+    private fun updateState(context: Context, state: SpecialistWalletState, expectedOwner: String = ownerNamespace()) {
+        check(ownerNamespace() == expectedOwner) { "ACCOUNT_CHANGED" }
+        val key = "${expectedOwner}_${state.specialistId}_${state.serviceVertical}"
         synchronized(memoryFlows) {
             val flow = memoryFlows.getOrPut(key) { MutableStateFlow(state) }
             flow.value = state
         }
-        val prefs = context.getSharedPreferences("elysium_wallet_${state.specialistId}_${state.serviceVertical}", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("elysium_wallet_v2_${expectedOwner}_${state.specialistId}_${state.serviceVertical}", Context.MODE_PRIVATE)
         prefs.edit {
             putString("wallet_json", json.encodeToString(state))
         }
     }
 
-    private fun recordInGlobalTrustQueue(context: Context, topup: SpecialistTopup) {
-        val existing = getAllGlobalTopups(context)
-        val updated = (listOf(topup) + existing.filterNot { it.id == topup.id })
-            .sortedByDescending { it.submittedAtEpochMs }
-        saveGlobalTopups(context, updated)
+    private fun recordInGlobalTrustQueue(context: Context, topup: SpecialistTopup, expectedOwner: String) {
+        synchronized(memoryFlows) {
+            check(ownerNamespace() == expectedOwner) { "ACCOUNT_CHANGED" }
+            val existing = getAllGlobalTopups(context, expectedOwner)
+            val updated = (listOf(topup) + existing.filterNot { it.id == topup.id })
+                .sortedByDescending { it.submittedAtEpochMs }
+            saveGlobalTopups(context, updated, expectedOwner)
+        }
     }
 
-    private fun saveGlobalTopups(context: Context, list: List<SpecialistTopup>) {
-        val prefs = context.getSharedPreferences("meet_trust_center_global_topups", Context.MODE_PRIVATE)
+    private fun saveGlobalTopups(context: Context, list: List<SpecialistTopup>, expectedOwner: String) {
+        check(ownerNamespace() == expectedOwner) { "ACCOUNT_CHANGED" }
+        val prefs = context.getSharedPreferences("meet_trust_center_topups_v2_$expectedOwner", Context.MODE_PRIVATE)
         prefs.edit {
             putString("topups_json", json.encodeToString(list))
         }

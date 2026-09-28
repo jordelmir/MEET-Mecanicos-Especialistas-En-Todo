@@ -1419,7 +1419,7 @@ class ObdViewModel @Inject constructor(
                 deliveryFeeMinor = deliveryFeeMinor,
                 totalAmountMinor = total,
                 paymentMethod = paymentMethod,
-                paymentStatus = if (paymentMethod == "SINPE") "ESCROW_HELD" else "PENDING",
+                paymentStatus = "PENDING", // A selected payment method is not confirmed funds.
                 deliveryPin = pin,
                 status = "PLACED",
                 createdAt = System.currentTimeMillis()

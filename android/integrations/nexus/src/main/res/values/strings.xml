@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Bilingual strings: English + Spanish per project convention.
+      The Spanish translation lives in res/values-es/strings.xml.
+    -->
+    <string name="app_name">Elysium Nexus</string>
+
+    <!--
+      Phase 1.2 — Editor toolbar.
+      These strings are the labels on the buttons of the editor's
+      top toolbar. They are bilingual; the same key in
+      res/values-es/strings.xml carries the Spanish translation.
+    -->
+    <string name="editor_add_button">Add button</string>
+    <string name="editor_add_stick">Add stick</string>
+    <string name="editor_add_trigger">Add trigger</string>
+    <string name="editor_save">Save</string>
+    <string name="editor_reset">Reset</string>
+    <string name="editor_undo">Undo</string>
+    <string name="editor_redo">Redo</string>
+    <string name="editor_opacity">Opacity</string>
+    <string name="editor_new_profile">New profile</string>
+    <string name="editor_delete_profile">Delete</string>
+    <string name="editor_align_left">Align L</string>
+    <string name="editor_align_right">Align R</string>
+    <string name="editor_align_top">Align T</string>
+    <string name="editor_align_bottom">Align B</string>
+    <string name="editor_distribute_horizontally">Dist H</string>
+    <string name="editor_distribute_vertically">Dist V</string>
+    <string name="delete_profile_confirm_title">Delete profile?</string>
+    <string name="delete_profile_confirm_message">The controls of this profile will be removed. This action cannot be undone.</string>
+    <string name="delete_profile_confirm_ok">Delete</string>
+    <string name="delete_profile_confirm_cancel">Cancel</string>
+    <string name="editor_neutralize">Neutralize (§38)</string>
+    <string name="editor_diag_seq">seq</string>
+    <string name="editor_diag_touches">touches</string>
+    <string name="editor_title">Elysium Nexus</string>
+    <string name="editor_saved">Saved</string>
+    <string name="editor_added_control">Added %1$s</string>
+    <!--
+      Phase 1.17 — Profile share intent. The
+      "Share" chip on the editor toolbar opens
+      the Android share sheet with the current
+      profile as a JSON document. The chooser
+      title is what the share sheet displays at
+      the top of the picker.
+    -->
+    <string name="editor_share_profile">Share</string>
+    <string name="share_profile_chooser_title">Share profile</string>
+    <string name="share_profile_failed">Share failed</string>
+    <!--
+      Phase 1.18 — Settings dialog. The dialog
+      has three sections (Sticks / Axis inversion /
+      Haptics) and two actions (Close / Reset to
+      defaults).
+    -->
+    <string name="editor_settings">Settings</string>
+    <string name="editor_import_profile">Import</string>
+    <string name="import_profile_paste_hint">Paste a profile JSON document below.</string>
+    <string name="import_profile_placeholder">{ "schemaVersion": 1, … }</string>
+    <string name="import_profile_button">Import</string>
+    <string name="editor_duplicate_profile">Duplicate</string>
+    <string name="editor_rename_profile">Rename</string>
+    <string name="rename_profile_hint">Enter a new name for this profile.</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_sticks">Sticks</string>
+    <string name="settings_left_stick_sensitivity">Left stick sensitivity</string>
+    <string name="settings_right_stick_sensitivity">Right stick sensitivity</string>
+    <string name="settings_section_inversion">Axis inversion</string>
+    <string name="settings_invert_left_x">Invert left X</string>
+    <string name="settings_invert_left_y">Invert left Y</string>
+    <string name="settings_invert_right_x">Invert right X</string>
+    <string name="settings_invert_right_y">Invert right Y</string>
+    <string name="settings_section_haptics">Haptics</string>
+    <string name="settings_haptics_enabled">Haptic feedback</string>
+    <string name="settings_close">Close</string>
+    <string name="settings_reset">Reset</string>
+    <!--
+      Phase ULT.2 — Visual overhaul. New
+      hero / section labels.
+    -->
+    <string name="hero_eyebrow">Elysium Nexus</string>
+    <string name="hero_subtitle_default">%1$d controls · profile %2$d · engine %3$d</string>
+    <string name="section_profiles">Profiles</string>
+    <string name="section_transport">Transport</string>
+    <string name="section_controls">Controls</string>
+    <string name="empty_state_title">No controls yet</string>
+    <string name="empty_state_body">Tap + to add your first button, stick, or trigger.</string>
+    <string name="empty_state_cta">Add control</string>
+    <string name="fab_add_content_description">Add control</string>
+</resources>

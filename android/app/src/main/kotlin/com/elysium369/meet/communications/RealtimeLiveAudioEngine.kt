@@ -76,11 +76,14 @@ class RealtimeLiveAudioEngine @Inject constructor(
     private val isRecording = AtomicBoolean(false)
     private val isPlaying = AtomicBoolean(false)
     private val isMuted = AtomicBoolean(false)
+    private val droppedPlaybackFrames = java.util.concurrent.atomic.AtomicLong(0)
+    fun droppedPlaybackFrames(): Long = droppedPlaybackFrames.get()
 
     @SuppressLint("MissingPermission")
     @Synchronized
     fun start(
         scope: CoroutineScope,
+        useEarpiece: Boolean = false,
         onAudioChunk: (ByteArray) -> Unit,
     ): Boolean {
         if (isRecording.get()) return false
@@ -129,7 +132,7 @@ class RealtimeLiveAudioEngine @Inject constructor(
                 SAMPLE_RATE,
                 CHANNEL_CONFIG_OUT,
                 AUDIO_FORMAT,
-            ).coerceAtLeast(CHUNK_SIZE * 4)
+            ).coerceAtLeast(CHUNK_SIZE * 10)
 
             val track = AudioTrack.Builder()
                 .setAudioAttributes(
@@ -161,7 +164,7 @@ class RealtimeLiveAudioEngine @Inject constructor(
 
             // Configure audio routing for speaker / earpiece call
             audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-            setSpeakerEnabled(false)
+            check(setSpeakerEnabled(!useEarpiece)) { "CALL_AUDIO_ROUTE_UNAVAILABLE" }
 
             track.play()
             isPlaying.set(true)
@@ -197,7 +200,8 @@ class RealtimeLiveAudioEngine @Inject constructor(
         val track = audioTrack ?: return
         if (!isPlaying.get()) return
         runCatching {
-            track.write(chunk, 0, chunk.size)
+            val accepted = track.write(chunk, 0, chunk.size, AudioTrack.WRITE_NON_BLOCKING)
+            if (accepted != chunk.size) droppedPlaybackFrames.incrementAndGet()
         }.onFailure { error ->
             Log.w(TAG, "Error writing audio chunk to AudioTrack", error)
         }

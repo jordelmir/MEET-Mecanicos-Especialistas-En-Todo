@@ -165,7 +165,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
         }
     }
     val speakerEnabled: StateFlow<Boolean> = audioEngine.speakerEnabled
-    fun setSpeakerEnabled(enabled:Boolean):Boolean = audioEngine.setSpeakerEnabled(enabled)
+    fun setSpeakerEnabled(enabled:Boolean):Boolean = !legacyMode.value && mutableState.value==CallConnectionState.ACTIVE && owner==SupabaseModule.client.auth.currentUserOrNull()?.id && audioEngine.setSpeakerEnabled(enabled)
     suspend fun answer(accept:Boolean):Boolean = mutex.withLock {
         val request=mutableIncoming.value ?: return@withLock false
         val principal=owner ?: return@withLock false
@@ -201,6 +201,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
             val chunks=Channel<ByteArray>(10,BufferOverflow.DROP_OLDEST)
             val playback=Channel<ByteArray>(2,BufferOverflow.DROP_OLDEST)
             val sequence=AtomicLong(0)
+            val sendMutex=Mutex()
             var lastPeerSequence=0L
             val lastPeerAt=AtomicLong(android.os.SystemClock.elapsedRealtime())
             try {
@@ -224,7 +225,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
                 android.util.Log.i("ElysiumCall", "CALL_MEDIA_CHANNEL_READY")
                 synchronized(this@ElysiumCallTransport) {
                     check(mediaGeneration==generation && owner==principal && SupabaseModule.client.auth.currentUserOrNull()?.id==principal)
-                    check(audioEngine.start(this) { chunk -> chunks.trySend(chunk.copyOf()) })
+                    check(audioEngine.start(this, useEarpiece = true) { chunk -> chunks.trySend(chunk.copyOf()) })
                     audioStarted=true;startedHere=true
                 }
                 launch {
@@ -233,14 +234,14 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
                         if(mediaGeneration!=generation || owner!=principal || mutableState.value!=CallConnectionState.ACTIVE) { batch.reset();continue }
                         batch.write(chunk)
                         if(batch.size()>=6400) {
-                            channel.broadcast("media",crypto.encrypt(call.id,principal,sequence.incrementAndGet(),"AUDIO",batch.toByteArray().copyOfRange(0,6400)))
+                            sendMutex.withLock { channel.broadcast("media",crypto.encrypt(call.id,principal,sequence.incrementAndGet(),"AUDIO",batch.toByteArray().copyOfRange(0,6400))) }
                             val buffered=batch.toByteArray()
                             batch.reset();batch.write(buffered,6400,buffered.size-6400)
                         }
                     }
                 }
                 while(isActive && mediaGeneration==generation && owner==principal) {
-                    channel.broadcast("media",crypto.encrypt(call.id,principal,sequence.incrementAndGet(),"HELLO",byteArrayOf()))
+                    sendMutex.withLock { channel.broadcast("media",crypto.encrypt(call.id,principal,sequence.incrementAndGet(),"HELLO",byteArrayOf())) }
                     check(android.os.SystemClock.elapsedRealtime()-lastPeerAt.get()<20_000L)
                     delay(1000)
                 }
@@ -248,16 +249,16 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
             } catch(c:CancellationException) {
                 if (c !is TimeoutCancellationException) throw c
                 synchronized(this@ElysiumCallTransport) {
-                    if(mediaGeneration==generation && owner==principal) { mutableState.value=CallConnectionState.FAILED;activeCall=null }
+                    if(mediaGeneration==generation && owner==principal) { mutableState.value=CallConnectionState.FAILED;activeCall=null;closeMedia() }
                 }
-                withContext(NonCancellable) { runCatching { rpc("communication_end_call_v1",call.id) } }
+                cleanupCallResources({}) { rpc("communication_end_call_v1",call.id) }
             }
             catch(failure:Exception) {
                 android.util.Log.w("ElysiumCall", "CALL_MEDIA_CONNECTION_FAILED_${failure.javaClass.simpleName}")
                 synchronized(this@ElysiumCallTransport) {
-                    if(mediaGeneration==generation && owner==principal) { mutableState.value=CallConnectionState.FAILED;activeCall=null }
+                    if(mediaGeneration==generation && owner==principal) { mutableState.value=CallConnectionState.FAILED;activeCall=null;closeMedia() }
                 }
-                runCatching { rpc("communication_end_call_v1",call.id) }
+                cleanupCallResources({}) { rpc("communication_end_call_v1",call.id) }
             } finally {
                 chunks.close()
                 playback.close()
@@ -268,7 +269,7 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
                         if(foregroundCallId==call.id) { foregroundCallId=null;context.stopService(Intent(context,CommunicationCallForegroundService::class.java)) }
                     }
                 }
-                withContext(NonCancellable) { runCatching { channel.unsubscribe() } }
+                cleanupCallResources({}) { channel.unsubscribe() }
             }
         }
     }

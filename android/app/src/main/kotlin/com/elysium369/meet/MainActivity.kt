@@ -1111,44 +1111,35 @@ fun MeetApp(
                     onBack = { navController.backOrHome() }
                 )
             }
-            composable("universal_services") {
-                com.elysium369.meet.ui.screens.services.UnifiedServicesScreen(
-                    viewModel = obdViewModel,
-                    onBack = { navController.backOrHome() },
-                    onOpenMessages = { navController.navigate("messages?serviceVertical=universal") },
-                    onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
-                    onAdvanced = { navController.safeNavigate("services_marketplace_advanced") },
-                    onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
-                )
-            }
-            composable("elysium_services") {
-                com.elysium369.meet.ui.screens.services.UnifiedServicesScreen(
-                    viewModel = obdViewModel,
-                    onBack = { navController.backOrHome() },
-                    onOpenMessages = { navController.navigate("messages?serviceVertical=universal") },
-                    onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
-                    onAdvanced = { navController.safeNavigate("services_marketplace_advanced") },
-                    onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
-                )
-            }
-            composable("services_marketplace_advanced") {
-                com.elysium369.meet.ui.screens.services.ElysiumServicesMarketplaceScreen(
-                    navController = navController,
-                    viewModel = obdViewModel
-                )
+            for ((servicesRoute, initialPane) in listOf("universal_services" to 0, "elysium_services" to 0,
+                "services_online" to 1, "services_marketplace_advanced" to 2)) {
+                composable(servicesRoute) {
+                    com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                        navController = navController, viewModel = obdViewModel,
+                        onBack = { navController.backOrHome() },
+                        onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                        onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                        onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                        onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                        onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                        initialPane = initialPane,
+                    )
+                }
             }
             composable(MeetDestinations.SERVICES_ACTIVE) {
                 com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
                     navController = navController,
                     viewModel = obdViewModel,
-                    initialTab = 0
+                    initialTab = 0,
+                    includeRides = false
                 )
             }
             composable(MeetDestinations.SERVICES_COMPLETED) {
                 com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
                     navController = navController,
                     viewModel = obdViewModel,
-                    initialTab = 1
+                    initialTab = 1,
+                    includeRides = false
                 )
             }
             composable(
@@ -1165,7 +1156,8 @@ fun MeetApp(
                 com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
                     navController = navController,
                     viewModel = obdViewModel,
-                    initialTab = initialTab
+                    initialTab = initialTab,
+                    includeRides = false
                 )
             }
             composable(MeetDestinations.PROVIDER_SERVICES_CONFIG) {
@@ -1812,6 +1804,16 @@ fun MeetApp(
             }
             composable(MeetDestinations.SUPREME_BASS) {
                 com.elysium369.meet.audio.supreme.SupremeBassScreen(onBack = { navController.popBackStack() })
+            }
+            composable(MeetDestinations.DRAGON_CALC) {
+                com.elysium369.meet.ui.screens.dragoncalc.DragonCalcScreen(onBack = { navController.backOrHome() })
+            }
+            composable(MeetDestinations.NEXUS_CONTROL) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    context.startActivity(android.content.Intent(context, com.elysium.nexus.ui.MainActivity::class.java))
+                    navController.popBackStack()
+                }
             }
             composable(MeetDestinations.SUPREME_BASS_BOOST) {
                 SupremeBassBoostScreen(onBack = { navController.popBackStack() })

@@ -85,8 +85,11 @@ import java.util.Locale
 fun ElysiumServicesMarketplaceScreen(
     navController: NavController,
     viewModel: ObdViewModel,
+    onPrepareRequest: ((ServicesRequestDraft) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val openAuthoritativeServices = LocalServiceOnlineAction.current
+    val prepareOffer = LocalServiceOfferDraft.current
     val scope = rememberCoroutineScope()
 
     var isSpecialistMode by rememberSaveable { mutableStateOf(false) }
@@ -139,7 +142,8 @@ fun ElysiumServicesMarketplaceScreen(
 
     // Provider profile & constitutional wallet state (5% platform fee)
     val userProfiles by viewModel.userProviderProfiles.collectAsState()
-    val activeProfile = userProfiles.firstOrNull { it.isActive && it.userId == viewModel.activePrincipal.value?.id }
+    val activePrincipal by viewModel.activePrincipal.collectAsState()
+    val activeProfile = userProfiles.firstOrNull { it.isActive && it.userId == activePrincipal?.id }
     val profileData = remember(activeProfile) {
         if (activeProfile != null && activeProfile.specialties.isNotBlank()) {
             ProviderServiceProfileData.fromJsonString(activeProfile.specialties)
@@ -247,7 +251,7 @@ fun ElysiumServicesMarketplaceScreen(
                             letterSpacing = 0.5.sp,
                         )
                         Text(
-                            text = if (isSpecialistMode) "Modo Especialista (Tomar / Contraofertar)" else "Modo Cliente (Solicitar con Escrow)",
+                            text = if (isSpecialistMode) "Modo Especialista (Tomar / Contraofertar)" else "Modo Cliente (Preparar solicitud)",
                             fontSize = 11.sp,
                             color = if (isSpecialistMode) MeetColors.neonGreen else MeetColors.cyberCyan,
                         )
@@ -590,27 +594,17 @@ fun ElysiumServicesMarketplaceScreen(
                                             else -> ""
                                         }
                                         val fullProblemDescription = "${activeCategory.name}: $problemInput$techSummary"
-                                        viewModel.createServiceRequest(
-                                            vehicleId = viewModel.selectedVehicle.value?.id ?: "V_COMMERCIAL",
-                                            problem = fullProblemDescription,
-                                            description = "$problemInput$techSummary",
-                                            location = locationInput,
-                                            priority = "MEDIUM",
-                                            priceOffer = price,
-                                            phone = "8888-8888",
-                                            latitude = locationLat,
-                                            longitude = locationLon
-                                        )
-                                        problemInput = ""
-                                        dtcCodeInput = ""
-                                        Toast.makeText(context, "¡Solicitud técnica publicada en la red con Escrow!", Toast.LENGTH_LONG).show()
+                                        val definitionId = when(activeCategory.domainKey) {
+                                            "AUTO_MECHANICAL" -> "mechanical"; "AUTO_TOW" -> "roadside"
+                                            "LOCKSMITH" -> "hardware_locksmith"; "BATTERY" -> "mechanical"
+                                            "HARDWARE" -> "hardware_materials"; "DETAILING" -> "vehicle_detailing"
+                                            "PLUMBING" -> "plumbing"; "ELECTRICAL" -> "electrical_home"
+                                            "PULPERIA" -> "pulperia_groceries"; else -> "soda_traditional_food"
+                                        }
+                                        onPrepareRequest?.invoke(ServicesRequestDraft(definitionId,fullProblemDescription,
+                                            "$problemInput$techSummary",locationInput,price.toLong(),"PHYSICAL",locationLat,locationLon))
+                                        if(onPrepareRequest==null) openAuthoritativeServices("Continúa la solicitud técnica en línea; todavía no se ha publicado.")
 
-                                        // DigiSoul XP
-                                        EvairDigiSoulEngine.shared.recordInteraction(
-                                            action = "SERVICE_REQUEST_CREATED",
-                                            xpGained = 30,
-                                            narrative = "Publicamos solicitud técnica de ${activeCategory.name} con respaldo forense."
-                                        )
                                     },
                                     modifier = Modifier
                                         .weight(1.2f)
@@ -743,30 +737,8 @@ fun ElysiumServicesMarketplaceScreen(
                                 selectedViewMode = "MAP"
                             },
                             onTakeDirect = {
-                                val grossAmount = req.priceOffer.toLong()
-                                val fee = profileData.calculateFee(grossAmount)
-                                if (!profileData.hasSufficientBalance(fee)) {
-                                    pendingTopUpRequest = req
-                                    requiredFeeForTopUp = fee
-                                    showTopUpDialog = true
-                                } else {
-                                    val deduction = profileData.withDeductedFee(grossAmount, req.requestId)
-                                    if (deduction != null && activeProfile != null) {
-                                        viewModel.updateProviderProfileSpecialties(
-                                            activeProfile.profileId,
-                                            deduction.first.toJsonString()
-                                        )
-                                    }
-                                    viewModel.placeServiceBid(
-                                        requestId = req.requestId,
-                                        providerName = activeProfile?.businessName ?: "Especialista Certificado MEET",
-                                        price = req.priceOffer,
-                                        estimatedHours = 1.0,
-                                        warrantyDays = 30,
-                                        message = "Acepto el precio propuesto por el cliente. En camino con equipo profesional."
-                                    )
-                                    Toast.makeText(context, "¡Oferta enviada! Comisión constitucional 5% (₡${"%,d".format(fee)}) deducida.", Toast.LENGTH_LONG).show()
-                                }
+                                prepareOffer(ServicesOfferDraft(req.priceOffer.toLong(),1.0,30,"Oferta para ${req.problem}"))
+                                openAuthoritativeServices("Esta solicitud pertenece al historial anterior. La nueva propuesta y su comisión requieren confirmación en línea; no se ha cobrado saldo.")
                             },
                             onCounterOffer = {
                                 counterOfferDialogRequest = req
@@ -788,32 +760,9 @@ fun ElysiumServicesMarketplaceScreen(
             request = req,
             onDismiss = { counterOfferDialogRequest = null },
             onSubmitCounterOffer = { price, hours, warranty, note ->
-                val grossAmount = price.toLong()
-                val fee = profileData.calculateFee(grossAmount)
-                if (!profileData.hasSufficientBalance(fee)) {
-                    pendingTopUpRequest = req
-                    requiredFeeForTopUp = fee
-                    counterOfferDialogRequest = null
-                    showTopUpDialog = true
-                } else {
-                    val deduction = profileData.withDeductedFee(grossAmount, req.requestId)
-                    if (deduction != null && activeProfile != null) {
-                        viewModel.updateProviderProfileSpecialties(
-                            activeProfile.profileId,
-                            deduction.first.toJsonString()
-                        )
-                    }
-                    viewModel.placeServiceBid(
-                        requestId = req.requestId,
-                        providerName = activeProfile?.businessName ?: "Especialista Profesional Certificado",
-                        price = price,
-                        estimatedHours = hours,
-                        warrantyDays = warranty,
-                        message = note
-                    )
-                    counterOfferDialogRequest = null
-                    Toast.makeText(context, "¡Contraoferta de ₡${"%,d".format(grossAmount)} enviada! Comisión 5% deducida.", Toast.LENGTH_LONG).show()
-                }
+                prepareOffer(ServicesOfferDraft(price.toLong(),hours,warranty,note))
+                openAuthoritativeServices("Borrador de contraoferta histórica: ₡$price · $hours horas · garantía $warranty días · $note. Aún no se ha enviado ni cobrado comisión; selecciona una solicitud en línea.")
+                counterOfferDialogRequest = null
             }
         )
     }
@@ -848,57 +797,8 @@ fun ElysiumServicesMarketplaceScreen(
             request = req,
             onDismiss = { ratingDialogRequest = null },
             onSubmitRating = { stars, praiseTags, reviewText ->
-                viewModel.completeMechanicRequest(req.requestId)
-
-                // 1. Cierre Forense con Hash SHA-256 y Escrow Release (Pillar 1)
-                val epochMs = System.currentTimeMillis()
-                val certReportId = "rep_svc_${req.requestId.take(8)}_$epochMs"
-                val vehicleId = if (req.vehicleId.isNotBlank()) req.vehicleId else "veh_client_${req.requestId.take(8)}"
-                val rawCertPayload = "$certReportId|${req.requestId}|${req.priceOffer}|$stars|$epochMs|ESCROW_RELEASED"
-                val certHash = HashEngine.sha256Hex(rawCertPayload)
-                val verifierUrl = "https://meet.elysium369.cr/verify?id=$certReportId"
-                val qrMinimalPayload = "$certReportId|$certHash|$vehicleId|$epochMs|SERVICE_COMPLETION_REPORT|$verifierUrl"
-
-                // 2. Inyección inmutable en la historia del vehículo
-                viewModel.vehicleHistoryTimeline.addEvent(
-                    vehicleId = vehicleId,
-                    type = VehicleEventType.REPAIR_COMPLETED,
-                    title = "Servicio Especializado: ${req.problem.take(30)}",
-                    description = "Servicio completado satisfactoriamente. Calificación ⭐ $stars. Tags: ${praiseTags.joinToString()}. Escrow liberado: ₡${String.format("%,.0f", req.priceOffer)} CRC.",
-                    details = mapOf(
-                        "reportId" to certReportId,
-                        "integrityHash" to certHash,
-                        "escrowStatus" to "RELEASED",
-                        "priceOffer" to "${req.priceOffer}"
-                    ),
-                    actorName = "Especialista Certificado MEET",
-                    relatedReportId = certReportId
-                )
-
-                // 3. DigiSoul XP & Memoria de Agente (Pillar 5)
-                EvairDigiSoulEngine.shared.recordInteraction(
-                    action = "SERVICE_COMPLETED_RATED",
-                    xpGained = 150,
-                    narrative = "Servicio cerrado con certificación forense SHA-256 ($certHash). Calificación de $stars estrellas. Tags: ${praiseTags.joinToString()}."
-                )
-
-                completionCertificateData = ServiceCompletionCertificateData(
-                    reportId = certReportId,
-                    integrityHash = certHash,
-                    vehicleId = vehicleId,
-                    generatedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(epochMs)),
-                    reportType = "CERTIFICADO DE SERVICIO FORENSE",
-                    verifierUrl = verifierUrl,
-                    escrowStatus = "FONDOS LIBERADOS (RELEASED)",
-                    amountCrc = req.priceOffer,
-                    specialistName = "Especialista Certificado MEET",
-                    problemDescription = req.problem,
-                    ratingStars = stars,
-                    qrMinimalPayload = qrMinimalPayload
-                )
-
+                openAuthoritativeServices("Calificación histórica pendiente: $stars estrellas · ${praiseTags.joinToString()} · $reviewText. No se ha confirmado cierre, certificado ni liberación de fondos; utiliza el servicio en línea correspondiente.")
                 ratingDialogRequest = null
-                Toast.makeText(context, "¡Servicio completado! Certificado forense generado y fondos liberados.", Toast.LENGTH_LONG).show()
             }
         )
     }
@@ -1126,6 +1026,7 @@ private fun ClientActiveRequestCard(
     onCompleteAndRate: () -> Unit,
     onTrackOnMap: () -> Unit = {},
 ) {
+    val openAuthoritativeServices = LocalServiceOnlineAction.current
     val bids by viewModel.getBidsForRequest(request.requestId).collectAsState(initial = emptyList())
     val isAccepted = request.status == "ACCEPTED"
 
@@ -1344,7 +1245,7 @@ private fun ClientActiveRequestCard(
                                 Spacer(Modifier.height(8.dp))
                                 Button(
                                     onClick = {
-                                        viewModel.acceptBid(request.requestId, bid.bidId)
+                                        openAuthoritativeServices("La oferta histórica necesita reconciliación con el servidor. No se ha asignado ni cobrado un servicio.")
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),

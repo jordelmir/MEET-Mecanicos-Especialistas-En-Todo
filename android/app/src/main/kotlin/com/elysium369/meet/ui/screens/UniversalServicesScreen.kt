@@ -58,8 +58,10 @@ fun UniversalServicesScreen(
     onNavigateToHistory: () -> Unit = {},
     onNavigateToProviderConfig: () -> Unit = {},
     onOpenAdvancedMarketplace: () -> Unit = {},
+    onPrepareRequest: ((com.elysium369.meet.ui.screens.services.ServicesRequestDraft) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val openAuthoritativeServices = com.elysium369.meet.ui.screens.services.LocalServiceOnlineAction.current
     val principal by viewModel.activePrincipal.collectAsState()
     val clientId = principal?.id.orEmpty()
     val allRequests by viewModel.serviceRequests.collectAsState()
@@ -96,6 +98,7 @@ fun UniversalServicesScreen(
             viewModel = viewModel,
             onNavigateBack = { selected = null },
             onOpenMessages = onOpenMessages,
+            onPrepareRequest = onPrepareRequest,
         )
         return
     }
@@ -205,7 +208,7 @@ fun UniversalServicesScreen(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             )
             OutlinedButton(onClick = onOpenAdvancedMarketplace, modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp)) {
-                Text("Cotizaciones, contraofertas y saldo")
+                Text("Solicitudes en línea, propuestas y saldo")
             }
             // ── Barra Universal de Control: Activos, Historial & Configuración ──
             Row(
@@ -368,7 +371,7 @@ fun UniversalServicesScreen(
                                 )
                                 Spacer(Modifier.width(6.dp))
                                 Text(
-                                    text = "RADAR SERVICIOS ELYSIUMS EN VIVO",
+                                    text = "RADAR SERVICIOS ELYSIUM EN VIVO",
                                     color = Color.White,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
@@ -508,6 +511,7 @@ private fun UniversalServiceCard(service: UniversalServiceDefinition, onClick: (
 
 @Composable
 private fun ClientServiceRequestCard(viewModel: ObdViewModel, request: ServiceRequestEntity, context: Context) {
+    val openAuthoritativeServices = com.elysium369.meet.ui.screens.services.LocalServiceOnlineAction.current
     val bids by viewModel.getBidsForRequest(request.requestId).collectAsState(initial = emptyList())
     val materialBids = bids.filter { it.shopName.contains("Ferreter", true) || it.message.contains("material", true) || it.message.contains("tubo", true) }
     val laborBids = bids.filter { it.shopName.contains("Plomer", true) || it.shopName.contains("Electr", true) || it.shopName.contains("Instalad", true) || it.message.contains("mano de obra", true) || it.message.contains("colocar", true) || it.message.contains("instal", true) }
@@ -574,7 +578,7 @@ private fun ClientServiceRequestCard(viewModel: ObdViewModel, request: ServiceRe
                     Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text("⭐ COMBO LLAVE EN MANO (Material + Instalación)", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 11.sp)
-                            Text("-5% Ahorro", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                            Text("Descuento propuesto", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                         }
                         Text("• Ferretería: ${bestMaterial.shopName} (₡${String.format("%,.0f", bestMaterial.price)})", color = Color.White, fontSize = 11.sp)
                         Text("• Especialista: ${bestLabor.shopName} (₡${String.format("%,.0f", bestLabor.price)})", color = Color.White, fontSize = 11.sp)
@@ -582,12 +586,8 @@ private fun ClientServiceRequestCard(viewModel: ObdViewModel, request: ServiceRe
                             Text("Total Combo: ₡${String.format("%,.0f", comboPrice)}", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, fontSize = 14.sp)
                             Button(
                                 onClick = {
-                                    viewModel.acceptBid(request.requestId, bestMaterial.bidId, context)
-                                    viewModel.acceptBid(request.requestId, bestLabor.bidId, context)
-                                    viewModel.voiceFeedbackManager.speak(
-                                        es = "Combo llave en mano aceptado. Se ha notificado a la ferretería y al instalador calificado.",
-                                        en = "Turnkey combo accepted. Notified hardware store and certified installer."
-                                    )
+                                    openAuthoritativeServices("El combo de materiales e instalación requiere dos órdenes autorizadas por servidor. Ninguna oferta ha sido aceptada todavía.")
+
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black),
                                 shape = RoundedCornerShape(8.dp)
@@ -623,11 +623,8 @@ private fun ClientServiceRequestCard(viewModel: ObdViewModel, request: ServiceRe
                         if (request.status == "OPEN") {
                             Button(
                                 onClick = {
-                                    viewModel.acceptBid(request.requestId, bid.bidId, context)
-                                    viewModel.voiceFeedbackManager.speak(
-                                        es = "Propuesta de ${bid.shopName} aceptada exitosamente.",
-                                        en = "Proposal from ${bid.shopName} accepted successfully."
-                                    )
+                                    openAuthoritativeServices("Oferta histórica pendiente de confirmación del servidor. No se ha asignado el servicio.")
+
                                 },
                                 shape = RoundedCornerShape(8.dp)
                             ) {
@@ -654,6 +651,8 @@ private fun ProviderServiceBoard(
     providerPhone: String,
     providerId: String?,
 ) {
+    val prepareOffer = com.elysium369.meet.ui.screens.services.LocalServiceOfferDraft.current
+    val openAuthoritativeServices = com.elysium369.meet.ui.screens.services.LocalServiceOnlineAction.current
     LazyColumn(
         contentPadding = PaddingValues(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -694,16 +693,8 @@ private fun ProviderServiceBoard(
                     )
                     Button(
                         onClick = {
-                            viewModel.placeServiceBid(
-                                requestId = request.requestId,
-                                price = offerText.toDoubleOrNull() ?: request.priceOffer,
-                                estimatedHours = 1.0,
-                                warrantyDays = 7,
-                                message = "Oferta Elysium; alcance final sujeto a confirmar evidencia y entregables.",
-                                providerPhone = providerPhone,
-                                providerName = providerName.ifBlank { "Proveedor Elysium" },
-                                providerId = providerId,
-                            )
+                            prepareOffer(com.elysium369.meet.ui.screens.services.ServicesOfferDraft(offerText.toLongOrNull() ?: request.priceOffer.toLong(),1.0,7,"Oferta Elysium; alcance sujeto a confirmar evidencia."))
+                            openAuthoritativeServices("Oferta histórica preparada por ₡${offerText.ifBlank { request.priceOffer.toString() }}. Envíala desde la solicitud en línea; todavía no se ha publicado ni cobrado saldo.")
                         },
                         modifier = Modifier.fillMaxWidth(),
                     ) { Text("ENVIAR OFERTA") }
