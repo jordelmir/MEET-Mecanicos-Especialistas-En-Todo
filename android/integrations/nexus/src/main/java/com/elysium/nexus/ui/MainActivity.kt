@@ -391,11 +391,9 @@ class MainActivity : ComponentActivity() {
                 val macTransport = remember { MacTransport() }
                 val current = navStack.value.last()
 
-                // §38 / back-behavior: the system back button must never
-                // kill the app. On the root it backgrounds the task
-                // (moveTaskToBack) so the process and the whole session
-                // survive; anywhere else it pops the navigation stack
-                // with the same cleanup as the on-screen back button.
+                // This screen is hosted by Elysium. At the Nexus root,
+                // finish only this activity to reveal Elysium Home again.
+                // Nested screens still pop their own navigation stack.
                 BackHandler {
                     when (val top = current) {
                         is HubDestination.IrLearner -> {
@@ -411,8 +409,7 @@ class MainActivity : ComponentActivity() {
                     if (navStack.value.size > 1) {
                         navStack.value = navStack.value.dropLast(1)
                     } else {
-                        android.util.Log.i(tag, "System back at root: backgrounding task, session preserved")
-                        moveTaskToBack(true)
+                        finish()
                     }
                 }
 

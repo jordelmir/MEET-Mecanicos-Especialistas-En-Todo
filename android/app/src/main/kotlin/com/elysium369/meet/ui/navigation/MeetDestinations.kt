@@ -65,6 +65,9 @@ object MeetDestinations {
     const val AGENT_STORE = "agent_store"
     const val DRAGON_CALC = "dragon_calc"
     const val NEXUS_CONTROL = "elysium_nexxus_control"
+    const val SCREEN_MIRROR = "elysium_screen_mirror"
+    const val FILE_MANAGER = "elysium_file_manager"
+    const val RECORD_SHIELD = "elysium_record_shield"
 
     // SUPREME BASS (Neon Integration)
     const val SUPREME_BASS = "supreme_bass"

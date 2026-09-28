@@ -40,11 +40,40 @@ select public.universal_service_transition_v1('20000000-0000-0000-0000-000000000
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
 select public.universal_service_transition_v1('20000000-0000-0000-0000-000000000001','START');
 select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+do $$begin
+ begin
+  perform public.universal_service_transition_v1('20000000-0000-0000-0000-000000000001','COMPLETE');
+  raise exception 'CUSTOMER_COMPLETED_WITHOUT_PROVIDER_ATTESTATION';
+ exception when others then
+  if sqlerrm <> 'PROVIDER_DELIVERY_AND_PAYMENT_ATTESTATION_REQUIRED' then raise; end if;
+ end;
+ begin
+  perform public.universal_service_transition_v1('20000000-0000-0000-0000-000000000001','FINISH');
+  raise exception 'CUSTOMER_IMPERSONATED_PROVIDER';
+ exception when others then
+  if sqlerrm <> 'PROVIDER_REQUIRED' then raise; end if;
+ end;
+end $$;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);
+select public.universal_service_transition_v1('20000000-0000-0000-0000-000000000001','FINISH') from generate_series(1,2);
+do $$begin
+ if (select provider_payment_attested_at from service_financial_contracts where aggregate_id='20000000-0000-0000-0000-000000000001') is null then raise exception 'PROVIDER_ATTESTATION_NOT_PERSISTED'; end if;
+end $$;
+select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);
+do $$begin
+ begin
+  perform public.universal_service_transition_v1('20000000-0000-0000-0000-000000000001','CANCEL');
+  raise exception 'ATTESTED_SERVICE_CANCELLED_WITHOUT_DISPUTE';
+ exception when others then
+  if sqlerrm <> 'ATTESTED_SERVICE_REQUIRES_DISPUTE' then raise; end if;
+ end;
+end $$;
 select public.universal_service_transition_v1('20000000-0000-0000-0000-000000000001','COMPLETE') from generate_series(1,20);
 do $$declare b jsonb;begin
  b:=public.elysium_provider_balance_v1('00000000-0000-0000-0000-000000000002');
  if (b->>'available_minor')::bigint<>4500 or (b->>'reserved_minor')::bigint<>0 then raise exception 'SETTLEMENT_WRONG'; end if;
  if (select count(*) from ride_wallet_ledger where entry_type='COMMISSION_CAPTURED')<>1 then raise exception 'DOUBLE_CAPTURE'; end if;
+ if (select customer_confirmed_at from service_financial_contracts where aggregate_id='20000000-0000-0000-0000-000000000001') is null then raise exception 'CUSTOMER_CONFIRMATION_NOT_PERSISTED'; end if;
  if exists(select transaction_id from ride_ledger_postings group by transaction_id having sum(case when direction='DEBIT' then amount_minor else -amount_minor end)<>0) then raise exception 'UNBALANCED_JOURNAL'; end if;
  if has_function_privilege('authenticated','public.elysium_provider_wallet_ensure_v1(uuid)','EXECUTE') or has_table_privilege('authenticated','ride_wallet_ledger','INSERT') then raise exception 'PRIVILEGE_ESCAPE'; end if;
 end $$;

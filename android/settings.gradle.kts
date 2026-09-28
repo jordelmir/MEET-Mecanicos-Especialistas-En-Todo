@@ -23,3 +23,6 @@ dependencyResolutionManagement {
 rootProject.name = "MeetOBD"
 include(":app")
 include(":integrations:nexus")
+include(":integrations:filemanager")
+include(":integrations:recordshield")
+include(":features:jsm")

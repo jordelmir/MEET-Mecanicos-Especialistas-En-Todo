@@ -202,6 +202,17 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
             val playback=Channel<ByteArray>(2,BufferOverflow.DROP_OLDEST)
             val sequence=AtomicLong(0)
             val sendMutex=Mutex()
+            suspend fun sendFrame(kind: String, bytes: ByteArray) {
+                try {
+                    sendMutex.withLock {
+                        channel.broadcast("media", crypto.encrypt(call.id, principal, sequence.incrementAndGet(), kind, bytes))
+                    }
+                } catch (failure: Exception) {
+                    if (failure.javaClass.simpleName != "RealtimeRateLimitException") throw failure
+                    // A transient server quota must not tear down a confirmed call.
+                    delay(750)
+                }
+            }
             var lastPeerSequence=0L
             val lastPeerAt=AtomicLong(android.os.SystemClock.elapsedRealtime())
             try {
@@ -229,21 +240,24 @@ class ElysiumCallTransport @Inject constructor(private val audioEngine:RealtimeL
                     audioStarted=true;startedHere=true
                 }
                 launch {
-                    val batch=java.io.ByteArrayOutputStream(6400)
+                    val batch=java.io.ByteArrayOutputStream(CommunicationCallFrameCipher.MAX_AUDIO_BYTES)
                     for(chunk in chunks) {
                         if(mediaGeneration!=generation || owner!=principal || mutableState.value!=CallConnectionState.ACTIVE) { batch.reset();continue }
                         batch.write(chunk)
-                        if(batch.size()>=6400) {
-                            sendMutex.withLock { channel.broadcast("media",crypto.encrypt(call.id,principal,sequence.incrementAndGet(),"AUDIO",batch.toByteArray().copyOfRange(0,6400))) }
+                        if(batch.size()>=CommunicationCallFrameCipher.MAX_AUDIO_BYTES) {
+                            sendFrame("AUDIO",batch.toByteArray().copyOfRange(0,CommunicationCallFrameCipher.MAX_AUDIO_BYTES))
                             val buffered=batch.toByteArray()
-                            batch.reset();batch.write(buffered,6400,buffered.size-6400)
+                            batch.reset();batch.write(buffered,CommunicationCallFrameCipher.MAX_AUDIO_BYTES,buffered.size-CommunicationCallFrameCipher.MAX_AUDIO_BYTES)
+                            // Ride audio uses the same hardware engine. Realtime Broadcast needs
+                            // fewer frames than raw 40 ms capture, even when capture is backlogged.
+                            delay(350)
                         }
                     }
                 }
                 while(isActive && mediaGeneration==generation && owner==principal) {
-                    sendMutex.withLock { channel.broadcast("media",crypto.encrypt(call.id,principal,sequence.incrementAndGet(),"HELLO",byteArrayOf())) }
+                    sendFrame("HELLO",byteArrayOf())
                     check(android.os.SystemClock.elapsedRealtime()-lastPeerAt.get()<20_000L)
-                    delay(1000)
+                    delay(2000)
                 }
                 }
             } catch(c:CancellationException) {

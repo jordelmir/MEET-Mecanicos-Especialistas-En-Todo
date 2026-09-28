@@ -9180,7 +9180,7 @@ fun LiveRideMetrics(
     val distanceTraveledKm = (meter?.validated_distance_meters ?: 0L) / 1000.0
     val isOpenBid = ride.fareMode == RideFareMode.OPEN_BID.name
     val gpsFresh = meter?.let { it.last_capture_ms != null && it.server_as_of_ms - it.last_capture_ms <= 30_000L } == true
-    val liveFareMinor = meter?.measured_fare_minor
+    val liveFareMinor = if (meter?.is_final == true) meter?.final_fare_minor else meter?.measured_fare_minor
 
     Surface(
         color = MeetColors.cyberCyan.copy(alpha = 0.08f),
@@ -9195,13 +9195,15 @@ fun LiveRideMetrics(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    if (meterConnected && gpsFresh) "MARÍA · MEDICIÓN COMPARTIDA" else "MARÍA · SINCRONIZACIÓN / GPS PENDIENTE",
+                    if (meter?.is_final == true) "MARÍA · TOTAL CONFIRMADO" else if (meterConnected && gpsFresh) "MARÍA · MEDICIÓN COMPARTIDA" else "MARÍA · SINCRONIZACIÓN / GPS PENDIENTE",
                     color = MeetColors.cyberCyan,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp,
                 )
-                if (isTripActive) {
+                if (meter?.is_final == true) {
+                    Text("FINALIZADO", color = MeetColors.neonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                } else if (isTripActive) {
                     Surface(
                         color = MeetColors.neonGreen.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(6.dp),
@@ -9268,7 +9270,7 @@ fun LiveRideMetrics(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                if (gpsFresh && meterConnected) "Medición provisional (no cobro final):" else "Última medición parcial:",
+                                if (meter?.is_final == true) "Tarifa final confirmada:" else if (gpsFresh && meterConnected) "Medición provisional (no cobro final):" else "Última medición parcial:",
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold

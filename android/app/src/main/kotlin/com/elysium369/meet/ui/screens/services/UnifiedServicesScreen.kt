@@ -22,7 +22,9 @@ import java.util.UUID
 import com.elysium369.meet.core.agent.ui.*
 
 @Serializable private data class ServiceDefinitionWire(val id:String,val domain:String,@SerialName("display_name") val name:String,@SerialName("supported_modalities") val modalities:List<String>)
-@Serializable private data class ServiceRequestWire(val id:String,@SerialName("client_id") val client:String,@SerialName("assigned_provider_id") val provider:String?=null,@SerialName("service_definition_id") val definition:String,val modality:String,val title:String,val description:String,@SerialName("location_label") val location:String?=null,@SerialName("offered_price_minor") val price:Long,@SerialName("final_price_minor") val finalPrice:Long?=null,val currency:String,val state:String,val version:Long)
+// Empty string means the older server has no attestation column; JSON null means
+// the new authority is active and still waiting for the provider.
+@Serializable private data class ServiceRequestWire(val id:String,@SerialName("client_id") val client:String,@SerialName("assigned_provider_id") val provider:String?=null,@SerialName("service_definition_id") val definition:String,val modality:String,val title:String,val description:String,@SerialName("location_label") val location:String?=null,@SerialName("offered_price_minor") val price:Long,@SerialName("final_price_minor") val finalPrice:Long?=null,@SerialName("provider_payment_attested_at") val providerPaymentAttestedAt:String?="",val currency:String,val state:String,val version:Long)
 @Serializable private data class ServiceOfferWire(val id:String,@SerialName("request_id") val request:String,@SerialName("provider_id") val provider:String,@SerialName("price_minor") val price:Long,val currency:String,val state:String,@SerialName("eta_minutes") val etaMinutes:Int?=null,@SerialName("warranty_days") val warrantyDays:Int=0,val scope:JsonObject=buildJsonObject {})
 @Serializable private data class ProviderSummary(@SerialName("provider_id") val providerId:String?=null,val name:String?=null,val completed:Long=0,val reviews:Long=0,val rating:Double?=null,@SerialName("balance_minor") val balance:Long?=null,val eligible:Boolean=false)
 
@@ -128,7 +130,7 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
      Text("Tu cuenta de comisiones es compartida por todos los servicios. Recarga mediante SINPE y espera la validación del comprobante.")
      Text("Comisión constitucional: 5% del precio acordado: se reserva al aceptar y se cobra una vez al completar el servicio.")
      OutlinedButton(onClick=onProviderConfig){Text("Mi perfil y configuración")}
-    } else Text("Compara propuestas. El proveedor inicia el trabajo y tú confirmas su finalización.")
+    } else Text("Compara propuestas. El proveedor confirma el trabajo y el pago recibido; tú confirmas después el cierre.")
     error?.let { Text(it,color=MaterialTheme.colorScheme.error) }
     if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
     Row { TextButton(onClick={history=false}){Text("Activos")};TextButton(onClick={history=true}){Text("Historial")};TextButton(onClick={action { }},enabled=!busy){Text("Actualizar")} }
@@ -158,7 +160,14 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
       TextButton(modifier=Modifier.serviceAction("cancel.${r.id}","Cancelar solicitud",!busy){transition(r,"CANCEL")},onClick={transition(r,"CANCEL")},enabled=!busy){Text("Cancelar solicitud")}
      }
      if(r.provider==actor && r.state=="ASSIGNED") Button(modifier=Modifier.serviceAction("start.${r.id}","Iniciar trabajo",!busy){transition(r,"START")},onClick={transition(r,"START")},enabled=!busy){Text("Iniciar trabajo")}
-     if(r.client==actor && r.state=="IN_PROGRESS") Button(modifier=Modifier.serviceAction("complete.${r.id}","Confirmar trabajo terminado",!busy){transition(r,"COMPLETE")},onClick={transition(r,"COMPLETE")},enabled=!busy){Text("Confirmar trabajo terminado")}
+     if(r.provider==actor && r.state=="IN_PROGRESS") {
+      if(r.providerPaymentAttestedAt==null) Button(modifier=Modifier.serviceAction("finish.${r.id}","Confirmar trabajo realizado y pago recibido",!busy,AgentUiSensitivity.FINANCIAL){transition(r,"FINISH")},onClick={transition(r,"FINISH")},enabled=!busy){Text("Trabajo realizado y pago recibido")}
+      else if(r.providerPaymentAttestedAt.isNotBlank()) Text("Esperando confirmación de la persona cliente. La comisión sigue reservada.")
+     }
+     if(r.client==actor && r.state=="IN_PROGRESS") {
+      if(r.providerPaymentAttestedAt==null) Text("Esperando a que el proveedor confirme trabajo y pago recibido.")
+      else Button(modifier=Modifier.serviceAction("complete.${r.id}","Confirmar servicio y pago",!busy,AgentUiSensitivity.FINANCIAL){transition(r,"COMPLETE")},onClick={transition(r,"COMPLETE")},enabled=!busy){Text("Confirmar servicio y pago")}
+     }
      if(r.client==actor && r.state=="COMPLETED") {
       Text("Califica tu servicio (una vez)")
       Row { (1..5).forEach { stars -> TextButton(enabled=!busy,onClick={action { client.postgrest.rpc("universal_service_rate_v1",buildJsonObject { put("p_request_id",r.id);put("p_stars",stars) }) }}){Text("$stars ★")} } }

@@ -7,7 +7,7 @@ import java.util.Base64
 class CommunicationCallFrameCipherTest {
     private val cipher=CommunicationCallFrameCipher(Base64.getEncoder().encodeToString(ByteArray(32) { it.toByte() }))
     @Test fun bidirectionalAudioPreservesBytesAndBindsCallIdentity() {
-        val bytes=ByteArray(6400) { (it%127).toByte() }
+        val bytes=ByteArray(CommunicationCallFrameCipher.MAX_AUDIO_BYTES) { (it%127).toByte() }
         val frame=cipher.encrypt("call-a","sender-a",1,"AUDIO",bytes)
         assertArrayEquals(bytes,cipher.decrypt(frame))
         assertTrue(runCatching { cipher.decrypt(frame.copy(call="call-b")) }.isFailure)
@@ -20,7 +20,7 @@ class CommunicationCallFrameCipherTest {
         assertTrue(runCatching { cipher.decrypt(frame.copy(kind="AUDIO")) }.isFailure)
     }
     @Test fun framesCannotAllocateUnboundedAudioOrUseInvalidKeys() {
-        assertTrue(runCatching { cipher.encrypt("call-a","sender-a",1,"AUDIO",ByteArray(6401)) }.isFailure)
+        assertTrue(runCatching { cipher.encrypt("call-a","sender-a",1,"AUDIO",ByteArray(CommunicationCallFrameCipher.MAX_AUDIO_BYTES+1)) }.isFailure)
         assertTrue(runCatching { CommunicationCallFrameCipher("invalid") }.isFailure)
     }
 }

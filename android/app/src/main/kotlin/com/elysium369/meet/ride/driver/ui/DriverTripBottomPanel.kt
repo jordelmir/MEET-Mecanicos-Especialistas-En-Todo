@@ -386,7 +386,7 @@ fun DriverTripBottomPanel(
                                 Text(if (isMetered) "DISTANCIA VALIDADA" else "DISTANCIA ESTIMADA", color = MeetColors.textMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                val fareDisplay = if (isMetered) sharedMeter?.measured_fare_minor?.let { "₡$it" }
+                                val fareDisplay = if (isMetered) (if (sharedMeter?.is_final == true) sharedMeter?.final_fare_minor else sharedMeter?.measured_fare_minor)?.let { "₡$it" }
                                     ?: "Pendiente" else "₡${state.agreedFareMinor}"
                                 Text(
                                     fareDisplay,
@@ -395,7 +395,7 @@ fun DriverTripBottomPanel(
                                     fontWeight = FontWeight.Black,
                                 )
                                 Text(
-                                    if (isMetered) "PROVISIONAL · NO COBRO FINAL" else "TARIFA FIJA",
+                                    if (isMetered && sharedMeter?.is_final == true) "TOTAL CONFIRMADO" else if (isMetered) "PROVISIONAL · NO COBRO FINAL" else "TARIFA FIJA",
                                     color = MeetColors.textMuted,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Bold

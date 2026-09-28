@@ -21,6 +21,7 @@ data class SharedRideMeterSnapshot(
     val rejected_segments: Long = 0,
     val accepted_segments: Long = 0,
     val measured_fare_minor: Long? = null,
+    val final_fare_minor: Long? = null,
     val currency: String,
     val rate_card_version: Long,
     val is_final: Boolean = false,
@@ -35,6 +36,7 @@ object SharedRideMeterGateway {
         check(SupabaseManager.client.auth.currentUserOrNull()?.id == owner) { "ACCOUNT_CHANGED" }
         return json.decodeFromString<SharedRideMeterSnapshot>(result.data).also {
             check(it.trip_id == tripId && it.server_version > 0 && it.validated_distance_meters >= 0)
+            check(!it.is_final || (it.final_fare_minor != null && it.final_fare_minor >= 0))
         }
     }
 }

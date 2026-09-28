@@ -30,6 +30,7 @@ if (localPropsFile.exists()) {
 android {
     namespace = "com.elysium369.meet"
     compileSdk = 37
+    dynamicFeatures += setOf(":features:jsm")
 
     lint {
         baseline = file("lint-baseline.xml")
@@ -311,6 +312,9 @@ android {
 
 dependencies {
     implementation(project(":integrations:nexus"))
+    implementation(project(":integrations:filemanager"))
+    implementation(project(":integrations:recordshield"))
+    implementation("com.google.android.play:feature-delivery:2.1.0")
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
@@ -345,6 +349,10 @@ dependencies {
     implementation("androidx.room:room-runtime:2.8.4")
     implementation("androidx.room:room-ktx:2.8.4")
     kapt("androidx.room:room-compiler:2.8.4")
+    implementation("com.google.mlkit:text-recognition:16.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
 
     // Coil
     implementation("io.coil-kt:coil-compose:2.5.0")

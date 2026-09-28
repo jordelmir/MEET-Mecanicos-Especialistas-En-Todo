@@ -29,9 +29,17 @@ create table if not exists public.service_financial_contracts (
  policy_code text not null default 'ELY_PROVIDER_COMMISSION_V1',
  state text not null check(state in ('RESERVED','CAPTURED','RELEASED','LEGACY_CAPTURED')),
  created_at timestamptz not null default now(),
+ provider_payment_attested_at timestamptz,
+ customer_confirmed_at timestamptz,
  settled_at timestamptz,
  unique(vertical,aggregate_id)
 );
+alter table public.service_financial_contracts
+ add column if not exists provider_payment_attested_at timestamptz,
+ add column if not exists customer_confirmed_at timestamptz;
+-- Completing a service requires both parties' server-recorded attestations.
+alter table public.universal_service_requests
+ add column if not exists provider_payment_attested_at timestamptz;
 -- Feature flags default fail-closed for unimplemented payment rails.
 create table if not exists public.elysium_financial_capabilities (
  capability text primary key,
@@ -623,17 +631,33 @@ begin
  elsif p_action='START' then
   if a is distinct from r.assigned_provider_id then raise exception 'PROVIDER_REQUIRED' using errcode='42501'; end if;
   if r.state='IN_PROGRESS' then return r; end if;
-  if r.state<>'ASSIGNED' then raise exception 'SERVICE_NOT_ASSIGNED'; end if;
-  update public.universal_service_requests set state='IN_PROGRESS',version=version+1,updated_at=now() where id=r.id returning * into r;
+ if r.state<>'ASSIGNED' then raise exception 'SERVICE_NOT_ASSIGNED'; end if;
+ update public.universal_service_requests set state='IN_PROGRESS',version=version+1,updated_at=now() where id=r.id returning * into r;
+ elsif p_action='FINISH' then
+  if a is distinct from r.assigned_provider_id then raise exception 'PROVIDER_REQUIRED' using errcode='42501'; end if;
+  if r.state<>'IN_PROGRESS' then raise exception 'SERVICE_NOT_IN_PROGRESS'; end if;
+  if r.provider_payment_attested_at is not null then return r; end if;
+  select * into c from public.service_financial_contracts where vertical='UNIVERSAL_SERVICE' and aggregate_id=r.id for update;
+  if found then
+   if c.state<>'RESERVED' or c.provider_id<>a then raise exception 'FINANCIAL_CONTRACT_NOT_RESERVED'; end if;
+   update public.service_financial_contracts set provider_payment_attested_at=now() where contract_id=c.contract_id;
+  elsif not exists(select 1 from public.service_provider_wallet_ledger where provider_id=a::text and reference_id=r.id::text and entry_type='CONSTITUTIONAL_FEE_5_PERCENT') then
+   raise exception 'FINANCIAL_CONTRACT_REQUIRED';
+  end if;
+  update public.universal_service_requests set provider_payment_attested_at=now(),version=version+1,updated_at=now() where id=r.id returning * into r;
  elsif p_action in ('COMPLETE','CANCEL') then
   if a<>r.client_id and (p_action<>'CANCEL' or a is distinct from r.assigned_provider_id) then raise exception 'PARTICIPANT_REQUIRED' using errcode='42501'; end if;
   if (p_action='COMPLETE' and r.state='COMPLETED') or (p_action='CANCEL' and r.state='CANCELLED') then return r; end if;
   if p_action='COMPLETE' and r.state<>'IN_PROGRESS' then raise exception 'SERVICE_NOT_IN_PROGRESS'; end if;
+  if p_action='COMPLETE' and r.provider_payment_attested_at is null then raise exception 'PROVIDER_DELIVERY_AND_PAYMENT_ATTESTATION_REQUIRED'; end if;
   if p_action='CANCEL' and r.state not in ('DRAFT','OPEN','ASSIGNED','IN_PROGRESS') then raise exception 'TERMINAL_SERVICE'; end if;
+  if p_action='CANCEL' and r.provider_payment_attested_at is not null then raise exception 'ATTESTED_SERVICE_REQUIRES_DISPUTE'; end if;
   select * into c from public.service_financial_contracts where vertical='UNIVERSAL_SERVICE' and aggregate_id=r.id for update;
   if found and c.state='RESERVED' then
+   if p_action='COMPLETE' and c.provider_payment_attested_at is null then raise exception 'PAYMENT_ATTESTATION_NOT_RECORDED'; end if;
    perform 1 from public.ride_wallets where driver_id=c.provider_id for update;
-   update public.service_financial_contracts set state=case when p_action='COMPLETE' then 'CAPTURED' else 'RELEASED' end,settled_at=now() where contract_id=c.contract_id;
+   update public.service_financial_contracts set state=case when p_action='COMPLETE' then 'CAPTURED' else 'RELEASED' end,
+    customer_confirmed_at=case when p_action='COMPLETE' then now() else null end,settled_at=now() where contract_id=c.contract_id;
    if c.commission_minor>0 then
     insert into public.ride_wallet_ledger(driver_id,idempotency_key,entry_type,amount_minor,currency,direction,withdrawable,metadata)
     values(c.provider_id,'service-'||lower(p_action)||':'||r.id::text,case when p_action='COMPLETE' then 'COMMISSION_CAPTURED' else 'COMMISSION_RELEASED' end,c.commission_minor,'CRC',case when p_action='COMPLETE' then 'DEBIT' else 'CREDIT' end,false,

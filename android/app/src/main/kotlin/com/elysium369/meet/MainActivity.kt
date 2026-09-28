@@ -1815,6 +1815,28 @@ fun MeetApp(
                     navController.popBackStack()
                 }
             }
+            composable(MeetDestinations.SCREEN_MIRROR) {
+                com.elysium369.meet.ui.screens.home.OnDemandFeatureScreen(
+                    module = "jsm",
+                    activityClass = "com.jsm.core.MainActivity",
+                    title = "Elysium ScreenMirror",
+                    onBack = { navController.backOrHome() },
+                )
+            }
+            composable(MeetDestinations.FILE_MANAGER) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    context.startActivity(android.content.Intent(context, com.elysium.vanguard.MainActivity::class.java))
+                    navController.popBackStack()
+                }
+            }
+            composable(MeetDestinations.RECORD_SHIELD) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    context.startActivity(android.content.Intent(context, com.elysium.vanguard.recordshield.ui.MainActivity::class.java))
+                    navController.popBackStack()
+                }
+            }
             composable(MeetDestinations.SUPREME_BASS_BOOST) {
                 SupremeBassBoostScreen(onBack = { navController.popBackStack() })
             }
