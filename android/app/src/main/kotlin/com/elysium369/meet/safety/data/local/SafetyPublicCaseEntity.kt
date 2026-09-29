@@ -23,12 +23,12 @@ data class SafetyPublicCaseEntity(
 
     val lifecycle: String,
 
-    val confidenceScore: Float,
+    val confidenceScore: Float?,
 
-    val eventCount: Int,
-    val claimCount: Int,
-    val sourceCount: Int,
-    val evidenceCount: Int,
+    val eventCount: Int?,
+    val claimCount: Int?,
+    val sourceCount: Int?,
+    val evidenceCount: Int?,
 
     val publishedAt: Long,
     val lastUpdatedAt: Long,

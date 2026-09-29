@@ -226,7 +226,7 @@ import com.elysium369.meet.commerce.data.local.CommerceOrderDao
         // LOCAL COMMERCE & DELIVERY (PULPERIAS & SODAS)
         CommerceOrderEntity::class,
     ],
-    version = 84,
+    version = 85,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

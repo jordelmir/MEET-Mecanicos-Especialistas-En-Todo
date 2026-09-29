@@ -5035,6 +5035,55 @@ object AppModule {
         }
     }
 
+    // A V3 case header can withhold confidence and counts. Preserve all V84
+    // rows while allowing those fields to remain unknown instead of storing 0.
+    val MIGRATION_84_85 = object : Migration(84, 85) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE `safety_public_cases_local` RENAME TO `safety_public_cases_local_v84`")
+            db.execSQL(
+                """
+                CREATE TABLE `safety_public_cases_local` (
+                    `caseId` TEXT NOT NULL,
+                    `caseType` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `publicSummary` TEXT NOT NULL,
+                    `lifecycle` TEXT NOT NULL,
+                    `confidenceScore` REAL,
+                    `eventCount` INTEGER,
+                    `claimCount` INTEGER,
+                    `sourceCount` INTEGER,
+                    `evidenceCount` INTEGER,
+                    `publishedAt` INTEGER NOT NULL,
+                    `lastUpdatedAt` INTEGER NOT NULL,
+                    `serverVersion` INTEGER NOT NULL,
+                    PRIMARY KEY(`caseId`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL(
+                """
+                INSERT INTO `safety_public_cases_local`
+                    (`caseId`, `caseType`, `title`, `publicSummary`, `lifecycle`,
+                     `confidenceScore`, `eventCount`, `claimCount`, `sourceCount`,
+                     `evidenceCount`, `publishedAt`, `lastUpdatedAt`, `serverVersion`)
+                SELECT `caseId`, `caseType`, `title`, `publicSummary`, `lifecycle`,
+                       `confidenceScore`, `eventCount`, `claimCount`, `sourceCount`,
+                       `evidenceCount`, `publishedAt`, `lastUpdatedAt`, `serverVersion`
+                FROM `safety_public_cases_local_v84`
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE `safety_public_cases_local_v84`")
+            db.execSQL(
+                "CREATE INDEX `index_safety_public_cases_local_lifecycle` " +
+                    "ON `safety_public_cases_local` (`lifecycle`)",
+            )
+            db.execSQL(
+                "CREATE INDEX `index_safety_public_cases_local_publishedAt` " +
+                    "ON `safety_public_cases_local` (`publishedAt`)",
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -5106,6 +5155,7 @@ object AppModule {
             MIGRATION_81_82,
             MIGRATION_82_83,
             MIGRATION_83_84,
+            MIGRATION_84_85,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

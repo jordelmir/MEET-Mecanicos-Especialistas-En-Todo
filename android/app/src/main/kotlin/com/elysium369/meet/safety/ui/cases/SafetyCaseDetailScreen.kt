@@ -184,15 +184,15 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                             ) {
                                 Column {
                                     Text("FUENTES", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.sp)
-                                    Text("${case.sourceCount}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MeetColors.cyberCyan)
+                                    Text(case.sourceCount?.toString() ?: stringResource(R.string.safety_public_unknown), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MeetColors.cyberCyan)
                                 }
                                 Column {
                                     Text("EVIDENCIAS", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.sp)
-                                    Text("${case.evidenceCount}", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MeetColors.neonGreen)
+                                    Text(case.evidenceCount?.toString() ?: stringResource(R.string.safety_public_unknown), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MeetColors.neonGreen)
                                 }
                                 Column {
                                     Text("CONFIANZA", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.sp)
-                                    Text("${(case.confidenceScore * 100).toInt()}%", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                                    Text(case.confidenceScore?.let { "${(it * 100).toInt()}%" } ?: stringResource(R.string.safety_public_unknown), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
                                 }
                             }
                         }

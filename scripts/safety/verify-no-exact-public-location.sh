@@ -3,8 +3,7 @@
 # verify-no-exact-public-location.sh — Public Location Sanitization Gate
 #
 # Asserts that:
-# 1. Public projections never store or publish raw micro-precision GPS for active
-#    illicit reports or citizen claims (minimum 2 decimal places / 1000m approx).
+# 1. V3 publication uses a coarse grid and server-side authority guard.
 # 2. Raw private GPS coordinates exist only in safety_private schemas or encrypted
 #    client storage.
 # 3. Android map models use geo_disclosure and display coordinates.
@@ -16,21 +15,26 @@ REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 MIGRATIONS_DIR="$REPO_ROOT/supabase/migrations"
 KOTLIN_DIR="$REPO_ROOT/android/app/src/main/kotlin/com/elysium369/meet/safety"
 
-echo "=== [1/3] Checking SQL Geo-Disclosure & Coordinate Rounding ==="
+echo "=== [1/3] Checking V3 SQL location publication boundary ==="
 
-# Check that projection function rounds public coordinates to 2 decimal places (~1.1 km)
-if ! grep -q "round(new.latitude::numeric,2)" "$MIGRATIONS_DIR"/*safety* 2>/dev/null && \
-   ! grep -q "round(new.latitude::numeric,\s*2)" "$MIGRATIONS_DIR"/*safety* 2>/dev/null; then
-  echo "FAIL: Public point projection lacks coordinate rounding to 2 decimals"
+v3_authority="$MIGRATIONS_DIR/20260928100000_safety_moderation_authority_v3.sql"
+v3_firewall="$MIGRATIONS_DIR/20260928090000_safety_publication_firewall_v3.sql"
+for contract in \
+  "round(v_content.latitude::numeric * 4) / 4" \
+  "round(v_content.longitude::numeric * 4) / 4" \
+  "new.location_accuracy_meters < 25000" \
+  "safety_guard_public_point_v3" \
+  "PUBLIC_LOCATION_SUPPRESSED"; do
+  if ! grep -Fq "$contract" "$v3_authority"; then
+    echo "FAIL: V3 location contract missing: $contract"
+    exit 1
+  fi
+done
+if ! grep -Fq "SAFETY_REPORT_AUTO_PUBLICATION_FORBIDDEN" "$v3_firewall"; then
+  echo "FAIL: legacy report-to-map function is not poisoned"
   exit 1
 fi
-
-if ! grep -q "APPROXIMATE_1000M" "$MIGRATIONS_DIR"/*safety* 2>/dev/null; then
-  echo "FAIL: Public point projection lacks APPROXIMATE_1000M geo_disclosure flag"
-  exit 1
-fi
-
-echo "  -> Public projection enforces 2-decimal coordinate rounding & APPROXIMATE_1000M"
+echo "  -> V3 server grid, suppression, and publication guard present"
 
 echo "=== [2/3] Checking Private Schema GPS Isolation ==="
 
