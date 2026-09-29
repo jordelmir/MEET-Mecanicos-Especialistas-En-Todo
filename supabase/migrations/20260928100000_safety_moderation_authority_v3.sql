@@ -200,14 +200,17 @@ declare
     v_final public.safety_publication_decisions%rowtype;
     v_candidate public.safety_publication_decisions%rowtype;
     v_content safety_private.report_content%rowtype;
+    v_claim public.safety_claims%rowtype;
+    v_report public.safety_reports%rowtype;
 begin
     select * into v_final from public.safety_publication_decisions
     where id = new.publication_decision_id;
     select * into v_candidate from public.safety_publication_decisions
     where id = v_final.supersedes_decision_id;
-    select c.* into v_content from safety_private.report_content c
-    join public.safety_claims claim on claim.report_id = c.report_id
-    where claim.id = new.claim_id;
+    select * into v_claim from public.safety_claims where id = new.claim_id;
+    select * into v_report from public.safety_reports where id = v_claim.report_id;
+    select * into v_content from safety_private.report_content
+    where report_id = v_claim.report_id;
     if v_final.decision_phase is distinct from 'FINAL'
        or v_final.decision is distinct from 'PUBLISH'
        or v_final.claim_id is distinct from new.claim_id
@@ -215,6 +218,19 @@ begin
        or v_candidate.id is distinct from v_final.supersedes_decision_id
        or v_candidate.reviewer_id is not distinct from v_final.reviewer_id
        or v_candidate.recommendation is distinct from 'READY_TO_PUBLISH'
+       or v_claim.state is distinct from new.claim_state
+       or v_report.state = 'WITHDRAWN'
+       or v_claim.state_version is distinct from v_final.claim_state_version
+       or v_report.state_version is distinct from v_final.report_state_version
+       or not exists (
+           select 1 from public.safety_claim_sources cs
+           join public.safety_sources s on s.id = cs.source_id
+           join public.safety_reports sr on sr.id = s.report_id
+           where cs.claim_id = new.claim_id
+             and cs.role in ('SUPPORTING', 'CORROBORATING', 'PRIMARY')
+             and s.source_type not in ('ANONYMOUS', 'UNKNOWN')
+             and sr.state <> 'WITHDRAWN'
+       )
        or new.claim_state not in ('DOCUMENTED', 'CORROBORATED', 'STRONGLY_CORROBORATED')
        or new.independent_source_count < 1
        or new.geo_disclosure <> 'APPROXIMATE_1000M'
@@ -279,6 +295,41 @@ revoke all on function public.safety_invalidate_changed_claim_v3()
 create trigger safety_invalidate_changed_claim_v3
     after update of state on public.safety_claims
     for each row execute function public.safety_invalidate_changed_claim_v3();
+
+-- A source's metadata is part of the publication proof. Changing it revokes
+-- every point it supports, including points owned by another report.
+create or replace function public.safety_invalidate_changed_source_point_v3()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+    if (new.report_id, new.source_type, new.cluster_id,
+        new.reliability_score, new.independence_score) is distinct from
+       (old.report_id, old.source_type, old.cluster_id,
+        old.reliability_score, old.independence_score) then
+        insert into safety_private.claim_reevaluation_v3(
+            claim_id, report_id, reason_code, requested_at, status
+        )
+        select distinct c.id, c.report_id, 'SOURCE_CHANGED', now(), 'PENDING'
+        from public.safety_claim_sources cs
+        join public.safety_claims c on c.id = cs.claim_id
+        where cs.source_id = new.id
+          and exists (select 1 from public.safety_public_points p
+                      where p.claim_id = c.id)
+        on conflict (claim_id) do update set
+            reason_code = excluded.reason_code,
+            requested_at = excluded.requested_at,
+            status = 'PENDING';
+        delete from public.safety_public_points p
+        using public.safety_claim_sources cs
+        where p.claim_id = cs.claim_id and cs.source_id = new.id;
+    end if;
+    return new;
+end;
+$$;
+revoke all on function public.safety_invalidate_changed_source_point_v3()
+    from public, anon, authenticated, service_role;
+create trigger safety_invalidate_changed_source_point_v3
+    after update on public.safety_sources
+    for each row execute function public.safety_invalidate_changed_source_point_v3();
 
 create or replace function public.safety_finalize_claim_publication_v1(
     p_candidate_decision_id uuid, p_final_decision text,
@@ -397,6 +448,15 @@ begin
     if not found then
         raise exception using errcode = '22023', message = 'PRIVATE_REPORT_CONTENT_MISSING';
     end if;
+    -- Lock source rows and their owning reports through the projection insert.
+    -- A concurrent source edit or source-report withdrawal then either waits
+    -- and revokes the point, or completes first and fails this eligibility check.
+    perform 1 from public.safety_claim_sources cs
+      join public.safety_sources s on s.id = cs.source_id
+      join public.safety_reports sr on sr.id = s.report_id
+     where cs.claim_id = v_claim.id
+       and cs.role in ('SUPPORTING', 'CORROBORATING', 'PRIMARY')
+     order by s.id for share of s, sr;
     select count(distinct coalesce(s.cluster_id, s.id)),
            count(*) filter (where s.source_type in
                ('DIRECT_WITNESS', 'FAMILY_OR_NEIGHBOR', 'SECOND_HAND')),
@@ -408,9 +468,11 @@ begin
            v_documentary, v_institutional
       from public.safety_claim_sources cs
       join public.safety_sources s on s.id = cs.source_id
+      join public.safety_reports sr on sr.id = s.report_id
      where cs.claim_id = v_claim.id
        and cs.role in ('SUPPORTING', 'CORROBORATING', 'PRIMARY')
-       and s.source_type not in ('ANONYMOUS', 'UNKNOWN');
+       and s.source_type not in ('ANONYMOUS', 'UNKNOWN')
+       and sr.state <> 'WITHDRAWN';
     if p_final_decision = 'PUBLISH' and v_independent < 1 then
         raise exception using errcode = '22023', message = 'PUBLICATION_REQUIRES_PROVENANCE';
     end if;
@@ -602,15 +664,21 @@ begin
         where report_id = p_report_id;
         insert into safety_private.claim_reevaluation_v3(
             claim_id, report_id, reason_code, requested_at, status
-        ) select c.id, p_report_id, 'REPORT_WITHDRAWN', now(), 'PENDING'
-          from public.safety_claims c where c.report_id = p_report_id
+        ) select distinct c.id, c.report_id, 'REPORT_WITHDRAWN', now(), 'PENDING'
+          from public.safety_claims c
+          left join public.safety_claim_sources cs on cs.claim_id = c.id
+          left join public.safety_sources s on s.id = cs.source_id
+         where c.report_id = p_report_id or s.report_id = p_report_id
         on conflict (claim_id) do update set
             reason_code = excluded.reason_code,
             requested_at = excluded.requested_at,
             status = 'PENDING';
         delete from public.safety_public_points
         where claim_id in (
-            select id from public.safety_claims where report_id = p_report_id
+            select c.id from public.safety_claims c
+            left join public.safety_claim_sources cs on cs.claim_id = c.id
+            left join public.safety_sources s on s.id = cs.source_id
+            where c.report_id = p_report_id or s.report_id = p_report_id
         );
         update public.safety_reports
         set state = 'WITHDRAWN', state_version = state_version + 1,

@@ -110,4 +110,5 @@ done
 
 psql "${psql_args[@]}" -f "$repo_root/tests/safety/safety-publication-integration.sql"
 psql "${psql_args[@]}" -f "$repo_root/tests/safety/safety-case-publication-integration.sql"
+psql "${psql_args[@]}" -f "$repo_root/tests/safety/safety-source-invalidation-integration.sql"
 echo "Safety PostgreSQL publication integration: PASS"
