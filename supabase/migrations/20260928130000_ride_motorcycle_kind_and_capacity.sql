@@ -3,12 +3,16 @@
 alter table public.ride_driver_vehicles
   add column if not exists vehicle_kind text not null default 'CAR';
 alter table public.ride_driver_vehicles
+  drop constraint if exists ride_driver_vehicle_kind_valid;
+alter table public.ride_driver_vehicles
   add constraint ride_driver_vehicle_kind_valid
   check (vehicle_kind in ('CAR', 'MOTORCYCLE') and
          (vehicle_kind <> 'MOTORCYCLE' or seats = 1));
 
 alter table public.ride_requests
   add column if not exists requested_vehicle_kind text not null default 'CAR';
+alter table public.ride_requests
+  drop constraint if exists ride_requested_vehicle_kind_valid;
 alter table public.ride_requests
   add constraint ride_requested_vehicle_kind_valid
   check (requested_vehicle_kind in ('CAR', 'MOTORCYCLE'));

@@ -586,6 +586,7 @@ grant execute on function public.safety_finalize_claim_publication_v1(
 -- Direct reads stay controlled by the feature gate even when the API queries
 -- the projection table rather than using the Android UI.
 drop policy if exists safety_public_points_v3_closed on public.safety_public_points;
+drop policy if exists safety_public_points_v3_published_read on public.safety_public_points;
 create policy safety_public_points_v3_published_read
 on public.safety_public_points for select to authenticated using (
     exists (select 1 from public.runtime_feature_gates

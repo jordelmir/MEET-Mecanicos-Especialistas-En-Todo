@@ -16,13 +16,16 @@ drop policy if exists universal_requests_client_update on public.universal_servi
 drop policy if exists universal_requests_client_delete on public.universal_service_requests;
 revoke update,delete on public.universal_service_requests from authenticated;
 drop policy if exists universal_requests_client_all on public.universal_service_requests;
+drop policy if exists universal_requests_client_read on public.universal_service_requests;
 create policy universal_requests_client_read on public.universal_service_requests
 for select to authenticated using(client_id=auth.uid());
+drop policy if exists universal_requests_client_create on public.universal_service_requests;
 create policy universal_requests_client_create on public.universal_service_requests
 for insert to authenticated with check(client_id=auth.uid() and state='OPEN'
  and assigned_provider_id is null and accepted_offer_id is null and final_price_minor is null
  and payment_state='NOT_STARTED' and version=1);
 drop policy if exists universal_offers_provider_write on public.universal_service_offers;
+drop policy if exists universal_offers_provider_create on public.universal_service_offers;
 create policy universal_offers_provider_create on public.universal_service_offers
 for insert to authenticated with check(provider_id=auth.uid() and state='PENDING'
  and public.universal_service_provider_eligible_v1(auth.uid())
@@ -91,6 +94,7 @@ create table if not exists public.universal_service_ratings(
 );
 alter table public.universal_service_ratings enable row level security;
 grant select on public.universal_service_ratings to authenticated;
+drop policy if exists universal_ratings_read on public.universal_service_ratings;
 create policy universal_ratings_read on public.universal_service_ratings for select to authenticated using(client_id=auth.uid() or provider_id=auth.uid());
 create or replace function public.universal_service_rate_v1(p_request_id uuid,p_stars integer)
 returns public.universal_service_ratings language plpgsql security definer set search_path='' as $$

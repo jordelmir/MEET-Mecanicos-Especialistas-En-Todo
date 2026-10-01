@@ -97,6 +97,7 @@ alter table public.platform_operation_cases enable row level security;
 alter table public.elysium_outbox_events enable row level security;
 
 -- Policy: users can read their own entitlements
+drop policy if exists "Users can read own entitlements" on public.agent_entitlements;
 create policy "Users can read own entitlements"
     on public.agent_entitlements
     for select
@@ -104,6 +105,7 @@ create policy "Users can read own entitlements"
     using (auth.uid() = user_id);
 
 -- Service role full access
+drop policy if exists "Service role manages entitlements" on public.agent_entitlements;
 create policy "Service role manages entitlements"
     on public.agent_entitlements
     for all
@@ -111,6 +113,7 @@ create policy "Service role manages entitlements"
     using (true)
     with check (true);
 
+drop policy if exists "Service role manages platform cases" on public.platform_operation_cases;
 create policy "Service role manages platform cases"
     on public.platform_operation_cases
     for all
@@ -118,6 +121,7 @@ create policy "Service role manages platform cases"
     using (true)
     with check (true);
 
+drop policy if exists "Service role manages outbox events" on public.elysium_outbox_events;
 create policy "Service role manages outbox events"
     on public.elysium_outbox_events
     for all

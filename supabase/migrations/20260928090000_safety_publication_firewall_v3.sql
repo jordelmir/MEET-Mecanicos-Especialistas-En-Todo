@@ -124,25 +124,35 @@ on conflict (source_table, source_key) do nothing;
 -- publication migrations must explicitly replace these deny policies.
 drop policy if exists safety_public_points_anyone_read
 on public.safety_public_points;
+drop policy if exists safety_public_points_v3_closed
+on public.safety_public_points;
 create policy safety_public_points_v3_closed
 on public.safety_public_points for select to authenticated using (false);
 
 drop policy if exists safety_public_case_projection_read
+on public.safety_public_case_projection;
+drop policy if exists safety_public_case_projection_v3_closed
 on public.safety_public_case_projection;
 create policy safety_public_case_projection_v3_closed
 on public.safety_public_case_projection for select to authenticated using (false);
 
 drop policy if exists safety_public_case_timeline_read
 on public.safety_public_case_timeline_projection;
+drop policy if exists safety_public_case_timeline_v3_closed
+on public.safety_public_case_timeline_projection;
 create policy safety_public_case_timeline_v3_closed
 on public.safety_public_case_timeline_projection for select to authenticated using (false);
 
 drop policy if exists safety_public_case_claim_read
 on public.safety_public_case_claim_projection;
+drop policy if exists safety_public_case_claim_v3_closed
+on public.safety_public_case_claim_projection;
 create policy safety_public_case_claim_v3_closed
 on public.safety_public_case_claim_projection for select to authenticated using (false);
 
 drop policy if exists safety_public_accountability_projection_read
+on public.safety_public_accountability_projection;
+drop policy if exists safety_public_accountability_projection_v3_closed
 on public.safety_public_accountability_projection;
 create policy safety_public_accountability_projection_v3_closed
 on public.safety_public_accountability_projection for select to authenticated using (false);

@@ -21,6 +21,7 @@ create index safety_evidence_verifications_evidence on public.safety_evidence_ve
 alter table public.safety_evidence_verifications enable row level security;
 revoke all on public.safety_evidence_verifications from public, anon, authenticated, service_role;
 grant select on public.safety_evidence_verifications to service_role, authenticated;
+drop policy if exists safety_verifications_owner_read on public.safety_evidence_verifications;
 create policy safety_verifications_owner_read on public.safety_evidence_verifications
 for select to authenticated using (exists (
     select 1 from public.safety_evidence_objects e

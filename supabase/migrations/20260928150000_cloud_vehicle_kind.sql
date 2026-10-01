@@ -12,5 +12,7 @@ alter table public.cloud_vehicles
 alter table public.cloud_vehicles
   add column if not exists fuel_type text not null default '';
 alter table public.cloud_vehicles
+  drop constraint if exists cloud_vehicle_kind_valid;
+alter table public.cloud_vehicles
   add constraint cloud_vehicle_kind_valid
   check (vehicle_kind in ('CAR', 'MOTORCYCLE'));

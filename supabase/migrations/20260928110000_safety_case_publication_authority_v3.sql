@@ -426,6 +426,8 @@ grant execute on function public.safety_finalize_case_publication_v1(
 
 drop policy if exists safety_public_case_projection_v3_closed
 on public.safety_public_case_projection;
+drop policy if exists safety_public_case_projection_v3_published_read
+on public.safety_public_case_projection;
 create policy safety_public_case_projection_v3_published_read
 on public.safety_public_case_projection for select to authenticated using (
     exists (select 1 from public.runtime_feature_gates

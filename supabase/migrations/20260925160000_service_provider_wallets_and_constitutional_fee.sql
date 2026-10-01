@@ -57,6 +57,7 @@ alter table public.service_provider_wallets enable row level security;
 alter table public.service_provider_wallet_ledger enable row level security;
 
 -- Read wallet: Provider owner or service role
+drop policy if exists "Providers can view own wallet" on public.service_provider_wallets;
 create policy "Providers can view own wallet"
   on public.service_provider_wallets
   for select
@@ -66,6 +67,7 @@ create policy "Providers can view own wallet"
   );
 
 -- Read ledger: Provider owner or service role
+drop policy if exists "Providers can view own ledger entries" on public.service_provider_wallet_ledger;
 create policy "Providers can view own ledger entries"
   on public.service_provider_wallet_ledger
   for select

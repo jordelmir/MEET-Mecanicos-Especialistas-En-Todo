@@ -28,6 +28,7 @@ alter table public.safety_public_accountability_projection add column publicatio
 revoke all on public.safety_public_accountability_projection from anon,authenticated,service_role;
 grant select on public.safety_public_accountability_projection to authenticated;
 drop policy if exists safety_public_accountability_projection_v3_closed on public.safety_public_accountability_projection;
+drop policy if exists safety_accountability_v3_published_read on public.safety_public_accountability_projection;
 create policy safety_accountability_v3_published_read on public.safety_public_accountability_projection for select to authenticated using(
  exists(select 1 from public.runtime_feature_gates where key='safety_accountability' and enabled)
  and exists(select 1 from public.safety_public_case_projection where case_id=safety_public_accountability_projection.case_id)
