@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="common_map_loading">Cargando mapa base…</string>
+    <string name="common_map_unavailable">Mapa base no disponible. Revisa la conexión; tus reportes guardados siguen disponibles.</string>
+    <string name="common_map_retry">Reintentar mapa</string>
+</resources>
