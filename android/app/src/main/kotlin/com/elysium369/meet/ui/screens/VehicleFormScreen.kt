@@ -61,6 +61,7 @@ private fun OwnedVehicleFormScreen(navController: NavController,viewModel: ObdVi
     var make by rememberSaveable { mutableStateOf("") }
     var model by rememberSaveable { mutableStateOf("") }
     var year by rememberSaveable { mutableStateOf("") }
+    var vehicleKind by rememberSaveable { mutableStateOf("CAR") }
     
     // Detailed Spec
     var engineDisplacement by rememberSaveable { mutableStateOf("") }
@@ -108,6 +109,7 @@ private fun OwnedVehicleFormScreen(navController: NavController,viewModel: ObdVi
     val scrollState = rememberScrollState()
     var isSaving by remember { mutableStateOf(false) }
     var saveSuccess by remember { mutableStateOf(false) }
+    var saveNotice by remember { mutableStateOf<String?>(null) }
 
     // Brand Colors
     val neonCyan = MeetColors.cyberCyan
@@ -213,6 +215,16 @@ private fun OwnedVehicleFormScreen(navController: NavController,viewModel: ObdVi
 
             // Section: DNA del Vehículo
             FormSectionHeader(t("ADN DEL VEHÍCULO", "VEHICLE DNA"), neonCyan)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("CAR" to t("🚗 Carro", "🚗 Car"), "MOTORCYCLE" to t("🛵 Moto", "🛵 Motorcycle")).forEach { (kind, label) ->
+                    FilterChip(selected = vehicleKind == kind, onClick = { vehicleKind = kind }, label = { Text(label) })
+                }
+            }
+            if (vehicleKind == "MOTORCYCLE") Text(
+                t("Moto: 1 pasajero en Viajes; comida y objetos pequeños en Entregas.", "Motorcycle: 1 ride passenger; food and small parcels in Deliveries."),
+                color = neonCyan,
+                fontSize = 12.sp,
+            )
             
             OutlinedTextField(
                 value = make,
@@ -423,11 +435,16 @@ private fun OwnedVehicleFormScreen(navController: NavController,viewModel: ObdVi
                 onClick = {
                     if (isFormValid && !isSaving) {
                         isSaving = true
-                        viewModel.saveVehicle(make, model, year, engineDisplacement, engineTech, transmission, transmissionType, fuelType, plate, vin)
-                        coroutineScope.launch {
-                            saveSuccess = true
-                            delay(1200) // Show success animation
-                            navController.backOrHome()
+                        viewModel.saveVehicle(make, model, year, engineDisplacement, engineTech, transmission, transmissionType, fuelType, plate, vin, vehicleKind) { online, notice ->
+                            saveNotice = notice
+                            isSaving = false
+                            if (online) {
+                                saveSuccess = true
+                                coroutineScope.launch {
+                                    delay(1200)
+                                    navController.backOrHome()
+                                }
+                            }
                         }
                     }
                 },
@@ -452,6 +469,9 @@ private fun OwnedVehicleFormScreen(navController: NavController,viewModel: ObdVi
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp
                 )
+            }
+            saveNotice?.let { notice ->
+                Text(notice, color = if (saveSuccess) MeetColors.neonGreen else MeetColors.warning, fontSize = 12.sp)
             }
             
             Spacer(modifier = Modifier.height(40.dp))

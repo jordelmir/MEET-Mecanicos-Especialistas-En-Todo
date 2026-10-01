@@ -23,14 +23,17 @@ class NeuralVault @Inject constructor(@ApplicationContext context: Context) {
     )
 
     fun saveApiKey(provider: String, key: String) {
-        sharedPrefs.edit().putString("${provider.lowercase()}_api_key", key).apply()
+        sharedPrefs.edit().putString(scopedKey(provider), key).apply()
     }
 
     fun getApiKey(provider: String): String? {
-        return sharedPrefs.getString("${provider.lowercase()}_api_key", null)
+        return sharedPrefs.getString(scopedKey(provider), null)
     }
 
     fun clearKey(provider: String) {
-        sharedPrefs.edit().remove("${provider.lowercase()}_api_key").apply()
+        sharedPrefs.edit().remove(scopedKey(provider)).apply()
     }
+
+    private fun scopedKey(provider: String) =
+        "${DragonAccountScope.storageKey()}_${provider.lowercase()}_api_key"
 }

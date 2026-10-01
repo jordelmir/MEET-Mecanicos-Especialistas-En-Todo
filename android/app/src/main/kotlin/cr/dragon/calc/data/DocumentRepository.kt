@@ -17,7 +17,7 @@ import java.util.UUID
 class DocumentRepository(context: Context) {
 
     private val prefs: SharedPreferences = context.getSharedPreferences("dragon_docs_prefs", Context.MODE_PRIVATE)
-    private val CELLS_KEY = "document_cells"
+    private val CELLS_KEY get() = "${dragoncore.security.DragonAccountScope.storageKey()}_document_cells"
 
     fun saveCells(cells: List<Cell>) {
         val jsonArray = JSONArray()

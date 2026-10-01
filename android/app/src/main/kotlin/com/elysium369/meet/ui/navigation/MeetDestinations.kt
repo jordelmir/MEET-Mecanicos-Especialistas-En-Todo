@@ -60,6 +60,7 @@ object MeetDestinations {
     const val FUEL_REWARDS = "fuel_rewards"
     const val ELYSIUM_SERVICES = "elysium_services"
     const val SERVICES_ACTIVE = "services_active"
+    const val ELYSIUM_DELIVERIES = "elysium_deliveries"
     const val SERVICES_COMPLETED = "services_completed"
     const val PROVIDER_SERVICES_CONFIG = "provider_services_config"
     const val AGENT_STORE = "agent_store"

@@ -38,7 +38,8 @@ data class Vehicle(
     val transmission_subtype: String = "",
     val fuel_type: String = "",
     val vin: String,
-    val plate: String
+    val plate: String,
+    val vehicle_kind: String = "CAR",
 )
 
 /** Wire model for the production `cloud_vehicles` table. */
@@ -54,6 +55,12 @@ private data class CloudVehicle(
     val plate: String? = null,
     val odometer: Int = 0,
     val nickname: String? = null,
+    val vehicle_kind: String = "CAR",
+    val displacement_cc: Int = 0,
+    val engine_tech: String = "",
+    val transmission_type: String = "",
+    val transmission_subtype: String = "",
+    val fuel_type: String = "",
 )
 
 @Serializable
@@ -164,6 +171,14 @@ class VehicleRepository internal constructor(
     suspend fun syncVehiclesFromCloud(userId: String): RemoteResult<Int> {
         if (principalKernel.current().id != userId || SupabaseManager.client.auth.currentUserOrNull()?.id != userId) return RemoteResult.Unauthorized
         return try {
+            // Publish this account's offline intents before refreshing the server projection.
+            // A failed push must not be overwritten by a stale cloud row.
+            for (pending in vehicleDao.getPendingVehiclesForUser(userId)) {
+                if (principalKernel.current().id != userId || SupabaseManager.client.auth.currentUserOrNull()?.id != userId)
+                    return RemoteResult.Unauthorized
+                SupabaseManager.client.postgrest["cloud_vehicles"].upsert(pending.toDomain().toCloudVehicle())
+                vehicleDao.markVehicleSynced(userId, pending.id, System.currentTimeMillis())
+            }
             val cloudVehicles = SupabaseManager.client.postgrest["cloud_vehicles"]
                 .select {
                     filter {
@@ -177,7 +192,16 @@ class VehicleRepository internal constructor(
                 val existing = vehicleDao.getVehicleById(vehicle.id)
                 if (existing != null && existing.userId != userId) return RemoteResult.Forbidden(code = "USER_MISMATCH", message = "Vehicle owner mismatch")
                 if (principalKernel.current().id != userId) return RemoteResult.Unauthorized
-                vehicleDao.insertVehicle(vehicle.toLocalVehicle().toEntity())
+                val received = vehicle.toLocalVehicle().toEntity()
+                vehicleDao.insertVehicle(received.copy(
+                    photoPath = existing?.photoPath,
+                    odometerKm = existing?.odometerKm ?: 0L,
+                    createdAt = existing?.createdAt ?: received.createdAt,
+                    syncedAt = System.currentTimeMillis(),
+                    businessId = existing?.businessId,
+                    fleetId = existing?.fleetId,
+                    assignedDriverId = existing?.assignedDriverId,
+                ))
             }
             RemoteResult.Success(cloudVehicles.size)
         } catch (e: Exception) {
@@ -224,6 +248,7 @@ class VehicleRepository internal constructor(
                 return RemoteResult.Forbidden(code = "USER_MISMATCH", message = "Authenticated user does not match vehicle owner")
             }
             SupabaseManager.client.postgrest["cloud_vehicles"].upsert(vehicle.toCloudVehicle())
+            vehicleDao.markVehicleSynced(owner, vehicle.id, System.currentTimeMillis())
             RemoteResult.Success(Unit)
         } catch (e: Exception) {
             android.util.Log.e("VehicleRepository", "Failed to push vehicle to cloud", e)
@@ -270,8 +295,14 @@ private fun CloudVehicle.toLocalVehicle() = Vehicle(
     make = make,
     model = model,
     engine = engine ?: "Dato no capturado",
+    displacement_cc = displacement_cc,
+    engine_tech = engine_tech,
+    transmission_type = transmission_type,
+    transmission_subtype = transmission_subtype,
+    fuel_type = fuel_type,
     vin = vin ?: "NOT_READ",
     plate = plate ?: "NOT_SET",
+    vehicle_kind = vehicle_kind,
 )
 
 private fun Vehicle.toCloudVehicle() = CloudVehicle(
@@ -283,6 +314,12 @@ private fun Vehicle.toCloudVehicle() = CloudVehicle(
     year = year.takeIf { it > 0 },
     engine = engine.takeUnless { it == "Dato no capturado" },
     plate = plate.takeUnless { it == "NOT_SET" },
+    vehicle_kind = vehicle_kind,
+    displacement_cc = displacement_cc,
+    engine_tech = engine_tech,
+    transmission_type = transmission_type,
+    transmission_subtype = transmission_subtype,
+    fuel_type = fuel_type,
 )
 
 fun VehicleEntity.toDomain() = Vehicle(
@@ -298,7 +335,8 @@ fun VehicleEntity.toDomain() = Vehicle(
     transmission_subtype = transmissionSubtype,
     fuel_type = fuelType,
     vin = vin,
-    plate = plate
+    plate = plate,
+    vehicle_kind = vehicleKind,
 )
 
 fun Vehicle.toEntity() = VehicleEntity(
@@ -318,7 +356,8 @@ fun Vehicle.toEntity() = VehicleEntity(
     photoPath = null,
     odometerKm = 0L,
     createdAt = System.currentTimeMillis(),
-    syncedAt = null
+    syncedAt = null,
+    vehicleKind = vehicle_kind,
 )
 
 @Singleton

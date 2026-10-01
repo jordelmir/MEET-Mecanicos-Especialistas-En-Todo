@@ -539,6 +539,7 @@ fun HomeClassicScreen(
                 add(Triple("🏠", "Properties", MeetColors.neonGreen) to "elysium_properties")
                 add(Triple("⛽", "Fuel Rewards", MeetColors.cyberCyan) to "fuel_rewards")
                 add(Triple("🚕", "Elysium Rides", MeetColors.neonGreen) to MeetDestinations.RIDE_HOME)
+                add(Triple("🛵", "Comida y Entregas", MeetColors.cyberCyan) to MeetDestinations.ELYSIUM_DELIVERIES)
                 add(Triple("📚", "Elysium Aprende", Color(0xFFFFD700)) to MeetDestinations.LEARNING_HUB)
                 add(Triple("⚡", "Servicios Elysium", MeetColors.neonGreen) to MeetDestinations.ELYSIUM_SERVICES)
                 add(Triple("🤖", "Agent Store", MeetColors.cyberCyan) to MeetDestinations.AGENT_STORE)

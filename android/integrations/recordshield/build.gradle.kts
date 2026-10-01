@@ -85,7 +85,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     implementation("com.google.android.gms:play-services-auth:21.3.0")
-    implementation("com.google.api-client:google-api-client:2.7.2")
-    implementation("com.google.oauth-client:google-oauth-client-jetty:1.36.0")
     testImplementation("junit:junit:4.13.2")
 }

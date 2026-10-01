@@ -5069,6 +5069,12 @@ object AppModule {
         }
     }
 
+    val MIGRATION_86_87 = object : Migration(86, 87) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE vehicles ADD COLUMN vehicleKind TEXT NOT NULL DEFAULT 'CAR'")
+        }
+    }
+
     val MIGRATION_84_85 = object : Migration(84, 85) {
         override fun migrate(db: SupportSQLiteDatabase) {
             db.execSQL("""
@@ -5191,6 +5197,7 @@ object AppModule {
             MIGRATION_83_84,
             MIGRATION_84_85,
             MIGRATION_85_86,
+            MIGRATION_86_87,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

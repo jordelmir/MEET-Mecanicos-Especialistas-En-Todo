@@ -33,11 +33,13 @@ fun ServicesExperienceScreen(
     onProviderConfig: () -> Unit,
     onServiceMessages: (String) -> Unit,
     initialPane: Int = 0,
+    initialRequestDraft: ServicesRequestDraft? = null,
+    initialHistory: Boolean = false,
 ) {
     val principal by viewModel.activePrincipal.collectAsState()
     val actor = principal?.id
     var pane by rememberSaveable(actor) { mutableIntStateOf(initialPane.coerceIn(0, 2)) }
-    var draft by remember(actor) { mutableStateOf<ServicesRequestDraft?>(null) }
+    var draft by remember(actor, initialRequestDraft) { mutableStateOf(initialRequestDraft) }
     var offerDraft by remember(actor) { mutableStateOf<ServicesOfferDraft?>(null) }
     var authorityNotice by remember(actor) { mutableStateOf<String?>(null) }
     CompositionLocalProvider(LocalServiceOnlineAction provides { message -> authorityNotice = message; pane = 1 },
@@ -59,7 +61,8 @@ fun ServicesExperienceScreen(
                 1 -> UnifiedServicesScreen(viewModel, onBack, onMessages, onProviderConfig,
                     onAdvanced = { pane = 2 }, onServiceMessages = onServiceMessages,
                     requestDraft = draft, onDraftConsumed = { draft = null },
-                    offerDraft = offerDraft, onOfferDraftConsumed = { offerDraft = null })
+                    offerDraft = offerDraft, onOfferDraftConsumed = { offerDraft = null },
+                    initialHistory = initialHistory)
                 else -> ElysiumServicesMarketplaceScreen(navController, viewModel, onPrepareRequest = { draft = it; pane = 1 })
             }
         }

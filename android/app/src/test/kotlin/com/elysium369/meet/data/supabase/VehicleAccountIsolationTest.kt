@@ -27,6 +27,13 @@ class VehicleAccountIsolationTest {
             val result=rows.value.firstOrNull { it.id==id };afterLookup?.invoke();return result
         }
         override suspend fun getVehicleByVinForUser(userId:String,vin:String)=rows.value.firstOrNull { it.userId==userId && it.vin==vin }
+        override suspend fun getPendingVehiclesForUser(userId: String): List<VehicleEntity> =
+            rows.value.filter { it.userId == userId && it.syncedAt == null }
+        override suspend fun markVehicleSynced(userId: String, id: String, syncedAt: Long) {
+            rows.value = rows.value.map {
+                if (it.userId == userId && it.id == id) it.copy(syncedAt = syncedAt) else it
+            }
+        }
         override suspend fun insertVehicle(vehicle:VehicleEntity) { writes++ }
         override suspend fun deleteVehicle(vehicle:VehicleEntity) { writes++ }
     }

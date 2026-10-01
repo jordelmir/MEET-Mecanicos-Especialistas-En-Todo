@@ -24,20 +24,20 @@ import com.elysium369.meet.core.agent.ui.*
 @Serializable private data class ServiceDefinitionWire(val id:String,val domain:String,@SerialName("display_name") val name:String,@SerialName("supported_modalities") val modalities:List<String>)
 // Empty string means the older server has no attestation column; JSON null means
 // the new authority is active and still waiting for the provider.
-@Serializable private data class ServiceRequestWire(val id:String,@SerialName("client_id") val client:String,@SerialName("assigned_provider_id") val provider:String?=null,@SerialName("service_definition_id") val definition:String,val modality:String,val title:String,val description:String,@SerialName("location_label") val location:String?=null,@SerialName("offered_price_minor") val price:Long,@SerialName("final_price_minor") val finalPrice:Long?=null,@SerialName("provider_payment_attested_at") val providerPaymentAttestedAt:String?="",val currency:String,val state:String,val version:Long)
+@Serializable private data class ServiceRequestWire(val id:String,@SerialName("client_id") val client:String,@SerialName("assigned_provider_id") val provider:String?=null,@SerialName("service_definition_id") val definition:String,val modality:String,val title:String,val description:String,val intake:JsonObject=buildJsonObject {},@SerialName("location_label") val location:String?=null,@SerialName("offered_price_minor") val price:Long,@SerialName("final_price_minor") val finalPrice:Long?=null,@SerialName("provider_payment_attested_at") val providerPaymentAttestedAt:String?="",val currency:String,val state:String,val version:Long)
 @Serializable private data class ServiceOfferWire(val id:String,@SerialName("request_id") val request:String,@SerialName("provider_id") val provider:String,@SerialName("price_minor") val price:Long,val currency:String,val state:String,@SerialName("eta_minutes") val etaMinutes:Int?=null,@SerialName("warranty_days") val warrantyDays:Int=0,val scope:JsonObject=buildJsonObject {})
 @Serializable private data class ProviderSummary(@SerialName("provider_id") val providerId:String?=null,val name:String?=null,val completed:Long=0,val reviews:Long=0,val rating:Double?=null,@SerialName("balance_minor") val balance:Long?=null,val eligible:Boolean=false)
 
 /** Both historical entry points share this server-authoritative client/provider experience. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:()->Unit,onProviderConfig:()->Unit,onAdvanced:()->Unit,onServiceMessages:(String)->Unit,requestDraft:ServicesRequestDraft?=null,onDraftConsumed:()->Unit={},offerDraft:ServicesOfferDraft?=null,onOfferDraftConsumed:()->Unit={}) {
+fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:()->Unit,onProviderConfig:()->Unit,onAdvanced:()->Unit,onServiceMessages:(String)->Unit,requestDraft:ServicesRequestDraft?=null,onDraftConsumed:()->Unit={},offerDraft:ServicesOfferDraft?=null,onOfferDraftConsumed:()->Unit={},initialHistory:Boolean=false) {
  val principal by viewModel.activePrincipal.collectAsState()
  val actor=principal?.id
  val scope=rememberCoroutineScope()
  var providerMode by remember(actor) { mutableStateOf(false) }
  var pages by remember(actor) { mutableStateOf(1) }
- var history by remember(actor) { mutableStateOf(false) }
+ var history by remember(actor,initialHistory) { mutableStateOf(initialHistory) }
  var definitions by remember(actor) { mutableStateOf(emptyList<ServiceDefinitionWire>()) }
  var requests by remember(actor) { mutableStateOf(emptyList<ServiceRequestWire>()) }
  var offers by remember(actor) { mutableStateOf(emptyList<ServiceOfferWire>()) }
@@ -57,6 +57,11 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
  var warrantyDays by remember(actor) { mutableStateOf("0") }
  var offerNote by remember(actor) { mutableStateOf("") }
  var requestIntake by remember(actor) { mutableStateOf<JsonObject>(buildJsonObject {}) }
+ var courierVehicleKind by remember(actor) { mutableStateOf("MOTORCYCLE") }
+ var packageWeight by remember(actor) { mutableStateOf("") }
+ var packageLength by remember(actor) { mutableStateOf("") }
+ var packageWidth by remember(actor) { mutableStateOf("") }
+ var packageHeight by remember(actor) { mutableStateOf("") }
  var transferAmount by remember(actor) { mutableStateOf("") }
  var transferId by remember(actor) { mutableStateOf(UUID.randomUUID().toString()) }
  var draftId by remember(actor) { mutableStateOf(UUID.randomUUID().toString()) }
@@ -184,13 +189,27 @@ fun UnifiedServicesScreen(viewModel:ObdViewModel,onBack:()->Unit,onOpenMessages:
    OutlinedTextField(description,{description=it},modifier=Modifier.agentTextInput(AgentUiControlId("services.description"),"Describe lo que necesitas",readValue={description},writeValue={description=it},route="elysium_services"),label={Text("Describe lo que necesitas")})
    OutlinedTextField(location,{location=it},modifier=Modifier.agentTextInput(AgentUiControlId("services.location"),"Lugar o instrucciones para servicio remoto",readValue={location},writeValue={location=it},route="elysium_services"),label={Text("Lugar o instrucciones para servicio remoto")})
    OutlinedTextField(price,{price=it},modifier=Modifier.agentTextInput(AgentUiControlId("services.price"),"Presupuesto",readValue={price},writeValue={price=it},route="elysium_services"),label={Text("Presupuesto en CRC (colones enteros)")})
-   d.modalities.forEach { option -> FilterChip(selected=modality==option,onClick={modality=option},label={Text(option)}) }
-  }},dismissButton={TextButton(onClick={selectedDefinition=null},enabled=!busy){Text("Volver")}},confirmButton={Button(enabled=!busy && title.trim().length in 3..160 && description.trim().length in 10..5000 && (price.toLongOrNull() ?: 0)>0 && location.isNotBlank(),onClick={action {
-   try { client.postgrest["universal_service_requests"].insert(buildJsonObject { put("id",draftId);put("client_id",requireNotNull(actor));put("service_definition_id",d.id);put("modality",modality);put("title",title.trim());put("description",description.trim());put("intake",requestIntake);put("location_label",location.trim());put("offered_price_minor",requireNotNull(price.toLongOrNull()));put("currency","CRC") }) } catch(c:CancellationException) { throw c } catch(e:Exception) {
-    val existing=client.postgrest["universal_service_requests"].select { filter {eq("id",draftId);eq("client_id",requireNotNull(actor))} }.decodeList<ServiceRequestWire>().singleOrNull()
-    if(existing==null || existing.definition!=d.id || existing.modality!=modality || existing.title!=title.trim() || existing.description!=description.trim() || existing.location!=location.trim() || existing.price!=price.toLongOrNull() || existing.currency!="CRC") throw e
+   if(d.id=="courier") {
+    Text("Objeto pequeño: indica peso y medidas reales. No transporta personas.")
+    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+     listOf("MOTORCYCLE" to "🛵 Moto", "CAR" to "🚗 Carro").forEach { (kind,label) ->
+      FilterChip(selected=courierVehicleKind==kind,onClick={courierVehicleKind=kind},label={Text(label)})
+     }
+    }
+    OutlinedTextField(packageWeight,{packageWeight=it},label={Text("Peso en kg")})
+    OutlinedTextField(packageLength,{packageLength=it},label={Text("Largo en cm")})
+    OutlinedTextField(packageWidth,{packageWidth=it},label={Text("Ancho en cm")})
+    OutlinedTextField(packageHeight,{packageHeight=it},label={Text("Alto en cm")})
+    Text(if(courierVehicleKind=="MOTORCYCLE") "Moto: hasta 10 kg · 45 × 35 × 35 cm" else "Carro: hasta 20 kg · 80 × 60 × 60 cm")
    }
-   selectedDefinition=null;title="";description="";location="";price=""
+   d.modalities.forEach { option -> FilterChip(selected=modality==option,onClick={modality=option},label={Text(option)}) }
+  }},dismissButton={TextButton(onClick={selectedDefinition=null},enabled=!busy){Text("Volver")}},confirmButton={Button(enabled=!busy && title.trim().length in 3..160 && description.trim().length in 10..5000 && (price.toLongOrNull() ?: 0)>0 && location.isNotBlank() && (d.id!="courier" || CourierPackagePolicy.valid(courierVehicleKind,packageWeight.toDoubleOrNull(),packageLength.toDoubleOrNull(),packageWidth.toDoubleOrNull(),packageHeight.toDoubleOrNull())),onClick={action {
+   val intake = if(d.id=="courier") CourierPackagePolicy.intake(courierVehicleKind,requireNotNull(packageWeight.toDoubleOrNull()),requireNotNull(packageLength.toDoubleOrNull()),requireNotNull(packageWidth.toDoubleOrNull()),requireNotNull(packageHeight.toDoubleOrNull()),description.trim()) else requestIntake
+   try { client.postgrest["universal_service_requests"].insert(buildJsonObject { put("id",draftId);put("client_id",requireNotNull(actor));put("service_definition_id",d.id);put("modality",modality);put("title",title.trim());put("description",description.trim());put("intake",intake);put("location_label",location.trim());put("offered_price_minor",requireNotNull(price.toLongOrNull()));put("currency","CRC") }) } catch(c:CancellationException) { throw c } catch(e:Exception) {
+    val existing=client.postgrest["universal_service_requests"].select { filter {eq("id",draftId);eq("client_id",requireNotNull(actor))} }.decodeList<ServiceRequestWire>().singleOrNull()
+    if(existing==null || existing.definition!=d.id || existing.modality!=modality || existing.title!=title.trim() || existing.description!=description.trim() || existing.intake!=intake || existing.location!=location.trim() || existing.price!=price.toLongOrNull() || existing.currency!="CRC") throw e
+   }
+   selectedDefinition=null;title="";description="";location="";price="";draftId=UUID.randomUUID().toString()
   }}){Text("Publicar solicitud")}})
  }
  bidTarget?.let { r -> AlertDialog(onDismissRequest={if(!busy)bidTarget=null},title={Text("Propuesta para ${r.title}")},text={Column { OutlinedTextField(price,{price=it},modifier=Modifier.agentTextInput(AgentUiControlId("services.price"),"Presupuesto",readValue={price},writeValue={price=it},route="elysium_services"),label={Text("Precio en ${r.currency}")})

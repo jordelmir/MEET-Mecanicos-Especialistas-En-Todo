@@ -54,7 +54,6 @@ object CoreModule {
     fun providePhysicsEngine(): DragonPhysicsEngine = DragonPhysicsEngine()
 
     @Provides
-    @Singleton
     fun provideDatabase(@ApplicationContext context: Context): DragonDatabase = DragonDatabase.getInstance(context)
 
     @Provides

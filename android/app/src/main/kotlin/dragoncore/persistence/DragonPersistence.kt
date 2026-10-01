@@ -24,7 +24,7 @@ object DragonPersistence {
      */
     fun saveDocument(context: Context, document: DragonDocument) {
         try {
-            val fileName = "${document.id}.drbk"
+            val fileName = scopedFileName(document.id)
             val jsonString = json.encodeToString(document)
             context.openFileOutput(fileName, Context.MODE_PRIVATE).use {
                 it.write(jsonString.toByteArray())
@@ -38,7 +38,7 @@ object DragonPersistence {
      */
     fun loadDocument(context: Context, id: String): DragonDocument? {
         return try {
-            val fileName = "$id.drbk"
+            val fileName = scopedFileName(id)
             val jsonString = context.openFileInput(fileName).bufferedReader().use { it.readText() }
             json.decodeFromString<DragonDocument>(jsonString)
         } catch (e: Exception) {
@@ -51,8 +51,9 @@ object DragonPersistence {
      */
     fun listBooks(context: Context): List<DragonDocument> {
         val files = context.fileList() ?: return emptyList()
-        return files.filter { it.endsWith(".drbk") }.mapNotNull { fileName ->
-            val id = fileName.removeSuffix(".drbk")
+        val prefix = "dragon_${dragoncore.security.DragonAccountScope.storageKey()}_"
+        return files.filter { it.startsWith(prefix) && it.endsWith(".drbk") }.mapNotNull { fileName ->
+            val id = fileName.removePrefix(prefix).removeSuffix(".drbk")
             loadDocument(context, id)
         }.sortedByDescending { it.lastModified }
     }
@@ -61,6 +62,11 @@ object DragonPersistence {
      * Elimina un libro.
      */
     fun deleteBook(context: Context, id: String) {
-        context.deleteFile("$id.drbk")
+        context.deleteFile(scopedFileName(id))
+    }
+
+    private fun scopedFileName(id: String): String {
+        require(id.matches(Regex("[A-Za-z0-9_-]{1,128}")))
+        return "dragon_${dragoncore.security.DragonAccountScope.storageKey()}_$id.drbk"
     }
 }

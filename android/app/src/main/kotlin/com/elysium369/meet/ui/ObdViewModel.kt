@@ -203,10 +203,11 @@ private data class RemoteRideDriverVehicleSummary(
     val seats: Int,
     @kotlinx.serialization.SerialName("verification_status") val verificationStatus: String,
     @kotlinx.serialization.SerialName("is_active") val active: Boolean,
+    @kotlinx.serialization.SerialName("vehicle_kind") val vehicleKind: String = "CAR",
 ) {
     fun toDomain() = RideDriverVehicleSummary(
         id, displayName, make, model, modelYear, color, plateMasked,
-        fleetName, seats, verificationStatus, active,
+        fleetName, seats, verificationStatus, active, vehicleKind,
     )
 }
 
@@ -7549,8 +7550,14 @@ class ObdViewModel @Inject constructor(
         transmissionType: String,
         fuelType: String,
         plate: String,
-        vin: String?
+        vin: String?,
+        vehicleKind: String = "CAR",
+        onResult: ((Boolean, String) -> Unit)? = null,
     ) {
+        if (vehicleKind !in setOf("CAR", "MOTORCYCLE")) {
+            onResult?.invoke(false, "Tipo de vehículo inválido")
+            return
+        }
         val ownerAtRequest=activePrincipalKernel.current().id
         viewModelScope.launch {
             if(activePrincipalKernel.current().id!=ownerAtRequest) return@launch
@@ -7572,25 +7579,30 @@ class ObdViewModel @Inject constructor(
                 transmission_subtype = transmissionType,
                 fuel_type = fuelType,
                 vin = vin?.ifBlank { "NOT_READ" } ?: "NOT_READ",
-                plate = plate.ifBlank { "NOT_SET" }
+                plate = plate.ifBlank { "NOT_SET" },
+                vehicle_kind = vehicleKind,
             )
 
-            android.util.Log.d("ObdVM", "Saving vehicle: ${vehicle.make} ${vehicle.model} (ID: ${vehicle.id})")
             when (val result = vehicleRepository.insertVehicle(vehicle)) {
                 is com.elysium369.meet.core.remote.RemoteResult.Success -> {
                     voiceFeedbackManager.speak(
                         "Vehículo $make $model guardado exitosamente.",
                         "Vehicle $make $model saved successfully."
                     )
+                    onResult?.invoke(true, "Vehículo confirmado en línea")
                 }
                 is com.elysium369.meet.core.remote.RemoteResult.Forbidden,
-                is com.elysium369.meet.core.remote.RemoteResult.Unauthorized -> return@launch
+                is com.elysium369.meet.core.remote.RemoteResult.Unauthorized -> {
+                    onResult?.invoke(false, "No se pudo confirmar la propiedad del vehículo. Inicia sesión y reintenta.")
+                    return@launch
+                }
                 else -> {
                     voiceFeedbackManager.speak(
                         "Vehículo guardado localmente; sincronización remota pendiente.",
                         "Vehicle saved locally; remote sync pending."
                     )
-                    Log.w("ObdVM", "Insert vehicle failed: $result")
+                    Log.w("ObdVM", "La sincronización del vehículo sigue pendiente")
+                    onResult?.invoke(false, "Guardado en este teléfono; pendiente de sincronización en línea")
                 }
             }
 
@@ -9017,17 +9029,19 @@ class ObdViewModel @Inject constructor(
         color: String,
         plate: String,
         fleetName: String?,
+        vehicleKind: String = "CAR",
     ) {
         val normalized = listOf(make, model, color, plate).map(String::trim)
-        if (normalized.any(String::isBlank) || year !in 1900..2200) return
+        if (normalized.any(String::isBlank) || year !in 1900..2200 || vehicleKind !in setOf("CAR", "MOTORCYCLE")) return
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 SupabaseManager.client.postgrest.rpc(
-                    "ride_upsert_driver_vehicle_v1",
+                    "ride_upsert_driver_vehicle_v2",
                     buildJsonObject {
                         put("p_vehicle_id", UUID.randomUUID().toString())
                         put("p_display_name", "$make $model $year $color")
-                        put("p_seats", 4)
+                        put("p_seats", if (vehicleKind == "MOTORCYCLE") 1 else 4)
+                        put("p_vehicle_kind", vehicleKind)
                         put("p_make", make.trim())
                         put("p_model", model.trim())
                         put("p_model_year", year)
@@ -9961,6 +9975,12 @@ class ObdViewModel @Inject constructor(
         passengerPreferences: RidePassengerPreferences? = null,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
+            if (passengerPreferences?.vehicleKind == com.elysium369.meet.ride.domain.RideVehicleKind.MOTORCYCLE &&
+                (passengerPreferences.kidsCount != 0 || passengerPreferences.fivePassengers ||
+                    passengerPreferences.pet != com.elysium369.meet.ride.domain.RidePetType.NONE)) {
+                _rideVerificationNotice.emit("La moto admite un solo pasajero, sin acompañantes ni mascotas.")
+                return@launch
+            }
             // A route cannot be calculated from a text label alone. Reject an
             // incomplete destination before writing a request locally or
             // publishing it remotely; otherwise both clients only receive two

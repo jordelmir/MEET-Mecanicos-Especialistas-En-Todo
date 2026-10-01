@@ -10,18 +10,23 @@ abstract class DragonDatabase : RoomDatabase() {
     abstract fun cellDao(): CellDao
 
     companion object {
-        private const val DB_NAME = "dragon_vault.db"
-
         @Volatile
         private var INSTANCE: DragonDatabase? = null
+        private var currentScope: String? = null
 
+        @Synchronized
         fun getInstance(context: Context): DragonDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(context, DragonDatabase::class.java, DB_NAME)
-                    .build()
-                INSTANCE = instance
-                instance
+            val scope = dragoncore.security.DragonAccountScope.storageKey()
+            if (currentScope != scope) {
+                INSTANCE?.close()
+                INSTANCE = null
+                currentScope = scope
             }
+            return INSTANCE ?: Room.databaseBuilder(
+                context.applicationContext,
+                DragonDatabase::class.java,
+                "dragon_vault_$scope.db",
+            ).build().also { INSTANCE = it }
         }
     }
 }

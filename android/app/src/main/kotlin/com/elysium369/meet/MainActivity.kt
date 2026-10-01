@@ -1126,20 +1126,70 @@ fun MeetApp(
                     )
                 }
             }
+            composable(MeetDestinations.ELYSIUM_DELIVERIES) {
+                com.elysium369.meet.ui.screens.services.ElysiumDeliveriesScreen(
+                    onBack = { navController.backOrHome() },
+                    onFood = { navController.safeNavigate("delivery_food") },
+                    onGroceries = { navController.safeNavigate("delivery_groceries") },
+                    onSmallParcel = { navController.safeNavigate("delivery_small_parcel") },
+                    onBecomeProvider = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                    onMyOrders = { navController.safeNavigate("services_online") },
+                )
+            }
+            for ((deliveryRoute, definitionId) in listOf(
+                "delivery_food" to "soda_traditional_food",
+                "delivery_groceries" to "pulperia_groceries",
+                "delivery_small_parcel" to "courier",
+            )) {
+                composable(deliveryRoute) {
+                    val title = when (definitionId) {
+                        "courier" -> "Entrega de objeto pequeño"
+                        "pulperia_groceries" -> "Compra y entrega de tienda"
+                        else -> "Pedido de comida"
+                    }
+                    com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                        navController = navController, viewModel = obdViewModel,
+                        onBack = { navController.backOrHome() },
+                        onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                        onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                        onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                        onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                        onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                        initialPane = 1,
+                        initialRequestDraft = com.elysium369.meet.ui.screens.services.ServicesRequestDraft(
+                            definitionId = definitionId,
+                            title = title,
+                            description = if (definitionId == "courier") "Objeto pequeño para entrega; indica peso, medidas, recogida y destino." else "Describe productos, cantidad, comercio y entrega solicitada.",
+                            location = "",
+                            priceCrc = 0,
+                            modality = "PHYSICAL",
+                        ),
+                    )
+                }
+            }
             composable(MeetDestinations.SERVICES_ACTIVE) {
-                com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
-                    navController = navController,
-                    viewModel = obdViewModel,
-                    initialTab = 0,
-                    includeRides = false
+                com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                    navController = navController, viewModel = obdViewModel,
+                    onBack = { navController.backOrHome() },
+                    onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                    onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                    onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                    onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                    onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                    initialPane = 1,
                 )
             }
             composable(MeetDestinations.SERVICES_COMPLETED) {
-                com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
-                    navController = navController,
-                    viewModel = obdViewModel,
-                    initialTab = 1,
-                    includeRides = false
+                com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                    navController = navController, viewModel = obdViewModel,
+                    onBack = { navController.backOrHome() },
+                    onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                    onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                    onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                    onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                    onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                    initialPane = 1,
+                    initialHistory = true,
                 )
             }
             composable(
@@ -1153,11 +1203,16 @@ fun MeetApp(
             ) { backStackEntry ->
                 val tabParam = backStackEntry.arguments?.getString("tab") ?: "active"
                 val initialTab = if (tabParam == "completed") 1 else 0
-                com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
-                    navController = navController,
-                    viewModel = obdViewModel,
-                    initialTab = initialTab,
-                    includeRides = false
+                com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                    navController = navController, viewModel = obdViewModel,
+                    onBack = { navController.backOrHome() },
+                    onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                    onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                    onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                    onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                    onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                    initialPane = 1,
+                    initialHistory = initialTab == 1,
                 )
             }
             composable(MeetDestinations.PROVIDER_SERVICES_CONFIG) {
@@ -1810,10 +1865,17 @@ fun MeetApp(
             }
             composable(MeetDestinations.NEXUS_CONTROL) {
                 val context = androidx.compose.ui.platform.LocalContext.current
+                val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                ) { _ -> navController.backOrHome() }
                 androidx.compose.runtime.LaunchedEffect(Unit) {
-                    context.startActivity(android.content.Intent(context, com.elysium.nexus.ui.MainActivity::class.java))
-                    navController.popBackStack()
+                    launcher.launch(
+                        android.content.Intent(context, com.elysium.nexus.ui.MainActivity::class.java)
+                            .putExtra("MEET_HOSTED", true),
+                    )
                 }
+                // While Nexus is visible, show nothing here — the Activity is on top.
+                androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
             }
             composable(MeetDestinations.SCREEN_MIRROR) {
                 com.elysium369.meet.ui.screens.home.OnDemandFeatureScreen(
@@ -1825,10 +1887,16 @@ fun MeetApp(
             }
             composable(MeetDestinations.FILE_MANAGER) {
                 val context = androidx.compose.ui.platform.LocalContext.current
+                val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                ) { _ -> navController.backOrHome() }
                 androidx.compose.runtime.LaunchedEffect(Unit) {
-                    context.startActivity(android.content.Intent(context, com.elysium.vanguard.MainActivity::class.java))
-                    navController.popBackStack()
+                    launcher.launch(
+                        android.content.Intent(context, com.elysium.vanguard.MainActivity::class.java)
+                            .putExtra("MEET_HOSTED", true),
+                    )
                 }
+                androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
             }
             composable(MeetDestinations.RECORD_SHIELD) {
                 val context = androidx.compose.ui.platform.LocalContext.current
