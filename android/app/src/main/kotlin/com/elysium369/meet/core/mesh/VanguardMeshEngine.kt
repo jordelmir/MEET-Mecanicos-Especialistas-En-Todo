@@ -3,74 +3,20 @@ package com.elysium369.meet.core.mesh
 import kotlinx.serialization.Serializable
 
 /**
- * ══════════════════════════════════════════════════════════════════════
- *  V A N G U A R D   M E S H   E N G I N E
- *  ──────────────────────────────────────────
- *  Phone-to-phone communication WITHOUT internet, WITHOUT SIM.
- *  Works in wars, protests, natural disasters, internet shutdowns.
- *
- *  HOW IT WORKS:
- *  ┌──────────────────────────────────────────────────────────────┐
- *  │  Layer 1: BLE (Bluetooth Low Energy) — Discovery + Signal  │
- *  │  • Range: ~100m (open field), ~30m (buildings)             │
- *  │  • Power: ultra-low (works for days)                       │
- *  │  • Purpose: discover nearby nodes, exchange metadata       │
- *  │                                                            │
- *  │  Layer 2: Wi-Fi Direct / Wi-Fi Aware — Data Transfer       │
- *  │  • Range: ~200m                                            │
- *  │  • Speed: up to 250 Mbps                                  │
- *  │  • Purpose: actual message/file transfer between nodes     │
- *  │  • NO ACCESS POINT NEEDED. Phone ↔ Phone direct.          │
- *  │                                                            │
- *  │  Layer 3: Store-Carry-Forward (Delay Tolerant Networking)  │
- *  │  • A person walks from zone A to zone B carrying messages  │
- *  │  • Messages have TTL (time-to-live) and hop limits         │
- *  │  • End-to-end encrypted: relay nodes CANNOT read content   │
- *  │  • This is how data travels across cities without internet │
- *  │                                                            │
- *  │  Layer 4: Reconciliation                                    │
- *  │  • When internet returns, sync with cloud                  │
- *  │  • Deduplication via message ID                            │
- *  │  • Delivery confirmations retroactively sent               │
- *  └──────────────────────────────────────────────────────────────┘
- *
- *  WHY IT WORKS WITHOUT SIM/INTERNET:
- *  BLE and Wi-Fi Direct use the phone's radio hardware directly.
- *  They do NOT go through cell towers or internet routers.
- *  Two phones within ~100m can communicate even if:
- *  - SIM card is removed
- *  - Airplane mode is on (with BLE/WiFi enabled)
- *  - All cell towers are destroyed
- *  - The government shut down the internet
- *  - There is no electricity (phones on battery)
- *
- *  SECURITY:
- *  - All messages end-to-end encrypted (X25519 + ChaCha20-Poly1305)
- *  - Relay nodes see only encrypted blobs
- *  - No metadata leakage (sender/receiver IDs are encrypted too)
- *  - Perfect forward secrecy via ephemeral key exchange
- *  - Messages self-destruct after TTL
- *
- *  PROTEST/WAR SCENARIO:
- *  If 1000 people have ELYSIUM installed:
- *  - Each phone is a node in the mesh
- *  - Messages hop from phone to phone
- *  - Range extends to KILOMETERS through hop chains
- *  - Store-carry-forward bridges gaps between clusters
- *  - Emergency broadcasts reach everyone in the mesh
- *  - No central server. No single point of failure.
- *  - Government cannot shut it down.
- * ══════════════════════════════════════════════════════════════════════
+ * Pure deterministic routing/state simulator. No Android radio, persistence or cryptography.
+ * A transition here models an input; it does not prove delivery or physical connectivity.
+ * Production participation uses MeshCoordinator, a durable MeshRepository and native transports.
+ * Production encrypted transfer remains disabled until an independently reviewed crypto provider
+ * is installed, paired on two devices and tested against the physical verification matrix.
  */
-
 // ─── Node Identity ───
 
 @Serializable
 data class MeshNodeId(
     val publicKeyFingerprint: String,
-    val ephemeralId: String = "eph-${System.currentTimeMillis()}",
+    val ephemeralId: String = java.util.UUID.randomUUID().toString(),
 ) {
-    /** Ephemeral IDs rotate every 15 minutes to prevent tracking */
+    /** Desired simulator rotation interval; this model does not schedule rotation. */
     val rotationIntervalMs: Long = 15 * 60 * 1000L
 }
 
@@ -187,12 +133,12 @@ enum class PeerConnectionState {
 
 // ─── The Mesh Engine ───
 
-class VanguardMeshEngine {
+class MeshRoutingSimulator {
 
     companion object {
-        /** BLE range in meters (conservative) */
+        /** Simulator assumption only; physical range has not been measured. */
         const val BLE_RANGE_METERS = 100
-        /** Wi-Fi Direct range in meters */
+        /** Simulator assumption only; physical range has not been measured. */
         const val WIFI_DIRECT_RANGE_METERS = 200
         /** Max message size for BLE */
         const val BLE_MAX_PAYLOAD_BYTES = 512
@@ -406,3 +352,6 @@ data class MeshStats(
     val totalDelivered: Int,
     val emergencyBroadcasts: Int,
 )
+
+/** Compatibility name for callers of the historical routing simulator. */
+typealias VanguardMeshEngine = MeshRoutingSimulator

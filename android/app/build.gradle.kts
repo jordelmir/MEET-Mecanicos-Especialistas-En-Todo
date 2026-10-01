@@ -89,6 +89,11 @@ android {
         }
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
         buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
+        val safetyPlayProjectNumber = providers.gradleProperty("SAFETY_PLAY_CLOUD_PROJECT_NUMBER")
+            .orElse(providers.environmentVariable("SAFETY_PLAY_CLOUD_PROJECT_NUMBER"))
+            .orElse(localProps.getProperty("SAFETY_PLAY_CLOUD_PROJECT_NUMBER", "0")).get().toLong()
+        require(safetyPlayProjectNumber >= 0) { "Invalid Safety Play cloud project number" }
+        buildConfigField("long", "SAFETY_PLAY_CLOUD_PROJECT_NUMBER", "${safetyPlayProjectNumber}L")
         // Public HTTPS endpoint only. LiveKit API secrets and participant tokens
         // are minted server-side and are never embedded in the APK.
         val communicationCallTokenUrl = localProps.getProperty(
@@ -402,6 +407,7 @@ dependencies {
     implementation("com.google.mlkit:barcode-scanning:17.2.0")
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
     implementation("com.google.android.gms:play-services-nearby:19.5.0")
+    implementation("com.google.android.play:integrity:1.6.0")
     // Bundled on-device face detector: liveness blink works offline and stores no face template.
     implementation("com.google.mlkit:face-detection:16.1.7")
 

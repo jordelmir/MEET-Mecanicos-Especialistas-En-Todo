@@ -1,0 +1,370 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "a331c6b6629b8cc0ecd930a4486eecab",
+    "entities": [
+      {
+        "tableName": "mesh_envelopes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`owner` TEXT NOT NULL, `messageId` TEXT NOT NULL, `originKeyId` TEXT NOT NULL, `recipientKeyId` TEXT NOT NULL, `wire` BLOB NOT NULL, `digest` TEXT NOT NULL, `storedBytes` INTEGER NOT NULL, `priority` INTEGER NOT NULL, `hops` INTEGER NOT NULL, `maxHops` INTEGER NOT NULL, `receivedAt` INTEGER NOT NULL, `expiresAt` INTEGER NOT NULL, `custodyState` TEXT NOT NULL, PRIMARY KEY(`owner`, `messageId`))",
+        "fields": [
+          {
+            "fieldPath": "owner",
+            "columnName": "owner",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageId",
+            "columnName": "messageId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originKeyId",
+            "columnName": "originKeyId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recipientKeyId",
+            "columnName": "recipientKeyId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wire",
+            "columnName": "wire",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "digest",
+            "columnName": "digest",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "storedBytes",
+            "columnName": "storedBytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "priority",
+            "columnName": "priority",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hops",
+            "columnName": "hops",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "maxHops",
+            "columnName": "maxHops",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedAt",
+            "columnName": "receivedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAt",
+            "columnName": "expiresAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "custodyState",
+            "columnName": "custodyState",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "owner",
+            "messageId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_mesh_envelopes_owner_expiresAt",
+            "unique": false,
+            "columnNames": [
+              "owner",
+              "expiresAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_mesh_envelopes_owner_expiresAt` ON `${TABLE_NAME}` (`owner`, `expiresAt`)"
+          },
+          {
+            "name": "index_mesh_envelopes_owner_originKeyId",
+            "unique": false,
+            "columnNames": [
+              "owner",
+              "originKeyId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_mesh_envelopes_owner_originKeyId` ON `${TABLE_NAME}` (`owner`, `originKeyId`)"
+          }
+        ]
+      },
+      {
+        "tableName": "mesh_custody_events",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `owner` TEXT NOT NULL, `messageId` TEXT NOT NULL, `originKeyId` TEXT NOT NULL, `peerKeyId` TEXT, `kind` TEXT NOT NULL, `at` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "owner",
+            "columnName": "owner",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageId",
+            "columnName": "messageId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originKeyId",
+            "columnName": "originKeyId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "peerKeyId",
+            "columnName": "peerKeyId",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "at",
+            "columnName": "at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_mesh_custody_events_owner_messageId",
+            "unique": false,
+            "columnNames": [
+              "owner",
+              "messageId"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_mesh_custody_events_owner_messageId` ON `${TABLE_NAME}` (`owner`, `messageId`)"
+          },
+          {
+            "name": "index_mesh_custody_events_owner_originKeyId_at",
+            "unique": false,
+            "columnNames": [
+              "owner",
+              "originKeyId",
+              "at"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_mesh_custody_events_owner_originKeyId_at` ON `${TABLE_NAME}` (`owner`, `originKeyId`, `at`)"
+          }
+        ]
+      },
+      {
+        "tableName": "mesh_peer_observations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`owner` TEXT NOT NULL, `rotatingId` TEXT NOT NULL, `bearer` TEXT NOT NULL, `lastSeen` INTEGER NOT NULL, PRIMARY KEY(`owner`, `rotatingId`, `bearer`))",
+        "fields": [
+          {
+            "fieldPath": "owner",
+            "columnName": "owner",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "rotatingId",
+            "columnName": "rotatingId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bearer",
+            "columnName": "bearer",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeen",
+            "columnName": "lastSeen",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "owner",
+            "rotatingId",
+            "bearer"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_mesh_peer_observations_lastSeen",
+            "unique": false,
+            "columnNames": [
+              "lastSeen"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_mesh_peer_observations_lastSeen` ON `${TABLE_NAME}` (`lastSeen`)"
+          }
+        ]
+      },
+      {
+        "tableName": "mesh_replay_index",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`owner` TEXT NOT NULL, `replayId` TEXT NOT NULL, `expiresAt` INTEGER NOT NULL, PRIMARY KEY(`owner`, `replayId`))",
+        "fields": [
+          {
+            "fieldPath": "owner",
+            "columnName": "owner",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "replayId",
+            "columnName": "replayId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "expiresAt",
+            "columnName": "expiresAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "owner",
+            "replayId"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_mesh_replay_index_expiresAt",
+            "unique": false,
+            "columnNames": [
+              "expiresAt"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_mesh_replay_index_expiresAt` ON `${TABLE_NAME}` (`expiresAt`)"
+          }
+        ]
+      },
+      {
+        "tableName": "mesh_attachment_chunks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`owner` TEXT NOT NULL, `messageId` TEXT NOT NULL, `chunkIndex` INTEGER NOT NULL, `bytes` BLOB NOT NULL, PRIMARY KEY(`owner`, `messageId`, `chunkIndex`), FOREIGN KEY(`owner`, `messageId`) REFERENCES `mesh_envelopes`(`owner`, `messageId`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "owner",
+            "columnName": "owner",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "messageId",
+            "columnName": "messageId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "chunkIndex",
+            "columnName": "chunkIndex",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bytes",
+            "columnName": "bytes",
+            "affinity": "BLOB",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "owner",
+            "messageId",
+            "chunkIndex"
+          ]
+        },
+        "foreignKeys": [
+          {
+            "table": "mesh_envelopes",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "owner",
+              "messageId"
+            ],
+            "referencedColumns": [
+              "owner",
+              "messageId"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "mesh_clock",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`owner` TEXT NOT NULL, `highWater` INTEGER NOT NULL, PRIMARY KEY(`owner`))",
+        "fields": [
+          {
+            "fieldPath": "owner",
+            "columnName": "owner",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "highWater",
+            "columnName": "highWater",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "owner"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a331c6b6629b8cc0ecd930a4486eecab')"
+    ]
+  }
+}

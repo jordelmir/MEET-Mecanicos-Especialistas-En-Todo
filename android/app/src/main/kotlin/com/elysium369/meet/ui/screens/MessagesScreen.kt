@@ -232,7 +232,13 @@ fun MessagesScreen(
                 pane == MessagesPane.CONTACTS -> ContactsPane(contacts, viewModel::openContact, viewModel::block, invite)
                 pane == MessagesPane.CALLS -> CallsPane(conversations) { viewModel.selectConversation(it.id) }
                 pane == MessagesPane.MESH -> MeshPane(privacy, viewModel::savePrivacy,nearbyStatus,nearbyPeers,nearbyInvitations,
-                    { nearbyPermissionLauncher.launch(nearbyPermissions) },viewModel::stopNearby,viewModel::connectNearby,viewModel::answerNearby)
+                    { nearbyPermissionLauncher.launch(nearbyPermissions) },viewModel::stopNearby,viewModel::connectNearby,viewModel::answerNearby,
+                    onNativeMesh = {
+                        identity?.principalId?.takeIf { it.isNotBlank() }?.let { owner ->
+                            context.startActivity(Intent(context, com.elysium369.meet.core.mesh.MeshActivity::class.java)
+                                .putExtra(com.elysium369.meet.core.mesh.MeshActivity.EXTRA_OWNER, owner))
+                        } ?: android.widget.Toast.makeText(context, "Identidad de cuenta pendiente; vuelve a iniciar sesión", android.widget.Toast.LENGTH_SHORT).show()
+                    })
                 pane == MessagesPane.SETTINGS -> SettingsPane(identity, privacy, viewModel::saveIdentity, viewModel::savePrivacy) { pane = MessagesPane.BLOCKED }
                 pane == MessagesPane.BLOCKED -> BlockedPane(blocked, viewModel::unblock)
             }
@@ -429,13 +435,13 @@ private fun CallsPane(conversations: List<ConversationSummary>, onOpen: (Convers
 @Composable
 private fun MeshPane(privacy: CommunicationPrivacySettings, onSave: (CommunicationPrivacySettings) -> Unit,
     status:String, peers:List<NearbyPeer>, invitations:List<NearbyInvitation>,onStart:()->Unit,onStop:()->Unit,
-    onConnect:(String)->Unit,onAnswer:(String,Boolean)->Unit) {
+    onConnect:(String)->Unit,onAnswer:(String,Boolean)->Unit, onNativeMesh: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(Modifier.fillMaxWidth().background(MeetColors.cyberCyan.copy(alpha = .08f), RoundedCornerShape(20.dp)).border(1.dp, MeetColors.cyberCyan.copy(alpha = .3f), RoundedCornerShape(20.dp)).padding(16.dp)) {
                 Icon(Icons.Outlined.WifiTethering, null, tint = MeetColors.cyberCyan, modifier = Modifier.size(42.dp))
                 Text("Vanguard Mesh", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
-                Text("Conexión directa cifrada entre teléfonos cercanos. Participación voluntaria.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                Text("Conexión cercana mediante Nearby. Participación voluntaria.", color = MeetColors.textSecondary, fontSize = 12.sp)
             }
         }
         item {
@@ -463,6 +469,8 @@ private fun MeshPane(privacy: CommunicationPrivacySettings, onSave: (Communicati
         item { ToggleRow("Ayudar como relevo cifrado", "El relevo no puede leer el contenido.", privacy.relayParticipation != "OFF") { onSave(privacy.copy(relayParticipation = if (it) "CONTACTS_ONLY" else "OFF")) } }
         item { ToggleRow("Relevar solo mientras carga", "Reduce el impacto en batería.", privacy.relayOnlyWhileCharging) { onSave(privacy.copy(relayOnlyWhileCharging = it)) } }
         item { HonestBanner("El enlace directo usa radios del teléfono. La entrega solo se confirma con un acuse firmado; voz y retransmisión por varios saltos siguen pendientes.") }
+        item { OutlinedButton(onNativeMesh, Modifier.fillMaxWidth()) { Text("Abrir Mesh nativo · BLE / Wi-Fi / LAN") } }
+        item { Text("Capas nativas disponibles para descubrimiento; transferencia bloqueada hasta revisar criptografía\n\n• BLE: controles pequeños\n• Wi-Fi Aware/Direct y LAN: sockets acotados\n• Room: custodia, replay, chunks y expiración\n• Pruebas físicas y revisión E2EE pendientes", color = MeetColors.textSecondary, fontSize = 12.sp) }
         item { Text("Capas previstas\n\n• BLE: descubrimiento y señalización\n• Wi‑Fi Aware/Direct: datos y voz local\n• Custodia cifrada con TTL y límite de saltos\n• Reconciliación al recuperar Internet", color = MeetColors.textSecondary, fontSize = 12.sp) }
     }
 }

@@ -188,8 +188,26 @@ fun SafetyObservatoryScreen(
                 }
             }
 
+            // Documented patterns are server projections; no people or guilt inference.
+            if (uiState.illicitPatterns.isNotEmpty() || uiState.patternsUnavailable) item {
+                Card(colors = CardDefaults.cardColors(containerColor = ObservatoryColors.cardSurface)) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text("Patrones documentados de actividad reportada", fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
+                        Text("Solo claims documentados con fuentes periodísticas, registros públicos o institucionales y agrupación independiente. No identifica personas ni establece culpabilidad.", fontSize = 12.sp, color = MeetColors.textSecondary)
+                        if (uiState.patternsUnavailable) Text("Patrones pendientes de consulta; no equivale a ausencia de actividad.", color = MeetColors.textSecondary)
+                        uiState.illicitPatterns.forEach { pattern ->
+                            Text("Celda ${pattern.public_cell_id} · ${pattern.period_start.take(10)}: ${pattern.documented_claim_count} claims · ${pattern.independent_source_clusters} grupos independientes · ${pattern.institutional_response_events} respuestas documentadas · ${pattern.truth_state.publicLabel}", fontSize = 12.sp, color = MeetColors.textSecondary, modifier = Modifier.padding(top = 8.dp))
+                        }
+                    }
+                }
+            }
             // ── Dashboard content ──
             uiState.stats?.let { stats ->
+                if (stats.privacy_suppressed) {
+                    item {
+                        Text("Proyección V3: semanas completas, retraso mínimo de 7 días y celdas con al menos 5 claims documentados. Los valores visibles son parciales; la ausencia de datos no significa ausencia de hechos ni inacción institucional.", color = MeetColors.textSecondary, fontSize = 12.sp, modifier = Modifier.padding(16.dp))
+                    }
+                }
                 // KPI row 1
                 item {
                     Row(
@@ -219,21 +237,21 @@ fun SafetyObservatoryScreen(
                     ) {
                         KpiCard(
                             label = stringResource(R.string.safety_observatory_victims),
-                            value = stats.total_victims_documented.toString(),
+                            value = if (stats.sensitive_metrics_available) stats.total_victims_documented.toString() else "Dato no publicado",
                             accentColor = ObservatoryColors.accentAmber,
                             modifier = Modifier.weight(1f),
                         )
                         KpiCard(
                             label = stringResource(R.string.safety_observatory_sources),
-                            value = stats.independent_source_count.toString(),
+                            value = if (stats.sensitive_metrics_available) stats.independent_source_count.toString() else "Dato no publicado",
                             accentColor = ObservatoryColors.accentGreen,
                             modifier = Modifier.weight(1f),
                         )
                     }
                 }
 
-                // Data Coverage banner (§31 of Execution Protocol)
-                item {
+                // Coverage is meaningful only when source metrics were actually published.
+                if (stats.sensitive_metrics_available) item {
                     val coverage = DataCoveragePolicy.classify(stats.public_point_count, stats.independent_source_count, 30L)
                     val coverageColor = when (coverage) {
                         DataCoverage.VERY_LOW -> ObservatoryColors.accentRed
@@ -320,7 +338,7 @@ fun SafetyObservatoryScreen(
                 }
 
                 // Bar chart — sources by type
-                item {
+                if (stats.sensitive_metrics_available) item {
                     ObservatoryBarChart(
                         data = stats.sourceBreakdown(),
                         title = stringResource(R.string.safety_observatory_sources_type),

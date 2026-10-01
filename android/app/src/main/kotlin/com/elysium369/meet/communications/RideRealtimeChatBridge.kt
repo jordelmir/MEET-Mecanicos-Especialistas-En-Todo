@@ -50,7 +50,7 @@ data class RideChatBroadcastPayload(
  *
  * Transmits text, preset messages, photos, and voice notes instantly via:
  * 1. Supabase Realtime broadcast channel (`chat_ride_$requestId`)
- * 2. Local UDP Mesh broadcast on port 42424 (`255.255.255.255`)
+ * Legacy local UDP is disabled because ride IDs and plaintext are not authenticated.
  */
 @Singleton
 class RideRealtimeChatBridge @Inject constructor(
@@ -58,6 +58,8 @@ class RideRealtimeChatBridge @Inject constructor(
 ) {
     companion object {
         private const val TAG = "RideRealtimeChatBridge"
+        // Legacy plaintext broadcast is disabled; only a reviewed authenticated transport may replace it.
+        private const val LEGACY_UDP_ENABLED = false
         private const val MAGIC_0: Byte = 0x45 // 'E'
         private const val MAGIC_1: Byte = 0x56 // 'V'
         private const val TYPE_CHAT: Byte = 0x10
@@ -74,7 +76,7 @@ class RideRealtimeChatBridge @Inject constructor(
     )
 
     /**
-     * Broadcasts a chat message over Cloud Realtime and Local UDP Mesh.
+     * Broadcasts over Cloud Realtime; the legacy unauthenticated UDP path is disabled.
      */
     suspend fun broadcastMessage(
         message: RideChatMessageEntity,
@@ -95,7 +97,7 @@ class RideRealtimeChatBridge @Inject constructor(
             Log.w(TAG, "Failed cloud realtime broadcast for message ${message.messageId}", err)
         }
 
-        // 2. Broadcast via Local UDP Mesh
+        // 2. Broadcast via Local UDP LAN
         runCatching {
             sendUdpChatMessage(payload)
         }.onFailure { err ->
@@ -131,7 +133,7 @@ class RideRealtimeChatBridge @Inject constructor(
                 }
             }
 
-            // Local UDP Mesh Listener
+            // Local UDP LAN Listener
             val meshJob = launch {
                 listenUdpChat(rideRequestId, localRole, onIncomingMessage)
             }
@@ -241,6 +243,7 @@ class RideRealtimeChatBridge @Inject constructor(
     }
 
     private fun sendUdpChatMessage(payload: RideChatBroadcastPayload) {
+        if (!LEGACY_UDP_ENABLED) return
         val payloadJson = json.encodeToString(payload)
         val jsonBytes = payloadJson.toByteArray(Charsets.UTF_8)
         if (jsonBytes.size > 60_000) return // Skip oversized UDP packets
@@ -266,6 +269,7 @@ class RideRealtimeChatBridge @Inject constructor(
         localRole: String,
         onIncomingMessage: suspend (RideChatMessageEntity) -> Unit,
     ) {
+        if (!LEGACY_UDP_ENABLED) return
         val socket = runCatching {
             DatagramSocket(null).apply {
                 reuseAddress = true

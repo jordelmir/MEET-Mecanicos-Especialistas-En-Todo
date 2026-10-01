@@ -8,6 +8,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.Instant
+import java.time.ZoneOffset
+import java.time.DayOfWeek
+import java.time.temporal.TemporalAdjusters
+import kotlinx.serialization.json.JsonNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,6 +29,8 @@ data class PublicAccountabilityEvent(
 @Serializable
 data class SafetyObservatoryMetrics(
     val public_point_count: Long = 0,
+    val privacy_suppressed: Boolean = false,
+    val sensitive_metrics_available: Boolean = true,
     val independent_source_count: Long = 0,
     val civil_source_count: Long = 0,
     val journalistic_source_count: Long = 0,
@@ -106,22 +112,82 @@ class SafetyInsightsRepository @Inject constructor(
         }.decodeList<PublicAccountabilityEvent>().filter { it.server_version > 0 }
     }
 
-    /** V1 — legacy basic metrics. */
+    /** Public V3 cells only. Retired V1/V2 authority is never used as fallback. */
     suspend fun observatory(filters: SafetyObservatoryFilters): SafetyObservatoryMetrics {
-        val params = filters.parameters()
         gates.requireEnabled("safety_observatory")
-        return client.postgrest.rpc("safety_observatory_query_v1", params).decodeAs<SafetyObservatoryMetrics>()
+        val projection = client.postgrest.rpc("safety_observatory_query_v3", filters.v3Parameters()).decodeAs<SafetyObservatoryProjectionV3>()
+        require(projection.policy_version == "SAFETY-OBSERVATORY-V3")
+        require(projection.cells.all { it.documented_claim_count >= 5 })
+        return projection.toMetrics()
     }
 
-    /** V2 — demographics + resolution times + category breakdown. */
-    suspend fun observatoryV2(filters: SafetyObservatoryFilters): SafetyObservatoryMetrics {
-        val params = filters.parameters()
+    /** Kept for call-site compatibility while all results originate from V3. */
+    suspend fun observatoryV2(filters: SafetyObservatoryFilters): SafetyObservatoryMetrics = observatory(filters)
+
+    suspend fun counternarcotics(filters: SafetyObservatoryFilters): IllicitMarketPatternsProjection {
         gates.requireEnabled("safety_observatory")
-        return try {
-            client.postgrest.rpc("safety_observatory_query_v2", params).decodeAs<SafetyObservatoryMetrics>()
-        } catch (_: Exception) {
-            // Graceful fallback to V1 if V2 RPC not yet deployed
-            observatory(filters)
-        }
+        val range = filters.v3Parameters()
+        return client.postgrest.rpc("safety_counternarcotics_patterns_v1", buildJsonObject {
+            put("p_from", range.getValue("p_from"))
+            put("p_until", range.getValue("p_until"))
+            put("p_country_code", range.getValue("p_country_code"))
+            put("p_admin1_code", range.getValue("p_admin1_code"))
+            put("p_admin2_code", range.getValue("p_admin2_code"))
+        }).decodeAs<IllicitMarketPatternsProjection>()
     }
 }
+
+@Serializable
+data class SafetyObservatoryCellV3(
+    val public_cell_id: String, val category: String, val period_start: String,
+    val documented_claim_count: Long,
+)
+
+@Serializable
+data class SafetyObservatoryProjectionV3(
+    val policy_version: String, val cells: List<SafetyObservatoryCellV3>,
+    val suppression: String, val missing_records_imply_inaction: Boolean = false,
+) {
+    fun toMetrics(): SafetyObservatoryMetrics {
+        fun count(category: String) = cells.filter { it.category == category }.sumOf { it.documented_claim_count }
+        return SafetyObservatoryMetrics(
+            public_point_count = cells.sumOf { it.documented_claim_count },
+            privacy_suppressed = true, sensitive_metrics_available = false,
+            homicide_count = count("HOMICIDE"), violence_count = count("VIOLENT_INCIDENT"),
+            drugs_count = count("DRUG_SALE_ACTIVITY"), threat_count = count("THREAT"),
+            missing_count = count("MISSING_PERSON"), institutional_count = count("INSTITUTIONAL_CONDUCT"),
+        )
+    }
+}
+
+/** UTC whole weeks provide stable query buckets; no fine time slicing is requested. */
+fun SafetyObservatoryFilters.v3Parameters(now: Instant = Instant.now()) = buildJsonObject {
+    fun weekFloor(value: Instant): Instant = value.atZone(ZoneOffset.UTC)
+        .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).toLocalDate().atStartOfDay(ZoneOffset.UTC).toInstant()
+    val safeEnd = weekFloor(now.minusSeconds(7 * 86400L))
+    val requestedEnd = to.trim().takeIf { it.isNotEmpty() }?.let(Instant::parse)
+    val end = minOf(requestedEnd?.let(::weekFloor) ?: safeEnd, safeEnd)
+    val requestedStart = from.trim().takeIf { it.isNotEmpty() }?.let(Instant::parse)
+    val start = requestedStart?.let { val floor = weekFloor(it); if (floor == it) floor else floor.plusSeconds(7 * 86400L) }
+        ?: end.minusSeconds(26 * 7 * 86400L)
+    require(start < end && java.time.Duration.between(start, end).toDays() <= 366) { "Selecciona semanas completas anteriores al retraso de privacidad." }
+    put("p_from", start.toString()); put("p_until", end.toString())
+    listOf("p_category" to category, "p_country_code" to country, "p_admin1_code" to admin1, "p_admin2_code" to admin2).forEach { (key, value) ->
+        put(key, value.trim().takeIf { it.isNotEmpty() }?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: JsonNull)
+    }
+}
+
+@Serializable
+data class IllicitMarketPattern(
+    val public_cell_id: String, val period_start: String, val documented_claim_count: Long,
+    val independent_source_clusters: Long, val active_weeks: Long,
+    val journalistic_sources: Long, val public_record_sources: Long, val institutional_sources: Long,
+    val institutional_response_events: Long = 0,
+    val truth_state: com.elysium369.meet.safety.analytics.counternarcotics.PatternTruthState, val policy_version: String,
+)
+
+@Serializable
+data class IllicitMarketPatternsProjection(
+    val patterns: List<IllicitMarketPattern>, val interpretation: String,
+    val missing_records_imply_inaction: Boolean = false,
+)

@@ -50,6 +50,10 @@
     <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
     <uses-feature android:name="android.hardware.uwb" android:required="false" />
 
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi.aware" android:required="false" />
+
     <queries>
         <package android:name="com.waze" />
         <package android:name="com.google.android.apps.maps" />
@@ -118,6 +122,8 @@
             </intent-filter>
         </activity>
         
+        <activity android:name=".core.mesh.MeshActivity" android:exported="false" android:label="Mesh nativo" />
+
         <service android:name=".communications.CommunicationCallForegroundService" android:exported="false" android:foregroundServiceType="microphone" />
         <service
             android:name=".core.obd.ObdForegroundService"
