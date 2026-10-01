@@ -29,6 +29,8 @@ class GalleryRepository @Inject constructor(
         queryMediaStore(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, mediaList)
         // Query Videos
         queryMediaStore(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, projection, mediaList)
+        // Direct local storage scan
+        scanDirectMedia(mediaList)
 
         emit(mediaList.sortedByDescending { it.dateModified })
     }.flowOn(Dispatchers.IO)
@@ -49,23 +51,64 @@ class GalleryRepository @Inject constructor(
                 while (cursor.moveToNext()) {
                     try {
                         val name = if (nameColumn >= 0) cursor.getString(nameColumn) ?: "Untitled" else "Untitled"
-                        val path = if (pathColumn >= 0) cursor.getString(pathColumn) ?: "" else ""
+                        val id = if (idColumn >= 0) cursor.getLong(idColumn) else 0L
+                        val rawPath = if (pathColumn >= 0) cursor.getString(pathColumn) ?: "" else ""
+                        val path = if (rawPath.isNotEmpty()) rawPath else android.content.ContentUris.withAppendedId(uri, id).toString()
                         val mime = if (mimeColumn >= 0) cursor.getString(mimeColumn) ?: "image/*" else "image/*"
                         val date = if (dateColumn >= 0) cursor.getLong(dateColumn) else 0L
-                        val id = if (idColumn >= 0) cursor.getLong(idColumn) else 0L
 
-                        if (path.isNotEmpty()) {
+                        list.add(
+                            GalleryMedia(
+                                id = id,
+                                name = name,
+                                path = path,
+                                mimeType = mime,
+                                dateModified = date
+                            )
+                        )
+                    } catch (_: Exception) {}
+                }
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun scanDirectMedia(list: MutableList<GalleryMedia>) {
+        try {
+            val mediaExtensions = mapOf(
+                "jpg" to "image/jpeg",
+                "jpeg" to "image/jpeg",
+                "png" to "image/png",
+                "webp" to "image/webp",
+                "mp4" to "video/mp4",
+                "mkv" to "video/x-matroska",
+                "mov" to "video/quicktime",
+                "gif" to "image/gif"
+            )
+            val existingPaths = list.map { it.path }.toMutableSet()
+            val candidateDirs = listOf(
+                java.io.File("/sdcard/DCIM"),
+                java.io.File("/sdcard/Pictures"),
+                java.io.File("/sdcard/Download"),
+                java.io.File("/sdcard/Movies"),
+                java.io.File(android.os.Environment.getExternalStorageDirectory(), "DCIM"),
+                java.io.File(android.os.Environment.getExternalStorageDirectory(), "Pictures"),
+            )
+
+            for (dir in candidateDirs) {
+                if (dir.exists() && dir.isDirectory) {
+                    dir.walkTopDown().maxDepth(3).filter { it.isFile && it.extension.lowercase() in mediaExtensions.keys }.forEach { file ->
+                        if (existingPaths.add(file.absolutePath)) {
                             list.add(
                                 GalleryMedia(
-                                    id = id,
-                                    name = name,
-                                    path = path,
-                                    mimeType = mime,
-                                    dateModified = date
+                                    id = file.absolutePath.hashCode().toLong(),
+                                    name = file.name,
+                                    path = file.absolutePath,
+                                    mimeType = mediaExtensions[file.extension.lowercase()] ?: "image/jpeg",
+                                    dateModified = file.lastModified() / 1000L
                                 )
                             )
                         }
-                    } catch (_: Exception) {}
+                    }
                 }
             }
         } catch (_: Exception) {}

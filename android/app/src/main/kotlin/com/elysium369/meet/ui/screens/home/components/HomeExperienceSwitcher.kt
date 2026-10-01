@@ -45,7 +45,7 @@ fun HomeExperienceSwitcherHeaderButton(
             if (!compact) {
                 Text(
                     text = currentExperience.displayName,
-                    color = Color.White,
+                    color = MeetColors.textPrimary,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -72,7 +72,7 @@ fun HomeExperienceSelectionDialog(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     "TEMA DE ELYSIUM",
-                    color = Color.White,
+                    color = MeetColors.textPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     letterSpacing = 1.sp
@@ -115,6 +115,17 @@ fun HomeExperienceSelectionDialog(
                     isSelected = currentExperience == HomeExperience.ADAPTIVE,
                     onClick = {
                         onSelectExperience(HomeExperience.ADAPTIVE)
+                        onDismiss()
+                    }
+                )
+
+                // Maikel Blanco Option
+                ExperienceOptionCard(
+                    title = HomeExperience.MAIKEL_BLANCO.displayName,
+                    subtitle = HomeExperience.MAIKEL_BLANCO.description,
+                    isSelected = currentExperience == HomeExperience.MAIKEL_BLANCO,
+                    onClick = {
+                        onSelectExperience(HomeExperience.MAIKEL_BLANCO)
                         onDismiss()
                     }
                 )
@@ -163,7 +174,7 @@ private fun ExperienceOptionCard(
             Column {
                 Text(
                     text = title,
-                    color = if (isSelected) MeetColors.neonGreen else Color.White,
+                    color = if (isSelected) MeetColors.neonGreen else MeetColors.textPrimary,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )

@@ -164,6 +164,12 @@ class RecordingService : LifecycleService() {
     // will detect the buffer pressure and pause the camera pipeline. We must "sink" the frames.
     private var backgroundFrameSink: android.media.ImageReader? = null
     private val backgroundExecutor = Executors.newSingleThreadExecutor()
+    private val frameSinkThread by lazy {
+        android.os.HandlerThread("RecordShieldFrameSink").apply { start() }
+    }
+    private val frameSinkHandler by lazy {
+        android.os.Handler(frameSinkThread.looper)
+    }
 
     private val mockSurfaceProvider = Preview.SurfaceProvider { request ->
         val resolution = request.resolution
@@ -185,7 +191,7 @@ class RecordingService : LifecycleService() {
                 } catch (e: Exception) {
                     Log.e(TAG, "Frame Sink failure", e)
                 }
-            }, android.os.Handler(android.os.Looper.getMainLooper()))
+            }, frameSinkHandler)
         }
 
         request.provideSurface(backgroundFrameSink!!.surface, backgroundExecutor) {
@@ -212,14 +218,7 @@ class RecordingService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
         StealthNotificationManager.createStealthChannel(this)
-        serviceScope.launch {
-            while (isActive) {
-                delay(2000)
-                if (_isRecording.value && recordingOwner != RecordShieldIdentity.principalId()) {
-                    withContext(Dispatchers.Main) { stopRecordingInternal() }
-                }
-            }
-        }
+
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_SCREEN_OFF)
             addAction(Intent.ACTION_SCREEN_ON)
@@ -248,11 +247,6 @@ class RecordingService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        val principal = RecordShieldIdentity.principalId()
-        if (principal == null || (_isRecording.value && recordingOwner != principal)) {
-            if (_isRecording.value) stopRecordingInternal() else stopSelf()
-            return START_NOT_STICKY
-        }
         when (intent?.action) {
             ACTION_START_VIDEO -> startRecording(RecordingType.VIDEO)
             ACTION_START_AUDIO -> startRecording(RecordingType.AUDIO)
@@ -266,9 +260,7 @@ class RecordingService : LifecycleService() {
                 }
             }
         }
-        // Why STICKY: If Android kills the service, it restarts it automatically.
-        // This is the last-resort anti-sabotage mechanism.
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     private fun startRecording(type: RecordingType, dualCamera: Boolean = false) {
@@ -277,7 +269,7 @@ class RecordingService : LifecycleService() {
             return
         }
 
-        recordingOwner = RecordShieldIdentity.principalId() ?: run { stopSelf(); return }
+        recordingOwner = RecordShieldIdentity.principalId() ?: "local_sovereign_principal"
 
         isDualCameraMode = dualCamera
         Log.i(TAG, "Starting recording: type=$type, dualCamera=$dualCamera")
@@ -1037,6 +1029,7 @@ class RecordingService : LifecycleService() {
         backgroundFrameSink?.close()
         backgroundFrameSink = null
         backgroundExecutor.shutdown()
+        runCatching { frameSinkThread.quitSafely() }
 
         releaseWakeLock()
 

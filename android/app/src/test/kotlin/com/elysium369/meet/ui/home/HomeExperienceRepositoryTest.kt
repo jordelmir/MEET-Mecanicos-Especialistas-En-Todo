@@ -115,7 +115,7 @@ class HomeExperienceRepositoryTest {
     }
 
     @Test
-    fun allThreeExperiencesSurviveRepositoryRecreation() {
+    fun allExperiencesSurviveRepositoryRecreation() {
         HomeExperience.entries.forEach { experience ->
             DefaultHomeExperienceRepository(fakeContext).setExperience(experience)
             assertEquals(experience, DefaultHomeExperienceRepository(fakeContext).getExperience())

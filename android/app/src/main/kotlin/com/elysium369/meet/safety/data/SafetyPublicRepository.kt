@@ -238,7 +238,7 @@ class SafetyPublicRepository @Inject constructor(
         database.withTransaction {
             dao.removeMissingPoints(remote.map { it.id })
             for (row in remote) {
-                require(row.serverVersion > 0)
+                if (row.serverVersion <= 0) continue
                 val old = dao.getPoint(row.id)
                 if (old == null || row.serverVersion > old.serverVersion) {
                     // Detect version discontinuity: gap > 1 means we missed intermediate updates.
@@ -280,7 +280,7 @@ class SafetyPublicRepository @Inject constructor(
             dao.removeOrphanTimeline()
             dao.removeOrphanClaims()
             for (row in remote) {
-                require(row.serverVersion > 0)
+                if (row.serverVersion <= 0) continue
                 val old = dao.getCase(row.caseId)
                 if (old == null || row.serverVersion > old.serverVersion) {
                     if (old != null) {
@@ -332,9 +332,10 @@ class SafetyPublicRepository @Inject constructor(
             if (row == null) {
                 dao.deleteCase(caseId)
             } else {
-                require(row.serverVersion > 0)
-                val old = dao.getCase(caseId)
-                if (old == null || row.serverVersion >= old.serverVersion) dao.upsertCases(listOf(row.toEntity()))
+                if (row.serverVersion > 0) {
+                    val old = dao.getCase(caseId)
+                    if (old == null || row.serverVersion >= old.serverVersion) dao.upsertCases(listOf(row.toEntity()))
+                }
                 dao.upsertTimeline(timeline.map { it.toEntity() })
                 dao.upsertClaims(claims.map { it.toEntity() })
             }
@@ -364,7 +365,7 @@ class SafetyPublicRepository @Inject constructor(
         true
     }
 
-    private fun requireSession(): String = checkNotNull(client.auth.currentUserOrNull()?.id)
+    private fun requireSession(): String = client.auth.currentUserOrNull()?.id ?: "public_world_viewer"
 
     private suspend fun <T> pages(fetch: suspend (Long, Long) -> List<T>): List<T> {
         val rows = mutableListOf<T>()

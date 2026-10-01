@@ -193,6 +193,26 @@ fun DocumentScreen(
                                 }
                             }
                         }
+                        var showAddCellMenu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { showAddCellMenu = true }) {
+                                Icon(Icons.Default.AddCircleOutline, contentDescription = "Añadir Celda", tint = DragonCyan)
+                            }
+                            DropdownMenu(
+                                expanded = showAddCellMenu,
+                                onDismissRequest = { showAddCellMenu = false },
+                                modifier = Modifier.background(DragonDarkGray)
+                            ) {
+                                DropdownMenuItem(text = { Text("Math Cell", color = DragonWhite, fontFamily = JetBrainsMono) }, onClick = { viewModel.addCell(CellType.MATH); showAddCellMenu = false })
+                                DropdownMenuItem(text = { Text("Graph 2D", color = DragonTeal, fontFamily = JetBrainsMono) }, onClick = { viewModel.addCell(CellType.GRAPH); showAddCellMenu = false })
+                                DropdownMenuItem(text = { Text("Surface 3D", color = DragonCyan, fontFamily = JetBrainsMono) }, onClick = { viewModel.addCell(CellType.GRAPH_3D); showAddCellMenu = false })
+                                DropdownMenuItem(text = { Text("Neural (Prompt)", color = DragonGreen, fontFamily = JetBrainsMono) }, onClick = { viewModel.addCell(CellType.PROMPT); showAddCellMenu = false })
+                                DropdownMenuItem(text = { Text("Scan (OCR)", color = DragonOrange, fontFamily = JetBrainsMono) }, onClick = { showVisionScreen = true; showAddCellMenu = false })
+                                DropdownMenuItem(text = { Text("Physics [⚛️]", color = DragonTeal, fontFamily = JetBrainsMono) }, onClick = { viewModel.addCell(CellType.PHYSICS); showAddCellMenu = false })
+                                DropdownMenuItem(text = { Text("Chemistry Lab [🧪]", color = DragonCyan, fontFamily = JetBrainsMono) }, onClick = { viewModel.addCell(CellType.CHEMISTRY); showAddCellMenu = false })
+                                DropdownMenuItem(text = { Text("Stats & Data [📊]", color = DragonGreen, fontFamily = JetBrainsMono) }, onClick = { viewModel.addCell(CellType.STATISTICS); showAddCellMenu = false })
+                            }
+                        }
                         Surface(
                             modifier = Modifier
                                 .padding(end = 16.dp)
@@ -212,91 +232,6 @@ fun DocumentScreen(
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = DragonBlack)
                 )
-            },
-            floatingActionButtonPosition = FabPosition.Center,
-            floatingActionButton = {
-                var showMenu by remember { mutableStateOf(false) }
-
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (showMenu) {
-                        Surface(
-                            modifier = Modifier
-                                .padding(bottom = 16.dp)
-                                .width(180.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            color = DragonDarkGray,
-                            shadowElevation = 8.dp
-                        ) {
-                            Column {
-                                DropdownMenuItem(
-                                    text = { Text("Math Cell", color = DragonWhite, fontFamily = JetBrainsMono) },
-                                    onClick = {
-                                        viewModel.addCell(CellType.MATH)
-                                        showMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Graph 2D", color = DragonTeal, fontFamily = JetBrainsMono) },
-                                    onClick = {
-                                        viewModel.addCell(CellType.GRAPH)
-                                        showMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Surface 3D", color = DragonCyan, fontFamily = JetBrainsMono) },
-                                    onClick = {
-                                        viewModel.addCell(CellType.GRAPH_3D)
-                                        showMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Neural (Prompt)", color = DragonGreen, fontFamily = JetBrainsMono) },
-                                    onClick = {
-                                        viewModel.addCell(CellType.PROMPT)
-                                        showMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Scan (OCR)", color = DragonOrange, fontFamily = JetBrainsMono) },
-                                    onClick = {
-                                        showVisionScreen = true
-                                        showMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Physics [⚛️]", color = DragonTeal, fontFamily = JetBrainsMono) },
-                                    onClick = {
-                                        viewModel.addCell(CellType.PHYSICS)
-                                        showMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Chemistry Lab [🧪]", color = DragonCyan, fontFamily = JetBrainsMono) },
-                                    onClick = {
-                                        viewModel.addCell(CellType.CHEMISTRY)
-                                        showMenu = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text("Stats & Data [📊]", color = DragonGreen, fontFamily = JetBrainsMono) },
-                                    onClick = {
-                                        viewModel.addCell(CellType.STATISTICS)
-                                        showMenu = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    FloatingActionButton(
-                        onClick = { showMenu = !showMenu },
-                        containerColor = DragonTeal,
-                        contentColor = DragonWhite,
-                        shape = CircleShape
-                    ) {
-                        Icon(imageVector = Icons.Default.Add, contentDescription = "Add Cell")
-                    }
-                }
             }
         ) { paddingValues ->
             Column(
@@ -307,10 +242,11 @@ fun DocumentScreen(
                 // 🧪 PROBABILITY & SCIENCE BRIDGE [RESTORED]
                 val categories = listOf(
                     "Math" to CellType.MATH,
+                    "Graph 2D" to CellType.GRAPH,
+                    "Surface 3D" to CellType.GRAPH_3D,
                     "Physics" to CellType.PHYSICS,
                     "Chemistry" to CellType.CHEMISTRY,
                     "Stats" to CellType.STATISTICS,
-                    "Graph 2D" to CellType.GRAPH,
                     "Neural" to CellType.PROMPT
                 )
 
@@ -338,6 +274,7 @@ fun DocumentScreen(
                                     CellType.CHEMISTRY -> Icons.Default.Science
                                     CellType.STATISTICS -> Icons.Default.BarChart
                                     CellType.GRAPH -> Icons.Default.Timeline
+                                    CellType.GRAPH_3D -> Icons.Default.Layers
                                     CellType.PROMPT -> Icons.Default.AutoAwesome
                                     else -> Icons.Default.Calculate
                                 }

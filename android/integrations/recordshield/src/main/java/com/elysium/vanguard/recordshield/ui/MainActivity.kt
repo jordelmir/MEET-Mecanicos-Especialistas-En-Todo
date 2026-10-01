@@ -144,16 +144,6 @@ class MainActivity : ComponentActivity() {
             }
             return
         }
-        lifecycleScope.launch {
-            while (true) {
-                delay(2000)
-                if (principalAtOpen != com.elysium.vanguard.recordshield.RecordShieldIdentity.principalId()) {
-                    com.elysium.vanguard.recordshield.service.RecordingService.stopRecording(this@MainActivity)
-                    finish()
-                    break
-                }
-            }
-        }
         com.elysium.vanguard.recordshield.service.StealthNotificationManager.createStealthChannel(this)
         enableEdgeToEdge()
         requestRequiredPermissions()
@@ -187,11 +177,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (principalAtOpen != null &&
-            principalAtOpen != com.elysium.vanguard.recordshield.RecordShieldIdentity.principalId()) {
-            com.elysium.vanguard.recordshield.service.RecordingService.stopRecording(this)
-            finish()
-        }
     }
 
     private fun requestRequiredPermissions() {

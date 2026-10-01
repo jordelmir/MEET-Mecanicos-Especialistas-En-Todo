@@ -478,7 +478,7 @@ fun EliteTopAppBar(
                             style = MaterialTheme.typography.titleLarge)
                     }
                     is String -> {
-                        Text(title, color = Color.White, fontWeight = FontWeight.Black,
+                        Text(title, color = if (MeetColors.isWhiteTheme) MeetColors.textPrimary else Color.White, fontWeight = FontWeight.Black,
                             style = MaterialTheme.typography.titleLarge)
                     }
                 }

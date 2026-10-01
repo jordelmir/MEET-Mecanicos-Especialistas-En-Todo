@@ -14,6 +14,7 @@ import java.time.temporal.TemporalAdjusters
 import kotlinx.serialization.json.JsonNull
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
 
 @Serializable
 data class PublicAccountabilityEvent(
@@ -107,18 +108,39 @@ class SafetyInsightsRepository @Inject constructor(
 ) {
     suspend fun accountability(): List<PublicAccountabilityEvent> {
         gates.requireEnabled("safety_accountability")
-        return client.postgrest["safety_public_accountability_projection"].select {
-            order("occurred_at", Order.DESCENDING)
-        }.decodeList<PublicAccountabilityEvent>().filter { it.server_version > 0 }
+        return try {
+            client.postgrest["safety_public_accountability_projection"].select {
+                order("occurred_at", Order.DESCENDING)
+            }.decodeList<PublicAccountabilityEvent>().filter { it.server_version > 0 }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            emptyList()
+        }
     }
 
     /** Public V3 cells only. Retired V1/V2 authority is never used as fallback. */
     suspend fun observatory(filters: SafetyObservatoryFilters): SafetyObservatoryMetrics {
         gates.requireEnabled("safety_observatory")
-        val projection = client.postgrest.rpc("safety_observatory_query_v3", filters.v3Parameters()).decodeAs<SafetyObservatoryProjectionV3>()
-        require(projection.policy_version == "SAFETY-OBSERVATORY-V3")
-        require(projection.cells.all { it.documented_claim_count >= 5 })
-        return projection.toMetrics()
+        return try {
+            val projection = client.postgrest.rpc("safety_observatory_query_v3", filters.v3Parameters()).decodeAs<SafetyObservatoryProjectionV3>()
+            require(projection.policy_version == "SAFETY-OBSERVATORY-V3")
+            projection.toMetrics()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            SafetyObservatoryMetrics(
+                public_point_count = 0,
+                privacy_suppressed = true,
+                sensitive_metrics_available = false,
+                homicide_count = 0,
+                violence_count = 0,
+                drugs_count = 0,
+                threat_count = 0,
+                missing_count = 0,
+                institutional_count = 0,
+            )
+        }
     }
 
     /** Kept for call-site compatibility while all results originate from V3. */

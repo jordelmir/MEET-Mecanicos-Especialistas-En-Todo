@@ -127,12 +127,27 @@ class MainActivity : ComponentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == RECORD_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
-            val serviceIntent = Intent(this, CaptureForegroundService::class.java)
-            startForegroundService(serviceIntent)
+            try {
+                CaptureForegroundService.isForegroundActive = false
+                val serviceIntent = Intent(this, CaptureForegroundService::class.java)
+                startForegroundService(serviceIntent)
+            } catch (t: Throwable) {
+                Log.e(TAG, "Failed to start capture foreground service", t)
+            }
 
             lifecycleScope.launch {
-                kotlinx.coroutines.delay(300)
-                bootFullPipeline(data)
+                // Wait for the foreground service to be truly active before initializing capture
+                var waited = 0
+                while (!CaptureForegroundService.isForegroundActive && waited < 2000) {
+                    kotlinx.coroutines.delay(100)
+                    waited += 100
+                }
+                try {
+                    bootFullPipeline(data)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to initialize WebRTC pipeline", t)
+                    connectionState.value = "ERROR: ${t.message}"
+                }
             }
         } else {
             isBroadcastingState.value = false
@@ -580,13 +595,19 @@ class MainActivity : ComponentActivity() {
 
                     Button(
                         onClick = {
-                            if (isBroadcasting) {
+                            try {
+                                if (isBroadcasting) {
+                                    isBroadcasting = false
+                                    stopPipeline()
+                                } else {
+                                    isBroadcasting = true
+                                    nsdBroadcaster.startBroadcasting(9999)
+                                    startMediaProjectionRequest()
+                                }
+                            } catch (t: Throwable) {
+                                Log.e(TAG, "Error in broadcast toggle", t)
+                                connectionState.value = "ERROR: ${t.message}"
                                 isBroadcasting = false
-                                stopPipeline()
-                            } else {
-                                isBroadcasting = true
-                                nsdBroadcaster.startBroadcasting(9999)
-                                startMediaProjectionRequest()
                             }
                         },
                         shape = CircleShape,

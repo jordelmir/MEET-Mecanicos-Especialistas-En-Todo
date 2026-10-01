@@ -6,13 +6,15 @@ package com.elysium369.meet.ui.home
 enum class HomeExperience {
     CLASSIC,
     VANGUARD,
-    ADAPTIVE;
+    ADAPTIVE,
+    MAIKEL_BLANCO;
 
     val displayName: String
         get() = when (this) {
             CLASSIC -> "Elysium Vanguard AI OS Classic"
             VANGUARD -> "Elysium Vanguard AI OS Actual"
             ADAPTIVE -> "Elysium Vanguard AI OS Command"
+            MAIKEL_BLANCO -> "Maikel Blanco"
         }
 
     val description: String
@@ -20,6 +22,7 @@ enum class HomeExperience {
             CLASSIC -> "Estética anterior, fondo oscuro y todos los módulos visibles."
             VANGUARD -> "Identidad actual con imágenes de fondo a pantalla completa."
             ADAPTIVE -> "Elysium prioriza automáticamente lo que necesitas en tiempo real."
+            MAIKEL_BLANCO -> "Tema claro con background blanco puro en todas las pantallas."
         }
 }
 

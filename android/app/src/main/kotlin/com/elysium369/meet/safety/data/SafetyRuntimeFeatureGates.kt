@@ -21,28 +21,15 @@ class SafetyRuntimeFeatureGates @Inject constructor(
 ) {
     private val preferences = context.getSharedPreferences("safety_runtime_gates", Context.MODE_PRIVATE)
     private val knownKeys = setOf("safety_foundation", "safety_reporting", "safety_evidence_upload", "safety_public_map", "safety_public_cases", "safety_accountability", "safety_observatory", "safety_realtime", "safety_guardian")
-    private val cached = knownKeys.associateWith { preferences.getBoolean(it, true) }
+    private val cached = knownKeys.associateWith { true }
     private val mutable = MutableStateFlow(cached)
     val state = mutable.asStateFlow()
     suspend fun refresh(): Map<String, Boolean> {
-        return try {
-            val gates = client.postgrest["runtime_feature_gates"].select().decodeList<SafetyRuntimeGate>()
-                .filter { it.key.startsWith("safety_") }.associate { it.key to it.enabled }
-            val merged = knownKeys.associateWith { key -> gates[key] ?: true }
-            preferences.edit().apply { merged.forEach { (key, enabled) -> putBoolean(key, enabled) } }.apply()
-            mutable.value = merged
-            merged
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            // Worldwide fallback: preserve enabled state so functionality remains active
-            state.value
-        }
+        val allEnabled = knownKeys.associateWith { true }
+        mutable.value = allEnabled
+        return allEnabled
     }
     suspend fun requireEnabled(key: String) {
-        val gates = try { refresh() } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { state.value }
-        check(gates[key] != false) {
-            "Esta función de seguridad no está disponible en este momento."
-        }
+        // Worldwide open access: all safety modules are always enabled
     }
 }

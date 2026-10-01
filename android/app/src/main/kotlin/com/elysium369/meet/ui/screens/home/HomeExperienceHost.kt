@@ -51,7 +51,7 @@ fun HomeExperienceHost(
         label = "HomeExperienceHostTransition"
     ) { experience ->
         when (experience) {
-            HomeExperience.CLASSIC, HomeExperience.VANGUARD -> {
+            HomeExperience.CLASSIC, HomeExperience.VANGUARD, HomeExperience.MAIKEL_BLANCO -> {
                 HomeClassicScreen(
                     navController = navController,
                     viewModel = obdViewModel,

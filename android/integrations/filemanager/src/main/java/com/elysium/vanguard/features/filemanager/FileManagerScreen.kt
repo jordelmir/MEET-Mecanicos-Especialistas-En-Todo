@@ -1419,7 +1419,7 @@ fun TerminalList(
     ) {
         item {
             Text(
-                text = "TITAN TERMINAL v2.1 // SYSTEM READY",
+                text = "ELYSIUM TERMINAL v2.1 // SYSTEM READY",
                 color = TitanColors.RadioactiveGreen,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 14.sp,

@@ -20,6 +20,8 @@ class CaptureForegroundService : Service() {
     companion object {
         const val CHANNEL_ID = "ElysiumVanguard_CaptureChannel"
         const val NOTIFICATION_ID = 999
+        @Volatile
+        var isForegroundActive: Boolean = false
     }
 
     private var wakeLock: PowerManager.WakeLock? = null
@@ -33,14 +35,24 @@ class CaptureForegroundService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = buildNotification()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val type = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
-            startForeground(NOTIFICATION_ID, notification, type)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val type = android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                startForeground(NOTIFICATION_ID, notification, type)
+            } else {
+                startForeground(NOTIFICATION_ID, notification)
+            }
+            isForegroundActive = true
+        } catch (e: Exception) {
+            android.util.Log.e("CaptureForegroundService", "startForeground failed with type, falling back", e)
+            try {
+                startForeground(NOTIFICATION_ID, notification)
+                isForegroundActive = true
+            } catch (e2: Exception) {
+                android.util.Log.e("CaptureForegroundService", "startForeground failed completely", e2)
+            }
         }
 
-        // El servicio se queda corriendo para mantener ScreenCapturerHook vivo
         return START_NOT_STICKY
     }
 
@@ -69,7 +81,7 @@ class CaptureForegroundService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Elysium ScreenMirror")
             .setContentText("Compartiendo la pantalla con un equipo autorizado")
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .build()
@@ -96,6 +108,7 @@ class CaptureForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        isForegroundActive = false
         super.onDestroy()
         releaseLocks()
     }

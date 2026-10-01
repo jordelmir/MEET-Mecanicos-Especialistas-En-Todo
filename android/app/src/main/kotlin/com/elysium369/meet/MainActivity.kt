@@ -489,15 +489,23 @@ fun MeetApp(
         Scaffold(
         containerColor = MeetColors.backgroundDeep,
         bottomBar = {
-            // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect/safety/*
-            val hideNavRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
+            // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect/safety/* o herramientas inmersivas
+            val hideNavRoutes = listOf(
+                "onboarding", "auth", "connect", "premium", "ride_service",
+                "ride_active_tracking", "ride_schedule", "ride_driver_registration",
+                "dragon_calc", "supreme_bass", "file_manager", "record_shield"
+            )
             val isSafetyRoute = activeRoute?.startsWith("safety") == true
             if (activeRoute !in hideNavRoutes && !isSafetyRoute && activeRoute != null) {
                 MeetBottomNavigation(navController)
             }
         },
         topBar = {
-            val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
+            val hideBarRoutes = listOf(
+                "onboarding", "auth", "connect", "premium", "ride_service",
+                "ride_active_tracking", "ride_schedule", "ride_driver_registration",
+                "dragon_calc", "supreme_bass", "file_manager", "record_shield"
+            )
             val showConnection = activeRoute !in hideBarRoutes && activeRoute?.startsWith("safety") != true && activeRoute != null
             Row(
                 modifier = Modifier.fillMaxWidth().statusBarsPadding().background(MeetColors.backgroundDeep),

@@ -15,8 +15,13 @@ import com.elysium369.meet.R
 /** Full-bleed original artwork behind independently scrollable screen controls. */
 @Composable
 fun ElysiumArtworkBackground(automotive: Boolean = false) {
-    if (com.elysium369.meet.ui.home.LocalHomeExperience.current == com.elysium369.meet.ui.home.HomeExperience.CLASSIC) {
+    val exp = com.elysium369.meet.ui.home.LocalHomeExperience.current
+    if (exp == com.elysium369.meet.ui.home.HomeExperience.CLASSIC) {
         Box(Modifier.fillMaxSize().background(com.elysium369.meet.ui.theme.MeetColors.backgroundDeep))
+        return
+    }
+    if (exp == com.elysium369.meet.ui.home.HomeExperience.MAIKEL_BLANCO) {
+        Box(Modifier.fillMaxSize().background(Color.White))
         return
     }
     Image(

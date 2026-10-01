@@ -92,7 +92,7 @@ fun SplashScreen(onNavigateToDashboard: () -> Unit) {
     // Boot text sequence
     val bootLines = listOf(
         "INITIALIZING NEURAL CORE...",
-        "LOADING TITAN MODULES...",
+        "LOADING ELYSIUM MODULES...",
         "CALIBRATING QUANTUM ENGINE...",
         "SYSTEM READY"
     )

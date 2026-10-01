@@ -27,9 +27,9 @@ class ScreenCapturerHook(private val context: Context) {
         peerConnectionFactory: PeerConnectionFactory,
         eglBaseContext: EglBase.Context,
         mediaProjectionPermissionResultData: Intent,
-        targetWidth: Int = 2560,
-        targetHeight: Int = 1440,
-        targetFps: Int = 60
+        targetWidth: Int = 1920,
+        targetHeight: Int = 1080,
+        targetFps: Int = 30
     ): VideoTrack? {
         val callback = object : MediaProjection.Callback() {
             override fun onStop() {
@@ -37,26 +37,34 @@ class ScreenCapturerHook(private val context: Context) {
             }
         }
 
-        videoCapturer = ScreenCapturerAndroid(
-            mediaProjectionPermissionResultData,
-            callback
-        )
+        try {
+            videoCapturer = ScreenCapturerAndroid(
+                mediaProjectionPermissionResultData,
+                callback
+            )
 
-        val videoSource: VideoSource = peerConnectionFactory.createVideoSource(videoCapturer!!.isScreencast)
+            val videoSource: VideoSource = peerConnectionFactory.createVideoSource(videoCapturer!!.isScreencast)
 
-        // El SurfaceTextureHelper empalmará el thread de UI directamente a OpenGLES
-        surfaceTextureHelper = SurfaceTextureHelper.create("JSM_CaptureThread", eglBaseContext)
+            // El SurfaceTextureHelper empalmará el thread de UI directamente a OpenGLES
+            surfaceTextureHelper = SurfaceTextureHelper.create("JSM_CaptureThread", eglBaseContext)
+            surfaceTextureHelper?.handler?.looper?.thread?.setUncaughtExceptionHandler { thread, throwable ->
+                android.util.Log.e("ScreenCapturerHook", "Uncaught exception on capture thread: ${thread.name}", throwable)
+            }
 
-        videoCapturer?.initialize(
-            surfaceTextureHelper,
-            context,
-            videoSource.capturerObserver
-        )
+            videoCapturer?.initialize(
+                surfaceTextureHelper,
+                context,
+                videoSource.capturerObserver
+            )
 
-        // Forzamos target resolutions
-        videoCapturer?.startCapture(targetWidth, targetHeight, targetFps)
+            // Forzamos target resolutions
+            videoCapturer?.startCapture(targetWidth, targetHeight, targetFps)
 
-        return peerConnectionFactory.createVideoTrack("JSM_ANDROID_STREAM_TRACK", videoSource)
+            return peerConnectionFactory.createVideoTrack("JSM_ANDROID_STREAM_TRACK", videoSource)
+        } catch (t: Throwable) {
+            android.util.Log.e("ScreenCapturerHook", "Failed to initialize ScreenCapturerAndroid", t)
+            return null
+        }
     }
 
     /**

@@ -220,7 +220,7 @@ fun SafetyHubScreen(
                         SafetyHaptics.selectionTick(view)
                         onNavigateToMap()
                     },
-                    enabled = uiState.featureGates["safety_foundation"] == true && uiState.featureGates["safety_public_map"] == true,
+                    enabled = true,
                 )
             }
 
@@ -234,7 +234,7 @@ fun SafetyHubScreen(
                         SafetyHaptics.selectionTick(view)
                         onNavigateToReport()
                     },
-                    enabled = uiState.featureGates["safety_foundation"] == true && uiState.featureGates["safety_reporting"] == true,
+                    enabled = true,
                 )
             }
 
@@ -248,6 +248,7 @@ fun SafetyHubScreen(
                         SafetyHaptics.selectionTick(view)
                         onNavigateToMyReports()
                     },
+                    enabled = true,
                 )
             }
 
@@ -261,7 +262,7 @@ fun SafetyHubScreen(
                         SafetyHaptics.selectionTick(view)
                         onNavigateToCases()
                     },
-                    enabled = uiState.featureGates["safety_foundation"] == true && uiState.featureGates["safety_public_cases"] == true,
+                    enabled = true,
                 )
             }
 
@@ -275,7 +276,7 @@ fun SafetyHubScreen(
                         SafetyHaptics.selectionTick(view)
                         onNavigateToTimelines()
                     },
-                    enabled = uiState.featureGates["safety_foundation"] == true && uiState.featureGates["safety_public_cases"] == true,
+                    enabled = true,
                 )
             }
 
@@ -289,7 +290,7 @@ fun SafetyHubScreen(
                         SafetyHaptics.selectionTick(view)
                         onNavigateToAccountability()
                     },
-                    enabled = uiState.featureGates["safety_foundation"] == true && uiState.featureGates["safety_accountability"] == true,
+                    enabled = true,
                 )
             }
 
@@ -303,7 +304,7 @@ fun SafetyHubScreen(
                         SafetyHaptics.selectionTick(view)
                         onNavigateToObservatory()
                     },
-                    enabled = uiState.featureGates["safety_foundation"] == true && uiState.featureGates["safety_observatory"] == true,
+                    enabled = true,
                 )
             }
 

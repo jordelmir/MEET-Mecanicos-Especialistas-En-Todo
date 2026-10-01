@@ -36,16 +36,16 @@ class NsdBroadcaster(private val context: Context) {
      * Expone un socket TCP base antes de que WebRTC tome el control.
      */
     fun startBroadcasting(port: Int) {
-        val serviceInfo = NsdServiceInfo().apply {
-            serviceName = SERVICE_NAME
-            serviceType = SERVICE_TYPE
-            this.port = port
-
-            // Atributos base pre-RTC (Opcional, depende de API Android lvl)
-            // setAttribute("device", "Magic_V2")
+        try {
+            val serviceInfo = NsdServiceInfo().apply {
+                serviceName = SERVICE_NAME
+                serviceType = SERVICE_TYPE
+                this.port = port
+            }
+            nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, registrationListener)
+        } catch (e: Exception) {
+            Log.e("NsdBroadcaster", "Failed to register NSD service", e)
         }
-
-        nsdManager.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, registrationListener)
     }
 
     fun stopBroadcasting() {

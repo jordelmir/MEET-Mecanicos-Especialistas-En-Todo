@@ -12,26 +12,44 @@ import androidx.compose.runtime.Composable
  * definida en Type.kt.
  */
 
-private val DragonColorScheme = darkColorScheme(
-    primary = DragonTeal,
-    secondary = DragonCyan,
-    tertiary = DragonOrange,
-    background = DragonBlack,
-    surface = DragonDarkGray,
-    surfaceVariant = DragonMidGray,
-    onPrimary = DragonWhite,
-    onSecondary = DragonBlack,
-    onBackground = DragonWhite,
-    onSurface = DragonWhite,
-    onSurfaceVariant = DragonGray,
-    error = DragonOrange,
-    onError = DragonWhite
-)
-
 @Composable
 fun DragonTheme(content: @Composable () -> Unit) {
+    val isWhite = com.elysium369.meet.ui.theme.MeetColors.isWhiteTheme
+    val scheme = if (isWhite) {
+        androidx.compose.material3.lightColorScheme(
+            primary = DragonTeal,
+            secondary = DragonCyan,
+            tertiary = DragonOrange,
+            background = androidx.compose.ui.graphics.Color.White,
+            surface = androidx.compose.ui.graphics.Color.White,
+            surfaceVariant = DragonDarkGray,
+            onPrimary = DragonBlack,
+            onSecondary = DragonBlack,
+            onBackground = DragonWhite,
+            onSurface = DragonWhite,
+            onSurfaceVariant = DragonGray,
+            error = DragonOrange,
+            onError = androidx.compose.ui.graphics.Color.White
+        )
+    } else {
+        darkColorScheme(
+            primary = DragonTeal,
+            secondary = DragonCyan,
+            tertiary = DragonOrange,
+            background = DragonBlack,
+            surface = DragonDarkGray,
+            surfaceVariant = DragonMidGray,
+            onPrimary = DragonWhite,
+            onSecondary = DragonBlack,
+            onBackground = DragonWhite,
+            onSurface = DragonWhite,
+            onSurfaceVariant = DragonGray,
+            error = DragonOrange,
+            onError = DragonWhite
+        )
+    }
     MaterialTheme(
-        colorScheme = DragonColorScheme,
+        colorScheme = scheme,
         typography = DragonTypography,  // Importado de Type.kt (JetBrains Mono)
         content = content
     )
