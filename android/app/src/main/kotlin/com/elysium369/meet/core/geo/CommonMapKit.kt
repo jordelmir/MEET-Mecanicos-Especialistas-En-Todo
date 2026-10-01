@@ -16,7 +16,6 @@ data class GeoPoint(
         require(capturedAtEpochMs >= 0) { "Captured time cannot be negative" }
     }
 }
-
 /**
  * Bounding box for map camera fitting.
  */
