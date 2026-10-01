@@ -1,6 +1,7 @@
 package com.elysium369.meet.safety.geo
 
 import com.elysium369.meet.core.geo.CommonMapState
+import com.elysium369.meet.core.geo.GeoArea
 import com.elysium369.meet.core.geo.GeoBounds
 import com.elysium369.meet.core.geo.GeoMarker
 import com.elysium369.meet.core.geo.GeoMarkerRole
@@ -20,23 +21,21 @@ object SafetyMapAdapter {
         privateLabel: String = "Mi reporte",
         independentSourcesSuffix: String = " fuentes independientes",
     ): CommonMapState {
-        val publicMarkers = points.map { point ->
-            GeoMarker(
-                id = point.publicPointId,
-                role = if (point.category == "HOMICIDE") GeoMarkerRole.HOMICIDE_PIN else GeoMarkerRole.INCIDENT_PIN,
-                point = GeoPoint(
-                    latitude = point.displayLatitude,
-                    longitude = point.displayLongitude,
-                ),
-                label = point.label,
-                subtitle = buildString {
-                    append(point.claimState)
-                    if (point.independentSourceCount > 0) {
-                        append(" · ")
-                        append(point.independentSourceCount)
-                        append(independentSourcesSuffix)
-                    }
-                },
+        val publicAreas = points.filter {
+            it.geoDisclosure == "COARSE_GRID_25KM_PLUS" && (it.uncertaintyMeters ?: 0) >= 25_000
+        }.map { point ->
+            val radius = requireNotNull(point.uncertaintyMeters)
+            val latitudeSpan = radius / 111_000.0
+            val longitudeSpan = latitudeSpan / kotlin.math.cos(Math.toRadians(point.displayLatitude)).coerceAtLeast(0.1)
+            val north = (point.displayLatitude + latitudeSpan).coerceAtMost(90.0)
+            val south = (point.displayLatitude - latitudeSpan).coerceAtLeast(-90.0)
+            val east = (point.displayLongitude + longitudeSpan).coerceAtMost(180.0)
+            val west = (point.displayLongitude - longitudeSpan).coerceAtLeast(-180.0)
+            GeoArea(
+                point.publicPointId,
+                listOf(GeoPoint(north, west), GeoPoint(north, east), GeoPoint(south, east), GeoPoint(south, west)),
+                point.label,
+                radius,
             )
         }
         val privateMarkers = privatePoints.map { point ->
@@ -49,14 +48,15 @@ object SafetyMapAdapter {
                 isHighlighted = point.syncState != "SYNCED",
             )
         }
-        val markers = publicMarkers + privateMarkers
+        val markers = privateMarkers
 
-        val bounds = GeoBounds.fromPoints(markers.map { it.point })
+        val bounds = GeoBounds.fromPoints(markers.map { it.point } + publicAreas.flatMap { it.boundary })
 
         return CommonMapState(
             markers = markers,
+            areas = publicAreas,
             cameraIntent = when {
-                bounds != null && markers.size > 1 ->
+                bounds != null && (publicAreas.isNotEmpty() || markers.size > 1) ->
                     MapCameraIntent.FitBounds(bounds)
                 markers.isNotEmpty() ->
                     MapCameraIntent.CenterOn(markers.first().point, 14.0)
@@ -76,4 +76,6 @@ data class SafetyPublicPoint(
     val claimState: String,
     val independentSourceCount: Int,
     val category: String,
+    val geoDisclosure: String = "WITHHELD",
+    val uncertaintyMeters: Int? = null,
 )

@@ -11,45 +11,40 @@ import android.graphics.Paint
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon as ComposeIcon
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.elysium369.meet.BuildConfig
+import com.elysium369.meet.R
 import com.elysium369.meet.core.geo.CommonMapState
 import com.elysium369.meet.core.geo.GeoPoint
 import com.elysium369.meet.core.geo.GeoMarkerRole
 import com.elysium369.meet.core.geo.MapCameraIntent
+import com.elysium369.meet.ui.theme.MeetColors
+import kotlinx.coroutines.delay
 import org.maplibre.android.MapLibre
 import org.maplibre.android.annotations.Icon
 import org.maplibre.android.annotations.IconFactory
 import org.maplibre.android.annotations.MarkerOptions
+import org.maplibre.android.annotations.PolygonOptions
 import org.maplibre.android.annotations.PolylineOptions
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
@@ -59,7 +54,8 @@ import org.maplibre.android.maps.MapView
 
 /**
  * Universal CommonMapPanel powered by MapLibre.
- * Renders CommonMapState with routes, multi-role markers, and auto-camera fitting.
+ * Renders CommonMapState with routes, areas (uncertainty footprints), multi-role markers,
+ * auto-camera fitting, and fail-honest loading/fallback resilience.
  */
 @SuppressLint("ClickableViewAccessibility")
 @Composable
@@ -74,6 +70,7 @@ fun CommonMapPanel(
     onRecenterRequested: (() -> Unit)? = null,
     onMarkerClick: ((String) -> Unit)? = null,
     onMapLongClick: ((GeoPoint) -> Unit)? = null,
+    fallbackStyleUrl: String = BuildConfig.RIDE_MAP_STYLE_FALLBACK_URL,
 ) {
     val latestMarkerClick by rememberUpdatedState(onMarkerClick)
     val latestMapLongClick by rememberUpdatedState(onMapLongClick)
@@ -83,71 +80,168 @@ fun CommonMapPanel(
     val lifecycle = LocalLifecycleOwner.current.lifecycle
 
     var mapInstance by remember { mutableStateOf<MapLibreMap?>(null) }
-    var mapViewInstance by remember { mutableStateOf<MapView?>(null) }
-    var lastRenderedState by remember { mutableStateOf<CommonMapState?>(null) }
+    val interaction = remember { MapInteractionPolicy() }
+    var gestureRevision by remember { mutableIntStateOf(0) }
+    var lastCameraKey: Any? by remember { mutableStateOf(null) }
+    val iconCache = remember { mutableMapOf<Pair<GeoMarkerRole, Boolean>, Icon>() }
+    var loadPolicy by remember(styleUrl, fallbackStyleUrl) {
+        mutableStateOf(MapStyleLoadPolicy.candidates(styleUrl, fallbackStyleUrl))
+    }
+    var loadRevision by remember { mutableIntStateOf(0) }
+    var mapInitializationFailed by remember { mutableStateOf(false) }
 
-    DisposableEffect(lifecycle, mapViewInstance) {
-        val mapView = mapViewInstance ?: return@DisposableEffect onDispose {}
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> mapView.onStart()
-                Lifecycle.Event.ON_RESUME -> mapView.onResume()
-                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
-                Lifecycle.Event.ON_STOP -> mapView.onStop()
-                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
-                else -> Unit
+    val failureListener = remember {
+        MapView.OnDidFailLoadingMapListener {
+            if (loadPolicy.phase != MapStyleLoadPolicy.Phase.UNAVAILABLE) {
+                loadPolicy = loadPolicy.failed()
             }
-        }
-        lifecycle.addObserver(observer)
-        onDispose {
-            lifecycle.removeObserver(observer)
         }
     }
 
-    Box(modifier = modifier) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { ctx ->
-                MapLibre.getInstance(ctx)
-                MapView(ctx).apply {
-                    mapViewInstance = this
-                    getMapAsync { map ->
-                        mapInstance = map
-                        map.uiSettings.isScrollGesturesEnabled = true
-                        map.uiSettings.isZoomGesturesEnabled = true
-                        map.uiSettings.isRotateGesturesEnabled = true
-                        map.uiSettings.isTiltGesturesEnabled = true
-                        map.addOnMapLongClickListener { latLng ->
-                            latestMapLongClick?.invoke(GeoPoint(latLng.latitude, latLng.longitude))
-                            latestMapLongClick != null
+    val mapView = remember(context) {
+        try {
+            MapLibre.getInstance(context.applicationContext)
+            MapView(context).apply {
+                setBackgroundColor(Color.rgb(8, 15, 24))
+                onCreate(null)
+            }
+        } catch (t: Throwable) {
+            android.util.Log.e("CommonMapPanel", "Error initializing MapLibre MapView", t)
+            mapInitializationFailed = true
+            null
+        }
+    }
+
+    val renderKey = state.visualKey()
+    val cameraKey = renderKey.cameraIntent to (renderKey.markers.map { it.point.latitude to it.point.longitude } to renderKey.routes.map { route -> route.points.map { it.latitude to it.longitude } })
+
+    LaunchedEffect(mapInstance, loadPolicy.attempt, loadRevision) {
+        val map = mapInstance ?: return@LaunchedEffect
+        val url = loadPolicy.currentUrl ?: return@LaunchedEffect
+        val attempt = loadPolicy.attempt
+        val revision = loadRevision
+        loadPolicy = loadPolicy.copy(phase = MapStyleLoadPolicy.Phase.LOADING)
+        map.setStyle(url) {
+            if (attempt == loadPolicy.attempt && revision == loadRevision && !mapInitializationFailed && loadPolicy.phase == MapStyleLoadPolicy.Phase.LOADING) {
+                loadPolicy = loadPolicy.loaded()
+                interaction.invalidate()
+                val current = latestState
+                renderCommonMap(context, map, current, markerIds, iconCache, moveCamera = !interaction.userOwnsCamera)
+                interaction.rendered(current.visualKey())
+                lastCameraKey = current.visualKey().cameraIntent to (current.markers.map { it.point.latitude to it.point.longitude } to current.routes.map { route -> route.points.map { it.latitude to it.longitude } })
+                onMapReady?.invoke(map)
+            }
+        }
+        delay(12_000)
+        if (attempt == loadPolicy.attempt && revision == loadRevision && loadPolicy.phase == MapStyleLoadPolicy.Phase.LOADING) {
+            loadPolicy = loadPolicy.failed()
+        }
+    }
+
+    DisposableEffect(lifecycle, mapView) {
+        val currentMapView = mapView ?: return@DisposableEffect onDispose {}
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> currentMapView.onStart()
+                Lifecycle.Event.ON_RESUME -> currentMapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> currentMapView.onPause()
+                Lifecycle.Event.ON_STOP -> currentMapView.onStop()
+                Lifecycle.Event.ON_DESTROY -> currentMapView.onDestroy()
+                else -> Unit
+            }
+        }
+        currentMapView.addOnDidFailLoadingMapListener(failureListener)
+        lifecycle.addObserver(observer)
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) currentMapView.onStart()
+        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) currentMapView.onResume()
+        onDispose {
+            currentMapView.removeOnDidFailLoadingMapListener(failureListener)
+            lifecycle.removeObserver(observer)
+            if (!currentMapView.isDestroyed) {
+                currentMapView.onPause()
+                currentMapView.onStop()
+                currentMapView.onDestroy()
+            }
+        }
+    }
+
+    Box(modifier = modifier.background(MeetColors.backgroundDeep)) {
+        if (mapView != null) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = {
+                    mapView.apply {
+                        getMapAsync { map ->
+                            mapInstance = map
+                            bindSmoothMapGestures(this, map, interaction) { gestureRevision++ }
+                            map.uiSettings.isScrollGesturesEnabled = true
+                            map.uiSettings.isZoomGesturesEnabled = true
+                            map.uiSettings.isRotateGesturesEnabled = true
+                            map.uiSettings.isTiltGesturesEnabled = true
+                            map.addOnMapLongClickListener { latLng ->
+                                latestMapLongClick?.invoke(GeoPoint(latLng.latitude, latLng.longitude))
+                                latestMapLongClick != null
+                            }
+                            map.setOnMarkerClickListener { marker ->
+                                val id = markerIds[marker.id]
+                                val callback = latestMarkerClick
+                                if (id != null && callback != null) { callback(id); true } else false
+                            }
+                            map.setOnPolygonClickListener { polygon ->
+                                markerIds[polygon.id]?.let { latestMarkerClick?.invoke(it) }
+                            }
                         }
-                        map.setOnMarkerClickListener { marker ->
-                            val id = markerIds[marker.id]
-                            val callback = latestMarkerClick
-                            if (id != null && callback != null) { callback(id); true } else false
-                        }
-                        map.setStyle(styleUrl) {
-                            val current = latestState
-                            renderCommonMap(ctx, map, current, markerIds)
-                            lastRenderedState = current
-                            onMapReady?.invoke(map)
+                    }
+                },
+                update = {
+                    gestureRevision // Reconcile deferred projections once native inertia finishes.
+                    mapInstance?.let { map ->
+                        if (map.style != null && interaction.shouldRender(renderKey)) {
+                            val moveCamera = !interaction.userOwnsCamera && lastCameraKey != cameraKey
+                            renderCommonMap(context, map, state, markerIds, iconCache, moveCamera)
+                            interaction.rendered(renderKey)
+                            if (moveCamera) lastCameraKey = cameraKey
                         }
                     }
                 }
-            },
-            update = {
-                mapInstance?.let { map ->
-                    if (map.style != null && lastRenderedState != state) {
-                        renderCommonMap(context, map, state, markerIds)
-                        lastRenderedState = state
+            )
+        }
+
+        if (loadPolicy.phase != MapStyleLoadPolicy.Phase.READY || mapInitializationFailed) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MeetColors.backgroundDeep)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+            ) {
+                val loading = !mapInitializationFailed && loadPolicy.phase == MapStyleLoadPolicy.Phase.LOADING
+                if (loading) {
+                    CircularProgressIndicator(color = MeetColors.cyberCyan, modifier = Modifier.size(36.dp))
+                }
+                Text(
+                    stringResource(if (loading) R.string.common_map_loading else R.string.common_map_unavailable),
+                    color = MeetColors.textPrimary,
+                    fontSize = 13.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                )
+                if (!loading) {
+                    TextButton(onClick = {
+                        mapInitializationFailed = false
+                        loadPolicy = loadPolicy.retry()
+                        loadRevision++
+                    }) {
+                        Text(stringResource(R.string.common_map_retry), color = MeetColors.cyberCyan)
                     }
                 }
             }
-        )
+        }
 
         if (state.showRecenterButton) {
             FloatingActionButton(
                 onClick = {
+                    interaction.recenter()
                     onRecenterRequested?.invoke()
                     mapInstance?.let { map ->
                         val target = resolveCommonUserCoordinates(context, userLocation, state)
@@ -163,17 +257,17 @@ fun CommonMapPanel(
                     .size(48.dp)
                     .zIndex(20f)
                     .border(
-                        BorderStroke(1.5.dp, ComposeColor(0xFF00E5FF)),
+                        BorderStroke(1.5.dp, MeetColors.cyberCyan),
                         CircleShape,
                     ),
                 shape = CircleShape,
-                containerColor = ComposeColor(0xFF07131E).copy(alpha = 0.94f),
-                contentColor = ComposeColor(0xFF00E5FF)
+                containerColor = MeetColors.backgroundDark.copy(alpha = 0.94f),
+                contentColor = MeetColors.cyberCyan,
             ) {
                 ComposeIcon(
                     imageVector = Icons.Default.MyLocation,
                     contentDescription = "Centrar en mi ubicación GPS",
-                    tint = ComposeColor(0xFF00E5FF),
+                    tint = MeetColors.cyberCyan,
                     modifier = Modifier.size(26.dp)
                 )
             }
@@ -221,6 +315,7 @@ private fun resolveCommonUserCoordinates(
     }
 
     val fallbackPt = state.markers.firstOrNull()?.point
+        ?: state.areas.firstOrNull()?.boundary?.firstOrNull()
         ?: state.routes.firstOrNull()?.points?.firstOrNull()
         ?: GeoPoint(9.9281, -84.0907)
     return LatLng(fallbackPt.latitude, fallbackPt.longitude)
@@ -231,6 +326,8 @@ private fun renderCommonMap(
     map: MapLibreMap,
     state: CommonMapState,
     markerIds: MutableMap<Long, String>,
+    iconCache: MutableMap<Pair<GeoMarkerRole, Boolean>, Icon>,
+    moveCamera: Boolean,
 ) {
     markerIds.clear()
     map.clear()
@@ -259,9 +356,21 @@ private fun renderCommonMap(
         }
     }
 
+    // Public uncertainty footprints are filled areas, never precise incident pins.
+    state.areas.forEach { area ->
+        val polygon = map.addPolygon(
+            PolygonOptions()
+                .addAll(area.boundary.map { LatLng(it.latitude, it.longitude) })
+                .fillColor(Color.parseColor("#00A6A6"))
+                .alpha(0.25f)
+                .strokeColor(Color.parseColor("#00E5FF"))
+        )
+        markerIds[polygon.id] = area.id
+    }
+
     // Render Markers
     state.markers.forEach { marker ->
-        val icon = createCommonMarkerIcon(context, iconFactory, marker.role, marker.isHighlighted)
+        val icon = iconCache.getOrPut(marker.role to marker.isHighlighted) { createCommonMarkerIcon(context, iconFactory, marker.role, marker.isHighlighted) }
         val accuracyText = marker.point.accuracyMeters?.let { "±${it.toInt()}m" } ?: ""
         val renderedMarker = map.addMarker(
             MarkerOptions()
@@ -274,7 +383,7 @@ private fun renderCommonMap(
     }
 
     // Camera Positioning
-    when (val intent = state.cameraIntent) {
+    if (moveCamera) when (val intent = state.cameraIntent) {
         is MapCameraIntent.CenterOn -> {
             map.animateCamera(
                 CameraUpdateFactory.newLatLngZoom(
@@ -285,16 +394,29 @@ private fun renderCommonMap(
             )
         }
         is MapCameraIntent.FitBounds -> {
-            val bounds = LatLngBounds.from(
-                intent.bounds.northLat,
-                intent.bounds.eastLng,
-                intent.bounds.southLat,
-                intent.bounds.westLng
-            )
-            map.animateCamera(
-                CameraUpdateFactory.newLatLngBounds(bounds, intent.paddingDp),
-                500
-            )
+            val north = intent.bounds.northLat
+            val south = intent.bounds.southLat
+            val east = intent.bounds.eastLng
+            val west = intent.bounds.westLng
+            if (kotlin.math.abs(north - south) < 0.0001 && kotlin.math.abs(east - west) < 0.0001) {
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(LatLng(north, east), 14.5),
+                    500
+                )
+            } else {
+                val bounds = LatLngBounds.from(north, east, south, west)
+                try {
+                    map.animateCamera(
+                        CameraUpdateFactory.newLatLngBounds(bounds, intent.paddingDp.coerceAtLeast(16)),
+                        500
+                    )
+                } catch (_: Exception) {
+                    map.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(LatLng((north + south) / 2.0, (east + west) / 2.0), 13.0),
+                        500
+                    )
+                }
+            }
         }
         is MapCameraIntent.FollowUser -> {
             fitCameraToBounds(map, state)
@@ -305,6 +427,7 @@ private fun renderCommonMap(
 private fun fitCameraToBounds(map: MapLibreMap, state: CommonMapState) {
     val allPoints = (
         state.markers.map { LatLng(it.point.latitude, it.point.longitude) } +
+        state.areas.flatMap { it.boundary.map { p -> LatLng(p.latitude, p.longitude) } } +
         state.routes.flatMap { it.points.map { p -> LatLng(p.latitude, p.longitude) } }
     ).distinct()
 
@@ -313,8 +436,14 @@ private fun fitCameraToBounds(map: MapLibreMap, state: CommonMapState) {
     if (allPoints.size == 1) {
         map.animateCamera(CameraUpdateFactory.newLatLngZoom(allPoints.first(), 15.5), 500)
     } else {
-        val bounds = LatLngBounds.Builder().includes(allPoints).build()
-        map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 72), 500)
+        try {
+            val bounds = LatLngBounds.Builder().includes(allPoints).build()
+            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 72), 500)
+        } catch (_: Exception) {
+            val avgLat = allPoints.map { it.latitude }.average()
+            val avgLng = allPoints.map { it.longitude }.average()
+            map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(avgLat, avgLng), 13.0), 500)
+        }
     }
 }
 
@@ -379,3 +508,13 @@ private fun createCommonMarkerIcon(
 
     return iconFactory.fromBitmap(bitmap)
 }
+
+private fun CommonMapState.visualKey(): CommonMapState = copy(
+    markers = markers.map { it.copy(point = it.point.copy(capturedAtEpochMs = 0)) },
+    routes = routes.map { it.copy(points = it.points.map { p -> p.copy(capturedAtEpochMs = 0) }) },
+    areas = areas.map { it.copy(boundary = it.boundary.map { p -> p.copy(capturedAtEpochMs = 0) }) },
+    cameraIntent = when (val intent = cameraIntent) {
+        is MapCameraIntent.CenterOn -> intent.copy(point = intent.point.copy(capturedAtEpochMs = 0, accuracyMeters = null))
+        else -> intent
+    },
+)

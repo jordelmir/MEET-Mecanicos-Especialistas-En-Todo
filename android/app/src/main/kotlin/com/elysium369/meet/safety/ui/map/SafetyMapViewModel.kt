@@ -80,7 +80,7 @@ class SafetyMapViewModel @Inject constructor(
         }
         SafetyMapUiState(
             mapState = SafetyMapAdapter.build(
-                points.map { SafetyPublicPoint(it.publicPointId, it.displayLatitude, it.displayLongitude, it.label, it.claimState, it.independentSourceCount, it.category) },
+                points.map { SafetyPublicPoint(it.publicPointId, it.displayLatitude, it.displayLongitude, it.label, it.claimState, it.independentSourceCount, it.category, it.geoDisclosure, it.locationAccuracyMeters) },
                 privatePoints,
             ),
             points = points, privatePoints = privatePoints, isLoading = busy, error = failure,
