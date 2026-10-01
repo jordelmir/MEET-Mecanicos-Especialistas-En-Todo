@@ -2,6 +2,7 @@ package com.elysium369.meet.safety.ui.observatory
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -345,6 +346,196 @@ fun SafetyObservatoryScreen(
                     )
                 }
 
+                // ── Procedencia y Tipos de Fuentes de Información ──
+                item {
+                    val totalSources = (stats.civil_source_count + stats.journalistic_source_count +
+                        stats.public_record_source_count + stats.documentary_source_count +
+                        stats.institutional_source_count).coerceAtLeast(1L)
+
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = ObservatoryColors.cardSurface),
+                        border = BorderStroke(1.dp, ObservatoryColors.accentCyan.copy(alpha = 0.35f)),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text(
+                                "Procedencia y Clasificación de la Información",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 16.sp,
+                                color = MeetColors.textPrimary,
+                            )
+                            Text(
+                                "El Observatorio de Seguridad MEET audita rigurosamente el origen de cada reporte. No divulga datos personales de denunciantes, pero sí clasifica de qué tipo de canal procede la información para total transparencia forense.",
+                                fontSize = 12.sp,
+                                color = MeetColors.textSecondary,
+                                lineHeight = 16.sp,
+                            )
+
+                            // Source Provenance Items with percentages
+                            SourceProvenanceDetailRow(
+                                icon = "📰",
+                                title = "Investigación Periodística",
+                                desc = "Reportajes de medios, crónicas de investigación independiente y prensa verificada.",
+                                count = stats.journalistic_source_count,
+                                total = totalSources,
+                                color = Color(0xFF69F0AE)
+                            )
+                            SourceProvenanceDetailRow(
+                                icon = "🛡️",
+                                title = "Reportes Ciudadanos / Casos Públicos",
+                                desc = "Alertas de la comunidad, denuncias de testigos protegidos y reportes con corroboración.",
+                                count = stats.civil_source_count,
+                                total = totalSources,
+                                color = Color(0xFF00E5FF)
+                            )
+                            SourceProvenanceDetailRow(
+                                icon = "🏛️",
+                                title = "Registros Públicos y Judiciales",
+                                desc = "Gacetas oficiales, juzgados, autos de apertura procesal y documentos registrales.",
+                                count = stats.public_record_source_count,
+                                total = totalSources,
+                                color = Color(0xFFFFD700)
+                            )
+                            SourceProvenanceDetailRow(
+                                icon = "🏢",
+                                title = "Expedientes Institucionales",
+                                desc = "Oficios y respuestas formales de fiscalías, comisarías, ministerios y defensorías.",
+                                count = stats.institutional_source_count,
+                                total = totalSources,
+                                color = Color(0xFF82B1FF)
+                            )
+                            SourceProvenanceDetailRow(
+                                icon = "📄",
+                                title = "Evidencias Documentales y Peritajes",
+                                desc = "Peritajes forenses certificados, metadatos multimedia verificados y hash SHA-256.",
+                                count = stats.documentary_source_count,
+                                total = totalSources,
+                                color = Color(0xFFFF80AB)
+                            )
+                        }
+                    }
+                }
+
+                // ── Filtro y Lista de Reportes Auditados ──
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Reportes Auditados en el Observatorio",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Black,
+                        color = MeetColors.textPrimary,
+                    )
+                    Text(
+                        "Filtrar por tipología de fuente originaria:",
+                        fontSize = 11.sp,
+                        color = MeetColors.textSecondary,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                    )
+
+                    // Source Filter Chips Row
+                    val filterOptions = listOf(
+                        null to "Todos",
+                        "JOURNALISTIC" to "📰 Periodístico",
+                        "CIVIL" to "🛡️ Caso Público",
+                        "PUBLIC_RECORD" to "🏛️ Registro Público",
+                        "INSTITUTIONAL" to "🏢 Institucional",
+                        "DOCUMENTARY" to "📄 Documental"
+                    )
+
+                    androidx.compose.foundation.lazy.LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    ) {
+                        items(filterOptions.size) { idx ->
+                            val (key, label) = filterOptions[idx]
+                            val isSelected = uiState.selectedSourceFilter == key
+                            FilterChip(
+                                selected = isSelected,
+                                onClick = { viewModel.setSourceFilter(key) },
+                                label = { Text(label, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = ObservatoryColors.accentCyan.copy(alpha = 0.25f),
+                                    selectedLabelColor = ObservatoryColors.accentCyan,
+                                    containerColor = ObservatoryColors.cardSurface,
+                                    labelColor = MeetColors.textSecondary
+                                ),
+                                border = BorderStroke(1.dp, if (isSelected) ObservatoryColors.accentCyan else ObservatoryColors.cardBorder)
+                            )
+                        }
+                    }
+                }
+
+                // Filtered cases and points
+                val selectedFilter = uiState.selectedSourceFilter
+                val filteredCases = if (selectedFilter == null) {
+                    uiState.recentCases
+                } else {
+                    uiState.recentCases.filter { c ->
+                        val (label, _) = formatProvenanceForCase(c.caseType, c.title)
+                        when (selectedFilter) {
+                            "JOURNALISTIC" -> label.contains("Periodística", ignoreCase = true)
+                            "CIVIL" -> label.contains("Ciudadano", ignoreCase = true) || label.contains("Público", ignoreCase = true)
+                            "PUBLIC_RECORD" -> label.contains("Registro", ignoreCase = true) || label.contains("Judicial", ignoreCase = true)
+                            "INSTITUTIONAL" -> label.contains("Institucional", ignoreCase = true)
+                            "DOCUMENTARY" -> label.contains("Documental", ignoreCase = true)
+                            else -> true
+                        }
+                    }
+                }
+
+                val filteredPoints = if (selectedFilter == null) {
+                    uiState.recentPoints
+                } else {
+                    uiState.recentPoints.filter { p ->
+                        when (selectedFilter) {
+                            "JOURNALISTIC" -> p.journalisticSourceCount > 0
+                            "CIVIL" -> p.civilSourceCount > 0
+                            "PUBLIC_RECORD" -> p.publicRecordSourceCount > 0
+                            "INSTITUTIONAL" -> p.institutionalSourceCount > 0
+                            "DOCUMENTARY" -> p.documentarySourceCount > 0
+                            else -> true
+                        }
+                    }
+                }
+
+                if (filteredCases.isNotEmpty()) {
+                    items(filteredCases.size) { index ->
+                        val case = filteredCases[index]
+                        ObservatoryCaseProvenanceCard(case = case)
+                    }
+                }
+
+                if (filteredPoints.isNotEmpty()) {
+                    items(filteredPoints.size) { index ->
+                        val point = filteredPoints[index]
+                        ObservatoryPointProvenanceCard(point = point)
+                    }
+                }
+
+                if (filteredCases.isEmpty() && filteredPoints.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = ObservatoryColors.cardSurface),
+                            border = BorderStroke(1.dp, ObservatoryColors.cardBorder)
+                        ) {
+                            Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "No se encontraron reportes con el filtro seleccionado.",
+                                    fontSize = 13.sp,
+                                    color = MeetColors.textSecondary,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                TextButton(onClick = { viewModel.setSourceFilter(null) }) {
+                                    Text("Ver todos los orígenes de información", color = ObservatoryColors.accentCyan)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Epistemic disclosure
                 item {
                     Card(
@@ -383,5 +574,245 @@ fun SafetyObservatoryScreen(
             // Bottom spacing
             item { Spacer(Modifier.height(24.dp)) }
         }
+    }
+}
+
+@Composable
+private fun SourceProvenanceDetailRow(
+    icon: String,
+    title: String,
+    desc: String,
+    count: Long,
+    total: Long,
+    color: Color,
+) {
+    val percentage = if (total > 0) ((count.toFloat() / total.toFloat()) * 100).toInt() else 0
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.08f))
+            .border(1.dp, color.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Text(icon, fontSize = 16.sp)
+                Spacer(Modifier.width(8.dp))
+                Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = color)
+            }
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = color.copy(alpha = 0.18f),
+                border = BorderStroke(0.8.dp, color.copy(alpha = 0.6f))
+            ) {
+                Text(
+                    text = "$count fuentes ($percentage%)",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    color = color,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+        }
+        Text(desc, fontSize = 11.sp, color = MeetColors.textSecondary, lineHeight = 15.sp)
+    }
+}
+
+@Composable
+private fun ObservatoryCaseProvenanceCard(case: com.elysium369.meet.safety.data.local.SafetyPublicCaseEntity) {
+    val (sourceLabel, sourceColor) = formatProvenanceForCase(case.caseType, case.title)
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = ObservatoryColors.cardSurface),
+        border = BorderStroke(1.dp, sourceColor.copy(alpha = 0.4f)),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = sourceColor.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, sourceColor.copy(alpha = 0.7f))
+                ) {
+                    Text(
+                        text = sourceLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = sourceColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+                Text(
+                    text = case.lifecycle,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = when (case.lifecycle) {
+                        "OPEN" -> MeetColors.cyberCyan
+                        "CLOSED" -> MeetColors.neonGreen
+                        else -> MeetColors.warning
+                    }
+                )
+            }
+
+            Text(
+                case.title,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = MeetColors.textPrimary
+            )
+
+            if (case.publicSummary.isNotBlank()) {
+                Text(
+                    case.publicSummary,
+                    fontSize = 12.sp,
+                    color = MeetColors.textSecondary,
+                    maxLines = 3,
+                    lineHeight = 16.sp
+                )
+            }
+
+            // Provenance & Metrics row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFF070E1A))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Tipo de Fuente: $sourceLabel",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = sourceColor
+                )
+                Text(
+                    "Fuentes: ${case.sourceCount ?: 1} · Hechos: ${case.claimCount ?: 1}",
+                    fontSize = 10.sp,
+                    color = MeetColors.textSecondary
+                )
+            }
+
+            Text(
+                "🛡️ Datos anonimizados conforme a la Constitución de Seguridad. Identifica el canal de origen sin juicio de personas.",
+                fontSize = 9.sp,
+                color = MeetColors.textSecondary.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun ObservatoryPointProvenanceCard(point: com.elysium369.meet.safety.data.local.SafetyPublicPointEntity) {
+    val (sourceLabel, sourceColor) = point.provenanceBadge()
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = ObservatoryColors.cardSurface),
+        border = BorderStroke(1.dp, sourceColor.copy(alpha = 0.4f)),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = sourceColor.copy(alpha = 0.15f),
+                    border = BorderStroke(1.dp, sourceColor.copy(alpha = 0.7f))
+                ) {
+                    Text(
+                        text = sourceLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = sourceColor,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+                Text(
+                    text = point.category,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = ObservatoryColors.accentCyan
+                )
+            }
+
+            Text(
+                point.label,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = MeetColors.textPrimary
+            )
+
+            // Sources tally
+            val activeSources = buildList {
+                if (point.journalisticSourceCount > 0) add("📰 Periodístico (${point.journalisticSourceCount})")
+                if (point.civilSourceCount > 0) add("🛡️ Ciudadano (${point.civilSourceCount})")
+                if (point.publicRecordSourceCount > 0) add("🏛️ Reg. Público (${point.publicRecordSourceCount})")
+                if (point.institutionalSourceCount > 0) add("🏢 Institucional (${point.institutionalSourceCount})")
+                if (point.documentarySourceCount > 0) add("📄 Documental (${point.documentarySourceCount})")
+            }
+
+            if (activeSources.isNotEmpty()) {
+                Text(
+                    "Canales de origen: ${activeSources.joinToString(" · ")}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = sourceColor
+                )
+            } else {
+                Text(
+                    "Fuentes independientes: ${point.independentSourceCount} · Estado: ${point.claimState}",
+                    fontSize = 11.sp,
+                    color = MeetColors.textSecondary
+                )
+            }
+
+            Text(
+                "Punto geodivulgado con resolución segura • No identifica domicilios ni personas.",
+                fontSize = 9.sp,
+                color = MeetColors.textSecondary.copy(alpha = 0.7f)
+            )
+        }
+    }
+}
+
+fun formatProvenanceForCase(caseType: String?, title: String = ""): Pair<String, Color> {
+    val type = caseType?.uppercase() ?: ""
+    val lower = title.lowercase()
+    return when {
+        type.contains("JOURNAL") || lower.contains("prensa") || lower.contains("periodis") || lower.contains("noticia") || lower.contains("investiga") ->
+            "📰 Investigación Periodística" to Color(0xFF69F0AE)
+        type.contains("INSTITUTION") || lower.contains("fiscal") || lower.contains("polic") || lower.contains("ministerio") || lower.contains("oficial") ->
+            "🏢 Expediente Institucional" to Color(0xFF82B1FF)
+        type.contains("RECORD") || type.contains("PUBLIC_RECORD") || lower.contains("juzgado") || lower.contains("gaceta") || lower.contains("tribunal") ->
+            "🏛️ Registro Público / Judicial" to Color(0xFFFFD700)
+        type.contains("DOCUMENT") || lower.contains("peritaje") || lower.contains("forense") ->
+            "📄 Evidencia Documental" to Color(0xFFFF80AB)
+        else ->
+            "🛡️ Caso Público / Reporte Ciudadano" to Color(0xFF00E5FF)
+    }
+}
+
+fun com.elysium369.meet.safety.data.local.SafetyPublicPointEntity.provenanceBadge(): Pair<String, Color> {
+    return when {
+        journalisticSourceCount > 0 -> "📰 Investigación Periodística" to Color(0xFF69F0AE)
+        publicRecordSourceCount > 0 -> "🏛️ Registro Público" to Color(0xFFFFD700)
+        institutionalSourceCount > 0 -> "🏢 Expediente Institucional" to Color(0xFF82B1FF)
+        documentarySourceCount > 0 -> "📄 Evidencia Documental" to Color(0xFFFF80AB)
+        civilSourceCount > 0 -> "🛡️ Reporte Ciudadano" to Color(0xFF00E5FF)
+        else -> "🛡️ Caso Público" to Color(0xFF00E5FF)
     }
 }

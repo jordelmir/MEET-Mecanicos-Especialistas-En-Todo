@@ -954,8 +954,16 @@ class RecordingService : LifecycleService() {
         // We do NOT cancel chunkJob immediately.
         // We set _isRecording.value to false, which signals the delay loops to finish, stops the recorder,
         // and safely waits for VideoRecordEvent.Finalize to complete.
-        serviceScope.launch {
-            chunkJob?.join()
+        val recordingToFinish = currentRecording
+        _currentRecordingId.value = null
+        currentRecording = null
+
+        uploadScope.launch {
+            try {
+                chunkJob?.join()
+            } catch (e: Exception) {
+                Log.w(TAG, "chunkJob join exception", e)
+            }
 
             // Cleanup dual camera if active
             if (dualCameraManager != null) {
@@ -979,15 +987,18 @@ class RecordingService : LifecycleService() {
                 previewSurfaceProvider = null // Crucial: clear preview to avoid black screen on next run
             }
 
-            val current = currentRecording
-            if (current != null) {
-                recordingRepository.updateRecordingStatus(
-                    current.id,
-                    RecordingStatus.COMPLETED.value,
-                    System.currentTimeMillis()
-                )
+            if (recordingToFinish != null) {
+                try {
+                    recordingRepository.updateRecordingStatus(
+                        recordingToFinish.id,
+                        RecordingStatus.COMPLETED.value,
+                        System.currentTimeMillis()
+                    )
+                    Log.i(TAG, "Recording ${recordingToFinish.id} marked COMPLETED in Room DB")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to mark recording as COMPLETED", e)
+                }
             }
-            _currentRecordingId.value = null
 
             releaseWakeLock()
 
@@ -1004,18 +1015,20 @@ class RecordingService : LifecycleService() {
     override fun onDestroy() {
         try { unregisterReceiver(screenStateReceiver) } catch (_: Exception) {}
         super.onDestroy()
-        // If destroyed without proper stop, mark as interrupted
+        // If destroyed without proper stop, ensure recording is saved as completed or interrupted
         if (_isRecording.value) {
             _isRecording.value = false
             _currentRecordingType.value = null
-            serviceScope.launch {
-                val current = currentRecording
-                if (current != null) {
-                    recordingRepository.updateRecordingStatus(
-                        current.id,
-                        RecordingStatus.INTERRUPTED.value,
-                        System.currentTimeMillis()
-                    )
+            val orphan = currentRecording
+            if (orphan != null) {
+                uploadScope.launch {
+                    try {
+                        recordingRepository.updateRecordingStatus(
+                            orphan.id,
+                            RecordingStatus.COMPLETED.value,
+                            System.currentTimeMillis()
+                        )
+                    } catch (_: Exception) {}
                 }
             }
         }

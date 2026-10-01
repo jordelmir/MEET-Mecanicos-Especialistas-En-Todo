@@ -165,8 +165,8 @@ private fun Recording.toEntity() = RecordingEntity(
 private fun RecordingEntity.toDomain() = Recording(
     id = id,
     deviceId = deviceId,
-    type = RecordingType.entries.first { it.value == recordingType },
-    status = RecordingStatus.entries.first { it.value == status },
+    type = RecordingType.entries.firstOrNull { it.value.equals(recordingType, ignoreCase = true) } ?: RecordingType.VIDEO,
+    status = RecordingStatus.entries.firstOrNull { it.value.equals(status, ignoreCase = true) } ?: RecordingStatus.COMPLETED,
     startedAt = startedAt,
     endedAt = endedAt,
     totalChunks = totalChunks,
@@ -197,6 +197,6 @@ private fun ChunkEntity.toDomain() = EvidenceChunk(
     durationMs = durationMs,
     mimeType = mimeType,
     sha256Hash = sha256Hash,
-    uploadStatus = UploadStatus.valueOf(uploadStatus),
+    uploadStatus = runCatching { UploadStatus.valueOf(uploadStatus) }.getOrDefault(UploadStatus.PENDING),
     createdAt = createdAt
 )

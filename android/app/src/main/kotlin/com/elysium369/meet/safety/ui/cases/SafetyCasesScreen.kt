@@ -272,6 +272,22 @@ private fun CaseCard(case: SafetyPublicCaseEntity, onClick: () -> Unit) {
                 }
             }
 
+            Spacer(modifier = Modifier.height(4.dp))
+            val (sourceLabel, sourceColor) = com.elysium369.meet.safety.ui.observatory.formatProvenanceForCase(case.caseType, case.title)
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = sourceColor.copy(alpha = 0.15f),
+                border = BorderStroke(0.8.dp, sourceColor.copy(alpha = 0.6f)),
+            ) {
+                Text(
+                    text = sourceLabel,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    color = sourceColor,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
+
             if (case.publicSummary.isNotBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(

@@ -244,7 +244,7 @@ fun EliteCard(
                 colors = if (classic) listOf(backgroundColor.copy(alpha=0.88f),backgroundColor.copy(alpha=0.75f),backgroundColor.copy(alpha=0.65f)) else listOf(
                     androidx.compose.ui.graphics.lerp(backgroundColor, accentColor, 0.12f),
                     backgroundColor,
-                    androidx.compose.ui.graphics.lerp(backgroundColor, MeetColors.backgroundDeep, 0.45f)
+                    androidx.compose.ui.graphics.lerp(backgroundColor, if (MeetColors.isWhiteTheme) Color(0xFF050B15) else MeetColors.backgroundDeep, 0.45f)
                 )
             )
         )
@@ -341,7 +341,7 @@ fun EliteButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     color: Color = MeetColors.neonGreen,
-    textColor: Color = MeetColors.backgroundDeep,
+    textColor: Color = Color(0xFF050B15),
     isEnabled: Boolean = true
 ) {
     Button(
@@ -474,12 +474,20 @@ fun EliteTopAppBar(
             Column {
                 when (title) {
                     is AnnotatedString -> {
-                        Text(title, fontWeight = FontWeight.Black,
-                            style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            title,
+                            color = if (MeetColors.isWhiteTheme) Color(0xFF0A111E) else Color.White,
+                            fontWeight = FontWeight.Black,
+                            style = MaterialTheme.typography.titleLarge
+                        )
                     }
                     is String -> {
-                        Text(title, color = if (MeetColors.isWhiteTheme) MeetColors.textPrimary else Color.White, fontWeight = FontWeight.Black,
-                            style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            title,
+                            color = if (MeetColors.isWhiteTheme) Color(0xFF0A111E) else Color.White,
+                            fontWeight = FontWeight.Black,
+                            style = MaterialTheme.typography.titleLarge
+                        )
                     }
                 }
                 if (subtitle != null) {
@@ -583,23 +591,24 @@ fun PhantomSectionHeader(
     modifier: Modifier = Modifier,
     accentColor: Color = MeetColors.neonGreen
 ) {
+    val textColor = if (MeetColors.isWhiteTheme) Color(0xFF0A111E) else accentColor.copy(alpha = 0.7f)
     Row(
         modifier = modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .width(3.dp)
-                .height(16.dp)
+                .width(4.dp)
+                .height(18.dp)
                 .background(
-                    Brush.verticalGradient(listOf(accentColor, accentColor.copy(alpha = 0.2f))),
+                    Brush.verticalGradient(listOf(accentColor, accentColor.copy(alpha = 0.3f))),
                     RoundedCornerShape(2.dp)
                 )
         )
         Spacer(Modifier.width(8.dp))
         Text(
             label.uppercase(),
-            color = accentColor.copy(alpha = 0.7f),
+            color = textColor,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Black,
             letterSpacing = 2.sp

@@ -2587,7 +2587,7 @@ fun MeetBottomNavigation(navController: NavController) {
         .value?.destination?.route
     
     NavigationBar(
-        containerColor = MeetColors.backgroundDark,
+        containerColor = if (MeetColors.isWhiteTheme) Color(0xFF0A111E) else MeetColors.backgroundDark,
         contentColor = MeetColors.neonGreen
     ) {
         NavigationBarItem(

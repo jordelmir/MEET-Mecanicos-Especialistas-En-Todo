@@ -10,8 +10,8 @@ import androidx.compose.ui.graphics.Color
 
 // --- Fondos ---
 val DragonBlack: Color get() = if (com.elysium369.meet.ui.theme.MeetColors.isWhiteTheme) Color.White else Color(0xFF000000)
-val DragonDarkGray: Color get() = if (com.elysium369.meet.ui.theme.MeetColors.isWhiteTheme) Color(0xFFF5F7FA) else Color(0xFF12151A)
-val DragonMidGray: Color get() = if (com.elysium369.meet.ui.theme.MeetColors.isWhiteTheme) Color(0xFFE5E9F0) else Color(0xFF1A1F29)
+val DragonDarkGray   = Color(0xFF12151A)  // Superficies, contenedores, teclado (Ajustado)
+val DragonMidGray    = Color(0xFF1A1F29)  // Hover / estados activos (Ajustado)
 
 // --- Acentos ---
 val DragonTeal       = Color(0xFF45A29E)  // Operadores primarios (+, -, *, /)
@@ -19,9 +19,9 @@ val DragonCyan       = Color(0xFF66FCF1)  // Funciones avanzadas (sin, cos, etc.
 val DragonOrange     = Color(0xFFFF5722)  // Alertas, errores, AC/DEL
 
 // --- Texto ---
-val DragonWhite: Color get() = if (com.elysium369.meet.ui.theme.MeetColors.isWhiteTheme) Color(0xFF0F172A) else Color(0xFFFFFFFF)
-val DragonGray: Color get() = if (com.elysium369.meet.ui.theme.MeetColors.isWhiteTheme) Color(0xFF475569) else Color(0xFF8892A0)
-val DragonDimWhite: Color get() = if (com.elysium369.meet.ui.theme.MeetColors.isWhiteTheme) Color(0xFF64748B) else Color(0xFFC5C6C7)
+val DragonWhite      = Color(0xFFFFFFFF)  // Digitos, variables, texto principal
+val DragonGray       = Color(0xFF8892A0)  // Texto secundario, labels
+val DragonDimWhite   = Color(0xFFC5C6C7)  // Texto deshabilitado
 
 // --- Especiales ---
 val DragonGreen      = Color(0xFF4CAF50)  // Bordes activos y focus

@@ -53,19 +53,19 @@ object MeetColors {
 
     // ═══════════ BACKGROUNDS ═══════════
     val backgroundDeep: Color get() = if (isWhiteTheme) Color.White else Color(0xFF050B15)
-    val backgroundDark: Color get() = if (isWhiteTheme) Color.White else Color(0xFF081222)
-    val cardBackground: Color get() = if (isWhiteTheme) Color(0xFFF5F7FA) else Color(0xFF0F1B30)
-    val cardBackgroundLighter: Color get() = if (isWhiteTheme) Color(0xFFE8ECEF) else Color(0xFF152640)
+    val backgroundDark: Color get() = if (isWhiteTheme) Color(0xFFF6F8FA) else Color(0xFF081222)
+    val cardBackground = Color(0xFF0F1B30)
+    val cardBackgroundLighter = Color(0xFF152640)
 
     // ═══════════ BORDERS ═══════════
-    val borderBlue: Color get() = if (isWhiteTheme) Color(0xFFE2E8F0) else Color(0xFF1E3355)
-    val borderGlow: Color get() = if (isWhiteTheme) neonGreen.copy(alpha = 0.5f) else neonGreen.copy(alpha = 0.3f)
-    val borderSubtle: Color get() = if (isWhiteTheme) Color(0xFFCBD5E1) else Color(0xFF182A42)
+    val borderBlue = Color(0xFF1E3355)
+    val borderGlow: Color get() = neonGreen.copy(alpha = 0.3f)
+    val borderSubtle = Color(0xFF182A42)
 
     // ═══════════ TEXT ═══════════
-    val textPrimary: Color get() = if (isWhiteTheme) Color(0xFF0F172A) else Color(0xFFF0F2F5)
-    val textSecondary: Color get() = if (isWhiteTheme) Color(0xFF334155) else Color(0xFFA5B5C8)
-    val textMuted: Color get() = if (isWhiteTheme) Color(0xFF64748B) else Color(0xFF8999AF)
+    val textPrimary = Color(0xFFF0F2F5)
+    val textSecondary = Color(0xFFA5B5C8)
+    val textMuted = Color(0xFF8999AF)
 
     // ═══════════ STATUS ═══════════
     val error = Color(0xFFFF1744)
@@ -82,31 +82,17 @@ object MeetColors {
     val phantomGradient: Brush get() = Brush.linearGradient(
         colors = listOf(neonGreen, electricBlue)
     )
-    val carbonGradient: Brush get() = if (isWhiteTheme) Brush.verticalGradient(
-        colors = listOf(Color.White, Color(0xFFF8FAFC), Color.White)
-    ) else Brush.verticalGradient(
+    val carbonGradient: Brush get() = Brush.verticalGradient(
         colors = listOf(Color(0xFF050B15), Color(0xFF0F1B30), Color(0xFF081222))
     )
-    val cardBorderGradient: Brush get() = if (isWhiteTheme) Brush.linearGradient(
-        colors = listOf(
-            borderSubtle,
-            borderBlue,
-            borderSubtle
-        )
-    ) else Brush.linearGradient(
+    val cardBorderGradient: Brush get() = Brush.linearGradient(
         colors = listOf(
             neonGreen.copy(alpha = 0.15f),
             electricBlue.copy(alpha = 0.3f),
             neonGreen.copy(alpha = 0.15f)
         )
     )
-    val heroGradient: Brush get() = if (isWhiteTheme) Brush.verticalGradient(
-        colors = listOf(
-            electricBlue.copy(alpha = 0.04f),
-            Color.Transparent,
-            neonGreen.copy(alpha = 0.02f)
-        )
-    ) else Brush.verticalGradient(
+    val heroGradient: Brush get() = Brush.verticalGradient(
         colors = listOf(
             electricBlue.copy(alpha = 0.08f),
             Color.Transparent,
@@ -321,73 +307,38 @@ fun MeetTheme(content: @Composable () -> Unit) {
     val isWhite = experience == com.elysium369.meet.ui.home.HomeExperience.MAIKEL_BLANCO
     MeetColors.isWhiteTheme = isWhite
 
-    val dynamicColorScheme = if (isWhite) {
-        androidx.compose.material3.lightColorScheme(
-            primary = MeetColors.neonGreenDim,
-            onPrimary = Color.White,
-            primaryContainer = Color(0xFFE8F5E9),
-            secondary = MeetColors.electricBlueDim,
-            onSecondary = Color.White,
-            tertiary = MeetColors.cyberCyan,
-            onTertiary = Color.White,
-            background = Color.White,
-            surface = Color.White,
-            surfaceVariant = Color(0xFFF5F7FA),
-            surfaceContainerHighest = Color(0xFFE2E8F0),
-            surfaceContainerHigh = Color(0xFFEDF2F7),
-            surfaceContainer = Color(0xFFF5F7FA),
-            surfaceContainerLow = Color(0xFFFAFBFC),
-            surfaceContainerLowest = Color.White,
-            error = MeetColors.error,
-            errorContainer = Color(0xFFFFEBEE),
-            onBackground = Color(0xFF0F172A),
-            onSurface = Color(0xFF0F172A),
-            onSurfaceVariant = Color(0xFF334155),
-            outline = Color(0xFFCBD5E1),
-            outlineVariant = Color(0xFFE2E8F0),
-            surfaceTint = MeetColors.secondary,
-            secondaryContainer = MeetColors.secondary.copy(alpha = 0.15f),
-            onSecondaryContainer = Color(0xFF0F172A),
-            tertiaryContainer = MeetColors.tertiary.copy(alpha = 0.15f),
-            onTertiaryContainer = Color(0xFF0F172A),
-            inversePrimary = MeetColors.primary,
-            inverseSurface = Color(0xFF0F172A),
-            inverseOnSurface = Color.White
-        )
-    } else {
-        darkColorScheme(
-            primary = MeetColors.neonGreen,
-            onPrimary = if (MeetColors.neonGreen.luminance() > 0.179f) MeetColors.backgroundDeep else MeetColors.textPrimary,
-            primaryContainer = MeetColors.neonGreenSubtle,
-            secondary = MeetColors.electricBlue,
-            onSecondary = if (MeetColors.electricBlue.luminance() > 0.179f) MeetColors.backgroundDeep else MeetColors.textPrimary,
-            tertiary = MeetColors.cyberCyan,
-            onTertiary = if (MeetColors.cyberCyan.luminance() > 0.179f) MeetColors.backgroundDeep else MeetColors.textPrimary,
-            background = Color(0xFF050B15),
-            surface = Color(0xFF0F1B30),
-            surfaceVariant = Color(0xFF152640),
-            surfaceContainerHighest = Color(0xFF1A3050),
-            surfaceContainerHigh = Color(0xFF152B48),
-            surfaceContainer = Color(0xFF112240),
-            surfaceContainerLow = Color(0xFF0D1C35),
-            surfaceContainerLowest = Color(0xFF08142A),
-            error = MeetColors.error,
-            errorContainer = Color(0xFF3D0012),
-            onBackground = MeetColors.textPrimary,
-            onSurface = MeetColors.textPrimary,
-            onSurfaceVariant = MeetColors.textSecondary,
-            outline = Color(0xFF1E3355),
-            outlineVariant = Color(0xFF152640),
-            surfaceTint = MeetColors.secondary,
-            secondaryContainer = MeetColors.secondary.copy(alpha = 0.20f),
-            onSecondaryContainer = MeetColors.textPrimary,
-            tertiaryContainer = MeetColors.tertiary.copy(alpha = 0.20f),
-            onTertiaryContainer = MeetColors.textPrimary,
-            inversePrimary = MeetColors.primary,
-            inverseSurface = MeetColors.neonGreen,
-            inverseOnSurface = MeetColors.backgroundDeep
-        )
-    }
+    val dynamicColorScheme = darkColorScheme(
+        primary = MeetColors.neonGreen,
+        onPrimary = if (MeetColors.neonGreen.luminance() > 0.179f) MeetColors.backgroundDeep else MeetColors.textPrimary,
+        primaryContainer = MeetColors.neonGreenSubtle,
+        secondary = MeetColors.electricBlue,
+        onSecondary = if (MeetColors.electricBlue.luminance() > 0.179f) MeetColors.backgroundDeep else MeetColors.textPrimary,
+        tertiary = MeetColors.cyberCyan,
+        onTertiary = if (MeetColors.cyberCyan.luminance() > 0.179f) MeetColors.backgroundDeep else MeetColors.textPrimary,
+        background = if (isWhite) Color.White else Color(0xFF050B15),
+        surface = Color(0xFF0F1B30),
+        surfaceVariant = Color(0xFF152640),
+        surfaceContainerHighest = Color(0xFF1A3050),
+        surfaceContainerHigh = Color(0xFF152B48),
+        surfaceContainer = Color(0xFF112240),
+        surfaceContainerLow = Color(0xFF0D1C35),
+        surfaceContainerLowest = Color(0xFF08142A),
+        error = MeetColors.error,
+        errorContainer = Color(0xFF3D0012),
+        onBackground = if (isWhite) Color(0xFF050B15) else MeetColors.textPrimary,
+        onSurface = MeetColors.textPrimary,
+        onSurfaceVariant = MeetColors.textSecondary,
+        outline = Color(0xFF1E3355),
+        outlineVariant = Color(0xFF152640),
+        surfaceTint = MeetColors.secondary,
+        secondaryContainer = MeetColors.secondary.copy(alpha = 0.20f),
+        onSecondaryContainer = MeetColors.textPrimary,
+        tertiaryContainer = MeetColors.tertiary.copy(alpha = 0.20f),
+        onTertiaryContainer = MeetColors.textPrimary,
+        inversePrimary = MeetColors.primary,
+        inverseSurface = MeetColors.neonGreen,
+        inverseOnSurface = MeetColors.backgroundDeep
+    )
     CompositionLocalProvider(
         LocalOverscrollFactory provides null,
         com.elysium369.meet.ui.home.LocalHomeExperience provides experience

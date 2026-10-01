@@ -34,6 +34,7 @@ object AppModule {
     // ========================================================================
 
     @Provides
+    @Singleton
     fun provideDatabase(@ApplicationContext context: Context): RecordShieldDatabase {
         return Room.databaseBuilder(
             context,
@@ -44,9 +45,11 @@ object AppModule {
     }
 
     @Provides
+    @Singleton
     fun provideRecordingDao(db: RecordShieldDatabase): RecordingDao = db.recordingDao()
 
     @Provides
+    @Singleton
     fun provideChunkDao(db: RecordShieldDatabase): ChunkDao = db.chunkDao()
 
     // ========================================================================

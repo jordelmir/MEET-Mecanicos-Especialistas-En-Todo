@@ -70,7 +70,28 @@ class MainActivity : ComponentActivity() {
     private var signalingServer: SignalingServer? = null
     private var foldMonitorJob: Job? = null
 
-    private val RECORD_REQUEST_CODE = 999
+    private val mediaProjectionLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            lifecycleScope.launch {
+                var waited = 0
+                while (!CaptureForegroundService.isForegroundActive && waited < 2000) {
+                    kotlinx.coroutines.delay(100)
+                    waited += 100
+                }
+                try {
+                    bootFullPipeline(result.data!!)
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to initialize WebRTC pipeline", t)
+                    connectionState.value = "ERROR: ${t.message}"
+                }
+            }
+        } else {
+            isBroadcastingState.value = false
+            connectionState.value = "PERMISSION_DENIED"
+        }
+    }
 
     // ─── Observable State ───
     private var isBroadcastingState = mutableStateOf(false)
@@ -117,41 +138,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun startMediaProjectionRequest() {
-        val mediaProjectionManager =
-            getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        @Suppress("DEPRECATION")
-        startActivityForResult(mediaProjectionManager.createScreenCaptureIntent(), RECORD_REQUEST_CODE)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == RECORD_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
-            try {
-                CaptureForegroundService.isForegroundActive = false
-                val serviceIntent = Intent(this, CaptureForegroundService::class.java)
-                startForegroundService(serviceIntent)
-            } catch (t: Throwable) {
-                Log.e(TAG, "Failed to start capture foreground service", t)
-            }
-
-            lifecycleScope.launch {
-                // Wait for the foreground service to be truly active before initializing capture
-                var waited = 0
-                while (!CaptureForegroundService.isForegroundActive && waited < 2000) {
-                    kotlinx.coroutines.delay(100)
-                    waited += 100
-                }
-                try {
-                    bootFullPipeline(data)
-                } catch (t: Throwable) {
-                    Log.e(TAG, "Failed to initialize WebRTC pipeline", t)
-                    connectionState.value = "ERROR: ${t.message}"
-                }
-            }
-        } else {
-            isBroadcastingState.value = false
-            connectionState.value = "PERMISSION_DENIED"
+        try {
+            // Start foreground service FIRST (required on Android 14+)
+            CaptureForegroundService.isForegroundActive = false
+            val serviceIntent = Intent(this, CaptureForegroundService::class.java)
+            startForegroundService(serviceIntent)
+            
+            val mediaProjectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            mediaProjectionLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start ScreenMirror", e)
+            connectionState.value = "ERROR: ${e.message}"
         }
     }
 

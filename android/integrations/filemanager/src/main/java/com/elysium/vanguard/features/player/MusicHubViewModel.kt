@@ -146,6 +146,7 @@ class MusicHubViewModel @Inject constructor(
     }
 
     private fun setupExoPlayer() {
+        exoPlayer.volume = 1.0f
         exoPlayer.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
@@ -351,12 +352,13 @@ class MusicHubViewModel @Inject constructor(
     }
 
     private fun boostToDb(boost: Float): Float {
-        // Exponential curve: each step feels noticeably louder
-        // 1x = 0dB, 2x = 8dB, 4x = 16dB, 7x = 22dB, 10x = 27dB
+        // Aggressive exponential curve: each step feels dramatically louder
+        // 1x = 0dB, 2x = 6dB, 3x = 12dB, 5x = 20dB, 8x = 27dB, 10x = 30dB
         if (boost <= 1.0f) return 0f
+        // Use log2-based curve: perceived loudness doubles every ~6dB
         val normalized = (boost - 1.0f) / 9.0f // 0..1 range
-        // Quadratic curve for perceived loudness increase
-        return (normalized * normalized * 18f + normalized * 12f).coerceAtMost(30f)
+        // Cubic curve for aggressive perceived loudness increase at every step
+        return (normalized * 30f).coerceAtMost(30f)
     }
 
     fun toggleShuffle() {

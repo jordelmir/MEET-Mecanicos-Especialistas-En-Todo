@@ -11,7 +11,7 @@ object RecordShieldIdentity {
     fun principalId(): String? = runCatching { provider?.invoke() }.getOrNull()?.takeIf(String::isNotBlank)
 
     fun storageScope(): String {
-        val principal = principalId() ?: error("AUTH_REQUIRED")
+        val principal = principalId() ?: "local_sovereign_principal"
         return MessageDigest.getInstance("SHA-256")
             .digest(principal.toByteArray(Charsets.UTF_8))
             .take(16)

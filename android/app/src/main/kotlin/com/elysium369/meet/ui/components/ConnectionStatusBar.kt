@@ -53,7 +53,7 @@ fun ConnectionStatusBar(
         state == ObdState.CONNECTED && truth.ecuState == com.elysium369.meet.core.obd.EcuLinkState.NO_RESPONSE -> com.elysium369.meet.ui.theme.MeetColors.warning
         state == ObdState.CONNECTING || state == ObdState.NEGOTIATING -> com.elysium369.meet.ui.theme.MeetColors.warning
         state == ObdState.ERROR -> com.elysium369.meet.ui.theme.MeetColors.error
-        else -> MeetColors.textMuted
+        else -> if (MeetColors.isWhiteTheme) Color(0xFF1E293B) else MeetColors.textMuted
     }
 
     val bgBrush = Brush.horizontalGradient(

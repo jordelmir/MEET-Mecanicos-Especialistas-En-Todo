@@ -16,6 +16,9 @@ interface SafetyPublicDao {
     )
     fun observePoints(): Flow<List<SafetyPublicPointEntity>>
 
+    @Query("SELECT * FROM safety_public_points_local ORDER BY publishedAt DESC")
+    suspend fun getPoints(): List<SafetyPublicPointEntity>
+
     @Query(
         """
         SELECT * FROM safety_public_cases_local
@@ -23,6 +26,12 @@ interface SafetyPublicDao {
         """
     )
     fun observeCases(): Flow<List<SafetyPublicCaseEntity>>
+
+    @Query("SELECT * FROM safety_public_cases_local ORDER BY lastUpdatedAt DESC")
+    suspend fun getCases(): List<SafetyPublicCaseEntity>
+
+    @Query("SELECT * FROM safety_public_claims_local")
+    suspend fun getClaims(): List<SafetyPublicClaimEntity>
 
     @Query(
         """
