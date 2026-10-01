@@ -4,7 +4,7 @@
   "description": "Reusable truth, custody, provenance, publication and geospatial safety contracts",
   "type": "module",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "files": [
     "dist",
     "schemas",
