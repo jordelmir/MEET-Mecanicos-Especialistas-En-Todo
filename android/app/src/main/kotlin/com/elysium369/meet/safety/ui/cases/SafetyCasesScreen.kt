@@ -296,15 +296,15 @@ private fun CaseCard(case: SafetyPublicCaseEntity, onClick: () -> Unit) {
             ) {
                 Column {
                     Text(stringResource(R.string.safety_cases_events), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary)
-                    Text("${case.eventCount}", fontSize = 15.sp, fontWeight = FontWeight.Black, color = MeetColors.cyberCyan)
+                    Text(case.eventCount?.toString() ?: stringResource(R.string.safety_public_unknown), fontSize = 15.sp, fontWeight = FontWeight.Black, color = MeetColors.cyberCyan)
                 }
                 Column {
                     Text(stringResource(R.string.safety_cases_claims), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary)
-                    Text("${case.claimCount}", fontSize = 15.sp, fontWeight = FontWeight.Black, color = MeetColors.neonGreen)
+                    Text(case.claimCount?.toString() ?: stringResource(R.string.safety_public_unknown), fontSize = 15.sp, fontWeight = FontWeight.Black, color = MeetColors.neonGreen)
                 }
                 Column {
                     Text(stringResource(R.string.safety_cases_confidence), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary)
-                    Text("${(case.confidenceScore * 100).toInt()}%", fontSize = 15.sp, fontWeight = FontWeight.Black, color = MeetColors.textPrimary)
+                    Text(case.confidenceScore?.let { "${(it * 100).toInt()}%" } ?: stringResource(R.string.safety_public_unknown), fontSize = 15.sp, fontWeight = FontWeight.Black, color = MeetColors.textPrimary)
                 }
             }
         }

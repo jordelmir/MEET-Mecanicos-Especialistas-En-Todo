@@ -233,7 +233,7 @@ import com.elysium369.meet.core.operations.data.CorrelatedIncidentDao
         OperationCaseEntity::class,
         CorrelatedIncidentEntity::class,
     ],
-    version = 87,
+    version = 88,
     exportSchema = true
 )
 @TypeConverters(Converters::class)

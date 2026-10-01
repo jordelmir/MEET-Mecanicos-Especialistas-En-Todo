@@ -156,19 +156,19 @@ data class SafetyPublicCaseWire(
     val lifecycle: String,
 
     @SerialName("confidence_score")
-    val confidenceScore: Float = 0f,
+    val confidenceScore: Float? = null,
 
     @SerialName("event_count")
-    val eventCount: Int = 0,
+    val eventCount: Int? = null,
 
     @SerialName("claim_count")
-    val claimCount: Int = 0,
+    val claimCount: Int? = null,
 
     @SerialName("source_count")
-    val sourceCount: Int = 0,
+    val sourceCount: Int? = null,
 
     @SerialName("evidence_count")
-    val evidenceCount: Int = 0,
+    val evidenceCount: Int? = null,
 
     @SerialName("published_at")
     val publishedAt: String,

@@ -44,4 +44,48 @@ class SafetyMigrationConformanceTest {
             db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
         }
     }
+
+    @Test
+    fun retiredSafetyCachesArePurgedAndNullableMetricsRemainUnknownInRoom88() {
+        val name = "safety-case-migration-87-to-88.db"
+        helper.createDatabase(name, 87).use { db ->
+            db.execSQL(
+                """
+                INSERT INTO safety_public_cases_local
+                (caseId, caseType, title, publicSummary, lifecycle,
+                 confidenceScore, eventCount, claimCount, sourceCount,
+                 evidenceCount, publishedAt, lastUpdatedAt, serverVersion)
+                VALUES ('old-case', 'SAFETY_CASE', 'Historical title', '',
+                        'UNDER_REVIEW', 0.7, 2, 3, 4, 5, 1, 1, 1)
+                """.trimIndent(),
+            )
+        }
+        helper.runMigrationsAndValidate(
+            name, 88, true, AppModule.MIGRATION_87_88,
+        ).use { db ->
+            db.query(
+                "SELECT confidenceScore, eventCount FROM safety_public_cases_local WHERE caseId = 'old-case'",
+            ).use { cursor ->
+                assertFalse(cursor.moveToFirst())
+            }
+            db.execSQL(
+                """
+                INSERT INTO safety_public_cases_local
+                (caseId, caseType, title, publicSummary, lifecycle,
+                 confidenceScore, eventCount, claimCount, sourceCount,
+                 evidenceCount, publishedAt, lastUpdatedAt, serverVersion)
+                VALUES ('v3-case', 'SAFETY_CASE', 'Caso con revisión independiente',
+                        '', 'UNDER_REVIEW', NULL, NULL, NULL, NULL, NULL, 2, 2, 1)
+                """.trimIndent(),
+            )
+            db.query(
+                "SELECT confidenceScore, eventCount FROM safety_public_cases_local WHERE caseId = 'v3-case'",
+            ).use { cursor ->
+                assertTrue(cursor.moveToFirst())
+                assertTrue(cursor.isNull(0))
+                assertTrue(cursor.isNull(1))
+            }
+            db.query("PRAGMA foreign_key_check").use { cursor -> assertFalse(cursor.moveToFirst()) }
+        }
+    }
 }

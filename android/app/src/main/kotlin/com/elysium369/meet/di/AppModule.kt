@@ -5124,6 +5124,46 @@ object AppModule {
         }
     }
 
+    // V3 retires reconstructible V2 public caches, including while offline.
+    // Private reports, evidence, payloads and pending commands remain intact.
+    val MIGRATION_87_88 = object : Migration(87, 88) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DELETE FROM `safety_public_timeline_local`")
+            db.execSQL("DELETE FROM `safety_public_claims_local`")
+            db.execSQL("DELETE FROM `safety_public_points_local`")
+            db.execSQL("ALTER TABLE `safety_public_cases_local` RENAME TO `safety_public_cases_local_pre_v3`")
+            db.execSQL(
+                """
+                CREATE TABLE `safety_public_cases_local` (
+                    `caseId` TEXT NOT NULL,
+                    `caseType` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `publicSummary` TEXT NOT NULL,
+                    `lifecycle` TEXT NOT NULL,
+                    `confidenceScore` REAL,
+                    `eventCount` INTEGER,
+                    `claimCount` INTEGER,
+                    `sourceCount` INTEGER,
+                    `evidenceCount` INTEGER,
+                    `publishedAt` INTEGER NOT NULL,
+                    `lastUpdatedAt` INTEGER NOT NULL,
+                    `serverVersion` INTEGER NOT NULL,
+                    PRIMARY KEY(`caseId`)
+                )
+                """.trimIndent(),
+            )
+            db.execSQL("DROP TABLE `safety_public_cases_local_pre_v3`")
+            db.execSQL(
+                "CREATE INDEX `index_safety_public_cases_local_lifecycle` " +
+                    "ON `safety_public_cases_local` (`lifecycle`)",
+            )
+            db.execSQL(
+                "CREATE INDEX `index_safety_public_cases_local_publishedAt` " +
+                    "ON `safety_public_cases_local` (`publishedAt`)",
+            )
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -5198,6 +5238,7 @@ object AppModule {
             MIGRATION_84_85,
             MIGRATION_85_86,
             MIGRATION_86_87,
+            MIGRATION_87_88,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

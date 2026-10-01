@@ -11,13 +11,24 @@ jobs:
     name: Safety Architecture, Boundary & Authority Gates
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 20
+          node-version: 24
       - name: Install dependencies
         run: npm ci
+      - name: Install PostgreSQL for real Safety authority tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql
+          pg_bin="$(dirname "$(find /usr/lib/postgresql -maxdepth 3 -type f -name initdb | sort -V | tail -n 1)")"
+          test -x "$pg_bin/initdb"
+          echo "$pg_bin" >> "$GITHUB_PATH"
+      - name: Verify citizen intake and independent publication in PostgreSQL
+        run: bash tests/safety/verify-safety-publication-postgres.sh
+      - name: Verify Safety RLS and 100 concurrent publication attempts
+        run: bash tests/safety/verify-safety-rls-concurrency-postgres.sh
       - name: Run Adversarial RLS Test Suite (26 tests)
         run: npx vitest run tests/adversarial/safety-rls-adversarial.test.ts
       - name: Verify Authority Isolation & SECURITY DEFINER Contracts
@@ -35,14 +46,14 @@ jobs:
     name: Safety Android OS, Unit Tests & Parity Gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 20
+          node-version: 24
       - name: Install root dependencies
         run: npm ci
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
           java-version: 17
