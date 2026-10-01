@@ -16,6 +16,6 @@ if [[ "$first_status" == 0 && "$second_status" == 0 ]] || [[ "$first_status" != 
  cat "$run_dir/one.log" "$run_dir/two.log"
  echo 'Concurrent intake must accept exactly one command' >&2; exit 1
 fi
-rg -q 'SAFETY_RATE_LIMIT_EXCEEDED' "$run_dir/one.log" "$run_dir/two.log"
+grep -q 'SAFETY_RATE_LIMIT_EXCEEDED' "$run_dir/one.log" "$run_dir/two.log"
 psql "${args[@]}" -f "$repo_root/tests/safety/safety-intake-concurrency-assert.sql"
 echo 'Safety concurrency intake budget: PASS'
