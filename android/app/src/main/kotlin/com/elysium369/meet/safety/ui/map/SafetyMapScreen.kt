@@ -362,7 +362,7 @@ private fun PublicPointDetail(point: SafetyPublicPointEntity, region: String, ho
         }
 
         item {
-            Text(stringResource(R.string.safety_public_geo_detail, point.geoDisclosure, point.locationAccuracyMeters?.toString() ?: stringResource(R.string.safety_public_unknown)), color = MeetColors.textSecondary, fontSize = 12.sp)
+            Text(stringResource(R.string.safety_public_geo_detail, stringResource(R.string.safety_public_coarse_area), point.locationAccuracyMeters?.toString() ?: stringResource(R.string.safety_public_unknown)), color = MeetColors.textSecondary, fontSize = 12.sp)
         }
         item {
             Text(stringResource(R.string.safety_public_sources_count, point.independentSourceCount), color = MeetColors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)

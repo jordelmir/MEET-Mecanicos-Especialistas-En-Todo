@@ -175,6 +175,43 @@ begin
 end $$;
 reset role;
 
+update public.runtime_feature_gates set enabled = true where key = 'safety_public_cases';
+
+-- A pending review cannot approve another graph even when the case version
+-- remains unchanged; restore each fixture through subtransaction rollback.
+do $$
+declare v_candidate uuid; v_mutation text;
+begin
+ foreach v_mutation in array array[
+   'update public.safety_claims set predicate = ''changed graph predicate'' where id = ''22222222-aaaa-4222-8222-222222222222''',
+   'delete from public.safety_event_claims where event_id = ''11111111-aaaa-4111-8111-111111111111'''
+ ] loop
+  begin
+   perform set_config('request.jwt.claim.sub', '55555555-5555-4555-8555-555555555555', true);
+   perform set_config('request.jwt.claims', '{"sub":"55555555-5555-4555-8555-555555555555","aal":"aal2"}', true);
+   v_candidate := public.safety_recommend_case_publication_v1(
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'READY_TO_PUBLISH', 'GRAPH_REVIEW', gen_random_uuid());
+   execute v_mutation;
+   if exists (select 1 from public.safety_public_case_projection where case_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
+      raise exception 'Changed graph retained published case';
+   end if;
+   perform set_config('request.jwt.claim.sub', '66666666-6666-4666-8666-666666666666', true);
+   perform set_config('request.jwt.claims', '{"sub":"66666666-6666-4666-8666-666666666666","aal":"aal2"}', true);
+   begin
+      perform public.safety_finalize_case_publication_v1(v_candidate, 'PUBLISH', 'GRAPH_REVIEW', gen_random_uuid());
+      raise exception 'Stale graph candidate was accepted';
+   exception when invalid_parameter_value then
+      if sqlerrm <> 'CASE_VERSION_OR_STATE_CHANGED' then raise; end if;
+   end;
+   raise exception using errcode = 'P0002', message = 'ROLLBACK_CASE_GRAPH_FIXTURE';
+  exception when no_data_found then
+   if sqlerrm <> 'ROLLBACK_CASE_GRAPH_FIXTURE' then raise; end if;
+  end;
+ end loop;
+end $$;
+
+update public.runtime_feature_gates set enabled = true where key = 'safety_public_cases';
+
 -- A later case change retires the header and retains its last public version.
 update public.safety_cases set state_version = state_version + 1
 where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -186,4 +223,36 @@ begin
                       where case_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') then
         raise exception 'Case update did not invalidate and archive header';
     end if;
+end $$;
+
+\echo 'CaseRepublishingUsesMonotonicVersionAndAuditableDecisionHistory'
+update public.runtime_feature_gates set enabled = true where key = 'safety_public_cases';
+set role authenticated;
+select set_config('request.jwt.claim.sub', '55555555-5555-4555-8555-555555555555', false);
+select set_config('request.jwt.claims', '{"sub":"55555555-5555-4555-8555-555555555555","aal":"aal2"}', false);
+select public.safety_recommend_case_publication_v1(
+ 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'READY_TO_PUBLISH', 'REVIEWED_AGAIN',
+ '88888888-aaaa-4888-8888-888888888888') as second_case_candidate \gset
+reset role;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '66666666-6666-4666-8666-666666666666', false);
+select set_config('request.jwt.claims', '{"sub":"66666666-6666-4666-8666-666666666666","aal":"aal2"}', false);
+select public.safety_finalize_case_publication_v1(
+ :'second_case_candidate'::uuid, 'PUBLISH', 'SECOND_INDEPENDENT_REVIEW',
+ '99999999-aaaa-4999-8999-999999999999');
+reset role;
+do $$ begin
+ if (select server_version from public.safety_public_case_projection
+     where case_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') <> 2 then
+   raise exception 'Republication reset server version';
+ end if;
+end $$;
+update public.safety_cases set state_version = state_version + 1
+where id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+do $$ begin
+ if (select count(*) from safety_private.public_case_history_v3
+     where case_id = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+       and publication_decision_id is not null) <> 2 then
+   raise exception 'Publication history lost a version or decision reference';
+ end if;
 end $$;

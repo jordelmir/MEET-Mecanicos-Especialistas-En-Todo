@@ -112,6 +112,7 @@ enum class CaseMilestoneType {
 }
 
 enum class GeoDisclosure {
+    COARSE_GRID_25KM_PLUS,
     APPROXIMATE_1000M,
     APPROXIMATE_500M,
     STREET_SEGMENT,

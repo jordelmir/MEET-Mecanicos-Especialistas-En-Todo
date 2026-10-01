@@ -84,6 +84,8 @@ create table public.runtime_feature_gates(
   reason text,
   updated_at timestamptz not null default now()
 );
+insert into public.runtime_feature_gates(key, enabled)
+select unnest(array['safety_public_map','safety_public_cases','safety_accountability','safety_observatory','safety_realtime','safety_foundation','safety_reporting','safety_evidence_upload']), true;
 alter table public.runtime_feature_gates enable row level security;
 create publication supabase_realtime;
 grant usage on schema public, auth, extensions to anon, authenticated, service_role;
@@ -103,10 +105,24 @@ migrations=(
   20260928090000_safety_publication_firewall_v3.sql
   20260928100000_safety_moderation_authority_v3.sql
   20260928110000_safety_case_publication_authority_v3.sql
+  20260930120000_safety_review_closure_v3.sql
 )
 for migration in "${migrations[@]}"; do
   psql "${psql_args[@]}" -f "$repo_root/supabase/migrations/$migration" >/dev/null
 done
+
+psql "${psql_args[@]}" <<'SQL'
+do $$ begin
+  if exists (select 1 from public.runtime_feature_gates where enabled
+    and key in ('safety_public_map','safety_public_cases','safety_accountability','safety_observatory','safety_realtime')) then
+    raise exception 'Retired public gate remained enabled';
+  end if;
+  if (select count(*) from public.runtime_feature_gates where enabled
+    and key in ('safety_foundation','safety_reporting','safety_evidence_upload')) <> 3 then
+    raise exception 'Private intake gates were disabled';
+  end if;
+end $$;
+SQL
 
 psql "${psql_args[@]}" -f "$repo_root/tests/safety/safety-rls-concurrency-setup.sql" >/dev/null
 candidate_id="$(psql "${psql_args[@]}" -At -c 'select id from public.test_safety_concurrency_candidate')"

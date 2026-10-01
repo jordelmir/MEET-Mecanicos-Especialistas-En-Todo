@@ -3,12 +3,12 @@
     <string name="safety_public_back">Regresar</string>
     <string name="safety_back">Regresar</string>
     <string name="safety_public_refresh">Actualizar</string>
-    <string name="safety_public_map_disclosure">Ubicaciones públicas autorizadas; pueden ser aproximadas. Un reporte no demuestra un hecho.</string>
+    <string name="safety_public_map_disclosure">Áreas públicas con incertidumbre de al menos 25 km. El centro de una celda no identifica el lugar de un hecho. Un reporte no demuestra un hecho.</string>
     <string name="safety_public_show_list">Ver lista accesible (%1$d puntos)</string>
     <string name="safety_public_show_map">Ver mapa (%1$d puntos)</string>
     <string name="safety_public_no_points">No hay puntos públicos para estos filtros.</string>
     <string name="safety_public_claim_state">Estado publicado: %1$s</string>
-    <string name="safety_public_geo_detail">Divulgación: %1$s · Precisión (metros): %2$s</string>
+    <string name="safety_public_geo_detail">Área: %1$s · Incertidumbre mínima (metros): %2$s</string>
     <string name="safety_public_unknown">Dato no capturado</string>
     <string name="safety_public_sources_count">Fuentes independientes: %1$d</string>
     <string name="safety_public_source_mix">Civiles: %1$d · Periodísticas: %2$d · Registros públicos: %3$d · Documentales: %4$d · Institucionales: %5$d</string>
@@ -56,7 +56,7 @@
     <string name="safety_map_report_now">REPORTAR AHORA</string>
     <string name="safety_map_visible_points">Visibles</string>
     <string name="safety_map_my_reports">Mis reportes</string>
-    <string name="safety_map_public_points">Públicos</string>
+    <string name="safety_map_public_points">Áreas públicas</string>
     <string name="safety_map_empty_title">Tu mapa de seguridad comienza aquí</string>
     <string name="safety_map_empty_body">Crea un reporte con ubicación para conservar una marca privada y fechada. La publicación pública requiere revisión autoritativa.</string>
     <string name="safety_map_create_report">CREAR REPORTE CON UBICACIÓN</string>
@@ -252,4 +252,5 @@
     <string name="safety_observatory_filter_dates">Rango de fechas</string>
     <string name="safety_observatory_apply_filters">APLICAR FILTROS</string>
     <string name="safety_observatory_reset_filters">REINICIAR</string>
+    <string name="safety_public_coarse_area">Celda regional aproximada</string>
 </resources>
