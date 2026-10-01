@@ -46,7 +46,6 @@ data class GeoBounds(
         }
     }
 }
-
 /**
  * Universal marker roles across all service verticals.
  */

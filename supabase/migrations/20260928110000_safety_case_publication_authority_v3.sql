@@ -182,6 +182,7 @@ revoke insert, update, delete on public.safety_public_case_projection
 create table if not exists safety_private.public_case_history_v3 (
     case_id uuid not null,
     server_version bigint not null,
+    publication_decision_id uuid,
     snapshot jsonb not null,
     archived_at timestamptz not null default now(),
     primary key (case_id, server_version)
@@ -193,8 +194,8 @@ create or replace function public.safety_archive_public_case_v3()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
     insert into safety_private.public_case_history_v3(
-        case_id, server_version, snapshot
-    ) values (old.case_id, old.server_version, to_jsonb(old))
+        case_id, server_version, publication_decision_id, snapshot
+    ) values (old.case_id, old.server_version, old.publication_decision_id, to_jsonb(old))
     on conflict (case_id, server_version) do nothing;
     if tg_op = 'UPDATE' then return new; end if;
     return old;
@@ -272,6 +273,7 @@ declare
     v_final_id uuid;
     v_eligible_claim_id uuid;
     v_result jsonb;
+    v_next_server_version bigint;
 begin
     if v_actor is null then
         raise exception using errcode = '28000', message = 'AUTHENTICATION_REQUIRED';
@@ -384,6 +386,11 @@ begin
         v_actor, btrim(p_reason_code)
     );
     if p_final_decision = 'PUBLISH' then
+        select greatest(
+            coalesce((select max(h.server_version) from safety_private.public_case_history_v3 h where h.case_id = v_case.id), 0),
+            coalesce((select p.server_version from public.safety_public_case_projection p where p.case_id = v_case.id), 0)
+        ) + 1 into v_next_server_version;
+
         insert into public.safety_public_case_projection(
             case_id, case_type, title, public_summary, lifecycle,
             confidence_score, event_count, claim_count, source_count,
@@ -392,13 +399,13 @@ begin
         ) values (
             v_case.id, 'SAFETY_CASE', 'Caso con revisión independiente', '',
             v_case.status, null, null, null, null, null,
-            now(), now(), 1, v_final_id, v_case.state_version
+            now(), now(), v_next_server_version, v_final_id, v_case.state_version
         ) on conflict (case_id) do update set
             lifecycle = excluded.lifecycle,
             last_updated_at = now(),
             publication_decision_id = excluded.publication_decision_id,
             case_state_version = excluded.case_state_version,
-            server_version = public.safety_public_case_projection.server_version + 1;
+            server_version = v_next_server_version;
     else
         delete from public.safety_public_case_projection
         where case_id = v_case.id;
