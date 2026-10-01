@@ -1,6 +1,5 @@
 package com.elysium369.meet.safety.analytics.counternarcotics
 
-import kotlinx.serialization.Serializable
 import java.time.Instant
 
 /**
@@ -23,15 +22,6 @@ import java.time.Instant
  * ══════════════════════════════════════════════════════════════════════
  */
 
-@Serializable
-enum class PatternTruthState {
-    INSUFFICIENT_DATA,
-    DOCUMENTED_PATTERN,
-    CORROBORATED_PATTERN,
-    DISPUTED_PATTERN,
-}
-
-@Serializable
 data class IllicitMarketPattern(
     val publicCellId: String,
     val periodStartEpochMs: Long,

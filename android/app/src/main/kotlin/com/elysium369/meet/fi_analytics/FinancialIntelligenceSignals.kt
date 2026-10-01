@@ -1,6 +1,5 @@
 package com.elysium369.meet.fi_analytics
 
-import kotlinx.serialization.Serializable
 
 /**
  * ══════════════════════════════════════════════════════════════════════
@@ -23,14 +22,12 @@ import kotlinx.serialization.Serializable
  * ══════════════════════════════════════════════════════════════════════
  */
 
-@Serializable
 enum class ReviewState {
     REVIEW_REQUIRED,
     AUDITED,
     DISMISSED,
 }
 
-@Serializable
 data class FinancialAggregateSignal(
     val cellId: String,
     val periodStartEpochMs: Long,
@@ -40,7 +37,6 @@ data class FinancialAggregateSignal(
     val sourceAuthority: String,
 )
 
-@Serializable
 data class CorrelationHypothesis(
     val cellId: String,
     val typologyCode: String,
