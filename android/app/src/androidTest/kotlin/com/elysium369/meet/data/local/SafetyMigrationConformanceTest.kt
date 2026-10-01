@@ -65,12 +65,10 @@ class SafetyMigrationConformanceTest {
             name, 85, true, AppModule.MIGRATION_84_85,
         ).use { db ->
             db.query(
-                "SELECT confidenceScore, eventCount FROM safety_public_cases_local WHERE caseId = 'old-case'",
-            ).use { cursor ->
-                assertTrue(cursor.moveToFirst())
-                assertEquals(0.7f, cursor.getFloat(0), 0.0001f)
-                assertEquals(2, cursor.getInt(1))
-            }
+                """
+                SELECT 1 FROM safety_public_cases_local WHERE caseId = 'old-case'
+                """.trimIndent(),
+            ).use { assertFalse(it.moveToFirst()) }
             db.execSQL(
                 """
                 INSERT INTO safety_public_cases_local

@@ -329,7 +329,7 @@ begin
   end if;
   if not exists (select 1 from safety_private.claim_reevaluation_v3
                  where claim_id = '77777777-7777-4777-8777-777777777777'
-                   and reason_code = 'CLAIM_STATE_CHANGED' and status = 'PENDING') then
+                   and reason_code = 'CLAIM_AUTHORITY_CHANGED' and status = 'PENDING') then
     raise exception 'Disputed claim did not request reevaluation';
   end if;
 end $$;

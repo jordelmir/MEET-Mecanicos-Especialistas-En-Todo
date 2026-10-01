@@ -233,7 +233,7 @@ begin
        )
        or new.claim_state not in ('DOCUMENTED', 'CORROBORATED', 'STRONGLY_CORROBORATED')
        or new.independent_source_count < 1
-       or new.geo_disclosure <> 'APPROXIMATE_1000M'
+       or new.geo_disclosure <> 'COARSE_GRID_25KM_PLUS'
        or new.location_accuracy_meters is null
        or new.location_accuracy_meters < 25000
        or v_content.latitude is null or v_content.longitude is null
@@ -269,23 +269,44 @@ revoke all on safety_private.claim_reevaluation_v3
     from public, anon, authenticated;
 grant select on safety_private.claim_reevaluation_v3 to service_role;
 
--- Any change to a claim that already has a public point withdraws that
--- projection for fresh independent review. The archived point remains proof
--- of what had been published.
 create or replace function public.safety_invalidate_changed_claim_v3()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
-    if new.state is distinct from old.state and exists (
-        select 1 from public.safety_public_points where claim_id = new.id
+    -- Epistemologically relevant columns only. state_version is a monotonic
+    -- counter that accompanies content changes but is NOT independently
+    -- epistemological — bumping it alone (e.g. to invalidate a stale
+    -- publication candidate) must NOT revoke existing published points.
+    if row(
+        new.report_id,
+        new.subject_ref,
+        new.predicate,
+        new.state,
+        new.methodology_version
+    ) is distinct from row(
+        old.report_id,
+        old.subject_ref,
+        old.predicate,
+        old.state,
+        old.methodology_version
     ) then
-        delete from public.safety_public_points where claim_id = new.id;
         insert into safety_private.claim_reevaluation_v3(
-            claim_id, report_id, reason_code, requested_at, status
-        ) values (new.id, new.report_id, 'CLAIM_STATE_CHANGED', now(), 'PENDING')
-        on conflict (claim_id) do update set
+            claim_id,
+            report_id,
+            reason_code,
+            requested_at,
+            status
+        ) values (
+            new.id,
+            new.report_id,
+            'CLAIM_AUTHORITY_CHANGED',
+            now(),
+            'PENDING'
+        ) on conflict(claim_id) do update set
+            report_id = excluded.report_id,
             reason_code = excluded.reason_code,
             requested_at = excluded.requested_at,
             status = 'PENDING';
+        delete from public.safety_public_points where claim_id = new.id;
     end if;
     return new;
 end;
@@ -293,7 +314,7 @@ $$;
 revoke all on function public.safety_invalidate_changed_claim_v3()
     from public, anon, authenticated, service_role;
 create trigger safety_invalidate_changed_claim_v3
-    after update of state on public.safety_claims
+    after update of report_id, subject_ref, predicate, state, methodology_version on public.safety_claims
     for each row execute function public.safety_invalidate_changed_claim_v3();
 
 -- A source's metadata is part of the publication proof. Changing it revokes
@@ -516,7 +537,7 @@ begin
             v_claim.id, v_report.category,
             round(v_content.latitude::numeric * 4) / 4,
             round(v_content.longitude::numeric * 4) / 4,
-            'APPROXIMATE_1000M',
+            'COARSE_GRID_25KM_PLUS',
             greatest(coalesce(ceil(v_content.accuracy_meters)::integer, 0), 25000),
             'Reporte documentado con revisión independiente', v_claim.state,
             v_independent, v_civil, v_journalistic, v_public_record,

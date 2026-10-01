@@ -7,9 +7,15 @@ grant usage on schema safety_private to service_role;
 -- one transaction so a partially applied firewall cannot expose old rows.
 update public.runtime_feature_gates
 set enabled = false,
-    reason = 'Safety V3 publication authority migration in progress',
+    reason = 'Safety V3 authoritative public projections not yet reopened',
     updated_at = now()
-where key in ('safety_public_map', 'safety_public_cases');
+where key in (
+    'safety_public_map',
+    'safety_public_cases',
+    'safety_accountability',
+    'safety_observatory',
+    'safety_realtime'
+);
 
 -- These historical SECURITY DEFINER RPCs bypass table RLS and do not check
 -- the publication gate. Observatory access resumes only through a V3

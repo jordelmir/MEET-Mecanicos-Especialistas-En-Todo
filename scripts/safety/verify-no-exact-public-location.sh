@@ -23,6 +23,7 @@ for contract in \
   "round(v_content.latitude::numeric * 4) / 4" \
   "round(v_content.longitude::numeric * 4) / 4" \
   "new.location_accuracy_meters < 25000" \
+  "COARSE_GRID_25KM_PLUS" \
   "safety_guard_public_point_v3" \
   "PUBLIC_LOCATION_SUPPRESSED"; do
   if ! grep -Fq "$contract" "$v3_authority"; then

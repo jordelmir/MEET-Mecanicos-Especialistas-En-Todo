@@ -5035,11 +5035,28 @@ object AppModule {
         }
     }
 
-    // A V3 case header can withhold confidence and counts. Preserve all V84
-    // rows while allowing those fields to remain unknown instead of storing 0.
     val MIGRATION_84_85 = object : Migration(84, 85) {
-        override fun migrate(db: SupportSQLiteDatabase) {
-            db.execSQL("ALTER TABLE `safety_public_cases_local` RENAME TO `safety_public_cases_local_v84`")
+        override fun migrate(
+            db: SupportSQLiteDatabase,
+        ) {
+            // All pre-V3 public projections were produced under an authority
+            // contract that V3 explicitly retired.
+            //
+            // These are reconstructible public caches, not private evidence.
+            db.execSQL(
+                "DELETE FROM `safety_public_timeline_local`",
+            )
+            db.execSQL(
+                "DELETE FROM `safety_public_claims_local`",
+            )
+            db.execSQL(
+                "DELETE FROM `safety_public_points_local`",
+            )
+            db.execSQL(
+                """
+                ALTER TABLE `safety_public_cases_local` RENAME TO `safety_public_cases_local_v84`
+                """.trimIndent(),
+            )
             db.execSQL(
                 """
                 CREATE TABLE `safety_public_cases_local` (
@@ -5060,26 +5077,20 @@ object AppModule {
                 )
                 """.trimIndent(),
             )
+            // Deliberately NO COPY.
+            // Legacy public projections have no V3 publication authority.
+            db.execSQL(
+                "DROP TABLE `safety_public_cases_local_v84`",
+            )
             db.execSQL(
                 """
-                INSERT INTO `safety_public_cases_local`
-                    (`caseId`, `caseType`, `title`, `publicSummary`, `lifecycle`,
-                     `confidenceScore`, `eventCount`, `claimCount`, `sourceCount`,
-                     `evidenceCount`, `publishedAt`, `lastUpdatedAt`, `serverVersion`)
-                SELECT `caseId`, `caseType`, `title`, `publicSummary`, `lifecycle`,
-                       `confidenceScore`, `eventCount`, `claimCount`, `sourceCount`,
-                       `evidenceCount`, `publishedAt`, `lastUpdatedAt`, `serverVersion`
-                FROM `safety_public_cases_local_v84`
+                CREATE INDEX `index_safety_public_cases_local_lifecycle` ON `safety_public_cases_local` (`lifecycle`)
                 """.trimIndent(),
             )
-            db.execSQL("DROP TABLE `safety_public_cases_local_v84`")
             db.execSQL(
-                "CREATE INDEX `index_safety_public_cases_local_lifecycle` " +
-                    "ON `safety_public_cases_local` (`lifecycle`)",
-            )
-            db.execSQL(
-                "CREATE INDEX `index_safety_public_cases_local_publishedAt` " +
-                    "ON `safety_public_cases_local` (`publishedAt`)",
+                """
+                CREATE INDEX `index_safety_public_cases_local_publishedAt` ON `safety_public_cases_local` (`publishedAt`)
+                """.trimIndent(),
             )
         }
     }
