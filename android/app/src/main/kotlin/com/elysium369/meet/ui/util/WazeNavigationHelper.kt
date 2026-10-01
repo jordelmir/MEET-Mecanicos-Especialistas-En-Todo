@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -92,13 +94,15 @@ fun WazeNavigationButton(
     destinationLng: Double = longitude,
     destinationLabel: String = label,
     modifier: Modifier = Modifier,
-    text: String = "Viajar con Waze 🚗💨",
-    compact: Boolean = false,
+    text: String = "Waze 🚗",
+    compact: Boolean = true,
 ) {
     val finalLat = if (destinationLat != 0.0) destinationLat else latitude
     val finalLng = if (destinationLng != 0.0) destinationLng else longitude
     val finalLabel = if (destinationLabel != "Destino") destinationLabel else label
     val context = LocalContext.current
+    val displayText = if (text == "Viajar con Waze 🚗💨" && compact) "Waze 🚗" else text
+
     Button(
         onClick = {
             WazeNavigationHelper.openWaze(context, finalLat, finalLng, finalLabel)
@@ -108,6 +112,10 @@ fun WazeNavigationButton(
             contentColor = Color(0xFF002233)
         ),
         shape = RoundedCornerShape(10.dp),
+        contentPadding = PaddingValues(
+            horizontal = if (compact) 8.dp else 12.dp,
+            vertical = if (compact) 6.dp else 10.dp
+        ),
         modifier = modifier
     ) {
         Icon(
@@ -116,12 +124,14 @@ fun WazeNavigationButton(
             tint = Color(0xFF002233),
             modifier = Modifier.size(if (compact) 14.dp else 16.dp)
         )
-        Spacer(Modifier.width(6.dp))
+        Spacer(Modifier.width(if (compact) 4.dp else 6.dp))
         Text(
-            text = text,
+            text = displayText,
             fontWeight = FontWeight.Black,
             fontSize = if (compact) 11.sp else 12.sp,
-            color = Color(0xFF002233)
+            color = Color(0xFF002233),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }

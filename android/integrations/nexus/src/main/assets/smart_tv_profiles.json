@@ -1,0 +1,107 @@
+{
+  "version": 1,
+  "profiles": [
+    {
+      "id": "kintech_smart_tv",
+      "name": "Kintech Smart TV (Android OS)",
+      "discovery": {
+        "mdns_target": "_androidtvremote2._tcp",
+        "ssdp_target": "urn:schemas-upnp-org:device:MediaRenderer:1",
+        "default_port": 6466
+      },
+      "protocol": "TLS_PROTOBUF",
+      "auth_type": "PIN_6_DIGIT",
+      "endpoints": {
+        "control": "tls://{ip}:6466"
+      }
+    },
+    {
+      "id": "universal_tv_ip",
+      "name": "Control Universal TV (Auto-Detect IP)",
+      "discovery": {
+        "mdns_target": "_services._dns-sd._udp",
+        "ssdp_target": "ssdp:all",
+        "default_port": 8080
+      },
+      "protocol": "AUTO_DETECT",
+      "auth_type": "AUTO",
+      "endpoints": {
+        "control": "http://{ip}:8080"
+      }
+    },
+    {
+      "id": "lg_webos",
+      "name": "LG webOS Smart TV",
+      "discovery": {
+        "ssdp_target": "urn:schemas-upnp-org:device:MediaRenderer:1",
+        "mdns_target": "_lg-webos._tcp",
+        "default_port": 3000,
+        "secure_port": 3001
+      },
+      "protocol": "WEBSOCKET_JSON",
+      "auth_type": "CLIENT_KEY_PROMPT",
+      "endpoints": {
+        "control": "ws://{ip}:3000",
+        "secure_control": "wss://{ip}:3001"
+      }
+    },
+    {
+      "id": "samsung_tizen",
+      "name": "Samsung Tizen Smart TV",
+      "discovery": {
+        "ssdp_target": "urn:samsung.com:device:RemoteControlReceiver:1",
+        "mdns_target": "_samsung._tcp",
+        "default_port": 8001,
+        "secure_port": 8002
+      },
+      "protocol": "WEBSOCKET_JSON",
+      "auth_type": "TOKEN_PAIRING",
+      "endpoints": {
+        "control": "ws://{ip}:8001/api/v2/channels/samsung.remote.control",
+        "secure_control": "wss://{ip}:8002/api/v2/channels/samsung.remote.control"
+      }
+    },
+    {
+      "id": "roku_ecp",
+      "name": "Roku TV / Streaming Stick",
+      "discovery": {
+        "ssdp_target": "roku:ecp",
+        "mdns_target": "_roku-ecp._tcp",
+        "default_port": 8060
+      },
+      "protocol": "HTTP_REST",
+      "auth_type": "NONE",
+      "endpoints": {
+        "keypress": "http://{ip}:8060/keypress/{key}",
+        "query_device": "http://{ip}:8060/query/device-info",
+        "query_apps": "http://{ip}:8060/query/apps"
+      }
+    },
+    {
+      "id": "android_tv_remote",
+      "name": "Android TV / Google TV",
+      "discovery": {
+        "mdns_target": "_androidtvremote2._tcp",
+        "default_port": 6466
+      },
+      "protocol": "TLS_PROTOBUF",
+      "auth_type": "PIN_6_DIGIT",
+      "endpoints": {
+        "control": "tls://{ip}:6466"
+      }
+    },
+    {
+      "id": "elysium_mac_agent",
+      "name": "Elysium Mac Agent",
+      "discovery": {
+        "mdns_target": "_elysium._tcp",
+        "default_port": 7878
+      },
+      "protocol": "X25519_CHACHA20",
+      "auth_type": "PIN_6_DIGIT",
+      "endpoints": {
+        "control": "tcp://{ip}:7878"
+      }
+    }
+  ]
+}

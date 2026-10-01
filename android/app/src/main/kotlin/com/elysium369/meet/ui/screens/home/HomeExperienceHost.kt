@@ -32,7 +32,7 @@ fun HomeExperienceHost(
 
     val currentExperience = when (val s = state) {
         is HomeExperienceUiState.Ready -> s.selected
-        else -> HomeExperience.CLASSIC
+        else -> HomeExperience.VANGUARD
     }
 
     val isPreview = when (val s = state) {
@@ -40,6 +40,9 @@ fun HomeExperienceHost(
         else -> false
     }
 
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.elysium369.meet.ui.home.LocalHomeExperience provides currentExperience
+    ) {
     AnimatedContent(
         targetState = currentExperience,
         transitionSpec = {
@@ -48,10 +51,11 @@ fun HomeExperienceHost(
         label = "HomeExperienceHostTransition"
     ) { experience ->
         when (experience) {
-            HomeExperience.CLASSIC -> {
+            HomeExperience.CLASSIC, HomeExperience.VANGUARD -> {
                 HomeClassicScreen(
                     navController = navController,
                     viewModel = obdViewModel,
+                    experience = experience,
                     onSelectExperience = { homeViewModel.switchExperience(it) },
                     onPreviewExperience = { homeViewModel.startPreview(it) },
                     isPreview = isPreview,
@@ -72,4 +76,5 @@ fun HomeExperienceHost(
             }
         }
     }
+}
 }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+      Brand-neutral palette. We do not borrow colors from any
+      commercial controller; the visual identity is built in Phase 1
+      with the editor.
+
+      tools:ignore="UnusedResources" — these land in 0.1 so the brand
+      palette is pinned; the editor that consumes them is Phase 1.
+      Without the ignore, lint flags them on a 0-warning floor.
+    -->
+    <color name="brand_ink" tools:ignore="UnusedResources">#0F0F12</color>
+    <color name="brand_paper" tools:ignore="UnusedResources">#F2F2F4</color>
+    <color name="brand_accent" tools:ignore="UnusedResources">#1F6FEB</color>
+    <color name="brand_danger" tools:ignore="UnusedResources">#B42318</color>
+
+    <!-- Elysium Nexus dark background — near-black with
+         violet undertone. Used as windowBackground in
+         Theme.ElysiumNexus so the cold-start window
+         matches the Compose dark scheme. -->
+    <color name="elysium_background">#050008</color>
+</resources>

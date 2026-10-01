@@ -16,7 +16,6 @@ data class GeoPoint(
         require(capturedAtEpochMs >= 0) { "Captured time cannot be negative" }
     }
 }
-
 /**
  * Bounding box for map camera fitting.
  */
@@ -47,7 +46,6 @@ data class GeoBounds(
         }
     }
 }
-
 /**
  * Universal marker roles across all service verticals.
  */
@@ -97,6 +95,19 @@ data class GeoRoute(
     }
 }
 
+/** Uncertainty footprint; its center does not identify an event location. */
+data class GeoArea(
+    val id: String,
+    val boundary: List<GeoPoint>,
+    val label: String,
+    val uncertaintyMeters: Int,
+) {
+    init {
+        require(id.isNotBlank() && label.isNotBlank())
+        require(boundary.size >= 4 && uncertaintyMeters > 0)
+    }
+}
+
 /**
  * Camera viewport intent.
  */
@@ -116,6 +127,7 @@ data class CommonMapState(
     val isInteractive: Boolean = true,
     val showRecenterButton: Boolean = true,
     val showTrafficOverlay: Boolean = false,
+    val areas: List<GeoArea> = emptyList(),
 ) {
     init {
         require(markers.map { it.id }.toSet().size == markers.size) { "Marker IDs must be unique" }

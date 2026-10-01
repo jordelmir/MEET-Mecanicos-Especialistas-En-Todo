@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,7 +24,7 @@ fun DtcCard(
     var expanded by remember { mutableStateOf(false) }
 
     Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0A0E1A)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
             .fillMaxWidth()
@@ -62,12 +63,12 @@ fun DtcCard(
             
             Text(
                 text = DtcUtils.getSpanishDescription(definition, dtcCode),
-                color = Color.LightGray
+                color = MeetColors.textSecondary
             )
 
             if (expanded) {
                 Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = Color.DarkGray)
+                Divider(color = MeetColors.borderSubtle)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text("Posibles Causas:", color = Color.White, fontWeight = FontWeight.Bold)
@@ -78,14 +79,14 @@ fun DtcCard(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Button(
                         onClick = { onConsultIa(dtcCode) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF333333))
+                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cardBackgroundLighter)
                     ) {
                         Text("🤖 Consultar IA")
                     }
                     
                     if (isPremium) {
                         OutlinedButton(onClick = { /* Ver Freeze Frame */ }) {
-                            Text("Ver Freeze Frame", color = Color(0xFFFF6B35))
+                            Text("Ver Freeze Frame", color = MeetColors.electricBlue)
                         }
                     }
                 }

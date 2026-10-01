@@ -320,6 +320,8 @@ fun RideCenterScreen(
                     contentAlignment = Alignment.Center,
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if(com.elysium369.meet.ui.home.LocalHomeExperience.current!=com.elysium369.meet.ui.home.HomeExperience.CLASSIC) com.elysium369.meet.ui.components.ElysiumVanguardBanner()
+                        Spacer(Modifier.height(12.dp))
                         Icon(
                             Icons.Default.Search,
                             contentDescription = null,
@@ -349,6 +351,7 @@ fun RideCenterScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
+                    item { if(com.elysium369.meet.ui.home.LocalHomeExperience.current!=com.elysium369.meet.ui.home.HomeExperience.CLASSIC) com.elysium369.meet.ui.components.ElysiumVanguardBanner() }
                     items(filteredRides, key = { it.requestId }) { ride ->
                         val isPending = (claimState as? ObdViewModel.RideClaimUiState.Pending)?.requestId == ride.requestId
                         RideCenterCard(
@@ -423,7 +426,7 @@ private fun RideCenterCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
         shape = RoundedCornerShape(16.dp),
     ) {

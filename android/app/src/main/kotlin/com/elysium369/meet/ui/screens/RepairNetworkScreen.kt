@@ -1688,7 +1688,7 @@ private fun RepairNetworkWorkflowGuide(
                 title = "Te llevamos a DEKRA",
                 subtitle = "Cita · prechequeo · custodia · traslado · resultado",
                 icon = "✓",
-                accentColor = Color(0xFF20D5C6),
+                accentColor = MeetColors.electricBlue,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onOpenDekra,
             )
@@ -1752,7 +1752,7 @@ private fun RepairNetworkWorkflowGuide(
                 title = "Servicios Elysium",
                 subtitle = "A domicilio · remoto · híbrido · ofertas y contratos",
                 icon = "✦",
-                accentColor = Color(0xFFC85CFF),
+                accentColor = MeetColors.hotMagenta,
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onOpenUniversalServices
             )

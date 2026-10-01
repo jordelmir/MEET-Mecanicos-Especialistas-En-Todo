@@ -49,7 +49,7 @@ fun ConnectionStatusBar(
 
     val stateColor = when {
         truth.isDemoSession && state == ObdState.CONNECTED -> com.elysium369.meet.ui.theme.MeetColors.electricBlue
-        state == ObdState.CONNECTED && truth.isSessionReady -> com.elysium369.meet.ui.theme.MeetColors.neonGreen
+        state == ObdState.CONNECTED && truth.isSessionReady -> com.elysium369.meet.ui.theme.MeetColors.success
         state == ObdState.CONNECTED && truth.ecuState == com.elysium369.meet.core.obd.EcuLinkState.NO_RESPONSE -> com.elysium369.meet.ui.theme.MeetColors.warning
         state == ObdState.CONNECTING || state == ObdState.NEGOTIATING -> com.elysium369.meet.ui.theme.MeetColors.warning
         state == ObdState.ERROR -> com.elysium369.meet.ui.theme.MeetColors.error

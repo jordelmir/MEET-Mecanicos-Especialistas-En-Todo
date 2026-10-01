@@ -9,6 +9,12 @@ interface VehicleDao {
     @Query("SELECT * FROM vehicles WHERE userId = :userId ORDER BY createdAt DESC")
     fun getAllVehiclesForUser(userId: String): Flow<List<VehicleEntity>>
 
+    @Query("SELECT * FROM vehicles WHERE userId = :userId AND syncedAt IS NULL ORDER BY createdAt ASC")
+    suspend fun getPendingVehiclesForUser(userId: String): List<VehicleEntity>
+
+    @Query("UPDATE vehicles SET syncedAt = :syncedAt WHERE id = :id AND userId = :userId")
+    suspend fun markVehicleSynced(userId: String, id: String, syncedAt: Long)
+
     @Query("SELECT * FROM vehicles WHERE id = :id AND userId = :userId LIMIT 1")
     suspend fun getVehicleByIdForUser(userId: String, id: String): VehicleEntity?
 

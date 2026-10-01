@@ -48,6 +48,9 @@ interface CommunicationDao {
         serviceReferenceId: String,
     ): CommunicationConversationEntity?
 
+    @Query("SELECT c.conversationId FROM communication_conversations c JOIN communication_participants p ON p.conversationId=c.conversationId AND p.ownerPrincipalId=c.ownerPrincipalId WHERE c.ownerPrincipalId=:owner AND p.participantPrincipalId=:peer AND p.membershipState='ACTIVE' AND c.kind='DIRECT' AND c.requestState='ACCEPTED' AND c.proofState='SERVER_AUTHORITATIVE' LIMIT 1")
+    suspend fun acceptedContactConversation(owner:String,peer:String):String?
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertConversation(conversation: CommunicationConversationEntity)
 
@@ -108,6 +111,38 @@ interface CommunicationDao {
         }
         return inserted
     }
+
+    @Query("SELECT * FROM communication_events WHERE ownerPrincipalId=:owner AND senderPrincipalId=:owner AND eventType='VOICE_NOTE' AND syncState='LOCAL_ONLY' ORDER BY createdAtEpochMs LIMIT 50")
+    suspend fun legacyVoiceNotes(owner:String):List<CommunicationEventEntity>
+    @Query("UPDATE communication_events SET eventType='AUDIO',senderDeviceId=:device,localCiphertextBase64=:ciphertext,localNonceBase64=:nonce,syncState='PENDING_REMOTE' WHERE eventId=:id AND ownerPrincipalId=:owner AND senderPrincipalId=:owner AND eventType='VOICE_NOTE' AND syncState='LOCAL_ONLY'")
+    suspend fun stageLegacyVoiceNote(id:String,owner:String,device:String,ciphertext:String,nonce:String)
+
+    @Query("SELECT * FROM communication_events WHERE ownerPrincipalId = :owner AND syncState IN ('PENDING_REMOTE','NEARBY_ACK') ORDER BY createdAtEpochMs LIMIT 50")
+    suspend fun pendingOnlineEvents(owner: String): List<CommunicationEventEntity>
+
+    @Query("SELECT * FROM communication_events WHERE eventId=:id AND ownerPrincipalId=:owner AND conversationId=:conversation LIMIT 1")
+    suspend fun getOnlineEvent(id:String,owner:String,conversation:String):CommunicationEventEntity?
+
+    @Query("UPDATE communication_events SET syncState='NEARBY_ACK' WHERE eventId=:id AND ownerPrincipalId=:owner AND conversationId=:conversation AND senderPrincipalId=:owner AND syncState='PENDING_REMOTE'")
+    suspend fun acknowledgeNearbyEvent(id:String,owner:String,conversation:String)
+
+    @Query("SELECT * FROM communication_conversations WHERE conversationId = :id AND ownerPrincipalId = :owner LIMIT 1")
+    suspend fun getOnlineConversation(id: String, owner: String): CommunicationConversationEntity?
+
+    @Query("UPDATE communication_conversations SET requestState=:state, proofState='SERVER_AUTHORITATIVE' WHERE conversationId=:id AND ownerPrincipalId=:owner")
+    suspend fun projectOnlineConversation(id: String, owner: String, state: String)
+
+    @Query("SELECT COALESCE(MAX(serverSequence),0) FROM communication_events WHERE conversationId=:id AND ownerPrincipalId=:owner")
+    suspend fun latestOnlineSequence(id: String, owner: String): Long
+
+    @Query("UPDATE communication_events SET remoteEnvelopeJson=:envelope WHERE eventId=:id AND ownerPrincipalId=:owner AND syncState IN ('PENDING_REMOTE','NEARBY_ACK')")
+    suspend fun persistTransportEnvelope(id: String, owner: String, envelope: String)
+
+    @Query("UPDATE communication_events SET syncState='SERVER_ACK', serverSequence=:sequence, receivedAtEpochMs=:received WHERE eventId=:id AND ownerPrincipalId=:owner")
+    suspend fun acknowledgeOnlineEvent(id: String, owner: String, sequence: Long, received: Long)
+
+    @Query("UPDATE communication_events SET remoteEnvelopeJson=:envelope, syncState='SERVER_ACK', serverSequence=:sequence, receivedAtEpochMs=:received WHERE eventId=:id AND ownerPrincipalId=:owner AND syncState!='REMOTE_UNREADABLE'")
+    suspend fun reconcileReceivedEvent(id:String,owner:String,envelope:String,sequence:Long,received:Long)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertReceipt(receipt: CommunicationReceiptEntity)

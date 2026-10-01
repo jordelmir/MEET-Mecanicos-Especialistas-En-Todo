@@ -1,0 +1,32 @@
+{
+  "name": "@elysium-safety/core",
+  "version": "0.1.0",
+  "description": "Reusable truth, custody, provenance, publication and geospatial safety contracts",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "files": [
+    "dist",
+    "schemas",
+    "README.md",
+    "NOTICE",
+    "LICENSE",
+    "SECURITY.md",
+    "GOVERNANCE.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build"
+  },
+  "devDependencies": {
+    "typescript": "~5.8.2"
+  }
+}

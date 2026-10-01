@@ -215,7 +215,7 @@ fun MeetExecutiveCommandCenterScreen(
             item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     VitalStatBox(modifier = Modifier.weight(1f), title = "Viajes", value = "${projection.completedTrips}", icon = Icons.Default.DirectionsCar, tint = Color(0xFFFFB300))
-                    VitalStatBox(modifier = Modifier.weight(1f), title = "Reparaciones", value = "${projection.completedServices}", icon = Icons.Default.Build, tint = Color(0xFF00E5FF))
+                    VitalStatBox(modifier = Modifier.weight(1f), title = "Reparaciones", value = "${projection.completedServices}", icon = Icons.Default.Build, tint = MeetColors.electricBlue)
                     VitalStatBox(modifier = Modifier.weight(1f), title = "Grúas", value = "${projection.completedTowCalls}", icon = Icons.Default.LocalShipping, tint = Color(0xFFFF5252))
                 }
             }

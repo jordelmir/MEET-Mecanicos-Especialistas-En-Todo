@@ -726,6 +726,12 @@ interface ProviderProfileDao {
     @Query("UPDATE provider_profiles SET rating = :rating, totalJobs = totalJobs + 1, updatedAt = :updatedAt WHERE profileId = :profileId")
     suspend fun updateRatingAndJobs(profileId: String, rating: Double, updatedAt: Long)
 
+    @Query("SELECT * FROM provider_profiles WHERE profileId = :profileId LIMIT 1")
+    suspend fun getProfile(profileId: String): ProviderProfileEntity?
+
+    @Query("UPDATE provider_profiles SET specialties = :specialties, updatedAt = :updatedAt WHERE profileId = :profileId")
+    suspend fun updateSpecialties(profileId: String, specialties: String, updatedAt: Long)
+
     @Query("DELETE FROM provider_profiles WHERE profileId = :profileId")
     suspend fun deleteProfile(profileId: String)
 }
@@ -936,11 +942,8 @@ interface RideDao {
     @Query(
         """
         UPDATE ride_requests
-        SET status = 'CANCELLED',
-            serverState = 'CANCELLED',
-            syncState = 'LOCAL_CANCELLED',
-            completedAt = :cancelledAt
-        WHERE requestId = :requestId
+        SET syncState = 'CANCEL_PENDING'
+        WHERE requestId = :requestId AND :cancelledAt >= 0
         """
     )
     suspend fun markRequestCancelledLocally(
@@ -951,13 +954,10 @@ interface RideDao {
     @Query(
         """
         UPDATE ride_requests
-        SET status = 'CANCELLED',
-            serverState = 'CANCELLED',
-            syncState = 'LOCAL_CANCELLED',
-            completedAt = :cancelledAt
+        SET syncState = 'CANCEL_PENDING'
         WHERE passengerId = :passengerId
           AND status IN ('PENDING_PUBLICATION', 'OPEN')
-          AND serverVersion = 0
+          AND serverVersion = 0 AND :cancelledAt >= 0
         """
     )
     suspend fun cancelUnpublishedRidesForPassenger(

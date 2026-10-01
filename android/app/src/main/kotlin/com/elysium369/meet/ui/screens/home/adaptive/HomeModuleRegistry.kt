@@ -49,6 +49,7 @@ object HomeModuleRegistry {
                 HomeModuleItem("tow_truck", "Asistencia & Grúa", "Auxilio vial geolocalizado", MeetDestinations.TOW_TRUCK, HomeSectionCategory.SERVICES, "tow_truck"),
                 HomeModuleItem("live_link", "Live Link PRO", "Sesión remota perito/mecánico", MeetDestinations.LIVE_STREAM, HomeSectionCategory.SERVICES, "live_stream"),
                 HomeModuleItem("ride", "Elysium Rides", "Transporte inteligente y conductor", MeetDestinations.RIDE_HOME, HomeSectionCategory.SERVICES, "ride_home"),
+                HomeModuleItem("deliveries", "Comida y Entregas", "Comida, tiendas y paquetes pequeños en línea", MeetDestinations.ELYSIUM_DELIVERIES, HomeSectionCategory.SERVICES, "elysium_services", isHighlight = true),
                 HomeModuleItem("legal_vanguard", "Legal Vanguard", "Abogados, bufetes y expediente protegido", MeetDestinations.LEGAL_VANGUARD, HomeSectionCategory.SERVICES, "legal_vanguard", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("elysium_properties", "Elysium Properties", "Property Passport, venta y alquiler", MeetDestinations.PROPERTIES, HomeSectionCategory.SERVICES, "elysium_properties", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("fuel_rewards", "Fuel Rewards", "Wallet, campañas y Station OS", MeetDestinations.FUEL_REWARDS, HomeSectionCategory.SERVICES, "fuel_rewards", isHighlight = true, badgeText = "NUEVO"),
@@ -61,6 +62,11 @@ object HomeModuleRegistry {
         map[HomeSectionCategory.TOOLS]?.addAll(
             listOf(
                 HomeModuleItem("ai_copilot", "IA Especialista", "Diagnóstico guiado por inteligencia", MeetDestinations.AI, HomeSectionCategory.TOOLS, "ai", isHighlight = true),
+                HomeModuleItem("dragon_calc", "DragonCalc Elysium", "Calculadora científica y simbólica", MeetDestinations.DRAGON_CALC, HomeSectionCategory.TOOLS, "dragon_calc", isHighlight = true),
+                HomeModuleItem("nexxus_control", "Elysium Nexxus Control", "Control de dispositivos, IR y Bluetooth", MeetDestinations.NEXUS_CONTROL, HomeSectionCategory.TOOLS, "nexxus_control", isHighlight = true),
+                HomeModuleItem("screen_mirror", "Elysium ScreenMirror", "Compartir pantalla con consentimiento", MeetDestinations.SCREEN_MIRROR, HomeSectionCategory.TOOLS, "screen_mirror", isHighlight = true),
+                HomeModuleItem("file_manager", "Elysium FileManager", "Archivos, multimedia y almacenamiento", MeetDestinations.FILE_MANAGER, HomeSectionCategory.TOOLS, "file_manager", isHighlight = true),
+                HomeModuleItem("record_shield", "Elysium RecordShield", "Grabación local con aviso visible", MeetDestinations.RECORD_SHIELD, HomeSectionCategory.TOOLS, "record_shield", isHighlight = true),
                 HomeModuleItem("engine_3d", "Motor 3D Interactivo", "Visor tridimensional de componentes", MeetDestinations.ENGINE_3D, HomeSectionCategory.TOOLS, "engine_3d"),
                 HomeModuleItem("hud", "Modo HUD", "Proyección en parabrisas", MeetDestinations.HUD, HomeSectionCategory.TOOLS, "hud"),
                 HomeModuleItem("protocol", "Protocolos", "Detección y parámetros de bus", MeetDestinations.PROTOCOL_LEARNING, HomeSectionCategory.TOOLS, "protocol_learning"),
@@ -85,6 +91,22 @@ object HomeModuleRegistry {
             )
         }
         map[HomeSectionCategory.PROFESSIONAL]?.addAll(proList)
+
+        // ── AUDIO ──
+        map[HomeSectionCategory.AUDIO]?.addAll(
+            listOf(
+                HomeModuleItem("equalizer", "Ecualizador", "Ajustes de frecuencia y bandas", "audio_equalizer", HomeSectionCategory.AUDIO, "equalizer"),
+                HomeModuleItem("playlist", "Reproducción", "Listas de reproducción y audio", "audio_playlist", HomeSectionCategory.AUDIO, "playlist"),
+                HomeModuleItem("fm", "Sintonizador FM", "Radio FM y bandas", "audio_fm", HomeSectionCategory.AUDIO, "fm")
+            )
+        )
+
+        // ── SUPREME BASS (Neon Integration) ──
+        map[HomeSectionCategory.SUPREME_BASS]?.addAll(
+            listOf(
+                HomeModuleItem("supreme_bass", "SupremeBass Neon", "Control de audio y boost 100–400%", MeetDestinations.SUPREME_BASS, HomeSectionCategory.SUPREME_BASS, "bass_boost", isHighlight = true)
+            )
+        )
 
         // ── SAFETY ──
         map[HomeSectionCategory.SAFETY]?.addAll(

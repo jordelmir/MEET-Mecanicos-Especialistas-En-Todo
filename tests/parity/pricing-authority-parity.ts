@@ -15,6 +15,7 @@ interface PricingFixture {
   distanceRateMinorPerKm: number;
   timeRateMinorPerMinute: number;
   minimumFareMinor: number;
+  meteredMinimumFareMinor: number;
   bookingFeeMinor: number;
   platformCommissionBasisPoints: number;
 }
@@ -51,6 +52,8 @@ const v3Migrations = readdirSync(migrationsDir)
 if (v3Migrations.length === 0) throw new Error('Pricing parity violation: ride_create_request_v3 is missing');
 const currentRideCreate = v3Migrations.at(-1)!;
 const policyMigration = source('supabase/migrations/20260922090000_crc_ride_pricing_authority_parity.sql');
+const meteredMinimumMigration = source('supabase/migrations/20260927230000_ride_metered_minimum_1000.sql');
+const v4MeteredGuardMigration = source('supabase/migrations/20260927233000_ride_v4_metered_minimum_guard.sql');
 const commissionMigration = source('supabase/migrations/20260920110000_ride_authority_and_completion_audit.sql');
 
 const crcDecimals = Number(expectMatch(currencySource, /CRC\("₡",\s*(\d+)\)/, 'CRC decimalPlaces is missing')[1]);
@@ -62,8 +65,14 @@ const serverTime = Number(expectMatch(currentRideCreate.sql, /p_time_rate_minor_
 expectEqual(crcDecimals, fixture.currencyDecimalPlaces, 'CRC decimalPlaces drifted');
 expectEqual(androidDistance, fixture.distanceRateMinorPerKm, 'Android distance rate drifted');
 expectEqual(androidTime, fixture.timeRateMinorPerMinute, 'Android time rate drifted');
+const androidMeteredMinimum = Number(expectMatch(fareEngineSource, /CRC_METERED_MINIMUM_FARE_MINOR\s*=\s*([\d_]+)L/, 'Android metered minimum is missing')[1].replaceAll('_', ''));
+expectEqual(androidMeteredMinimum, fixture.meteredMinimumFareMinor, 'Android metered minimum drifted');
 expectEqual(serverDistance, fixture.distanceRateMinorPerKm, `${currentRideCreate.name} distance rate drifted`);
 expectEqual(serverTime, fixture.timeRateMinorPerMinute, `${currentRideCreate.name} time rate drifted`);
+expectMatch(meteredMinimumMigration, new RegExp(`METERED_MINIMUM_PARITY=${fixture.marketId}\\|${fixture.serviceCategoryId}\\|${fixture.rateCardVersion}\\|${fixture.currency}\\|${fixture.meteredMinimumFareMinor}`), 'metered minimum marker drifted');
+expectMatch(currentRideCreate.sql, /v_expected_fare\s*:=\s*greatest\(\s*1000,/, 'server estimate lacks metered minimum');
+expectMatch(meteredMinimumMigration, /measured\s*:=\s*case[\s\S]*then greatest\(1000,/, 'shared meter lacks metered minimum');
+expectMatch(v4MeteredGuardMigration, /v_expected_fare\s*:=\s*greatest\(v_raw_fare,\s*v_policy\.metered_minimum_fare_minor\)/, 'v4 bypasses metered minimum');
 
 const policyMarker = [
   fixture.marketId,

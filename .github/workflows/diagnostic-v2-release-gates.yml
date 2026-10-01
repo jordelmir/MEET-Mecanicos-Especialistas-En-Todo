@@ -121,6 +121,9 @@ jobs:
       - name: Diagnostic unit and property tests
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest
+      - name: Elysium Nexxus Control module tests
+        working-directory: android
+        run: ./gradlew :integrations:nexus:testDebugUnitTest
       - name: Android lint
         working-directory: android
         run: ./gradlew :app:lintDebug

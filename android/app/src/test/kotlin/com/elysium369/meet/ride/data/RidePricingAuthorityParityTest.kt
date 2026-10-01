@@ -31,7 +31,7 @@ class RidePricingAuthorityParityTest {
             "supabase/migrations/20260922090000_crc_ride_pricing_authority_parity.sql",
         ).readText()
         val rideCreateSql = projectFile(
-            "supabase/migrations/20260918020000_ride_create_request_preferences_support.sql",
+            "supabase/migrations/20260927230000_ride_metered_minimum_1000.sql",
         ).readText()
 
         val version = fixtureLong(fixture, "rateCardVersion")
@@ -45,8 +45,11 @@ class RidePricingAuthorityParityTest {
         assertEquals(fixtureLong(fixture, "currencyDecimalPlaces").toInt(), CurrencyCode.CRC.decimalPlaces)
         assertEquals(distance, RideFareEngine.CRC_DISTANCE_RATE_MINOR_PER_KM)
         assertEquals(time, RideFareEngine.CRC_TIME_RATE_MINOR_PER_MINUTE)
+        assertEquals(fixtureLong(fixture, "meteredMinimumFareMinor"), RideFareEngine.CRC_METERED_MINIMUM_FARE_MINOR)
         assertTrue(rideCreateSql.contains("p_distance_rate_minor_per_km <> $distance"))
         assertTrue(rideCreateSql.contains("p_time_rate_minor_per_minute <> $time"))
+        assertTrue(rideCreateSql.contains("v_expected_fare := greatest(\n            1000,"))
+        assertTrue(rideCreateSql.contains("METERED_MINIMUM_PARITY=CR_GAM|STD_RIDE|2|CRC|1000"))
 
         val marker = "PRICING_PARITY_RATE_CARD=CR_GAM|STD_RIDE|$version|CRC|$base|$distance|$time|$minimum|$booking|$commission"
         assertTrue(policySql.contains(marker))

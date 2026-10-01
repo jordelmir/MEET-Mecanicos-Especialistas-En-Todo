@@ -130,6 +130,11 @@ object SafetyEvidenceScheduler {
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        WorkManager.getInstance(context).enqueueUniqueWork("safety-evidence-upload", ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+        val verification = OneTimeWorkRequestBuilder<SafetyEvidenceVerificationWorker>()
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+        WorkManager.getInstance(context).beginUniqueWork("safety-evidence-upload", ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+            .then(verification).enqueue()
     }
 }

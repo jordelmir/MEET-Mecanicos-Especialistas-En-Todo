@@ -72,6 +72,8 @@ data class RideWalletBalance(
     @SerialName("posted_minor") val postedMinor: Long = 0,
     @SerialName("reserved_minor") val reservedMinor: Long = 0,
     @SerialName("available_minor") val availableMinor: Long = 0,
+    @SerialName("promotional_available_minor") val promotionalAvailableMinor: Long? = null,
+    @SerialName("funded_available_minor") val fundedAvailableMinor: Long? = null,
 )
 
 @Serializable

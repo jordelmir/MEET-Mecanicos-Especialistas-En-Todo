@@ -77,19 +77,22 @@ fun HolographicBackgroundShared(
     var phase by remember { mutableFloatStateOf(0f) }
     var glowPulse by remember { mutableFloatStateOf(0.42f) }
 
-    LaunchedEffect(animated) {
-        if (!animated) {
+    val motionEnabled = animated && com.elysium369.meet.ui.elysium.theme.rememberElysiumMotionEnabled()
+    LaunchedEffect(motionEnabled) {
+        if (!motionEnabled) {
             phase = 0f
             glowPulse = 0.42f
             return@LaunchedEffect
         }
-        val startedAt = System.currentTimeMillis()
+        val startedAt = withFrameNanos { it }
         while (true) {
-            val elapsed = System.currentTimeMillis() - startedAt
-            phase = (elapsed % 24000L) / 24000f
-            val wave = ((sin(((elapsed % 6000L) / 6000f) * 2f * PI.toFloat()) + 1f) / 2f)
-            glowPulse = 0.30f + (wave * 0.25f)
             kotlinx.coroutines.delay(220L)
+            withFrameNanos { now ->
+                val elapsed = now - startedAt
+                phase = (elapsed % 24_000_000_000L) / 24_000_000_000f
+                val wave = ((sin(((elapsed % 6_000_000_000L) / 6_000_000_000f) * 2f * PI.toFloat()) + 1f) / 2f)
+                glowPulse = 0.30f + (wave * 0.25f)
+            }
         }
     }
 
@@ -139,7 +142,8 @@ fun HolographicBackgroundShared(
         }
 
         // Drifting particles
-        sharedBackgroundParticles.take(10).forEach { p ->
+        for (particleIndex in 0 until 10) {
+            val p = sharedBackgroundParticles[particleIndex]
             val px = ((p.xSeed * w) + (phase * p.speed * w) + (p.horizontalDrift * w * sin(phase * 2 * PI.toFloat()))) % w
             val py = ((p.ySeed * h) - (phase * p.speed * h)) % h
             
@@ -184,7 +188,8 @@ fun EliteCard(
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
-    val accentColor = glowColor ?: MeetColors.neonGreen.copy(alpha = 0.5f)
+    val classic = com.elysium369.meet.ui.home.LocalHomeExperience.current == com.elysium369.meet.ui.home.HomeExperience.CLASSIC
+    val accentColor = glowColor ?: if (classic) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.electricBlue.copy(alpha = 0.65f)
 
     var rotX = 0f
     var rotY = 0f
@@ -236,10 +241,10 @@ fun EliteCard(
         .clip(shape)
         .background(
             Brush.verticalGradient(
-                colors = listOf(
-                    backgroundColor.copy(alpha = 0.88f),
-                    backgroundColor.copy(alpha = 0.75f),
-                    backgroundColor.copy(alpha = 0.65f)
+                colors = if (classic) listOf(backgroundColor.copy(alpha=0.88f),backgroundColor.copy(alpha=0.75f),backgroundColor.copy(alpha=0.65f)) else listOf(
+                    androidx.compose.ui.graphics.lerp(backgroundColor, accentColor, 0.12f),
+                    backgroundColor,
+                    androidx.compose.ui.graphics.lerp(backgroundColor, MeetColors.backgroundDeep, 0.45f)
                 )
             )
         )
@@ -281,8 +286,8 @@ fun EliteCard(
                 size = Size(size.width, size.height * 0.3f)
             )
 
-            // Cyber corner markings (only if 3D hologram style is active)
-            if (enableHolo3D) {
+            // Static metallic corner highlights keep the frame legible without motion.
+            if (!classic || enableHolo3D) {
                 val markerLen = 8.dp.toPx()
                 val pad = 2.dp.toPx()
                 val w = size.width
@@ -306,12 +311,12 @@ fun EliteCard(
             }
         }
         .border(
-            width = 0.5.dp,
+            width = if (classic) 0.5.dp else 1.dp,
             brush = Brush.linearGradient(
-                colors = listOf(
-                    accentColor.copy(alpha = 0.2f),
-                    accentColor.copy(alpha = 0.05f),
-                    accentColor.copy(alpha = 0.2f)
+                colors = if (classic) listOf(accentColor.copy(alpha=0.2f),accentColor.copy(alpha=0.05f),accentColor.copy(alpha=0.2f)) else listOf(
+                    accentColor.copy(alpha = 0.85f),
+                    borderColor.copy(alpha = 0.65f),
+                    accentColor.copy(alpha = 0.55f)
                 )
             ),
             shape = shape

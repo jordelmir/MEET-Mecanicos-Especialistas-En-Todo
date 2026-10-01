@@ -184,6 +184,62 @@ class CommunicationRemoteGateway @Inject constructor() {
         },
     )
 
+    fun authenticatedPrincipalId(): String? = SupabaseModule.client.auth.currentUserOrNull()?.id
+
+    suspend fun registerTransportDevice(deviceId: String, publicKey: String): Boolean = authenticatedRpc(
+        "communication_register_transport_device",
+        buildJsonObject { put("p_device_id", deviceId); put("p_public_key", publicKey) },
+    )
+
+    suspend fun conversationKeys(conversationId: String): List<CommunicationDeviceKeyWire> =
+        SupabaseModule.client.postgrest.rpc("communication_conversation_device_keys",
+            buildJsonObject { put("p_conversation_id", conversationId) }).decodeList()
+
+    suspend fun ownOnlineIdentity():CommunicationOwnIdentityWire? =
+        SupabaseModule.client.postgrest["communication_identity_profiles"].select {
+            filter { eq("principal_id",requireNotNull(authenticatedPrincipalId())) }
+        }.decodeList<CommunicationOwnIdentityWire>().firstOrNull()
+
+    suspend fun onlineContactProfiles(): List<CommunicationContactProfileWire> =
+        SupabaseModule.client.postgrest.rpc("communication_contact_profiles",buildJsonObject {}).decodeList()
+
+    suspend fun onlineConversations(): List<CommunicationConversationWire> =
+        SupabaseModule.client.postgrest["communication_conversations"].select().decodeList()
+
+    suspend fun onlineParticipants(conversationId: String): List<CommunicationParticipantWire> =
+        SupabaseModule.client.postgrest["communication_participants"].select {
+            filter { eq("conversation_id", conversationId) }
+        }.decodeList()
+
+    suspend fun onlineEvents(conversationId: String, afterSequence: Long): List<CommunicationEventWire> =
+        SupabaseModule.client.postgrest["communication_events"].select {
+            filter { eq("conversation_id", conversationId); gt("server_sequence", afterSequence) }
+            order("server_sequence", io.github.jan.supabase.postgrest.query.Order.ASCENDING)
+            limit(100)
+        }.decodeList()
+
+    suspend fun publishedEvent(eventId:String):CommunicationEventWire? =
+        SupabaseModule.client.postgrest["communication_events"].select {
+            filter { eq("event_id",eventId) }
+        }.decodeList<CommunicationEventWire>().firstOrNull()
+
+    suspend fun publishEvent(event: CommunicationEventWire): CommunicationEventWire {
+        return SupabaseModule.client.postgrest.rpc("communication_publish_event_v2",buildJsonObject {
+            put("p_event_id",event.eventId);put("p_conversation_id",event.conversationId)
+            put("p_device_id",event.senderDeviceId);put("p_envelope",event.envelope)
+            put("p_reply_to",event.replyTo?.let { kotlinx.serialization.json.JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull)
+            put("p_created_at",event.clientCreatedAt);put("p_event_type",event.eventType)
+        }).decodeSingle()
+    }
+
+    suspend fun issuePairingToken(): String = SupabaseModule.client.postgrest.rpc(
+        "communication_issue_pairing_token", buildJsonObject {}
+    ).decodeAs()
+
+    suspend fun consumePairingToken(token: String): String = SupabaseModule.client.postgrest.rpc(
+        "communication_consume_pairing_token", buildJsonObject { put("p_token", token) }
+    ).decodeAs()
+
     private suspend fun authenticatedRpc(function: String, parameters: JsonObject): Boolean {
         val client = SupabaseModule.client
         if (client.auth.currentUserOrNull() == null) return false

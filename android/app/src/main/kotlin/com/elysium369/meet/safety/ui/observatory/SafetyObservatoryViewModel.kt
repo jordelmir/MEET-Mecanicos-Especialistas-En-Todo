@@ -19,6 +19,8 @@ data class SafetyObservatoryUiState(
     val filters: SafetyObservatoryFilters = SafetyObservatoryFilters(),
     val isLoading: Boolean = true,
     val error: String? = null,
+    val illicitPatterns: List<com.elysium369.meet.safety.data.IllicitMarketPattern> = emptyList(),
+    val patternsUnavailable: Boolean = false,
 )
 
 @HiltViewModel
@@ -32,10 +34,17 @@ class SafetyObservatoryViewModel @Inject constructor(private val repository: Saf
         request?.cancel()
         request = viewModelScope.launch {
             val filters = mutable.value.filters
-            mutable.update { it.copy(isLoading = true, error = null, stats = null) }
+            mutable.update { it.copy(isLoading = true, error = null, stats = null, illicitPatterns = emptyList(), patternsUnavailable = false) }
             try {
                 val stats = repository.observatoryV2(filters)
                 mutable.update { it.copy(stats = stats, isLoading = false) }
+                if (filters.category.isBlank() || filters.category == "DRUG_SALE_ACTIVITY") {
+                    try {
+                        val patterns = repository.counternarcotics(filters)
+                        mutable.update { it.copy(illicitPatterns = patterns.patterns) }
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { mutable.update { it.copy(patternsUnavailable = true) } }
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (error: Exception) {
                 mutable.update { it.copy(isLoading = false, error = "No se pudieron consultar los datos. Revisa los filtros y vuelve a intentar.") }

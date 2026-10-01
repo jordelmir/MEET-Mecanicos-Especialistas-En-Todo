@@ -32,6 +32,10 @@ import com.elysium369.meet.provider.domain.models.*
 import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import java.util.UUID
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
 
 /**
  * ══════════════════════════════════════════════════════════════════════
@@ -51,37 +55,95 @@ fun ProviderServiceCatalogConfigScreen(
     viewModel: ObdViewModel,
     onBack: () -> Unit,
 ) {
-    val context = LocalContext.current
     val profiles by viewModel.userProviderProfiles.collectAsState()
-    val gps by viewModel.currentGpsLocation.collectAsState()
-
-    // Encontrar perfil existente o preparar nuevo
-    val existingProfile = profiles.firstOrNull { it.isActive }
-    var selectedCategory by rememberSaveable {
-        mutableStateOf(
-            if (existingProfile != null) {
-                ProviderDomainCategory.fromId(existingProfile.specialties.let {
-                    try {
-                        org.json.JSONObject(it).optString("domainCategory", "AUTOMOTIVE_MECHANIC")
-                    } catch (_: Exception) { "AUTOMOTIVE_MECHANIC" }
-                })
-            } else ProviderDomainCategory.AUTOMOTIVE_MECHANIC
-        )
+    val principal by viewModel.activePrincipal.collectAsState()
+    val actorId = principal.id.takeIf { principal.isAuthenticated && viewModel.currentUserId == it }
+    val ownProfiles = profiles.filter { it.userId == actorId && it.isActive }
+    var selectedProfileId by rememberSaveable(actorId) { mutableStateOf<String?>(null) }
+    var explicitCategory by rememberSaveable(actorId, selectedProfileId) { mutableStateOf<ProviderDomainCategory?>(null) }
+    var waitingForProfiles by remember(actorId) { mutableStateOf(true) }
+    LaunchedEffect(actorId) {
+        if (actorId != null) viewModel.refreshProviderRoles()
+        kotlinx.coroutines.delay(5_000L)
+        waitingForProfiles = false
     }
-
-    var profileData by remember {
-        mutableStateOf(
-            if (existingProfile != null && existingProfile.specialties.isNotBlank()) {
-                ProviderServiceProfileData.fromJsonString(existingProfile.specialties)
-            } else {
-                ProviderServiceProfileData.defaultTemplateForCategory(selectedCategory)
+    val existingProfile = ownProfiles.firstOrNull { it.profileId == selectedProfileId }
+        ?: ownProfiles.singleOrNull()
+    val storedCategory = existingProfile?.let { profile ->
+        val storedId = runCatching { org.json.JSONObject(profile.specialties).optString("domainCategory") }.getOrNull()
+        ProviderCatalogEditPolicy.category(storedId, profile.providerType)
+    }
+    val initialCategory = explicitCategory ?: storedCategory
+    if (existingProfile == null || initialCategory == null) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Configurar mis servicios") },
+                    navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Volver") } },
+                )
+            },
+            containerColor = MeetColors.backgroundDeep,
+        ) { padding ->
+            LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                item {
+                    Text(
+                        when {
+                            actorId == null -> "Inicia sesión para configurar tu perfil de proveedor."
+                            ownProfiles.isEmpty() && waitingForProfiles -> "Cargando tus perfiles de proveedor…"
+                            ownProfiles.isEmpty() -> "No hay un perfil activo disponible. Registra tu perfil desde Ajustes antes de configurar el catálogo."
+                            existingProfile == null -> "Selecciona el perfil cuyo catálogo deseas editar."
+                            else -> "Selecciona la categoría de este perfil. No hay una categoría de catálogo registrada."
+                        }, color = MeetColors.textPrimary,
+                    )
+                }
+                if (existingProfile == null) {
+                    items(ownProfiles, key = { it.profileId }) { profile ->
+                        OutlinedButton(onClick = { selectedProfileId = profile.profileId }, modifier = Modifier.fillMaxWidth()) {
+                            Text("${profile.businessName} · ${profile.providerType}")
+                        }
+                    }
+                } else {
+                    items(ProviderDomainCategory.entries) { category ->
+                        OutlinedButton(onClick = { explicitCategory = category }, modifier = Modifier.fillMaxWidth()) { Text(category.title) }
+                    }
+                }
+                if (actorId != null && ownProfiles.isEmpty()) item {
+                    OutlinedButton(onClick = { viewModel.refreshProviderRoles() }) { Text("Actualizar perfiles") }
+                }
             }
+        }
+        return
+    }
+    key(actorId, existingProfile.profileId) {
+        ProviderServiceCatalogEditor(viewModel, existingProfile, initialCategory, onBack)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProviderServiceCatalogEditor(
+    viewModel: ObdViewModel,
+    existingProfile: ProviderProfileEntity,
+    initialCategory: ProviderDomainCategory,
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var saving by remember { mutableStateOf(false) }
+    var saveMessage by remember { mutableStateOf<String?>(null) }
+    var selectedCategory by rememberSaveable(existingProfile.profileId) { mutableStateOf(initialCategory) }
+    var profileData by remember(existingProfile.profileId) {
+        mutableStateOf(
+            if (runCatching { org.json.JSONObject(existingProfile.specialties).has("domainCategory") }.getOrDefault(false)) {
+                ProviderServiceProfileData.fromJsonString(existingProfile.specialties).copy(domainCategory = initialCategory)
+            } else ProviderServiceProfileData.defaultTemplateForCategory(initialCategory).copy(
+                certifiedEquipment = emptyList(), operatingRadiusKm = existingProfile.radiusKm,
+            )
         )
     }
-
-    var businessName by rememberSaveable { mutableStateOf(existingProfile?.businessName ?: "Mi Taller / Servicio Especializado") }
-    var ownerName by rememberSaveable { mutableStateOf(existingProfile?.ownerName ?: "Especialista MEET") }
-    var phone by rememberSaveable { mutableStateOf(existingProfile?.phone ?: "506") }
+    val businessName = existingProfile.businessName
+    val ownerName = existingProfile.ownerName
+    val phone = existingProfile.phone
 
     // Campos editables
     var hourlyRateStr by rememberSaveable { mutableStateOf(profileData.hourlyLaborRateCrc.toString()) }
@@ -119,38 +181,54 @@ fun ProviderServiceCatalogConfigScreen(
                 },
                 actions = {
                     Button(
+                        enabled = !saving,
                         onClick = {
-                            val hourly = hourlyRateStr.toLongOrNull() ?: 15000L
-                            val baseFee = baseFeeStr.toLongOrNull() ?: 15000L
-                            val perKm = perKmFeeStr.toLongOrNull() ?: 1200L
-                            val wDays = warrantyDaysStr.toIntOrNull() ?: 90
-                            val wKm = warrantyKmStr.toIntOrNull() ?: 5000
-
+                            val rates = ProviderCatalogEditPolicy.rates(hourlyRateStr, baseFeeStr, perKmFeeStr, warrantyDaysStr, warrantyKmStr)
+                            if (rates == null) {
+                                saveMessage = "Ingresa tarifas y garantías válidas, sin valores negativos."
+                                return@Button
+                            }
+                            if (viewModel.currentUserId != existingProfile.userId) {
+                                saveMessage = "La sesión cambió. Vuelve a abrir tu perfil antes de guardar."
+                                return@Button
+                            }
                             val updatedData = profileData.copy(
                                 domainCategory = selectedCategory,
-                                hourlyLaborRateCrc = hourly,
-                                baseDiagnosticFeeCrc = baseFee,
-                                ratePerKmCrc = perKm,
+                                hourlyLaborRateCrc = rates.hourly,
+                                baseDiagnosticFeeCrc = rates.base,
+                                ratePerKmCrc = rates.perKm,
                                 materialPolicy = selectedMaterialPolicy,
-                                warrantyDays = wDays,
-                                warrantyKm = wKm
+                                warrantyDays = rates.warrantyDays,
+                                warrantyKm = rates.warrantyKm,
                             )
-
-                            viewModel.registerAsProvider(
-                                providerType = "SERVICE_PROVIDER",
-                                businessName = businessName,
-                                ownerName = ownerName,
-                                phone = phone,
-                                location = existingProfile?.location ?: (gps?.let { "${it.latitude},${it.longitude}" } ?: "Costa Rica"),
-                                latitude = gps?.latitude ?: (existingProfile?.latitude ?: 0.0),
-                                longitude = gps?.longitude ?: (existingProfile?.longitude ?: 0.0),
-                                specialties = updatedData.toJsonString(),
-                                radiusKm = updatedData.operatingRadiusKm,
-                                licenseNumber = existingProfile?.licenseNumber ?: "MEET-PRO-CR",
-                                context = context
-                            )
-                            Toast.makeText(context, "✅ Catálogo de servicios y materiales guardado", Toast.LENGTH_SHORT).show()
-                            onBack()
+                            val draftJson = updatedData.toJsonString()
+                            saving = true
+                            saveMessage = "Guardando el catálogo de este perfil…"
+                            scope.launch {
+                                try {
+                                    viewModel.updateProviderProfileSpecialties(existingProfile.profileId, draftJson)
+                                    val saved = withTimeoutOrNull(15_000L) {
+                                        viewModel.userProviderProfiles.first { rows ->
+                                            viewModel.currentUserId == existingProfile.userId && rows.any { row ->
+                                                row.profileId == existingProfile.profileId && row.userId == existingProfile.userId &&
+                                                    row.isActive && row.specialties == draftJson
+                                            }
+                                        }
+                                    }
+                                    if (saved != null) {
+                                        saveMessage = "Catálogo guardado en este dispositivo. La sincronización remota está pendiente de confirmación."
+                                        Toast.makeText(context, saveMessage, Toast.LENGTH_LONG).show()
+                                    } else {
+                                        saveMessage = "No se confirmó el guardado. Conserva tus cambios e inténtalo de nuevo."
+                                    }
+                                } catch (cancelled: CancellationException) {
+                                    throw cancelled
+                                } catch (_: Exception) {
+                                    saveMessage = "No se pudo confirmar el guardado del catálogo."
+                                } finally {
+                                    saving = false
+                                }
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                         shape = RoundedCornerShape(10.dp),
@@ -158,7 +236,7 @@ fun ProviderServiceCatalogConfigScreen(
                     ) {
                         Icon(Icons.Default.Save, null, tint = Color.Black, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("Guardar", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                        Text(if (saving) "Guardando…" else "Guardar", color = Color.Black, fontWeight = FontWeight.Black, fontSize = 12.sp)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MeetColors.backgroundDeep)
@@ -174,6 +252,10 @@ fun ProviderServiceCatalogConfigScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                Text("Perfil: ${existingProfile.businessName} · ${existingProfile.providerType}", color = MeetColors.textSecondary)
+                saveMessage?.let { Text(it, color = MeetColors.textPrimary) }
+            }
             // ── SECCIÓN 1: Selección de Categoría Técnica ──
             item {
                 Text(
@@ -192,7 +274,13 @@ fun ProviderServiceCatalogConfigScreen(
                             selected = selectedCategory == cat,
                             onClick = {
                                 selectedCategory = cat
-                                val newTemplate = ProviderServiceProfileData.defaultTemplateForCategory(cat)
+                                val newTemplate = ProviderServiceProfileData.defaultTemplateForCategory(cat).copy(
+                                    certifiedEquipment = profileData.certifiedEquipment,
+                                    operatingRadiusKm = profileData.operatingRadiusKm,
+                                    walletBalanceCrc = profileData.walletBalanceCrc,
+                                    platformCommissionBps = profileData.platformCommissionBps,
+                                    walletTransactions = profileData.walletTransactions,
+                                )
                                 profileData = newTemplate
                                 hourlyRateStr = newTemplate.hourlyLaborRateCrc.toString()
                                 baseFeeStr = newTemplate.baseDiagnosticFeeCrc.toString()
@@ -226,7 +314,8 @@ fun ProviderServiceCatalogConfigScreen(
                         Text("Identidad Comercial", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         OutlinedTextField(
                             value = businessName,
-                            onValueChange = { businessName = it },
+                            onValueChange = {},
+                            readOnly = true,
                             label = { Text("Nombre del Negocio o Taller") },
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(
@@ -238,7 +327,8 @@ fun ProviderServiceCatalogConfigScreen(
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
                                 value = ownerName,
-                                onValueChange = { ownerName = it },
+                                onValueChange = {},
+                                readOnly = true,
                                 label = { Text("Responsable Técnico") },
                                 modifier = Modifier.weight(1f),
                                 colors = OutlinedTextFieldDefaults.colors(
@@ -249,7 +339,8 @@ fun ProviderServiceCatalogConfigScreen(
                             )
                             OutlinedTextField(
                                 value = phone,
-                                onValueChange = { phone = it },
+                                onValueChange = {},
+                                readOnly = true,
                                 label = { Text("Teléfono / WhatsApp") },
                                 modifier = Modifier.weight(1f),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),

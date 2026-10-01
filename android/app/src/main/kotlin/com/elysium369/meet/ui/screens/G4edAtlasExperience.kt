@@ -90,8 +90,8 @@ import io.github.sceneview.rememberModelInstance
 import io.github.sceneview.rememberModelLoader
 import io.github.sceneview.rememberView
 
-private val atlasCyan = Color(0xFF00F5D4)
-private val atlasViolet = Color(0xFFB026FF)
+private val atlasCyan: Color get() = MeetColors.electricBlue
+private val atlasViolet: Color get() = MeetColors.hotMagenta
 private val atlasAmber = Color(0xFFFFB000)
 private val atlasGlass = Color(0xC9111822)
 

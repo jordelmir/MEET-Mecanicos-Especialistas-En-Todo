@@ -131,7 +131,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                 "pre_purchase",
                 "Inspección Pre-Compra", "Pre-Purchase Check",
                 "Verificación de odómetro y salud general", "Verify odometer & vehicle health",
-                "🛡️", Color(0xFF00E5FF), "meet_perito"
+                "🛡️", MeetColors.secondary, "meet_perito"
             ),
             ProFeature(
                 "meet_dna",
@@ -185,6 +185,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        com.elysium369.meet.ui.components.ElysiumArtworkBackground(automotive = true)
         Scaffold(
             topBar = {
                 EliteTopAppBar(
@@ -200,7 +201,7 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                     backgroundColor = MeetColors.backgroundDark
                 )
             },
-            containerColor = MeetColors.backgroundDark
+            containerColor = Color.Transparent
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -210,30 +211,6 @@ fun ProHubScreen(navController: NavController, viewModel: com.elysium369.meet.ui
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-
-                // ELITE LOGO with pulsating neon glow
-                Image(
-                    painter = painterResource(id = R.drawable.meet_elite_logo),
-                    contentDescription = "Elysium Vanguard AI OS Logo",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(110.dp)
-                        .neonGlow(
-                            color = if (isPro) MeetColors.neonGreen else MeetColors.warning,
-                            minElevation = 8f,
-                            maxElevation = 24f,
-                            minAlpha = 0.25f,
-                            maxAlpha = 0.75f
-                        )
-                        .clip(RoundedCornerShape(16.dp))
-                        .border(
-                            2.dp,
-                            if (isPro) MeetColors.neonGreen else MeetColors.warning,
-                            RoundedCornerShape(16.dp)
-                        )
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
 
                 // Adapter Cryptographic/Integrity Status Card
                 if (!isPro) {

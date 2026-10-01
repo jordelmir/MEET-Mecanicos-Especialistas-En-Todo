@@ -28,9 +28,9 @@ android/
 | Campo | Valor |
 |---|---|
 | **Archivo** | `android/meet-release.jks` |
-| **Store Password** | `Meet2026Elite!` |
+| **Store Password** | `<CONTRASEÑA_PRIVADA_LOCAL>` |
 | **Key Alias** | `meet-key` |
-| **Key Password** | `Meet2026Elite!` |
+| **Key Password** | `<CONTRASEÑA_PRIVADA_LOCAL>` |
 | **Tipo** | PKCS12 / RSA 2048-bit |
 | **Validez** | 16 Mayo 2026 → 01 Oct 2053 (~27 años) |
 | **CN (Propietario)** | `CN=MEET Diagnostics, OU=Elysium369, O=Elysium369, L=Mexico, ST=Mexico, C=MX` |
@@ -40,7 +40,7 @@ android/
 > [!IMPORTANT]
 > **Verificado ✅** (Mayo 2026). Para re-verificar en el futuro:
 > ```bash
-> keytool -list -v -keystore android/meet-release.jks -storepass 'Meet2026Elite!'
+> keytool -list -v -keystore android/meet-release.jks -storepass '<CONTRASEÑA_PRIVADA_LOCAL>'
 > ```
 
 ---
@@ -72,9 +72,9 @@ signingConfigs {
 ```bash
 cd android && ./gradlew clean assembleRelease \
   -PKEYSTORE_PATH=../meet-release.jks \
-  -PKEYSTORE_PASSWORD='Meet2026Elite!' \
+  -PKEYSTORE_PASSWORD='<CONTRASEÑA_PRIVADA_LOCAL>' \
   -PKEY_ALIAS=meet-key \
-  -PKEY_PASSWORD='Meet2026Elite!'
+  -PKEY_PASSWORD='<CONTRASEÑA_PRIVADA_LOCAL>'
 ```
 
 **El APK firmado sale en:**
@@ -87,9 +87,9 @@ android/app/build/outputs/apk/release/app-release.apk
 ```bash
 cd android && ./gradlew clean bundleRelease \
   -PKEYSTORE_PATH=../meet-release.jks \
-  -PKEYSTORE_PASSWORD='Meet2026Elite!' \
+  -PKEYSTORE_PASSWORD='<CONTRASEÑA_PRIVADA_LOCAL>' \
   -PKEY_ALIAS=meet-key \
-  -PKEY_PASSWORD='Meet2026Elite!'
+  -PKEY_PASSWORD='<CONTRASEÑA_PRIVADA_LOCAL>'
 ```
 
 **El AAB firmado sale en:**
@@ -122,8 +122,8 @@ keytool -genkey -v \
   -keyalg RSA \
   -keysize 2048 \
   -validity 10000 \
-  -storepass Meet2026Elite! \
-  -keypass Meet2026Elite! \
+  -storepass <CONTRASEÑA_PRIVADA_LOCAL> \
+  -keypass <CONTRASEÑA_PRIVADA_LOCAL> \
   -dname "CN=MEET App, OU=Elysium369, O=Elysium369, L=San Jose, S=San Jose, C=CR"
 ```
 
@@ -159,7 +159,7 @@ jarsigner -verify releases/MEET-vX.X.X-release.aab
 
 ### Ver el fingerprint SHA-256 del keystore (el que Google Play muestra):
 ```bash
-keytool -list -v -keystore android/meet-release.jks -storepass 'Meet2026Elite!' | grep SHA256
+keytool -list -v -keystore android/meet-release.jks -storepass '<CONTRASEÑA_PRIVADA_LOCAL>' | grep SHA256
 ```
 
 ---
@@ -213,9 +213,9 @@ cd "/Users/jordelmirsdevhome/Downloads/Web Apps/MEET Mecanicos Especialistas En 
 # 3. Build AAB firmado para Google Play
 cd android && ./gradlew clean bundleRelease \
   -PKEYSTORE_PATH=../meet-release.jks \
-  -PKEYSTORE_PASSWORD='Meet2026Elite!' \
+  -PKEYSTORE_PASSWORD='<CONTRASEÑA_PRIVADA_LOCAL>' \
   -PKEY_ALIAS=meet-key \
-  -PKEY_PASSWORD='Meet2026Elite!'
+  -PKEY_PASSWORD='<CONTRASEÑA_PRIVADA_LOCAL>'
 
 # 4. Copiar el AAB a releases
 cp app/build/outputs/bundle/release/app-release.aab \
@@ -224,9 +224,9 @@ cp app/build/outputs/bundle/release/app-release.aab \
 # 5. (Opcional) Build APK para prueba directa en teléfono
 ./gradlew assembleRelease \
   -PKEYSTORE_PATH=../meet-release.jks \
-  -PKEYSTORE_PASSWORD='Meet2026Elite!' \
+  -PKEYSTORE_PASSWORD='<CONTRASEÑA_PRIVADA_LOCAL>' \
   -PKEY_ALIAS=meet-key \
-  -PKEY_PASSWORD='Meet2026Elite!'
+  -PKEY_PASSWORD='<CONTRASEÑA_PRIVADA_LOCAL>'
 
 # 6. Copiar APK
 cp app/build/outputs/apk/release/app-release.apk \
@@ -246,7 +246,7 @@ adb push ../releases/MEET-vX.Y.Z-release.apk /sdcard/Download/
 ### "keystore password was incorrect"
 ```bash
 # Verifica que la contraseña es correcta:
-keytool -list -keystore android/meet-release.jks -storepass 'Meet2026Elite!'
+keytool -list -keystore android/meet-release.jks -storepass '<CONTRASEÑA_PRIVADA_LOCAL>'
 ```
 
 ### "Key was created with errors" / firma inválida

@@ -18,14 +18,16 @@ class CommunicationContinuityContractTest {
         val screen = source("com/elysium369/meet/ui/screens/MessagesScreen.kt")
         assertTrue(recorder.contains("@Singleton"))
         assertTrue(recorder.contains("OperationOwner.APPLICATION_SCOPED"))
-        assertFalse(screen.contains("onDispose") && screen.contains("cancelVoiceNote"))
+        assertFalse(Regex("""onDispose\s*\{[^}]*cancelVoiceNote""").containsMatchIn(screen))
     }
 
     @Test
     fun `typed events and replies are preserved in encrypted ledger`() {
         val repository = source("com/elysium369/meet/communications/ElysiumCommunicationRepository.kt")
-        assertTrue(repository.contains("eventType = \"VOICE_NOTE\""))
+        assertTrue(repository.contains("queueMedia(conversationId, \"AUDIO\""))
         assertTrue(repository.contains("replyToEventId = replyToEventId"))
+        assertTrue(repository.contains("replyToEventId=replyTo"))
+        assertTrue(repository.contains("local=cipher.encrypt(payload,associatedData(conversationId,id,owner.id))"))
         assertTrue(repository.contains("cipher.encrypt("))
     }
 }

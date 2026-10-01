@@ -111,7 +111,19 @@ enum class CaseMilestoneType {
     APPEAL_RECORDED,
 }
 
+enum class PublicGeoDisclosure {
+    COARSE_GRID_25KM_PLUS,
+}
+
+data class SafetyPublicGeoPoint(
+    val centerLatitude: Double,
+    val centerLongitude: Double,
+    val uncertaintyMeters: Int,
+    val disclosure: PublicGeoDisclosure,
+)
+
 enum class GeoDisclosure {
+    COARSE_GRID_25KM_PLUS,
     APPROXIMATE_1000M,
     APPROXIMATE_500M,
     STREET_SEGMENT,

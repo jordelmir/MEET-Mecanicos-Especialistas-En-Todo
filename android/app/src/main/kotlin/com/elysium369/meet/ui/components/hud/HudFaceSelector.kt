@@ -72,8 +72,8 @@ fun HudFaceSelector(
                         else
                             Brush.horizontalGradient(
                                 listOf(
-                                    Color(0xFF111111),
-                                    Color(0xFF0A0A0A)
+                                    MeetColors.cardBackground,
+                                    MeetColors.backgroundDark
                                 )
                             )
                     )

@@ -73,6 +73,7 @@ fun ActiveAndCompletedServicesHubScreen(
     navController: NavController,
     viewModel: ObdViewModel,
     initialTab: Int = 0,
+    includeRides: Boolean = true,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -82,7 +83,8 @@ fun ActiveAndCompletedServicesHubScreen(
     var selectedCategoryFilter by rememberSaveable { mutableStateOf("TODOS") }
 
     // Reactivos de Viajes
-    val userRides by viewModel.rideRequests.collectAsState(initial = emptyList())
+    val allUserRides by viewModel.rideRequests.collectAsState(initial = emptyList())
+    val userRides = if (includeRides) allUserRides else emptyList()
     val activeRideRequest by viewModel.activeRideRequest.collectAsState(initial = null)
     val openRideRequests by viewModel.openRideRequests.collectAsState(initial = emptyList())
     val isDriverMode by viewModel.rideDriverMode.collectAsState(initial = false)
@@ -121,7 +123,7 @@ fun ActiveAndCompletedServicesHubScreen(
                             letterSpacing = 0.5.sp,
                         )
                         Text(
-                            text = if (isProviderMode) "Modo Prestador (Chofer / Repartidor / Comercio)" else "Modo Cliente (Mis Solicitudes y Pedidos)",
+                            text = if (isProviderMode) "Modo Prestador (Profesional / Repartidor / Comercio)" else "Modo Cliente (Mis Solicitudes y Pedidos)",
                             fontSize = 11.sp,
                             color = if (isProviderMode) MeetColors.neonGreen else MeetColors.cyberCyan,
                         )
@@ -134,7 +136,7 @@ fun ActiveAndCompletedServicesHubScreen(
                 },
                 actions = {
                     // Botón para limpiar viajes trabados de emergencia
-                    IconButton(onClick = {
+                    if (includeRides) IconButton(onClick = {
                         viewModel.clearAllStuckRides()
                         Toast.makeText(context, "Viajes pendientes limpiados", Toast.LENGTH_SHORT).show()
                     }) {
@@ -304,7 +306,7 @@ fun ActiveAndCompletedServicesHubScreen(
                         "RIDES" to "🚗 Viajes",
                         "COMMERCE" to "🏪 Pulperías & Sodas",
                         "TECHNICAL" to "🔧 Mecánica & Grúas"
-                    )
+                    ).filter { includeRides || it.first != "RIDES" }
                     items(filterOptions) { (key, label) ->
                         FilterChip(
                             selected = selectedCategoryFilter == key,
@@ -329,8 +331,8 @@ fun ActiveAndCompletedServicesHubScreen(
                         isProviderMode = isProviderMode,
                         filter = selectedCategoryFilter,
                         userRides = userRides,
-                        activeRide = activeRideRequest,
-                        openRides = openRideRequests,
+                        activeRide = if (includeRides) activeRideRequest else null,
+                        openRides = if (includeRides) openRideRequests else emptyList(),
                         serviceRequests = serviceRequests,
                         activeCommerceOrders = activeCommerceOrders,
                         courierMissions = courierMissions,
@@ -446,7 +448,7 @@ fun ActiveAndCompletedServicesHubScreen(
                         fontSize = 14.sp
                     )
                     Text(
-                        "La unidad y el estado del servicio serán liberados de inmediato sin penalización.",
+                        "La cancelación se confirmará con el servidor. Los cargos dependen del estado y de las reglas aplicables.",
                         color = MeetColors.neonGreen,
                         fontSize = 12.sp
                     )
@@ -467,7 +469,7 @@ fun ActiveAndCompletedServicesHubScreen(
                                 actorRole = if (isDriverMode) "DRIVER" else "PASSENGER"
                             )
                         }
-                        Toast.makeText(context, "Viaje cancelado de forma segura.", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Cancelación solicitada; pendiente de confirmación.", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE53935))
                 ) {
@@ -1253,6 +1255,7 @@ private fun ActiveTechnicalServiceCard(
             Text("Requerimiento: ${request.problem}", color = Color.White, fontWeight = FontWeight.Medium, fontSize = 13.sp)
             Text("Ubicación: ${request.location}", color = Color.LightGray, fontSize = 12.sp)
             Spacer(Modifier.height(8.dp))
+            val feeEst = maxOf(1L, (request.priceOffer.toLong() * 500L) / 10000L)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1264,25 +1267,35 @@ private fun ActiveTechnicalServiceCard(
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp
                 )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Text(
+                    "Comisión 5%: ₡${"%,d".format(feeEst)}",
+                    color = Color.LightGray,
+                    fontSize = 11.sp
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (request.latitude != 0.0 && request.longitude != 0.0) {
+                    WazeNavigationButton(
+                        destinationLat = request.latitude,
+                        destinationLng = request.longitude,
+                        destinationLabel = request.problem,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                OutlinedButton(
+                    onClick = onCancel,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252)),
+                    border = BorderStroke(1.dp, Color(0xFFFF5252)),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
-                    if (request.latitude != 0.0 && request.longitude != 0.0) {
-                        WazeNavigationButton(
-                            destinationLat = request.latitude,
-                            destinationLng = request.longitude,
-                            destinationLabel = request.problem
-                        )
-                    }
-                    OutlinedButton(
-                        onClick = onCancel,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFF5252)),
-                        border = BorderStroke(1.dp, Color(0xFFFF5252)),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text("Cancelar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
+                    Text("Cancelar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

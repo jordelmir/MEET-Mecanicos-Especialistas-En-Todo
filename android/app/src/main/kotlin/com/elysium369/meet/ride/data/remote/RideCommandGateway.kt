@@ -209,14 +209,16 @@ class SupabaseRideCommandGateway @Inject constructor() : RideCommandGateway {
                 }
                 val serverVer = data.long("version")
                     ?: rawElement.long("version")
-                    ?: (command.expectedVersion + 1)
+                if(com.elysium369.meet.ride.domain.RideAuthorityEvidence.validVersion(serverVer)==null) {
+                    return RideCommandGatewayResult.Rejected("INVALID_AUTHORITY_RECEIPT","El servidor no devolvió una versión válida; pendiente de reconciliar.",true,null,rawElement.text("correlation_id"))
+                }
                 val finalPrice = data.long("customer_total_minor")
                     ?: data.long("final_fare_minor")
                     ?: rawElement.long("customer_total_minor")
 
                 RideCommandGatewayResult.Accepted(
                     status = status,
-                    serverVersion = serverVer,
+                    serverVersion = requireNotNull(serverVer),
                     finalPriceMinor = finalPrice,
                     correlationId = rawElement.text("correlation_id"),
                     data = data,

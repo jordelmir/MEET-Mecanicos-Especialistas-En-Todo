@@ -5,6 +5,7 @@ DECLARE
     v_policy public.mobility_pricing_policies%ROWTYPE;
     v_active_count BIGINT;
     v_create_request_definition TEXT;
+    v_create_v4_definition TEXT;
 BEGIN
     SELECT count(*)
       INTO v_active_count
@@ -46,8 +47,18 @@ BEGIN
 
     IF v_create_request_definition !~ 'p_distance_rate_minor_per_km[^;]+<> 300'
        OR v_create_request_definition !~ 'p_time_rate_minor_per_minute[^;]+<> 60'
+       OR v_create_request_definition !~ 'v_expected_fare := greatest\([[:space:]]*1000,'
     THEN
         RAISE EXCEPTION 'PRICING_PARITY_RIDE_CREATE_REQUEST_V3_MISMATCH';
+    END IF;
+    IF v_policy.metered_minimum_fare_minor <> 1000 THEN
+        RAISE EXCEPTION 'PRICING_PARITY_METERED_MINIMUM_MISMATCH';
+    END IF;
+    SELECT pg_get_functiondef(
+        'public.ride_create_request_v4(uuid,text,text,double precision,double precision,text,double precision,double precision,text,bigint,text,text,jsonb,text,bigint,bigint,bigint,bigint,bigint,boolean,text,jsonb,text,text)'::regprocedure
+    ) INTO v_create_v4_definition;
+    IF v_create_v4_definition !~ 'v_expected_fare := greatest\(v_raw_fare, v_policy.metered_minimum_fare_minor\)' THEN
+        RAISE EXCEPTION 'PRICING_PARITY_RIDE_CREATE_REQUEST_V4_METERED_MINIMUM_MISMATCH';
     END IF;
 END;
 $$;

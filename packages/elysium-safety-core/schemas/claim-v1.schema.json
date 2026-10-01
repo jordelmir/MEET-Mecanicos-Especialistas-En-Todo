@@ -1,0 +1,12 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"urn:elysium:safety:claim:v1",
+  "type":"object","additionalProperties":false,
+  "required":["claimId","state","serverVersion","methodologyVersion"],
+  "properties":{
+    "claimId":{"type":"string","format":"uuid"},
+    "state":{"enum":["ALLEGED","DOCUMENTED","CORROBORATED","STRONGLY_CORROBORATED","DISPUTED","RETRACTED"]},
+    "serverVersion":{"type":"integer","minimum":1},
+    "methodologyVersion":{"type":"string","minLength":1,"maxLength":80}
+  }
+}

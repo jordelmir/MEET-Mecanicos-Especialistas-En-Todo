@@ -1,6 +1,7 @@
 package com.elysium369.meet
 
 import android.app.Application
+import android.content.Context
 import androidx.work.Configuration
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -16,11 +17,17 @@ import com.elysium369.meet.ride.work.RideCommandSyncWorker
 import com.elysium369.meet.platform.marketos.work.MarketOsSyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
+import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
 @HiltAndroidApp
 class MeetApplication : Application(), Configuration.Provider {
+
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        com.google.android.play.core.splitcompat.SplitCompat.install(this)
+    }
 
     @Inject lateinit var db: MeetDatabase
     @Inject lateinit var workerFactory: HiltWorkerFactory
@@ -36,6 +43,9 @@ class MeetApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        com.elysium.vanguard.recordshield.RecordShieldIdentity.install {
+            com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id
+        }
 
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->

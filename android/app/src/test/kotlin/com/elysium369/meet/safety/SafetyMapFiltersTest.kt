@@ -9,7 +9,7 @@ class SafetyMapFiltersTest {
     private val now = 1_800_000_000_000L
     private fun point() = SafetyPublicPointEntity(
         publicPointId = "public-id", category = "THREAT", displayLatitude = 9.9,
-        displayLongitude = -84.0, geoDisclosure = "APPROXIMATE_1000M", locationAccuracyMeters = 1000,
+        displayLongitude = -84.0, geoDisclosure = "COARSE_GRID_25KM_PLUS", locationAccuracyMeters = 25000,
         label = "Zona pública", claimState = "DOCUMENTED", independentSourceCount = 1,
         civilSourceCount = 1, journalisticSourceCount = 0, publicRecordSourceCount = 0,
         documentarySourceCount = 0, institutionalSourceCount = 0, countryCode = "CR",
@@ -19,6 +19,15 @@ class SafetyMapFiltersTest {
     @Test fun suppressedAndUnknownDisclosureNeverReachPublicMap() {
         val points = listOf(point(), point().copy(geoDisclosure = "SUPPRESSED"), point().copy(geoDisclosure = "NEW_UNKNOWN"))
         assertEquals(listOf(point()), points.filterFor(SafetyMapLayer.ALL, SafetyTimeRange.ALL, now))
+    }
+    @Test fun rejectsLegacyDisclosuresAndInsufficientUncertainty() {
+        val points = listOf(
+            point().copy(geoDisclosure = "APPROXIMATE_1000M"),
+            point().copy(geoDisclosure = "EXACT_PUBLIC_PLACE"),
+            point().copy(locationAccuracyMeters = 24_999),
+            point().copy(locationAccuracyMeters = null),
+        )
+        assertTrue(points.filterFor(SafetyMapLayer.ALL, SafetyTimeRange.ALL, now).isEmpty())
     }
     @Test fun rejectsUnversionedAndMalformedCoordinates() {
         val points = listOf(point().copy(serverVersion = 0), point().copy(displayLatitude = Double.NaN), point().copy(displayLongitude = 181.0))

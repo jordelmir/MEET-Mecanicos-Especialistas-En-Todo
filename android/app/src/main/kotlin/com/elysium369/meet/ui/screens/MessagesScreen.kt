@@ -21,6 +21,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -32,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elysium369.meet.BuildConfig
 import com.elysium369.meet.communications.*
+import com.elysium369.meet.core.agent.ui.*
 import com.elysium369.meet.ui.CommunicationViewModel
 import com.elysium369.meet.ui.theme.MeetColors
 import java.text.DateFormat
@@ -47,11 +50,70 @@ fun MessagesScreen(
     serviceTitle: String? = null,
     viewModel: CommunicationViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(viewModel, lifecycleOwner) {
+        lifecycleOwner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+            while (true) {
+                viewModel.refreshNearby()
+                viewModel.refreshOnline()
+                kotlinx.coroutines.delay(10_000)
+            }
+        }
+    }
+    DisposableEffect(viewModel,lifecycleOwner) {
+        val observer=androidx.lifecycle.LifecycleEventObserver { _,event ->
+            if(event==androidx.lifecycle.Lifecycle.Event.ON_STOP) viewModel.stopNearby()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer);viewModel.stopNearby() }
+    }
+    val nearbyStatus by viewModel.nearbyStatus.collectAsStateWithLifecycle()
+    val nearbyPeers by viewModel.nearbyPeers.collectAsStateWithLifecycle()
+    val nearbyInvitations by viewModel.nearbyInvitations.collectAsStateWithLifecycle()
+    val nearbyPermissions=remember {
+        buildList {
+            if(android.os.Build.VERSION.SDK_INT>=31) {
+                add(Manifest.permission.BLUETOOTH_SCAN);add(Manifest.permission.BLUETOOTH_CONNECT);add(Manifest.permission.BLUETOOTH_ADVERTISE)
+            }
+            if(android.os.Build.VERSION.SDK_INT>=33) add(Manifest.permission.NEARBY_WIFI_DEVICES)
+            else { add(Manifest.permission.ACCESS_COARSE_LOCATION);add(Manifest.permission.ACCESS_FINE_LOCATION) }
+            if(android.os.Build.VERSION.SDK_INT>=37) add("android.permission.ACCESS_LOCAL_NETWORK")
+        }.toTypedArray()
+    }
+    val nearbyPermissionLauncher=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        if(nearbyPermissions.all { result[it]==true || ContextCompat.checkSelfPermission(context,it)==PackageManager.PERMISSION_GRANTED }) viewModel.startNearby()
+        else viewModel.nearbyPermissionDenied()
+    }
+    val onlineStatus by viewModel.onlineStatus.collectAsStateWithLifecycle()
+    val pairingQr by viewModel.pairingQr.collectAsStateWithLifecycle()
+    var scanningQr by remember { mutableStateOf(false) }
+    if (scanningQr) {
+        com.elysium369.meet.core.share.QrScannerOverlay(
+            onResult = { scanningQr = false; viewModel.scanPairingQr(it) },
+            onDismiss = { scanningQr = false },
+        )
+    }
+    pairingQr?.let { value ->
+        val bitmap = remember(value) { com.elysium369.meet.core.share.QrCodeSharing.generateQrBitmap(value) }
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPairingQr,
+            title = { Text("Conectar en persona") },
+            text = { Column {
+                Text("Muéstralo solo a la persona que quieres conectar. Vence en 5 minutos y se usa una vez.")
+                bitmap?.let { androidx.compose.foundation.Image(it.asImageBitmap(), "QR para conectar", Modifier.fillMaxWidth().aspectRatio(1f)) }
+            } },
+            confirmButton = { TextButton(viewModel::dismissPairingQr) { Text("Cerrar") } },
+        )
+    }
     val conversations by viewModel.conversations.collectAsStateWithLifecycle()
     val selected by viewModel.selectedConversation.collectAsStateWithLifecycle()
     val messages by viewModel.messages.collectAsStateWithLifecycle()
     val notice by viewModel.notice.collectAsStateWithLifecycle()
+    val speakerEnabled by viewModel.speakerEnabled.collectAsStateWithLifecycle()
     val callState by viewModel.callState.collectAsStateWithLifecycle()
+    val incomingCall by viewModel.incomingCall.collectAsStateWithLifecycle()
+    var answeringCall by remember { mutableStateOf(false) }
     val identity by viewModel.identity.collectAsStateWithLifecycle()
     val privacy by viewModel.privacy.collectAsStateWithLifecycle()
     val contacts by viewModel.contacts.collectAsStateWithLifecycle()
@@ -60,7 +122,6 @@ fun MessagesScreen(
     val searching by viewModel.searchInProgress.collectAsStateWithLifecycle()
     val voiceNoteState by viewModel.voiceNoteState.collectAsStateWithLifecycle()
     var pane by remember { mutableStateOf(MessagesPane.INBOX) }
-    val context = LocalContext.current
 
     val invite = {
         val send = Intent(Intent.ACTION_SEND).apply {
@@ -72,13 +133,19 @@ fun MessagesScreen(
         }
         context.startActivity(Intent.createChooser(send, "Invitar a Elysium"))
     }
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if(uri!=null) viewModel.sendImage(uri)
+    }
+    val attachImage: () -> Unit = { if(viewModel.beginImageSelection()) imagePicker.launch("image/*") }
+
     val microphone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) viewModel.startCall() else viewModel.microphonePermissionDenied()
+        if (granted) { if(answeringCall) viewModel.answerCall(true) else viewModel.startCall() } else viewModel.microphonePermissionDenied()
     }
     val voiceMicrophone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) viewModel.startVoiceNote() else viewModel.microphonePermissionDenied()
     }
     val startCall = {
+        answeringCall=false
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             viewModel.startCall()
         } else microphone.launch(Manifest.permission.RECORD_AUDIO)
@@ -116,9 +183,39 @@ fun MessagesScreen(
                 onSearch = if (selected == null && pane != MessagesPane.DISCOVER) ({ pane = MessagesPane.DISCOVER }) else null,
                 onSettings = if (selected == null && pane != MessagesPane.SETTINGS) ({ pane = MessagesPane.SETTINGS }) else null,
                 onCall = selected?.let { startCall },
-                onEndCall = if (callState == CallConnectionState.ACTIVE || callState == CallConnectionState.CONNECTING) viewModel::endCall else null,
+                onEndCall = if (callState in setOf(CallConnectionState.ACTIVE,CallConnectionState.CONNECTING,CallConnectionState.RINGING)) viewModel::endCall else null,
             )
+            Text(onlineStatus, color = MeetColors.textSecondary, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 16.dp))
             notice?.let { HonestBanner(it) }
+            if(incomingCall!=null) {
+                HonestBanner("Llamada de voz entrante")
+                Row(Modifier.fillMaxWidth().padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    val acceptCall = {
+                        answeringCall=true
+                        if(ContextCompat.checkSelfPermission(context,Manifest.permission.RECORD_AUDIO)==PackageManager.PERMISSION_GRANTED) viewModel.answerCall(true)
+                        else microphone.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                    Button(acceptCall,Modifier.weight(1f).messageAction("accept_call", "Aceptar llamada", action=acceptCall)) { Text("Aceptar llamada") }
+                    OutlinedButton({ viewModel.answerCall(false) },Modifier.weight(1f).messageAction("reject_call", "Rechazar llamada", action={ viewModel.answerCall(false) })) { Text("Rechazar llamada") }
+                }
+            }
+            if(callState in setOf(CallConnectionState.RINGING,CallConnectionState.CONNECTING,CallConnectionState.ACTIVE)) {
+                OutlinedButton({ viewModel.setSpeakerEnabled(!speakerEnabled) }, enabled = callState == CallConnectionState.ACTIVE) {
+                    Text(if(speakerEnabled) "Altavoz activado · cambiar a auricular" else "Auricular · activar altavoz")
+                }
+                HonestBanner(when(callState) { CallConnectionState.ACTIVE -> "Audio conectado";CallConnectionState.RINGING -> "Llamando · esperando respuesta";else -> "Conectando audio" })
+            }
+
+            if (callState == CallConnectionState.FAILED) {
+                HonestBanner("No se pudo conectar el audio. La llamada terminó; puedes volver a intentarlo.")
+            }
+
+            if (selected?.canRespondToRequest == true) {
+                Row(Modifier.fillMaxWidth().padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Button({ viewModel.respondToRequest(true) },Modifier.weight(1f).messageAction("request.accept", "Aceptar conversación") { viewModel.respondToRequest(true) }) { Text("Aceptar conversación") }
+                    OutlinedButton({ viewModel.respondToRequest(false) },Modifier.weight(1f).messageAction("request.reject", "Rechazar") { viewModel.respondToRequest(false) }) { Text("Rechazar") }
+                }
+            }
             when {
                 selected != null -> ConversationBody(
                     conversation = selected!!,
@@ -128,12 +225,20 @@ fun MessagesScreen(
                     onStartVoice = startVoiceNote,
                     onStopVoice = viewModel::stopAndSendVoiceNote,
                     onCancelVoice = viewModel::cancelVoiceNote,
+                    onImage = attachImage,
                 )
                 pane == MessagesPane.INBOX -> Inbox(conversations, contacts, serviceVertical, { viewModel.selectConversation(it.id) }) { pane = it }
-                pane == MessagesPane.DISCOVER -> DiscoverPane(searchOutcome, searching, viewModel::searchContact, viewModel::requestContact, invite)
-                pane == MessagesPane.CONTACTS -> ContactsPane(contacts, viewModel::block, invite)
+                pane == MessagesPane.DISCOVER -> DiscoverPane(searchOutcome, searching, viewModel::searchContact, viewModel::requestContact, invite, viewModel::createPairingQr, { scanningQr = true })
+                pane == MessagesPane.CONTACTS -> ContactsPane(contacts, viewModel::openContact, viewModel::block, invite)
                 pane == MessagesPane.CALLS -> CallsPane(conversations) { viewModel.selectConversation(it.id) }
-                pane == MessagesPane.MESH -> MeshPane(privacy, viewModel::savePrivacy)
+                pane == MessagesPane.MESH -> MeshPane(privacy, viewModel::savePrivacy,nearbyStatus,nearbyPeers,nearbyInvitations,
+                    { nearbyPermissionLauncher.launch(nearbyPermissions) },viewModel::stopNearby,viewModel::connectNearby,viewModel::answerNearby,
+                    onNativeMesh = {
+                        identity?.principalId?.takeIf { it.isNotBlank() }?.let { owner ->
+                            context.startActivity(Intent(context, com.elysium369.meet.core.mesh.MeshActivity::class.java)
+                                .putExtra(com.elysium369.meet.core.mesh.MeshActivity.EXTRA_OWNER, owner))
+                        } ?: android.widget.Toast.makeText(context, "Identidad de cuenta pendiente; vuelve a iniciar sesión", android.widget.Toast.LENGTH_SHORT).show()
+                    })
                 pane == MessagesPane.SETTINGS -> SettingsPane(identity, privacy, viewModel::saveIdentity, viewModel::savePrivacy) { pane = MessagesPane.BLOCKED }
                 pane == MessagesPane.BLOCKED -> BlockedPane(blocked, viewModel::unblock)
             }
@@ -162,7 +267,7 @@ private fun MessagesHeader(
     onEndCall: (() -> Unit)?,
 ) {
     Row(Modifier.fillMaxWidth().background(MeetColors.cardBackground).padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Volver", tint = Color.White) }
+        IconButton(onClick = onBack, modifier = Modifier.messageAction("back", "Volver", action = onBack)) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Volver", tint = Color.White) }
         Box(Modifier.size(38.dp).background(MeetColors.cyberCyan.copy(alpha = .14f), CircleShape), contentAlignment = Alignment.Center) {
             Icon(Icons.Outlined.ChatBubbleOutline, null, tint = MeetColors.cyberCyan)
         }
@@ -170,8 +275,8 @@ private fun MessagesHeader(
             Text(title, color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp, maxLines = 1)
             Text(subtitle, color = MeetColors.textSecondary, fontSize = 10.sp, maxLines = 1)
         }
-        onSearch?.let { IconButton(onClick = it) { Icon(Icons.Outlined.Search, "Buscar", tint = Color.White) } }
-        onSettings?.let { IconButton(onClick = it) { Icon(Icons.Outlined.Settings, "Ajustes", tint = Color.White) } }
+        onSearch?.let { IconButton(onClick = it, modifier = Modifier.messageAction("open_search", "Buscar", aliases = setOf("encontrar personas"), action = it)) { Icon(Icons.Outlined.Search, "Buscar", tint = Color.White) } }
+        onSettings?.let { IconButton(onClick = it, modifier = Modifier.messageAction("settings", "Ajustes", aliases = setOf("privacidad y cuenta"), action = it)) { Icon(Icons.Outlined.Settings, "Ajustes", tint = Color.White) } }
         if (onEndCall != null) IconButton(onClick = onEndCall) { Icon(Icons.Outlined.CallEnd, "Finalizar", tint = MeetColors.error) }
         else onCall?.let { IconButton(onClick = it) { Icon(Icons.Outlined.Call, "Llamar", tint = MeetColors.neonGreen) } }
     }
@@ -219,6 +324,8 @@ private fun DiscoverPane(
     onSearch: (String) -> Unit,
     onRequest: (ContactSearchResult) -> Unit,
     onInvite: () -> Unit,
+    onShowQr: () -> Unit,
+    onScanQr: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -230,7 +337,8 @@ private fun DiscoverPane(
             OutlinedTextField(
                 query,
                 { query = it.take(320) },
-                Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth().agentTextInput(AgentUiControlId("messages.discover.query"), "Buscar persona", AgentTextFieldRole.SEARCH,
+                    readValue = { query }, writeValue = { query = it.take(320) }, commit = { if (query.isNotBlank() && !searching) onSearch(query) }),
                 leadingIcon = { Icon(Icons.Outlined.Search, null) },
                 placeholder = { Text("@ID Elysium, correo o teléfono") },
                 supportingText = { Text("Teléfono opcional. Nunca se usa para SMS.") },
@@ -238,7 +346,7 @@ private fun DiscoverPane(
             )
         }
         item {
-            Button({ onSearch(query) }, Modifier.fillMaxWidth(), enabled = query.isNotBlank() && !searching) {
+            Button({ onSearch(query) }, Modifier.fillMaxWidth().messageAction("search", "Buscar de forma exacta", enabled = query.isNotBlank() && !searching) { onSearch(query) }, enabled = query.isNotBlank() && !searching) {
                 if (searching) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Outlined.Search, null)
                 Text(if (searching) "Buscando…" else "Buscar de forma exacta", Modifier.padding(start = 8.dp))
             }
@@ -254,11 +362,12 @@ private fun DiscoverPane(
         }
         item { SectionTitle("Emparejar sin revelar tu libreta", "en persona") }
         item {
-            PairingMethod(Icons.Outlined.QrCode2, "Código QR Elysium", "Tarjeta de identidad firmada y palabras de seguridad.")
+            Button(onShowQr, Modifier.fillMaxWidth().messageAction("show_qr", "Mostrar mi QR para conectar", aliases = setOf("mostrar mi QR", "mi QR"), action = onShowQr)) { Text("Mostrar mi QR para conectar") }
+            OutlinedButton(onScanQr, Modifier.fillMaxWidth().messageAction("scan_qr", "Abrir cámara y escanear QR", aliases = setOf("escanear QR", "abrir cámara"), action = onScanQr)) { Text("Abrir cámara y escanear QR") }
             Spacer(Modifier.height(8.dp))
             PairingMethod(Icons.Outlined.WifiTethering, "Encuentro cercano", "Sin anunciar correo ni teléfono; aprobación mutua.")
         }
-        item { Text("El escáner y la transferencia Mesh se habilitarán cuando el transporte criptográfico pase verificación física; aquí no se simula un envío.", color = MeetColors.warning, fontSize = 10.sp) }
+        item { Text("El QR requiere conexión al servidor. Mesh sin internet sigue pendiente de verificación física; no equivale al chat en línea.", color = MeetColors.warning, fontSize = 10.sp) }
     }
 }
 
@@ -295,7 +404,7 @@ private fun NotFoundCard(onInvite: () -> Unit) {
 }
 
 @Composable
-private fun ContactsPane(contacts: List<ElysiumContact>, onBlock: (ElysiumContact) -> Unit, onInvite: () -> Unit) {
+private fun ContactsPane(contacts: List<ElysiumContact>, onOpen:(ElysiumContact)->Unit, onBlock: (ElysiumContact) -> Unit, onInvite: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { OutlinedButton(onInvite, Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Share, null); Text("Invitar a Elysium", Modifier.padding(start = 6.dp)) } }
         if (contacts.isEmpty()) item { EmptyPanel("No hay contactos todavía. Busca a alguien o comparte el enlace oficial.") }
@@ -306,6 +415,7 @@ private fun ContactsPane(contacts: List<ElysiumContact>, onBlock: (ElysiumContac
                     Text(contact.displayName, color = Color.White, fontWeight = FontWeight.Bold)
                     Text(contact.elysiumId?.let { "@$it · ${contact.relationshipState.lowercase()}" } ?: contact.relationshipState.lowercase(), color = MeetColors.textSecondary, fontSize = 11.sp)
                 }
+                if(!contact.isBlocked) IconButton({ onOpen(contact) }) { Icon(Icons.Outlined.Chat,"Abrir conversación",tint=MeetColors.cyberCyan) }
                 if (!contact.isBlocked) IconButton({ onBlock(contact) }) { Icon(Icons.Outlined.Block, "Bloquear", tint = MeetColors.warning) }
             }
         }
@@ -323,19 +433,44 @@ private fun CallsPane(conversations: List<ConversationSummary>, onOpen: (Convers
 }
 
 @Composable
-private fun MeshPane(privacy: CommunicationPrivacySettings, onSave: (CommunicationPrivacySettings) -> Unit) {
+private fun MeshPane(privacy: CommunicationPrivacySettings, onSave: (CommunicationPrivacySettings) -> Unit,
+    status:String, peers:List<NearbyPeer>, invitations:List<NearbyInvitation>,onStart:()->Unit,onStop:()->Unit,
+    onConnect:(String)->Unit,onAnswer:(String,Boolean)->Unit, onNativeMesh: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
             Column(Modifier.fillMaxWidth().background(MeetColors.cyberCyan.copy(alpha = .08f), RoundedCornerShape(20.dp)).border(1.dp, MeetColors.cyberCyan.copy(alpha = .3f), RoundedCornerShape(20.dp)).padding(16.dp)) {
                 Icon(Icons.Outlined.WifiTethering, null, tint = MeetColors.cyberCyan, modifier = Modifier.size(42.dp))
                 Text("Vanguard Mesh", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Black)
-                Text("Descubrimiento cercano, entrega directa y store-carry-forward sin Internet. Participación siempre voluntaria.", color = MeetColors.textSecondary, fontSize = 12.sp)
+                Text("Conexión cercana mediante Nearby. Participación voluntaria.", color = MeetColors.textSecondary, fontSize = 12.sp)
             }
+        }
+        item {
+            Text(status,color=MeetColors.cyberCyan)
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Button(onStart,Modifier.weight(1f).messageAction("nearby.start", "Buscar teléfonos", action = onStart)) { Text("Buscar teléfonos") }
+                OutlinedButton(onStop,Modifier.weight(1f).messageAction("nearby.stop", "Desconectar", action = onStop)) { Text("Desconectar") }
+            }
+            Text("Ambos teléfonos deben aceptar el mismo código. Solo se intercambian mensajes de contactos autorizados con claves sincronizadas en las últimas 24 horas.",color=MeetColors.textSecondary,fontSize=11.sp)
+        }
+        items(invitations,key={ "invite:"+it.id }) { invitation ->
+            Column(Modifier.fillMaxWidth().padding(8.dp)) {
+                Text("${invitation.name} · código ${invitation.code}",color=Color.White)
+                Text("Comprueba que el otro teléfono muestra el mismo código antes de aceptar.",color=MeetColors.warning,fontSize=11.sp)
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                    Button({ onAnswer(invitation.id,true) }) { Text("Código coincide") }
+                    OutlinedButton({ onAnswer(invitation.id,false) }) { Text("Rechazar") }
+                }
+            }
+        }
+        items(peers,key={ "peer:"+it.id }) { peer ->
+            OutlinedButton({ onConnect(peer.id) },Modifier.fillMaxWidth()) { Text("Conectar con ${peer.name}") }
         }
         item { ToggleRow("Visible para solicitudes cercanas", "No anuncia correo ni teléfono.", privacy.meshDiscoverability != "OFF") { onSave(privacy.copy(meshDiscoverability = if (it) "NEARBY_REQUESTS" else "OFF")) } }
         item { ToggleRow("Ayudar como relevo cifrado", "El relevo no puede leer el contenido.", privacy.relayParticipation != "OFF") { onSave(privacy.copy(relayParticipation = if (it) "CONTACTS_ONLY" else "OFF")) } }
         item { ToggleRow("Relevar solo mientras carga", "Reduce el impacto en batería.", privacy.relayOnlyWhileCharging) { onSave(privacy.copy(relayOnlyWhileCharging = it)) } }
-        item { HonestBanner("Preferencias persistidas. BLE/Wi‑Fi y voz local todavía requieren verificación física antes de declararse operativos.") }
+        item { HonestBanner("El enlace directo usa radios del teléfono. La entrega solo se confirma con un acuse firmado; voz y retransmisión por varios saltos siguen pendientes.") }
+        item { OutlinedButton(onNativeMesh, Modifier.fillMaxWidth()) { Text("Abrir Mesh nativo · BLE / Wi-Fi / LAN") } }
+        item { Text("Capas nativas disponibles para descubrimiento; transferencia bloqueada hasta revisar criptografía\n\n• BLE: controles pequeños\n• Wi-Fi Aware/Direct y LAN: sockets acotados\n• Room: custodia, replay, chunks y expiración\n• Pruebas físicas y revisión E2EE pendientes", color = MeetColors.textSecondary, fontSize = 12.sp) }
         item { Text("Capas previstas\n\n• BLE: descubrimiento y señalización\n• Wi‑Fi Aware/Direct: datos y voz local\n• Custodia cifrada con TTL y límite de saltos\n• Reconciliación al recuperar Internet", color = MeetColors.textSecondary, fontSize = 12.sp) }
     }
 }
@@ -404,10 +539,13 @@ private fun ConversationBody(
     onStartVoice: () -> Unit,
     onStopVoice: (String?) -> Unit,
     onCancelVoice: () -> Unit,
+    onImage: () -> Unit,
 ) {
     var text by rememberSaveable(conversation.id) { mutableStateOf("") }
     var search by rememberSaveable(conversation.id) { mutableStateOf("") }
     var replyToEventId by rememberSaveable(conversation.id) { mutableStateOf<String?>(null) }
+    val playback=remember(conversation.id) { CommunicationVoicePlayback() }
+    DisposableEffect(playback) { onDispose { playback.close() } }
     val visibleMessages = remember(messages, search) {
         if (search.isBlank()) messages else messages.filter { it.body.contains(search.trim(), ignoreCase = true) }
     }
@@ -416,12 +554,12 @@ private fun ConversationBody(
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().background(MeetColors.cyberCyan.copy(alpha = .08f)).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Lock, null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
-            Text(if ((conversation.participantCount ?: 0) < 2) "Esperando participante autorizado · envío bloqueado" else "Cifrado local activo · transporte remoto sujeto a configuración", color = MeetColors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
+            Text(if ((conversation.participantCount ?: 0) < 2) "Esperando participante autorizado · envío bloqueado" else "Mensajes cifrados · consulta la confirmación de entrega en cada mensaje", color = MeetColors.textSecondary, fontSize = 11.sp, modifier = Modifier.padding(start = 8.dp))
         }
         OutlinedTextField(
             value = search,
             onValueChange = { search = it.take(160) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 4.dp).agentTextInput(AgentUiControlId("messages.search.${conversation.id}"), "Buscar en esta conversación", AgentTextFieldRole.SEARCH, readValue={search}, writeValue={search=it.take(160)}),
             leadingIcon = { Icon(Icons.Outlined.Search, null) },
             placeholder = { Text("Buscar en esta conversación") },
             singleLine = true,
@@ -429,7 +567,7 @@ private fun ConversationBody(
         LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Spacer(Modifier.height(4.dp)) }
             items(visibleMessages, key = { it.id }) { message ->
-                MessageBubble(message) { replyToEventId = message.id }
+                MessageBubble(message,playback::play) { replyToEventId = message.id }
             }
             if (messages.isEmpty()) item { EmptyPanel("Escribe cuando la otra persona esté autorizada.") }
             else if (visibleMessages.isEmpty()) item { EmptyPanel("No hay mensajes que coincidan con la búsqueda.") }
@@ -443,58 +581,81 @@ private fun ConversationBody(
         }
         Row(Modifier.fillMaxWidth().background(MeetColors.cardBackground).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             if (recordingThisConversation) {
-                IconButton({ onStopVoice(replyToEventId); replyToEventId = null }) {
+                IconButton({ onStopVoice(replyToEventId); replyToEventId = null }, Modifier.messageAction("stop_voice", "Detener y guardar nota", action={onStopVoice(replyToEventId);replyToEventId=null})) {
                     Icon(Icons.Outlined.StopCircle, "Detener y guardar nota", tint = MeetColors.error)
                 }
-                IconButton(onCancelVoice) { Icon(Icons.Outlined.Delete, "Descartar nota", tint = MeetColors.warning) }
+                IconButton(onCancelVoice,Modifier.messageAction("discard_voice", "Descartar nota", action=onCancelVoice)) { Icon(Icons.Outlined.Delete, "Descartar nota", tint = MeetColors.warning) }
             } else {
-                IconButton(onStartVoice) { Icon(Icons.Outlined.Mic, "Grabar nota de voz", tint = MeetColors.neonGreen) }
+                IconButton(onStartVoice,Modifier.messageAction("record_voice", "Grabar nota de voz", action=onStartVoice)) { Icon(Icons.Outlined.Mic, "Grabar nota de voz", tint = MeetColors.neonGreen) }
             }
-            OutlinedTextField(text, { text = it.take(4000) }, Modifier.weight(1f), placeholder = { Text("Escribe un mensaje") }, maxLines = 4)
-            IconButton({
+            OutlinedTextField(text, { text = it.take(4000) }, Modifier.weight(1f).agentTextInput(
+                AgentUiControlId("messages.compose.${conversation.id}"), "Mensaje", AgentTextFieldRole.MESSAGE,
+                readValue = { text }, writeValue = { text = it.take(4000) }, sensitivity = AgentUiSensitivity.PERSONAL),
+                placeholder = { Text("Escribe un mensaje") }, maxLines = 4)
+            val send = {
                 onSend(text, replyToEventId) {
                     text = ""
                     replyToEventId = null
                 }
-            }, enabled = text.isNotBlank() && !recordingThisConversation) { Icon(Icons.Outlined.Send, "Enviar", tint = MeetColors.cyberCyan) }
+            }
+            val canSend = text.isNotBlank() && !recordingThisConversation && conversation.requestState == MessageRequestState.ACCEPTED && (conversation.participantCount ?: 0) >= 2
+            IconButton(onImage, enabled = conversation.requestState == MessageRequestState.ACCEPTED && !recordingThisConversation,
+                modifier = Modifier.messageAction("image.${conversation.id}", "Adjuntar imagen", enabled = conversation.requestState == MessageRequestState.ACCEPTED && !recordingThisConversation, action = onImage)) {
+                Icon(Icons.Outlined.AddPhotoAlternate, "Adjuntar imagen", tint = MeetColors.cyberCyan)
+            }
+            IconButton(send, modifier = Modifier.messageAction("send.${conversation.id}", "Enviar", enabled = canSend, action = send), enabled = canSend) { Icon(Icons.Outlined.Send, "Enviar", tint = MeetColors.cyberCyan) }
         }
     }
 }
 
 @Composable
-private fun MessageBubble(message: DecryptedMessage, onReply: () -> Unit) {
+private fun MessageBubble(message: DecryptedMessage, onPlayVoice:(String)->Unit, onReply: () -> Unit) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.isMine) Arrangement.End else Arrangement.Start) {
         Column(Modifier.fillMaxWidth(.82f).background(if (message.isMine) MeetColors.electricBlue.copy(alpha = .28f) else MeetColors.cardBackground, RoundedCornerShape(16.dp)).padding(12.dp)) {
             message.replyToEventId?.let { Text("↪ Respuesta", color = MeetColors.cyberCyan, fontSize = 9.sp) }
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (message.eventType == "VOICE_NOTE" && message.localMediaPath != null) {
-                    IconButton({ playVoiceNote(message.localMediaPath) }) {
+                if (message.eventType in setOf("VOICE_NOTE","AUDIO") && message.localMediaPath != null) {
+                    IconButton({ onPlayVoice(message.localMediaPath) }) {
                         Icon(Icons.Outlined.PlayCircle, "Reproducir nota de voz", tint = MeetColors.neonGreen)
                     }
                 }
                 Text(message.body, color = if (message.decryptionFailed) MeetColors.warning else Color.White, modifier = Modifier.weight(1f))
                 IconButton(onReply) { Icon(Icons.Outlined.Reply, "Responder", tint = MeetColors.cyberCyan) }
             }
-            Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(message.createdAtEpochMs)) + " · " + message.deliveryState, color = MeetColors.textSecondary, fontSize = 9.sp, modifier = Modifier.align(Alignment.End).padding(top = 4.dp))
+            if(message.eventType == "IMAGE" && message.localMediaPath != null && !message.decryptionFailed) {
+                coil.compose.AsyncImage(model = java.io.File(message.localMediaPath), contentDescription = "Imagen adjunta", modifier = Modifier.fillMaxWidth().heightIn(max = 260.dp))
+            }
+            Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(message.createdAtEpochMs)) + " · " + when(message.deliveryState) {
+                "SERVER_ACK" -> "Confirmado por servidor"
+                "NEARBY_ACK" -> "Recibido por otro teléfono"
+                "NEARBY_RECEIVED" -> "Recibido por enlace cercano"
+                "REMOTE_UNREADABLE" -> "Sin clave válida en este dispositivo"
+                "PENDING_REMOTE" -> "Pendiente de envío"
+                else -> "Solo en este dispositivo"
+            }, color = MeetColors.textSecondary, fontSize = 9.sp, modifier = Modifier.align(Alignment.End).padding(top = 4.dp))
         }
     }
 }
 
-private fun playVoiceNote(path: String) {
-    runCatching {
-        android.media.MediaPlayer().apply {
-            setDataSource(path)
-            setOnCompletionListener { it.release() }
-            setOnErrorListener { player, _, _ -> player.release(); true }
-            prepare()
-            start()
-        }
+private class CommunicationVoicePlayback {
+    private var current:android.media.MediaPlayer?=null
+    fun close() { runCatching { current?.release() };current=null }
+    fun play(path:String) {
+        close()
+        runCatching {
+            val player=android.media.MediaPlayer();current=player
+            player.setDataSource(path)
+            player.setOnCompletionListener { if(current===it) current=null;it.release() }
+            player.setOnErrorListener { failed,_,_ -> if(current===failed) current=null;failed.release();true }
+            player.setOnPreparedListener { if(current===it) it.start() }
+            player.prepareAsync()
+        }.onFailure { close() }
     }
 }
 
 @Composable
 private fun ConversationRow(row: ConversationSummary, onClick: () -> Unit) {
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).background(MeetColors.cardBackground, RoundedCornerShape(16.dp)).border(1.dp, MeetColors.cyberCyan.copy(alpha = .18f), RoundedCornerShape(16.dp)).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().messageAction("conversation.${row.id}", row.title, aliases = setOf("abrir conversación con ${row.title}"), action = onClick).clickable(onClick = onClick).background(MeetColors.cardBackground, RoundedCornerShape(16.dp)).border(1.dp, MeetColors.cyberCyan.copy(alpha = .18f), RoundedCornerShape(16.dp)).padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
         ContactAvatar(row.title)
         Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
             Text(row.title, color = Color.White, fontWeight = FontWeight.Bold)
@@ -511,16 +672,19 @@ private fun ConversationRow(row: ConversationSummary, onClick: () -> Unit) {
 }
 
 @Composable private fun PrimaryAction(label: String, icon: ImageVector, modifier: Modifier, onClick: () -> Unit) {
-    Button(onClick, modifier.height(48.dp)) { Icon(icon, null); Text(label, Modifier.padding(start = 6.dp), maxLines = 1, fontSize = 12.sp) }
+    Button(onClick, modifier.height(48.dp).messageAction("primary.$label", label, action = onClick)) { Icon(icon, null); Text(label, Modifier.padding(start = 6.dp), maxLines = 1, fontSize = 12.sp) }
 }
 
 @Composable private fun CompactAction(label: String, icon: ImageVector, detail: String, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.clickable(onClick = onClick).background(MeetColors.cardBackground, RoundedCornerShape(15.dp)).padding(11.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.messageAction("pane.$label", label, action = onClick).clickable(onClick = onClick).background(MeetColors.cardBackground, RoundedCornerShape(15.dp)).padding(11.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(icon, null, tint = MeetColors.cyberCyan)
         Text(label, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 5.dp))
         Text(detail, color = MeetColors.textSecondary, fontSize = 8.sp, maxLines = 1)
     }
 }
+
+private fun Modifier.messageAction(id: String, label: String, aliases: Set<String> = emptySet(), enabled: Boolean = true, action: () -> Unit): Modifier =
+    agentAction(AgentUiControlId("messages.$id"), label, aliases = aliases, route = "messages", enabled = enabled, onActivate = action)
 
 @Composable private fun PairingMethod(icon: ImageVector, title: String, detail: String) {
     Row(Modifier.fillMaxWidth().background(MeetColors.cardBackground, RoundedCornerShape(15.dp)).padding(13.dp), verticalAlignment = Alignment.CenterVertically) {

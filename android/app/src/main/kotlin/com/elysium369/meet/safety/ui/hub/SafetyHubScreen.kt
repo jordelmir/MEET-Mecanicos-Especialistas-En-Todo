@@ -78,7 +78,7 @@ fun SafetyHubScreen(
                             stringResource(R.string.safety_map_vanguard_title),
                             fontWeight = FontWeight.Black,
                             fontSize = 17.sp,
-                            color = Color.White,
+                            color = MeetColors.textPrimary,
                         )
                         Text(
                             stringResource(R.string.safety_hub_subtitle),
@@ -92,7 +92,7 @@ fun SafetyHubScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.safety_back),
-                            tint = Color.White,
+                            tint = MeetColors.textPrimary,
                         )
                     }
                 },
@@ -153,7 +153,7 @@ fun SafetyHubScreen(
                                 Spacer(Modifier.height(4.dp))
                                 Text(
                                     stringResource(R.string.safety_hub_global_center_desc),
-                                    color = Color.White,
+                                    color = MeetColors.textPrimary,
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -243,7 +243,7 @@ fun SafetyHubScreen(
                     title = stringResource(R.string.safety_my_reports_title),
                     subtitle = stringResource(R.string.safety_hub_card_my_reports_desc),
                     icon = Icons.Filled.Assignment,
-                    iconColor = Color(0xFF00BCD4),
+                    iconColor = MeetColors.electricBlue,
                     onClick = {
                         SafetyHaptics.selectionTick(view)
                         onNavigateToMyReports()
@@ -256,7 +256,7 @@ fun SafetyHubScreen(
                     title = stringResource(R.string.safety_hub_card_cases),
                     subtitle = stringResource(R.string.safety_hub_card_cases_desc),
                     icon = Icons.Filled.FolderOpen,
-                    iconColor = Color(0xFFFFD600),
+                    iconColor = MeetColors.cyberCyan,
                     onClick = {
                         SafetyHaptics.selectionTick(view)
                         onNavigateToCases()
@@ -270,7 +270,7 @@ fun SafetyHubScreen(
                     title = stringResource(R.string.safety_hub_card_timelines),
                     subtitle = stringResource(R.string.safety_hub_card_timelines_desc),
                     icon = Icons.Filled.Timeline,
-                    iconColor = Color(0xFFFF8C00),
+                    iconColor = MeetColors.hotMagenta,
                     onClick = {
                         SafetyHaptics.selectionTick(view)
                         onNavigateToTimelines()
@@ -284,7 +284,7 @@ fun SafetyHubScreen(
                     title = stringResource(R.string.safety_hub_card_accountability),
                     subtitle = stringResource(R.string.safety_hub_card_accountability_desc),
                     icon = Icons.Filled.AccountBalance,
-                    iconColor = Color(0xFF4CAF50),
+                    iconColor = MeetColors.neonGreen,
                     onClick = {
                         SafetyHaptics.selectionTick(view)
                         onNavigateToAccountability()
@@ -298,7 +298,7 @@ fun SafetyHubScreen(
                     title = stringResource(R.string.safety_hub_card_observatory),
                     subtitle = stringResource(R.string.safety_hub_card_observatory_desc),
                     icon = Icons.Filled.Analytics,
-                    iconColor = Color(0xFF9C27B0),
+                    iconColor = MeetColors.hotMagenta,
                     onClick = {
                         SafetyHaptics.selectionTick(view)
                         onNavigateToObservatory()
@@ -404,7 +404,7 @@ private fun SafetyHubCard(
                     title,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
-                    color = if (enabled) Color.White else MeetColors.textSecondary,
+                    color = if (enabled) MeetColors.textPrimary else MeetColors.textSecondary,
                     letterSpacing = 1.sp,
                     fontSize = 13.sp,
                 )

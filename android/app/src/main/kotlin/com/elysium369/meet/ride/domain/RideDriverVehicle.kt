@@ -12,4 +12,5 @@ data class RideDriverVehicleSummary(
     val seats: Int,
     val verificationStatus: String,
     val active: Boolean,
+    val vehicleKind: String = "CAR",
 )

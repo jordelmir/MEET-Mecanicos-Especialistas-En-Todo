@@ -60,9 +60,23 @@ object MeetDestinations {
     const val FUEL_REWARDS = "fuel_rewards"
     const val ELYSIUM_SERVICES = "elysium_services"
     const val SERVICES_ACTIVE = "services_active"
+    const val ELYSIUM_DELIVERIES = "elysium_deliveries"
     const val SERVICES_COMPLETED = "services_completed"
     const val PROVIDER_SERVICES_CONFIG = "provider_services_config"
     const val AGENT_STORE = "agent_store"
+    const val DRAGON_CALC = "dragon_calc"
+    const val NEXUS_CONTROL = "elysium_nexxus_control"
+    const val SCREEN_MIRROR = "elysium_screen_mirror"
+    const val FILE_MANAGER = "elysium_file_manager"
+    const val RECORD_SHIELD = "elysium_record_shield"
+
+    // SUPREME BASS (Neon Integration)
+    const val SUPREME_BASS = "supreme_bass"
+    const val SUPREME_BASS_BOOST = "supreme_bass_boost"
+    const val SUPREME_SUBWOOFER_TUNE = "supreme_subwoofer_tune"
+    const val SUPREME_AUDIO_VIZ = "supreme_audio_viz"
+    const val SUPREME_CAR_PRESETS = "supreme_car_presets"
+    const val SUPREME_FREQ_RESPONSE = "supreme_freq_response"
 
     // SAFETY FOUNDATION V1
     const val SAFETY_HOME = "safety"

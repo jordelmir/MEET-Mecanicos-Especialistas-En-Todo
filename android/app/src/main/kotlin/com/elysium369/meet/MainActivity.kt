@@ -2,8 +2,15 @@ package com.elysium369.meet
 
 import com.elysium369.meet.ui.components.AnimatedNeonIcon
 import com.elysium369.meet.ui.components.ElysiumLivingCompanionOverlay
+import com.elysium369.meet.ui.components.EliteButton
+import com.elysium369.meet.ui.components.EliteCard
+import com.elysium369.meet.ui.components.MeetSectionIcon
+import com.elysium369.meet.dsp.AudioDSPChain
+import com.elysium369.meet.dsp.BassBoost
+import com.elysium369.meet.dsp.ParametricEQ
 
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.components.SystemThemeCustomizerDialog
 import com.elysium369.meet.ui.theme.MeetTheme
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -19,16 +26,25 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.zIndex
-import com.elysium369.meet.ui.screens.ride.RideLiveCallOverlay
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.zIndex
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -74,6 +90,7 @@ import com.elysium369.meet.identity.PrincipalProvisioningStore
 import com.elysium369.meet.observability.MeetTelemetry
 import com.elysium369.meet.observability.AuthObservability
 import com.elysium369.meet.observability.TelemetryContext
+import com.elysium369.meet.ui.screens.ride.RideLiveCallOverlay
 import com.elysium369.meet.ui.components.AdapterSearchSheet
 import com.elysium369.meet.ui.components.ConnectionStatusBar
 import com.elysium369.meet.ui.components.HolographicBackgroundShared
@@ -90,35 +107,13 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Star
 import io.github.jan.supabase.gotrue.SessionStatus
 import io.github.jan.supabase.gotrue.auth
 import io.github.jan.supabase.gotrue.handleDeeplinks
 
-val CyberpunkColorScheme = darkColorScheme(
-    primary = Color(0xFF00FFD4),
-    onPrimary = Color.Black,
-    secondary = Color(0xFFBB00FF),
-    onSecondary = Color.Black,
-    tertiary = Color(0xFF00E5FF),
-    background = Color(0xFF050B15),
-    onBackground = Color(0xFFF0F2F5),
-    surface = Color(0xFF0F1B30),
-    onSurface = Color(0xFFF0F2F5),
-    surfaceVariant = Color(0xFF152640),
-    onSurfaceVariant = Color(0xFF00FFD4),
-    surfaceContainerHighest = Color(0xFF1A3050),
-    surfaceContainerHigh = Color(0xFF152B48),
-    surfaceContainer = Color(0xFF112240),
-    surfaceContainerLow = Color(0xFF0D1C35),
-    surfaceContainerLowest = Color(0xFF08142A),
-    inverseSurface = Color(0xFF00FFD4),
-    inverseOnSurface = Color(0xFF050B15),
-    outline = Color(0xFF1E3355),
-    outlineVariant = Color(0xFF152640),
-    error = Color(0xFFFF1744),
-    errorContainer = Color(0xFF3D0012)
-)
+
 
 @Composable
 private fun PlatformOwnerRouteGuard(
@@ -211,6 +206,7 @@ class MainActivity : ComponentActivity() {
 
         checkPermissions()
         MeetColors.initialize(this)
+        com.elysium369.meet.ui.elysium.theme.ElysiumThemeRepository.initialize(this)
 
         setContent {
             MeetTheme {
@@ -348,6 +344,10 @@ fun MeetApp(
     // these below that gate used to dispose the graph, reset screen state and
     // stop the shared runtime even though the user had not signed out.
     val navController = rememberNavController()
+    val activeRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+    val visualRoute = if (passwordRecoveryRequested || accessDecision == PrincipalAccessPolicy.Decision.REQUIRE_AUTHENTICATION) "auth" else activeRoute ?: "home"
+    com.elysium369.meet.ui.elysium.theme.BindElysiumTheme(visualRoute)
+
     val liveLinkServer = remember { LiveLinkServer.shared() }
     var mainGraphEstablished by rememberSaveable { mutableStateOf(false) }
 
@@ -471,14 +471,23 @@ fun MeetApp(
     val isPremium by obdViewModel.isPremium.collectAsState()
     val animatedIconStyle by rememberAnimatedIconStyle(context)
     val animatedIconClock = rememberAnimatedIconClock(animatedIconStyle)
-    val activeRoute = navController.currentBackStackEntryAsState().value?.destination?.route
+
+    var showGlobalVisualStudio by remember { mutableStateOf(false) }
+    if (showGlobalVisualStudio) {
+        SystemThemeCustomizerDialog(
+            onDismiss = { showGlobalVisualStudio = false },
+            route = activeRoute ?: "home",
+            initialScope = com.elysium369.meet.ui.elysium.theme.ThemeScope.ROUTE,
+        )
+    }
+
 
     CompositionLocalProvider(
         LocalAnimatedIconStyle provides animatedIconStyle,
         LocalAnimatedIconClock provides animatedIconClock
     ) {
         Scaffold(
-        containerColor = Color(0xFF060612),
+        containerColor = MeetColors.backgroundDeep,
         bottomBar = {
             // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect/safety/*
             val hideNavRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
@@ -489,13 +498,21 @@ fun MeetApp(
         },
         topBar = {
             val hideBarRoutes = listOf("onboarding", "auth", "connect", "premium", "ride_service", "ride_active_tracking", "ride_schedule", "ride_driver_registration")
-            val isSafetyBar = activeRoute?.startsWith("safety") == true
-            if (activeRoute !in hideBarRoutes && !isSafetyBar && activeRoute != null) {
-                Box(modifier = Modifier.statusBarsPadding()) {
-                    ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
+            val showConnection = activeRoute !in hideBarRoutes && activeRoute?.startsWith("safety") != true && activeRoute != null
+            Row(
+                modifier = Modifier.fillMaxWidth().statusBarsPadding().background(MeetColors.backgroundDeep),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.weight(1f)) {
+                    if (showConnection) ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
+                    else Text("ELYSIUM VANGUARD", modifier = Modifier.padding(horizontal = 16.dp), color = MeetColors.textSecondary, style = MaterialTheme.typography.labelMedium)
+                }
+                IconButton(onClick = { showGlobalVisualStudio = true }) {
+                    Icon(Icons.Default.Palette, contentDescription = "Personalizar esta pantalla", tint = MeetColors.secondary)
                 }
             }
         }
+
     ) { paddingValues ->
         // paddingValues accounts for the top status bar and bottom navigation bar.
         // Apply it once to the Box so all children stay within the safe area.
@@ -1094,34 +1111,85 @@ fun MeetApp(
                     onBack = { navController.backOrHome() }
                 )
             }
-            composable("universal_services") {
-                UniversalServicesScreen(
-                    viewModel = obdViewModel,
+            for ((servicesRoute, initialPane) in listOf("universal_services" to 0, "elysium_services" to 0,
+                "services_online" to 1, "services_marketplace_advanced" to 2)) {
+                composable(servicesRoute) {
+                    com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                        navController = navController, viewModel = obdViewModel,
+                        onBack = { navController.backOrHome() },
+                        onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                        onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                        onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                        onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                        onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                        initialPane = initialPane,
+                    )
+                }
+            }
+            composable(MeetDestinations.ELYSIUM_DELIVERIES) {
+                com.elysium369.meet.ui.screens.services.ElysiumDeliveriesScreen(
                     onBack = { navController.backOrHome() },
-                    onOpenMessages = { navController.navigate("messages?serviceVertical=universal") },
-                    onNavigateToActiveServices = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
-                    onNavigateToHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
-                    onNavigateToProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                    onFood = { navController.safeNavigate("delivery_food") },
+                    onGroceries = { navController.safeNavigate("delivery_groceries") },
+                    onSmallParcel = { navController.safeNavigate("delivery_small_parcel") },
+                    onBecomeProvider = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                    onMyOrders = { navController.safeNavigate("services_online") },
                 )
             }
-            composable("elysium_services") {
-                com.elysium369.meet.ui.screens.services.ElysiumServicesMarketplaceScreen(
-                    navController = navController,
-                    viewModel = obdViewModel
-                )
+            for ((deliveryRoute, definitionId) in listOf(
+                "delivery_food" to "soda_traditional_food",
+                "delivery_groceries" to "pulperia_groceries",
+                "delivery_small_parcel" to "courier",
+            )) {
+                composable(deliveryRoute) {
+                    val title = when (definitionId) {
+                        "courier" -> "Entrega de objeto pequeño"
+                        "pulperia_groceries" -> "Compra y entrega de tienda"
+                        else -> "Pedido de comida"
+                    }
+                    com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                        navController = navController, viewModel = obdViewModel,
+                        onBack = { navController.backOrHome() },
+                        onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                        onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                        onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                        onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                        onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                        initialPane = 1,
+                        initialRequestDraft = com.elysium369.meet.ui.screens.services.ServicesRequestDraft(
+                            definitionId = definitionId,
+                            title = title,
+                            description = if (definitionId == "courier") "Objeto pequeño para entrega; indica peso, medidas, recogida y destino." else "Describe productos, cantidad, comercio y entrega solicitada.",
+                            location = "",
+                            priceCrc = 0,
+                            modality = "PHYSICAL",
+                        ),
+                    )
+                }
             }
             composable(MeetDestinations.SERVICES_ACTIVE) {
-                com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
-                    navController = navController,
-                    viewModel = obdViewModel,
-                    initialTab = 0
+                com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                    navController = navController, viewModel = obdViewModel,
+                    onBack = { navController.backOrHome() },
+                    onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                    onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                    onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                    onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                    onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                    initialPane = 1,
                 )
             }
             composable(MeetDestinations.SERVICES_COMPLETED) {
-                com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
-                    navController = navController,
-                    viewModel = obdViewModel,
-                    initialTab = 1
+                com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                    navController = navController, viewModel = obdViewModel,
+                    onBack = { navController.backOrHome() },
+                    onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                    onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                    onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                    onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                    onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                    initialPane = 1,
+                    initialHistory = true,
                 )
             }
             composable(
@@ -1135,10 +1203,16 @@ fun MeetApp(
             ) { backStackEntry ->
                 val tabParam = backStackEntry.arguments?.getString("tab") ?: "active"
                 val initialTab = if (tabParam == "completed") 1 else 0
-                com.elysium369.meet.ui.screens.services.ActiveAndCompletedServicesHubScreen(
-                    navController = navController,
-                    viewModel = obdViewModel,
-                    initialTab = initialTab
+                com.elysium369.meet.ui.screens.services.ServicesExperienceScreen(
+                    navController = navController, viewModel = obdViewModel,
+                    onBack = { navController.backOrHome() },
+                    onMessages = { navController.navigate("messages?serviceVertical=universal") },
+                    onActive = { navController.safeNavigate(MeetDestinations.SERVICES_ACTIVE) },
+                    onHistory = { navController.safeNavigate(MeetDestinations.SERVICES_COMPLETED) },
+                    onProviderConfig = { navController.safeNavigate(MeetDestinations.PROVIDER_SERVICES_CONFIG) },
+                    onServiceMessages = { id -> navController.navigate("messages?serviceVertical=universal&serviceReferenceId=$id") },
+                    initialPane = 1,
+                    initialHistory = initialTab == 1,
                 )
             }
             composable(MeetDestinations.PROVIDER_SERVICES_CONFIG) {
@@ -1519,77 +1593,34 @@ fun MeetApp(
                         )
                     }
 
-                    val isDriverRole = isDriverMode || (req.assignedDriverId != null && req.assignedDriverId == obdViewModel.currentUserId)
+                    val isDriverRole = req.assignedDriverId != null && req.assignedDriverId == obdViewModel.currentUserId
 
                     val driverLoc = when {
-                        parsedState == com.elysium369.meet.ride.domain.RideState.ARRIVED -> {
-                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
-                                latitude = req.pickupLatitude,
-                                longitude = req.pickupLongitude,
-                                accuracy = req.pickupAccuracy.takeIf { it in 1f..100f } ?: 5f,
-                                timestamp = now,
-                                receivedAt = now,
-                                sequenceId = 1L,
-                                source = "ARRIVED_CONFIRMED"
-                            )
-                        }
                         currentGps != null && isDriverRole -> {
                             com.elysium369.meet.ui.screens.ride.RideLocationPoint(
                                 latitude = currentGps!!.latitude,
                                 longitude = currentGps!!.longitude,
                                 accuracy = currentGps!!.accuracy.coerceIn(1f, 100f),
-                                timestamp = now,
-                                receivedAt = now,
-                                sequenceId = 1L,
+                                timestamp = currentGps!!.timestamp,
+                                receivedAt = currentGps!!.timestamp,
+                                sequenceId = currentGps!!.timestamp,
                                 source = "DRIVER_DEVICE_GPS"
-                            )
-                        }
-                        currentGps != null -> {
-                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
-                                latitude = currentGps!!.latitude,
-                                longitude = currentGps!!.longitude,
-                                accuracy = currentGps!!.accuracy.coerceIn(1f, 100f),
-                                timestamp = now,
-                                receivedAt = now,
-                                sequenceId = 1L,
-                                source = "GPS_TRACKING"
-                            )
-                        }
-                        req.pickupLatitude != 0.0 -> {
-                            com.elysium369.meet.ui.screens.ride.RideLocationPoint(
-                                latitude = req.pickupLatitude,
-                                longitude = req.pickupLongitude,
-                                accuracy = 10f,
-                                timestamp = now,
-                                receivedAt = now,
-                                sequenceId = 1L,
-                                source = "PICKUP_ORIGIN"
                             )
                         }
                         else -> null
                     }
 
-                    val passengerLoc = currentGps?.let { gps ->
+                    val passengerLoc = currentGps?.takeIf { req.passengerId == obdViewModel.currentUserId }?.let { gps ->
                         com.elysium369.meet.ui.screens.ride.RideLocationPoint(
                             latitude = gps.latitude,
                             longitude = gps.longitude,
                             accuracy = gps.accuracy.coerceIn(1f, 100f),
-                            timestamp = now,
-                            receivedAt = now,
-                            sequenceId = 1L,
+                            timestamp = currentGps!!.timestamp,
+                            receivedAt = currentGps!!.timestamp,
+                            sequenceId = currentGps!!.timestamp,
                             source = "PASSENGER_DEVICE_GPS"
                         )
-                    } ?: if (req.pickupLatitude != 0.0) {
-                        com.elysium369.meet.ui.screens.ride.RideLocationPoint(
-                            latitude = req.pickupLatitude,
-                            longitude = req.pickupLongitude,
-                            accuracy = req.pickupAccuracy.coerceIn(1f, 100f),
-                            timestamp = now,
-                            receivedAt = now,
-                            sequenceId = 1L,
-                            source = "PICKUP_COORDINATES"
-                        )
-                    } else null
+                    }
 
                     com.elysium369.meet.ui.screens.ride.ActiveRideViewState(
                         rideId = req.requestId,
@@ -1826,6 +1857,69 @@ fun MeetApp(
                     onBack = { navController.popBackStack() },
                 )
             }
+            composable(MeetDestinations.SUPREME_BASS) {
+                com.elysium369.meet.audio.supreme.SupremeBassScreen(onBack = { navController.popBackStack() })
+            }
+            composable(MeetDestinations.DRAGON_CALC) {
+                com.elysium369.meet.ui.screens.dragoncalc.DragonCalcScreen(onBack = { navController.backOrHome() })
+            }
+            composable(MeetDestinations.NEXUS_CONTROL) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                ) { _ -> navController.backOrHome() }
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    launcher.launch(
+                        android.content.Intent(context, com.elysium.nexus.ui.MainActivity::class.java)
+                            .putExtra("MEET_HOSTED", true),
+                    )
+                }
+                // While Nexus is visible, show nothing here — the Activity is on top.
+                androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
+            }
+            composable(MeetDestinations.SCREEN_MIRROR) {
+                com.elysium369.meet.ui.screens.home.OnDemandFeatureScreen(
+                    module = "jsm",
+                    activityClass = "com.jsm.core.MainActivity",
+                    title = "Elysium ScreenMirror",
+                    onBack = { navController.backOrHome() },
+                )
+            }
+            composable(MeetDestinations.FILE_MANAGER) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+                    contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+                ) { _ -> navController.backOrHome() }
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    launcher.launch(
+                        android.content.Intent(context, com.elysium.vanguard.MainActivity::class.java)
+                            .putExtra("MEET_HOSTED", true),
+                    )
+                }
+                androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
+            }
+            composable(MeetDestinations.RECORD_SHIELD) {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                androidx.compose.runtime.LaunchedEffect(Unit) {
+                    context.startActivity(android.content.Intent(context, com.elysium.vanguard.recordshield.ui.MainActivity::class.java))
+                    navController.popBackStack()
+                }
+            }
+            composable(MeetDestinations.SUPREME_BASS_BOOST) {
+                SupremeBassBoostScreen(onBack = { navController.popBackStack() })
+            }
+            composable(MeetDestinations.SUPREME_SUBWOOFER_TUNE) {
+                SupremeSubwooferTuneScreen(onBack = { navController.popBackStack() })
+            }
+            composable(MeetDestinations.SUPREME_AUDIO_VIZ) {
+                SupremeAudioVizScreen(onBack = { navController.popBackStack() })
+            }
+            composable(MeetDestinations.SUPREME_CAR_PRESETS) {
+                SupremeCarPresetsScreen(onBack = { navController.popBackStack() })
+            }
+            composable(MeetDestinations.SUPREME_FREQ_RESPONSE) {
+                SupremeFreqResponseScreen(onBack = { navController.popBackStack() })
+            }
         }
 
         val liveCallState by obdViewModel.liveCallState.collectAsState()
@@ -1845,7 +1939,7 @@ fun MeetApp(
                 .zIndex(99f),
         )
 
-        // Elysium Living 3D Companion Overlay (Draco Dragon, Pokemon Volt, Goku SSJ4, Evair, etc.)
+        // Elysium Living 3D Companion Overlay (Draco Dragon, Volt Aether, Titan Vanguard, Evair, etc.)
         // Lives across all screens, draggable, speech bubble, TTS audible interaction, companion switcher
         ElysiumLivingCompanionOverlay(
             navController = navController,
@@ -1861,16 +1955,618 @@ fun MeetApp(
 }
 
 @Composable
+fun SupremeBassBoostScreen(onBack: () -> Unit) {
+    val bassBoost = remember { BassBoost() }
+    val eq = remember { ParametricEQ() }
+    val dspChain = remember { AudioDSPChain() }
+    val sampleRate = 48_000
+
+    // Initialize DSP
+    LaunchedEffect(Unit) {
+        bassBoost.configure(sampleRate)
+        eq.configure(sampleRate)
+        dspChain.configure(sampleRate)
+    }
+
+    var bassEnabled by remember { mutableStateOf(true) }
+    var bassBoostDb by remember { mutableStateOf(0.0f) }
+    var bassCutoffHz by remember { mutableStateOf(150.0) }
+    var eqEnabled by remember { mutableStateOf(true) }
+    var eqPreset by remember { mutableStateOf(ParametricEQ.EQPreset.FLAT) }
+    var eqBands by remember { mutableStateOf(List(10) { 0.0 }) }
+    var outputGain by remember { mutableStateOf(1.0f) }
+    var peakLevel by remember { mutableStateOf(0.0f) }
+    var rmsLevel by remember { mutableStateOf(0.0f) }
+    var clippedSamples by remember { mutableStateOf(0) }
+    var processTimeUs by remember { mutableStateOf(0L) }
+
+    // Apply profile function
+    val applyProfile = fun(boost: Float, cutoff: Double, preset: ParametricEQ.EQPreset, bands: List<Double>) {
+        bassEnabled = true
+        bassBoostDb = boost
+        bassCutoffHz = cutoff
+        eqPreset = preset
+        eqBands = bands
+
+        bassBoost.setBoost(boost)
+        bassBoost.setCutoffFrequency(cutoff)
+        bassBoost.setEnabled(true)
+        eq.applyPreset(preset)
+        bands.forEachIndexed { index, gain ->
+            eq.setBandGain(index, gain)
+        }
+        outputGain = dspChain.getCombinedOutputGain()
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        HolographicBackgroundShared()
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // Back button + Title
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("←", color = MeetColors.neonGreen, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onBack() }
+                    .padding(16.dp)
+                )
+                Spacer(Modifier.weight(1f))
+            }
+
+            // Header
+            Text("🔊 Bass Boost Profiles", style = MaterialTheme.typography.headlineMedium, color = MeetColors.neonGreen, fontWeight = FontWeight.Black)
+            Text("SupremeBass-Neon DSP Engine — Low Shelf Filter + 10-Band Parametric EQ", style = MaterialTheme.typography.bodyMedium, color = MeetColors.textSecondary)
+            Spacer(Modifier.height(8.dp))
+
+            // DSP Status Card
+            EliteCard(
+                glowColor = MeetColors.neonGreen,
+                borderColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                    Text("DSP STATUS", color = MeetColors.neonGreen, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        StatusMetric("Process", "${processTimeUs}μs")
+                        StatusMetric("Peak", "${String.format("%.1f", peakLevel)} dB")
+                        StatusMetric("RMS", "${String.format("%.1f", rmsLevel)} dB")
+                        StatusMetric("Clips", clippedSamples.toString())
+                        StatusMetric("Gain", String.format("%.2f", outputGain))
+                    }
+                }
+            }
+
+            // Bass Boost Controls
+            EliteCard(
+                glowColor = MeetColors.hotMagenta,
+                borderColor = MeetColors.hotMagenta.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("BASS BOOST", color = MeetColors.hotMagenta, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
+                        Spacer(Modifier.weight(1f))
+                        androidx.compose.material3.Switch(
+                            checked = bassEnabled,
+                            onCheckedChange = { enabled ->
+                                bassEnabled = enabled
+                                bassBoost.setEnabled(enabled)
+                                dspChain.bassBoost.setEnabled(enabled)
+                            },
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedThumbColor = MeetColors.hotMagenta,
+                                checkedTrackColor = MeetColors.hotMagenta.copy(alpha = 0.3f)
+                            )
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+
+                    if (bassEnabled) {
+                        // Boost slider
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text("Gain", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary, modifier = Modifier.width(60.dp))
+                                Spacer(Modifier.weight(1f))
+                                Text("${String.format("%.1f", bassBoostDb)} dB", style = MaterialTheme.typography.bodySmall, color = MeetColors.hotMagenta, fontWeight = FontWeight.Bold)
+                            }
+                            androidx.compose.material3.Slider(
+                                value = bassBoostDb,
+                                onValueChange = { value ->
+                                    bassBoostDb = value
+                                    bassBoost.setBoost(value)
+                                    outputGain = dspChain.getCombinedOutputGain()
+                                },
+                                valueRange = 0f..12f,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = androidx.compose.material3.SliderDefaults.colors(
+                                    thumbColor = MeetColors.hotMagenta,
+                                    activeTrackColor = MeetColors.hotMagenta,
+                                    inactiveTrackColor = MeetColors.hotMagenta.copy(alpha = 0.2f)
+                                )
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+
+                        // Cutoff slider
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                Text("Cutoff", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary, modifier = Modifier.width(60.dp))
+                                Spacer(Modifier.weight(1f))
+                                Text("${String.format("%.0f", bassCutoffHz)} Hz", style = MaterialTheme.typography.bodySmall, color = MeetColors.hotMagenta, fontWeight = FontWeight.Bold)
+                            }
+                            androidx.compose.material3.Slider(
+                                value = bassCutoffHz.toFloat(),
+                                onValueChange = { value ->
+                                    bassCutoffHz = value.toDouble()
+                                    bassBoost.setCutoffFrequency(value.toDouble())
+                                },
+                                valueRange = 20f..500f,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = androidx.compose.material3.SliderDefaults.colors(
+                                    thumbColor = MeetColors.hotMagenta,
+                                    activeTrackColor = MeetColors.hotMagenta,
+                                    inactiveTrackColor = MeetColors.hotMagenta.copy(alpha = 0.2f)
+                                )
+                            )
+                        }
+                        Spacer(Modifier.height(12.dp))
+
+                        // Output gain display
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Text("Output Gain", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary, modifier = Modifier.width(80.dp))
+                            Spacer(Modifier.weight(1f))
+                            Text("${String.format("%.2f", outputGain)}x (${String.format("%.1f", 20 * kotlin.math.ln(outputGain.toDouble()) / kotlin.math.ln(10.0))} dB)", style = MaterialTheme.typography.bodySmall, color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
+            // 10-Band EQ
+            EliteCard(
+                glowColor = MeetColors.cyberCyan,
+                borderColor = MeetColors.cyberCyan.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text("10-BAND PARAMETRIC EQ", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
+                        Spacer(Modifier.weight(1f))
+                        androidx.compose.material3.Switch(
+                            checked = eqEnabled,
+                            onCheckedChange = { enabled ->
+                                eqEnabled = enabled
+                            },
+                            colors = androidx.compose.material3.SwitchDefaults.colors(
+                                checkedThumbColor = MeetColors.cyberCyan,
+                                checkedTrackColor = MeetColors.cyberCyan.copy(alpha = 0.3f)
+                            )
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+
+                    if (eqEnabled) {
+                        // Preset selector
+                        Text("Preset: ${eqPreset.name}", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                        Spacer(Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            ParametricEQ.EQPreset.entries.forEach { preset ->
+                                val isSelected = eqPreset == preset
+                                EliteButton(
+                                    text = preset.name.take(4),
+                                    onClick = {
+                                        eqPreset = preset
+                                        eq.applyPreset(preset)
+                                        eqBands = eq.getBands().map { it.gainDb }
+                                        outputGain = dspChain.getCombinedOutputGain()
+                                    },
+                                    color = if (isSelected) MeetColors.cyberCyan else MeetColors.cyberCyan.copy(alpha = 0.2f),
+                                    textColor = if (isSelected) MeetColors.backgroundDeep else MeetColors.textSecondary,
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(12.dp))
+
+                        // Band sliders
+                        val bandLabels = listOf("31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k")
+                        for (i in eqBands.indices) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = bandLabels[i],
+                                    style = TextStyle(
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    modifier = Modifier.width(30.dp)
+                                )
+
+                                androidx.compose.material3.Slider(
+                                    value = eqBands[i].toFloat(),
+                                    onValueChange = { value ->
+                                        val newBands = eqBands.toMutableList()
+                                        newBands[i] = value.toDouble()
+                                        eqBands = newBands
+                                        eq.setBandGain(i, value.toDouble())
+                                        outputGain = dspChain.getCombinedOutputGain()
+                                    },
+                                    valueRange = -12f..12f,
+                                    modifier = Modifier.weight(1f),
+                                    colors = androidx.compose.material3.SliderDefaults.colors(
+                                        thumbColor = MeetColors.cyberCyan,
+                                        activeTrackColor = MeetColors.cyberCyan,
+                                        inactiveTrackColor = MeetColors.cyberCyan.copy(alpha = 0.2f)
+                                    )
+                                )
+
+                                Text(
+                                    text = String.format("%.1f", eqBands[i]),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (eqBands[i] > 0) MeetColors.neonGreen else MeetColors.hotMagenta,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.width(40.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Quick Profiles
+            EliteCard(
+                glowColor = MeetColors.electricBlue,
+                borderColor = MeetColors.electricBlue.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                    Text("QUICK PROFILES", color = MeetColors.electricBlue, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
+                    Spacer(Modifier.height(12.dp))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        listOf(
+                            Profile("Flat", "0 dB, 150 Hz, FLAT", listOf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), ParametricEQ.EQPreset.FLAT),
+                            Profile("Bass +6", "+6 dB @ 150 Hz, BASS_BOOST", listOf(6.0, 4.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), ParametricEQ.EQPreset.BASS_BOOST),
+                            Profile("Bass +12", "+12 dB @ 120 Hz, ELECTRONIC", listOf(6.0, 4.0, 2.0, -2.0, 0.0, 0.0, 2.0, 4.0, 2.0, 0.0), ParametricEQ.EQPreset.ELECTRONIC),
+                            Profile("Subsonic", "+12 dB @ 50 Hz, Custom Deep", listOf(12.0, 6.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0), ParametricEQ.EQPreset.CUSTOM),
+                            Profile("Rock", "Rock preset optimized", listOf(4.0, 2.0, 0.0, 0.0, -2.0, 0.0, 0.0, 2.0, 4.0, 0.0), ParametricEQ.EQPreset.ROCK),
+                            Profile("Custom", "Your custom curve", eqBands, ParametricEQ.EQPreset.CUSTOM)
+                        ).forEach { profile ->
+                            EliteCard(
+                                glowColor = if (profile.name == "Custom") MeetColors.neonGreen else MeetColors.electricBlue,
+                                borderColor = (if (profile.name == "Custom") MeetColors.neonGreen else MeetColors.electricBlue).copy(alpha = 0.3f),
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    val (boost, cutoff) = when (profile.name) {
+                                        "Flat" -> 0.0f to 150.0
+                                        "Bass +6" -> 6.0f to 150.0
+                                        "Bass +12" -> 12.0f to 120.0
+                                        "Subsonic" -> 12.0f to 50.0
+                                        "Rock" -> 4.0f to 150.0
+                                        else -> bassBoostDb to bassCutoffHz
+                                    }
+                                    applyProfile(boost, cutoff, profile.preset, profile.bands)
+                                }
+                            ) {
+                                Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(profile.name, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                        Text(profile.desc, color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    MeetSectionIcon(key = "apply", contentDescription = "Aplicar", fallbackGlyph = "→", tint = if (profile.name == "Custom") MeetColors.neonGreen else MeetColors.electricBlue, size = 24.dp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Frequency Response Curve
+            EliteCard(
+                glowColor = MeetColors.electricBlue,
+                borderColor = MeetColors.electricBlue.copy(alpha = 0.3f),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                    Text("FREQUENCY RESPONSE (Theoretical)", color = MeetColors.electricBlue, fontWeight = FontWeight.Black, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Bass: ${String.format("%.1f", bassBoostDb)} dB @ ${String.format("%.0f", bassCutoffHz)} Hz  |  EQ: ${eqPreset.name}  |  Output Gain: ${String.format("%.2f", outputGain)}x", style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary)
+                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .background(MeetColors.backgroundDeep)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, MeetColors.electricBlue.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    ) {
+                        // Placeholder for actual curve drawing
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                MeetSectionIcon(key = "graph", contentDescription = "Gráfica", fallbackGlyph = "📈", tint = MeetColors.electricBlue, size = 48.dp)
+                                Spacer(Modifier.height(8.dp))
+                                Text("Curva teórica calculada desde DSP", color = MeetColors.textMuted, style = MaterialTheme.typography.bodyMedium)
+                                Text("Bass Shelf: ${String.format("%.1f", bassBoostDb)}dB @ ${String.format("%.0f", bassCutoffHz)}Hz  |  EQ Bands: ${eqBands.map { String.format("%.1f", it) }.joinToString("  ")}", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+data class Profile(
+    val name: String,
+    val desc: String,
+    val bands: List<Double>,
+    val preset: ParametricEQ.EQPreset
+)
+
+@Composable
+private fun RowScope.StatusMetric(label: String, value: String) {
+    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, color = MeetColors.neonGreen, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleSmall)
+        Text(label, color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+fun SupremeSubwooferTuneScreen(onBack: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        HolographicBackgroundShared()
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("←", color = MeetColors.hotMagenta, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onBack() }
+                    .padding(16.dp)
+                )
+                Spacer(Modifier.weight(1f))
+            }
+            Text("🎛️ Subwoofer Tuning", style = MaterialTheme.typography.headlineMedium, color = MeetColors.hotMagenta, fontWeight = FontWeight.Black)
+            Text("Afinación de subwoofer y caja acústica", style = MaterialTheme.typography.bodyMedium, color = MeetColors.textSecondary)
+            Spacer(Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                listOf(
+                    "Tipo de Caja" to "Sellada / Bass-reflex / Bandpass / Isobárica",
+                    "Frecuencia de sintonía (Fb)" to "20–60 Hz",
+                    "Volumen de caja (Vb)" to "Calculado por Thiele/Small",
+                    "Longitud puerto" to "Ajuste de fase y resonancia",
+                    "Amortiguamiento" to "Polyfill / Fiberglass / None"
+                ).forEach { (param, desc) ->
+                    EliteCard(
+                        glowColor = MeetColors.cyberCyan,
+                        borderColor = MeetColors.cyberCyan.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(param, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                Text(desc, color = MeetColors.textSecondary, style = MaterialTheme.typography.bodySmall)
+                            }
+                            MeetSectionIcon(key = "edit", contentDescription = "Editar", fallbackGlyph = "✎", tint = MeetColors.cyberCyan, size = 20.dp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SupremeAudioVizScreen(onBack: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        HolographicBackgroundShared()
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("←", color = MeetColors.cyberCyan, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onBack() }
+                    .padding(16.dp)
+                )
+                Spacer(Modifier.weight(1f))
+            }
+            Text("🌈 Visualizador Neon", style = MaterialTheme.typography.headlineMedium, color = MeetColors.cyberCyan, fontWeight = FontWeight.Black)
+            Text("Espectro de audio en tiempo real — FFT 1024 bandas", style = MaterialTheme.typography.bodyMedium, color = MeetColors.textSecondary)
+            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(200.dp)
+                    .background(MeetColors.backgroundDeep)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(2.dp, MeetColors.cyberCyan, RoundedCornerShape(16.dp))
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        MeetSectionIcon(key = "fft", contentDescription = "FFT", fallbackGlyph = "📊", tint = MeetColors.cyberCyan, size = 48.dp)
+                        Spacer(Modifier.height(8.dp))
+                        Text("Esperando señal de audio...", color = MeetColors.textMuted, style = MaterialTheme.typography.bodyMedium)
+                        Text("Conecta SupremeBass-Neon para visualizar FFT en vivo", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                listOf("Barras" to MeetColors.neonGreen, "Línea" to MeetColors.cyberCyan, "Circular" to MeetColors.hotMagenta, "Partículas" to MeetColors.electricBlue)
+                    .forEach { (mode, color) ->
+                        EliteButton(
+                            text = mode,
+                            onClick = { /* TODO: Change viz mode */ },
+                            color = color,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+            }
+        }
+    }
+}
+
+@Composable
+fun SupremeCarPresetsScreen(onBack: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        HolographicBackgroundShared()
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("←", color = MeetColors.neonGreen, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onBack() }
+                    .padding(16.dp)
+                )
+                Spacer(Modifier.weight(1f))
+            }
+            Text("🚗 Presets por Vehículo", style = MaterialTheme.typography.headlineMedium, color = MeetColors.neonGreen, fontWeight = FontWeight.Black)
+            Text("Configuraciones acústicas por modelo/carrocería", style = MaterialTheme.typography.bodyMedium, color = MeetColors.textSecondary)
+            Spacer(Modifier.height(8.dp))
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                listOf(
+                    "Sedán" to "Volumen medio, reflex trasero",
+                    "Hatchback" to "Gain +3dB, caja compacta",
+                    "SUV" to "Caja grande, Fb baja (25 Hz)",
+                    "Pickup" to "Caja bajo asiento, sellada",
+                    "Coupé" to "Reflex lateral, Fb 35 Hz",
+                    "Convertible" to "Gain +6dB, compensación cabina"
+                ).forEach { (vehicle, desc) ->
+                    EliteCard(
+                        glowColor = MeetColors.neonGreen,
+                        borderColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { /* TODO: Load preset */ }
+                    ) {
+                        Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(vehicle, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                                Text(desc, color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
+                            }
+                            MeetSectionIcon(key = "load", contentDescription = "Cargar", fallbackGlyph = "↓", tint = MeetColors.neonGreen, size = 24.dp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SupremeFreqResponseScreen(onBack: () -> Unit) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        HolographicBackgroundShared()
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp).statusBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("←", color = MeetColors.electricBlue, fontSize = 28.sp, fontWeight = FontWeight.Black, modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onBack() }
+                    .padding(16.dp)
+                )
+                Spacer(Modifier.weight(1f))
+            }
+            Text("📊 Respuesta Frecuencia", style = MaterialTheme.typography.headlineMedium, color = MeetColors.electricBlue, fontWeight = FontWeight.Black)
+            Text("Análisis FFT y curva de respuesta — 20 Hz–20 kHz", style = MaterialTheme.typography.bodyMedium, color = MeetColors.textSecondary)
+            Spacer(Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .background(MeetColors.backgroundDeep)
+                    .clip(RoundedCornerShape(16.dp))
+                    .border(2.dp, MeetColors.electricBlue, RoundedCornerShape(16.dp))
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        MeetSectionIcon(key = "graph", contentDescription = "Gráfica", fallbackGlyph = "📈", tint = MeetColors.electricBlue, size = 48.dp)
+                        Spacer(Modifier.height(8.dp))
+                        Text("Curva de respuesta", color = MeetColors.textMuted, style = MaterialTheme.typography.bodyMedium)
+                        Text("Micrófono RTA requerido para medición real", color = MeetColors.textMuted, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                listOf("Medir" to MeetColors.neonGreen, "Importar" to MeetColors.cyberCyan, "Exportar" to MeetColors.hotMagenta, "Comparar" to MeetColors.electricBlue)
+                    .forEach { (action, color) ->
+                        EliteButton(
+                            text = action,
+                            onClick = { /* TODO: Action */ },
+                            color = color,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+            }
+        }
+    }
+}
+
+@Composable
 fun MeetBottomNavigation(navController: NavController) {
     val currentRoute = navController.currentBackStackEntryAsState()
         .value?.destination?.route
     
     NavigationBar(
-        containerColor = Color(0xFF070B14),
+        containerColor = MeetColors.backgroundDark,
         contentColor = MeetColors.neonGreen
     ) {
         NavigationBarItem(
-            icon = { AnimatedNeonIcon(Icons.Default.Home, "Home") },
+            icon = { AnimatedNeonIcon(Icons.Default.Home, "Home", tint = if (currentRoute == "home") MeetColors.primary else MeetColors.textMuted) },
             label = { Text("Inicio", fontSize = 10.sp) },
             selected = currentRoute == "home",
             onClick = { navController.navigateTopLevel("home") },
@@ -1883,7 +2579,7 @@ fun MeetBottomNavigation(navController: NavController) {
             )
         )
         NavigationBarItem(
-            icon = { AnimatedNeonIcon(Icons.Default.Build, "Scanner") },
+            icon = { AnimatedNeonIcon(Icons.Default.Build, "Scanner", tint = if (currentRoute == "scanner") MeetColors.tertiary else MeetColors.textMuted) },
             label = { Text("Scanner", fontSize = 10.sp) },
             selected = currentRoute == "scanner",
             onClick = { navController.navigateTopLevel("scanner") },
@@ -1896,7 +2592,7 @@ fun MeetBottomNavigation(navController: NavController) {
             )
         )
         NavigationBarItem(
-            icon = { AnimatedNeonIcon(Icons.Default.Warning, "DTCs") },
+            icon = { AnimatedNeonIcon(Icons.Default.Warning, "DTCs", tint = if (currentRoute == "dtc") MeetColors.error else MeetColors.textMuted) },
             label = { Text("DTCs", fontSize = 10.sp) },
             selected = currentRoute == "dtc",
             onClick = { navController.navigateTopLevel("dtc") },
@@ -1909,7 +2605,7 @@ fun MeetBottomNavigation(navController: NavController) {
             )
         )
         NavigationBarItem(
-            icon = { AnimatedNeonIcon(Icons.Default.List, "Garage") },
+            icon = { AnimatedNeonIcon(Icons.Default.List, "Garage", tint = if (currentRoute == "garage") MeetColors.secondary else MeetColors.textMuted) },
             label = { Text("Garage", fontSize = 10.sp) },
             selected = currentRoute == "garage",
             onClick = { navController.navigateTopLevel("garage") },
@@ -1922,7 +2618,7 @@ fun MeetBottomNavigation(navController: NavController) {
             )
         )
         NavigationBarItem(
-            icon = { AnimatedNeonIcon(Icons.Default.Star, "PRO") },
+            icon = { AnimatedNeonIcon(Icons.Default.Star, "PRO", tint = if (currentRoute == "pro_hub") MeetColors.quaternary else MeetColors.textMuted) },
             label = { Text("PRO", fontSize = 10.sp) },
             selected = currentRoute == "pro_hub",
             onClick = { navController.navigateTopLevel("pro_hub") },

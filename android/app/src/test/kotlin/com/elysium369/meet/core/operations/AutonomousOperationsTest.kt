@@ -85,7 +85,7 @@ class AutonomousOperationsTest {
     fun conversationalOwnerAgent_answersActionableQuestionsAccurately() {
         // 1. When operating completely cleanly
         val cleanAnswer = engine.answerOwnerQuery("¿Qué necesita mi atención?", null)
-        assertTrue(cleanAnswer.contains("Elysium opera con total normalidad autónoma"))
+        assertTrue(cleanAnswer.contains("Elysium opera con normalidad autónoma"))
 
         // 2. Introduce an SRE DLQ emergency
         engine.evaluateSreHealth(outboxLagSeconds = 10L, deadLetterCount = 1, apiAvailabilityPercent = 99.9)
@@ -96,7 +96,8 @@ class AutonomousOperationsTest {
 
         // 3. Financial inquiry
         val noMoneyProblem = engine.answerOwnerQuery("¿Hay dinero descuadrado?", null)
-        assertTrue(noMoneyProblem.contains("Libro mayor 100% conciliado"))
+        assertTrue(noMoneyProblem.contains("No se registran discrepancias no resueltas en los casos de operación analizados"))
+        org.junit.Assert.assertFalse(noMoneyProblem.contains("100% conciliado"))
 
         engine.evaluateFinancialIntegrity(1, Money.ofCrc(12_500L))
         val moneyProblem = engine.answerOwnerQuery("¿Hay dinero descuadrado?", null)

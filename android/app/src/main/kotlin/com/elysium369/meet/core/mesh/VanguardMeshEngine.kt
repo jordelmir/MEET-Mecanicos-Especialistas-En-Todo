@@ -4,62 +4,46 @@ import kotlinx.serialization.Serializable
 
 /**
  * ══════════════════════════════════════════════════════════════════════
- *  V A N G U A R D   M E S H   E N G I N E
- *  ──────────────────────────────────────────
- *  Phone-to-phone communication WITHOUT internet, WITHOUT SIM.
- *  Works in wars, protests, natural disasters, internet shutdowns.
+ *  V A N G U A R D   M E S H   R O U T I N G   S I M U L A T O R
+ *  ────────────────────────────────────────────────────────────────
+ *  Pure deterministic routing and state simulator for the Elysium
+ *  Vanguard Mesh network design.
  *
- *  HOW IT WORKS:
+ *  IMPORTANT — WHAT THIS CLASS IS:
  *  ┌──────────────────────────────────────────────────────────────┐
- *  │  Layer 1: BLE (Bluetooth Low Energy) — Discovery + Signal  │
- *  │  • Range: ~100m (open field), ~30m (buildings)             │
- *  │  • Power: ultra-low (works for days)                       │
- *  │  • Purpose: discover nearby nodes, exchange metadata       │
+ *  │  This class performs NO physical radio I/O.                 │
+ *  │  It does NOT by itself provide:                            │
+ *  │    • BLE advertising or scanning                           │
+ *  │    • Wi-Fi Direct or Wi-Fi Aware connections               │
+ *  │    • End-to-end encryption                                 │
+ *  │    • Forward secrecy                                       │
+ *  │    • Censorship resistance                                 │
+ *  │    • Metadata privacy                                      │
  *  │                                                            │
- *  │  Layer 2: Wi-Fi Direct / Wi-Fi Aware — Data Transfer       │
- *  │  • Range: ~200m                                            │
- *  │  • Speed: up to 250 Mbps                                  │
- *  │  • Purpose: actual message/file transfer between nodes     │
- *  │  • NO ACCESS POINT NEEDED. Phone ↔ Phone direct.          │
- *  │                                                            │
- *  │  Layer 3: Store-Carry-Forward (Delay Tolerant Networking)  │
- *  │  • A person walks from zone A to zone B carrying messages  │
- *  │  • Messages have TTL (time-to-live) and hop limits         │
- *  │  • End-to-end encrypted: relay nodes CANNOT read content   │
- *  │  • This is how data travels across cities without internet │
- *  │                                                            │
- *  │  Layer 4: Reconciliation                                    │
- *  │  • When internet returns, sync with cloud                  │
- *  │  • Deduplication via message ID                            │
- *  │  • Delivery confirmations retroactively sent               │
+ *  │  It models routing decisions, store-carry-forward logic,   │
+ *  │  peer state, relay policies, TTL/hop limits, and message   │
+ *  │  deduplication — all in-memory with no persistent custody. │
  *  └──────────────────────────────────────────────────────────────┘
  *
- *  WHY IT WORKS WITHOUT SIM/INTERNET:
- *  BLE and Wi-Fi Direct use the phone's radio hardware directly.
- *  They do NOT go through cell towers or internet routers.
- *  Two phones within ~100m can communicate even if:
- *  - SIM card is removed
- *  - Airplane mode is on (with BLE/WiFi enabled)
- *  - All cell towers are destroyed
- *  - The government shut down the internet
- *  - There is no electricity (phones on battery)
+ *  DESIGN INTENT (not yet implemented):
+ *  The full mesh network design is documented in:
+ *    docs/superpowers/specs/2026-08-23-elysium-communications-identity-mesh-design.md
  *
- *  SECURITY:
- *  - All messages end-to-end encrypted (X25519 + ChaCha20-Poly1305)
- *  - Relay nodes see only encrypted blobs
- *  - No metadata leakage (sender/receiver IDs are encrypted too)
- *  - Perfect forward secrecy via ephemeral key exchange
- *  - Messages self-destruct after TTL
+ *  That design envisions BLE discovery, Wi-Fi Direct/Aware data
+ *  transfer, store-carry-forward DTN, and cloud reconciliation.
+ *  However, per the design document's own stated requirements,
+ *  NONE of these claims may be made until:
+ *    1. A reviewed MeshTransport implementation exists
+ *    2. A reviewed cryptographic session (X25519+ChaCha20-Poly1305) exists
+ *    3. Persistent custody state replaces the in-memory store
+ *    4. Physical multi-device verification passes
+ *    5. Adversarial tests (replay, Sybil, flood, key revocation) pass
+ *    6. Independent protocol review is completed
  *
- *  PROTEST/WAR SCENARIO:
- *  If 1000 people have ELYSIUM installed:
- *  - Each phone is a node in the mesh
- *  - Messages hop from phone to phone
- *  - Range extends to KILOMETERS through hop chains
- *  - Store-carry-forward bridges gaps between clusters
- *  - Emergency broadcasts reach everyone in the mesh
- *  - No central server. No single point of failure.
- *  - Government cannot shut it down.
+ *  STATE: IMPLEMENTED + UNIT_VERIFIED (routing simulator only)
+ *  STATE: DESIGNED (physical transports, crypto, E2EE)
+ *
+ *  @see MeshRoutingSimulator (typealias below)
  * ══════════════════════════════════════════════════════════════════════
  */
 
@@ -417,3 +401,6 @@ data class MeshStats(
     val totalDelivered: Int,
     val emergencyBroadcasts: Int,
 )
+
+/** Honest alias: this engine is a routing simulator, not a production mesh. */
+typealias MeshRoutingSimulator = VanguardMeshEngine

@@ -3,12 +3,12 @@
     <string name="safety_public_back">Back</string>
     <string name="safety_back">Back</string>
     <string name="safety_public_refresh">Refresh</string>
-    <string name="safety_public_map_disclosure">Authorized public locations; they may be approximate. A report does not establish a fact.</string>
+    <string name="safety_public_map_disclosure">Public areas have at least 25 km of uncertainty. A cell center does not identify an event location. A report does not establish a fact.</string>
     <string name="safety_public_show_list">Show accessible list (%1$d points)</string>
     <string name="safety_public_show_map">Show map (%1$d points)</string>
     <string name="safety_public_no_points">No public points match these filters.</string>
     <string name="safety_public_claim_state">Published status: %1$s</string>
-    <string name="safety_public_geo_detail">Disclosure: %1$s · Accuracy (meters): %2$s</string>
+    <string name="safety_public_geo_detail">Area: %1$s · Minimum uncertainty (meters): %2$s</string>
     <string name="safety_public_unknown">Data not captured</string>
     <string name="safety_public_sources_count">Independent sources: %1$d</string>
     <string name="safety_public_source_mix">Civil: %1$d · Journalistic: %2$d · Public records: %3$d · Documentary: %4$d · Institutional: %5$d</string>
@@ -56,7 +56,7 @@
     <string name="safety_map_report_now">REPORT NOW</string>
     <string name="safety_map_visible_points">Visible</string>
     <string name="safety_map_my_reports">My reports</string>
-    <string name="safety_map_public_points">Public</string>
+    <string name="safety_map_public_points">Public areas</string>
     <string name="safety_map_empty_title">Your safety map starts here</string>
     <string name="safety_map_empty_body">Create a location report to keep a private, dated marker. Public release requires authoritative review.</string>
     <string name="safety_map_create_report">CREATE LOCATION REPORT</string>
@@ -254,4 +254,5 @@
     <string name="safety_observatory_filter_dates">Date range</string>
     <string name="safety_observatory_apply_filters">APPLY FILTERS</string>
     <string name="safety_observatory_reset_filters">RESET</string>
+    <string name="safety_public_coarse_area">Approximate regional cell</string>
 </resources>

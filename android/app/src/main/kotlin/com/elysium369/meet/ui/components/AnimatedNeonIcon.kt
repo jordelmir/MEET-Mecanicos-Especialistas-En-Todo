@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.ui.elysium.theme.rememberElysiumMotionEnabled
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -82,16 +84,18 @@ fun rememberAnimatedIconStyle(context: Context): State<AnimatedIconStyle> {
 fun rememberAnimatedIconClock(style: AnimatedIconStyle): AnimatedIconClock {
     var phase by remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(style.enabled, style.clockIntervalMs) {
-        if (!style.enabled) {
+    val motionEnabled = rememberElysiumMotionEnabled() && style.enabled
+    LaunchedEffect(motionEnabled, style.clockIntervalMs) {
+        if (!motionEnabled) {
             phase = 0f
             return@LaunchedEffect
         }
-        val startedAt = System.currentTimeMillis()
+        val startedAt = withFrameNanos { it }
         while (true) {
-            val elapsed = System.currentTimeMillis() - startedAt
-            phase = (elapsed % 6_000L) / 6_000f
             kotlinx.coroutines.delay(style.clockIntervalMs.coerceAtLeast(64L))
+            withFrameNanos { now ->
+                phase = ((now - startedAt) % 6_000_000_000L) / 6_000_000_000f
+            }
         }
     }
 

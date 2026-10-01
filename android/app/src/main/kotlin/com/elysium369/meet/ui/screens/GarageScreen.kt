@@ -51,14 +51,17 @@ fun GarageScreen(
     navController: NavController,
     viewModel: ObdViewModel
 ) {
-    val activeVehicle by viewModel.selectedVehicle.collectAsState()
-    val vehicles by viewModel.vehicles.collectAsState()
+    val principal by viewModel.activePrincipal.collectAsState()
+    val selectedVehicle by viewModel.selectedVehicle.collectAsState()
+    val storedVehicles by viewModel.vehicles.collectAsState()
+    val activeVehicle = selectedVehicle?.takeIf { it.user_id == principal.id }
+    val vehicles = storedVehicles.filter { it.user_id == principal.id }
     val isDeleting by viewModel.isDeletingVehicle.collectAsState()
     val isReadingVinId by viewModel.isReadingVin.collectAsState()
     val vinFeedback by viewModel.vinReadFeedback.collectAsState()
 
     // Confirmation dialog state
-    var vehicleToDelete by remember { mutableStateOf<Vehicle?>(null) }
+    var vehicleToDelete by remember(principal.id) { mutableStateOf<Vehicle?>(null) }
 
     Scaffold(
         topBar = {
@@ -87,11 +90,15 @@ fun GarageScreen(
         },
         containerColor = com.elysium369.meet.ui.theme.MeetColors.backgroundDark
     ) { padding ->
+        val showArtwork=com.elysium369.meet.ui.home.LocalHomeExperience.current!=com.elysium369.meet.ui.home.HomeExperience.CLASSIC
         Box(modifier = Modifier.fillMaxSize()) {
+            com.elysium369.meet.ui.components.ElysiumArtworkBackground(automotive = true)
             if (vehicles.isEmpty()) {
                 // Empty State
                 Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if(showArtwork) Spacer(Modifier.height(160.dp))
+                        Spacer(Modifier.height(16.dp))
                         MeetSectionIcon(
                             key = "garage",
                             contentDescription = "Garage",

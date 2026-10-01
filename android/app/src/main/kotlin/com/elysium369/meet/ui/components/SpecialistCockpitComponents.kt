@@ -59,14 +59,14 @@ fun SpecialistRoleBanner(
             .graphicsLayer {
                 shadowElevation = 8.dp.toPx()
             },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF081220)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(
             1.dp,
             Brush.horizontalGradient(
                 listOf(
                     if (isSpecialistMode) accentColor.copy(alpha = 0.8f) else MeetColors.cyberCyan.copy(alpha = 0.5f),
-                    if (isSpecialistMode) Color(0xFFC85CFF).copy(alpha = 0.6f) else MeetColors.electricBlue.copy(alpha = 0.5f),
+                    if (isSpecialistMode) MeetColors.hotMagenta.copy(alpha = 0.6f) else MeetColors.electricBlue.copy(alpha = 0.5f),
                 ),
             ),
         ),
@@ -158,11 +158,11 @@ fun SpecialistProfileHeroCard(
     businessName: String,
     ownerName: String,
     phone: String,
-    rating: Double = 4.95,
-    reviewsCount: Int = 148,
-    totalJobs: Int = 236,
-    acceptanceRatePercent: Double = 99.1,
-    isVerified: Boolean = true,
+    rating: Double = 0.0,
+    reviewsCount: Int = 0,
+    totalJobs: Int = 0,
+    acceptanceRatePercent: Double = 0.0,
+    isVerified: Boolean = false,
     isOnline: Boolean = true,
     onToggleOnline: (Boolean) -> Unit,
     onEditProfile: () -> Unit,
@@ -193,7 +193,7 @@ fun SpecialistProfileHeroCard(
                 shadowElevation = 16.dp.toPx()
                 cameraDistance = 16f * density
             },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF091424)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(
             1.5.dp,
@@ -246,7 +246,7 @@ fun SpecialistProfileHeroCard(
                                 }
                                 .clip(CircleShape)
                                 .background(if (isOnline) MeetColors.neonGreen else MeetColors.textMuted)
-                                .border(2.dp, Color(0xFF091424), CircleShape),
+                                .border(2.dp, MeetColors.cardBackground, CircleShape),
                         )
                     }
 
@@ -338,7 +338,7 @@ fun SpecialistProfileHeroCard(
                             checkedThumbColor = Color.Black,
                             checkedTrackColor = accentColor,
                             uncheckedThumbColor = MeetColors.textSecondary,
-                            uncheckedTrackColor = Color(0xFF1E293B),
+                            uncheckedTrackColor = MeetColors.cardBackgroundLighter,
                         ),
                     )
                 }
@@ -346,7 +346,7 @@ fun SpecialistProfileHeroCard(
 
             // Row 2: Four Key Performance Indicators (KPIs)
             Surface(
-                color = Color(0xFF060E18),
+                color = MeetColors.backgroundDark,
                 shape = RoundedCornerShape(14.dp),
                 border = BorderStroke(1.dp, Color(0x22FFFFFF)),
                 modifier = Modifier.fillMaxWidth(),
@@ -360,15 +360,15 @@ fun SpecialistProfileHeroCard(
                 ) {
                     SpecialistMetricItem(
                         label = "REPUTACIÓN",
-                        value = "★ ${String.format("%.1f", rating)}",
+                        value = if (reviewsCount > 0) "★ ${String.format("%.1f", rating)}" else "Sin datos",
                         subValue = "$reviewsCount res.",
                         valueColor = Color(0xFFFFD700),
                     )
                     Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color(0x22FFFFFF)))
                     SpecialistMetricItem(
                         label = "ACEPTACIÓN",
-                        value = "${String.format("%.1f", acceptanceRatePercent)}%",
-                        subValue = "Óptima",
+                        value = if (acceptanceRatePercent > 0) "${String.format("%.1f", acceptanceRatePercent)}%" else "Sin datos",
+                        subValue = if (acceptanceRatePercent > 0) "Registrada" else "No capturada",
                         valueColor = MeetColors.neonGreen,
                     )
                     Box(modifier = Modifier.width(1.dp).height(24.dp).background(Color(0x22FFFFFF)))
@@ -383,7 +383,7 @@ fun SpecialistProfileHeroCard(
                         label = "GARANTÍA",
                         value = "100%",
                         subValue = "Escrow Activo",
-                        valueColor = Color(0xFFC85CFF),
+                        valueColor = MeetColors.hotMagenta,
                     )
                 }
             }
@@ -483,7 +483,7 @@ fun SpecialistEarningsHeroCard(
                 shadowElevation = 14.dp.toPx()
                 cameraDistance = 16f * density
             },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF071B1E)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(20.dp),
         border = BorderStroke(1.3.dp, accentColor.copy(alpha = 0.75f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 12.dp),
@@ -608,7 +608,7 @@ fun SpecialistOperationalMetricsRow(
             value = if (escrowGuaranteed) "100%" else "Básico",
             subtitle = "Pagos Protegidos",
             icon = "🛡️",
-            tint = Color(0xFFC85CFF),
+            tint = MeetColors.hotMagenta,
             modifier = Modifier.weight(1f),
         )
     }
@@ -625,7 +625,7 @@ private fun OperationalKpiCard(
 ) {
     Card(
         modifier = modifier.graphicsLayer { shadowElevation = 6.dp.toPx() },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF091322)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(1.dp, tint.copy(alpha = 0.35f)),
     ) {
@@ -721,7 +721,7 @@ fun SpecialistEditProfileDialog(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White,
-                        focusedBorderColor = Color(0xFFC85CFF),
+                        focusedBorderColor = MeetColors.hotMagenta,
                         unfocusedBorderColor = MeetColors.borderSubtle,
                     ),
                 )
@@ -744,7 +744,7 @@ fun SpecialistEditProfileDialog(
                 Text("CANCELAR", color = MeetColors.textSecondary, fontSize = 11.sp)
             }
         },
-        containerColor = Color(0xFF0C1626),
+        containerColor = MeetColors.backgroundDark,
         shape = RoundedCornerShape(18.dp),
     )
 }
@@ -764,7 +764,7 @@ fun SpecialistWalletCard(
                 shadowElevation = 14.dp.toPx()
                 cameraDistance = 16f * density
             },
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF071422)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         shape = RoundedCornerShape(22.dp),
         border = BorderStroke(
             1.4.dp,
@@ -823,7 +823,7 @@ fun SpecialistWalletCard(
 
             // Hero Balances Card
             Surface(
-                color = Color(0xFF040A12),
+                color = MeetColors.backgroundDeep,
                 shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(1.dp, Color(0x22FFFFFF)),
                 modifier = Modifier.fillMaxWidth(),
@@ -844,14 +844,17 @@ fun SpecialistWalletCard(
                             letterSpacing = 0.5.sp,
                         )
                         Text(
-                            text = "₡${String.format("%,.0f", walletState.balanceCrc)}",
+                            text = "₡${String.format("%,d", walletState.balanceCrc)}",
                             color = accentColor,
                             fontSize = 28.sp,
                             fontWeight = FontWeight.Black,
                             letterSpacing = (-0.5).sp,
                         )
+                        walletState.promotionalAvailableCrc?.let { Text("Promocional para comisiones: ₡$it", fontSize = 10.sp) }
+                        walletState.fundedAvailableCrc?.let { Text("Recargas disponibles: ₡$it", fontSize = 10.sp) }
+                        walletState.reservedCrc?.let { Text("Reservado en servicios: ₡$it", fontSize = 10.sp) }
                         Text(
-                            text = "100% disponible para operar y respaldar servicios",
+                            text = "Saldo disponible para respaldar comisiones; requiere confirmación del servidor",
                             color = MeetColors.textMuted,
                             fontSize = 8.sp,
                         )
@@ -860,7 +863,7 @@ fun SpecialistWalletCard(
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = Color(0xFF132838),
+                            color = MeetColors.cardBackgroundLighter,
                             border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.6f)),
                         ) {
                             Column(
@@ -868,13 +871,13 @@ fun SpecialistWalletCard(
                                 horizontalAlignment = Alignment.End,
                             ) {
                                 Text(
-                                    text = "REGALO BIENVENIDA",
+                                    text = "CRÉDITO INICIAL ELEGIBLE",
                                     color = MeetColors.cyberCyan,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Black,
                                 )
                                 Text(
-                                    text = "₡15,000 REGALADOS",
+                                    text = "₡5.000 · una sola vez",
                                     color = Color.White,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Black,
@@ -883,7 +886,7 @@ fun SpecialistWalletCard(
                         }
 
                         Text(
-                            text = "Por Jorge Del Valle / Elysium",
+                            text = "Solo para comisiones · requiere validación",
                             color = MeetColors.textMuted,
                             fontSize = 8.sp,
                         )
@@ -899,7 +902,7 @@ fun SpecialistWalletCard(
             ) {
                 Surface(
                     modifier = Modifier.weight(1f),
-                    color = Color(0xFF0A1828),
+                    color = MeetColors.cardBackground,
                     shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
                 ) {
@@ -911,7 +914,7 @@ fun SpecialistWalletCard(
                 }
                 Surface(
                     modifier = Modifier.weight(1f),
-                    color = Color(0xFF0A1828),
+                    color = MeetColors.cardBackground,
                     shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
                 ) {
@@ -923,7 +926,7 @@ fun SpecialistWalletCard(
                 }
                 Surface(
                     modifier = Modifier.weight(1f),
-                    color = Color(0xFF0A1828),
+                    color = MeetColors.cardBackground,
                     shape = RoundedCornerShape(10.dp),
                     border = BorderStroke(1.dp, Color(0x1FFFFFFF)),
                 ) {
@@ -937,7 +940,7 @@ fun SpecialistWalletCard(
 
             // SINPE Móvil Reference Box
             Surface(
-                color = Color(0xFF0A1624),
+                color = MeetColors.backgroundDark,
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
                 modifier = Modifier.fillMaxWidth(),
@@ -1019,7 +1022,7 @@ fun SpecialistWalletCard(
                             else -> "PENDIENTE TRUST CENTER ⏳" to MeetColors.warning
                         }
                         Surface(
-                            color = Color(0xFF050D18),
+                            color = MeetColors.backgroundDeep,
                             shape = RoundedCornerShape(10.dp),
                             border = BorderStroke(1.dp, statusColor.copy(alpha = 0.35f)),
                             modifier = Modifier.fillMaxWidth(),
@@ -1033,7 +1036,7 @@ fun SpecialistWalletCard(
                             ) {
                                 Column {
                                     Text(
-                                        text = "₡${String.format("%,.0f", topup.amountCrc)} · Ref: ${topup.referenceNumber}",
+                                        text = "₡${String.format("%,d", topup.amountCrc)} · Ref: ${topup.referenceNumber}",
                                         color = Color.White,
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
@@ -1069,7 +1072,7 @@ fun SpecialistSinpeTopupDialog(
     specialistId: String,
     serviceVertical: String,
     onDismiss: () -> Unit,
-    onTopupSubmitted: (amountCrc: Double, reference: String) -> Unit = { _, _ -> },
+    onTopupSubmitted: (amountCrc: Long, reference: String) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -1139,7 +1142,7 @@ fun SpecialistSinpeTopupDialog(
             ) {
                 // Official SINPE Móvil Banner
                 Surface(
-                    color = Color(0xFF101E30),
+                    color = MeetColors.cardBackground,
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
                     modifier = Modifier.fillMaxWidth(),
@@ -1222,7 +1225,7 @@ fun SpecialistSinpeTopupDialog(
                     listOf(5_000, 10_000, 20_000, 50_000).forEach { amt ->
                         Surface(
                             shape = RoundedCornerShape(8.dp),
-                            color = if (amountInput == amt.toString()) MeetColors.neonGreen.copy(alpha = 0.25f) else Color(0xFF142436),
+                            color = if (amountInput == amt.toString()) MeetColors.neonGreen.copy(alpha = 0.25f) else MeetColors.cardBackgroundLighter,
                             border = BorderStroke(1.dp, if (amountInput == amt.toString()) MeetColors.neonGreen else Color(0x33FFFFFF)),
                             modifier = Modifier
                                 .weight(1f)
@@ -1300,13 +1303,13 @@ fun SpecialistSinpeTopupDialog(
             }
         },
         confirmButton = {
-            val amountNum = amountInput.toDoubleOrNull() ?: 0.0
+            val amountNum = amountInput.toLongOrNull() ?: 0L
             Button(
                 onClick = {
                     if (amountNum > 0) {
                         isSubmitting = true
                         coroutineScope.launch {
-                            SpecialistWalletStore.submitTopup(
+                            val submitted = SpecialistWalletStore.submitTopup(
                                 context = context,
                                 specialistId = specialistId,
                                 serviceVertical = serviceVertical,
@@ -1319,14 +1322,14 @@ fun SpecialistSinpeTopupDialog(
                             onTopupSubmitted(amountNum, detectedRef)
                             android.widget.Toast.makeText(
                                 context,
-                                "Recarga de ₡${String.format("%,.0f", amountNum)} enviada a revisión en Trust Center.",
+                                if (submitted.status == "PENDING_REVIEW") "Comprobante recibido por el servidor; pendiente de validación." else "Comprobante guardado en este dispositivo; envío al servidor pendiente.",
                                 android.widget.Toast.LENGTH_LONG,
                             ).show()
                             onDismiss()
                         }
                     }
                 },
-                enabled = !isSubmitting && (amountInput.toDoubleOrNull() ?: 0.0) > 0,
+                enabled = !isSubmitting && (amountInput.toLongOrNull() ?: 0L) > 0,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MeetColors.neonGreen,
                     contentColor = Color.Black,
@@ -1348,7 +1351,7 @@ fun SpecialistSinpeTopupDialog(
                 Text("CANCELAR", color = MeetColors.textSecondary, fontSize = 11.sp)
             }
         },
-        containerColor = Color(0xFF0A1524),
+        containerColor = MeetColors.backgroundDark,
         shape = RoundedCornerShape(20.dp),
     )
 }

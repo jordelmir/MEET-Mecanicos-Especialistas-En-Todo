@@ -1,0 +1,40 @@
+{
+  "version": "0.7.0-retail-truth",
+  "catalogDbPath": "apps/android/app/src/main/assets/ir/ir_catalog.db",
+  "totalSignalsAudited": 223571,
+  "classification": {
+    "RAW_EXECUTABLE": 114690,
+    "PARAMETRIC_EXECUTABLE": 76507,
+    "EXPERIMENTAL_LAB_ONLY": 20464,
+    "INVALID_PARAMETERS": 0,
+    "UNSUPPORTED": 11910
+  },
+  "commercialGate": {
+    "unknownCount": 11910,
+    "isPass": false
+  },
+  "brandCount": 1345,
+  "protocolBreakdown": {
+    "UNKNOWN": 114690,
+    "SIRC": 4549,
+    "SAMSUNG32": 2456,
+    "NECEXT": 8495,
+    "NEC": 53856,
+    "RC6": 2805,
+    "RC5": 13647,
+    "SIRC20": 2613,
+    "KASEIKYO": 4012,
+    "SIRC15": 2206,
+    "PIONEER": 1440,
+    "RC5X": 212,
+    "NEC42": 124,
+    "AIWA": 2332,
+    "MITSUBISHI": 2288,
+    "JVC": 3838,
+    "SHARP": 357,
+    "DENON": 1750,
+    "NECX2": 1776,
+    "SAMSUNG36": 39,
+    "APPLE": 86
+  }
+}

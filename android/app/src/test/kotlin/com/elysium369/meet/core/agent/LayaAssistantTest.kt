@@ -157,7 +157,9 @@ class LayaAssistantTest {
         val response = assistantEngine.ask("¡Auxilio emergencia choque en la pista 911!")
 
         assertTrue("Must be classified as emergency", response.isEmergency)
-        assertTrue(response.text.contains("PROTOCOLO DE EMERGENCIA"))
+        assertTrue(response.text.contains("911"))
+        assertTrue(response.text.contains("No se ha realizado una llamada"))
+        assertTrue(response.text.contains("ni enviado una alerta o ubicación"))
         assertTrue(response.text.contains("911"))
 
         val actionTypes = response.suggestedActions.map { it.type }

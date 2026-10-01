@@ -145,6 +145,10 @@ class RideVoiceCoordinator(
                 auditoryFeedback.playCue(RideAuditoryCue.CALL_CONNECTED)
                 Result.success(Unit)
             }
+            is CallTransportOutcome.Ringing -> {
+                _voiceState.value = RideVoiceState.Connecting(rideId)
+                Result.success(Unit)
+            }
             is CallTransportOutcome.Failed -> {
                 _voiceState.value = RideVoiceState.Error(outcome.safeCode)
                 Result.failure(IllegalStateException(outcome.safeCode))

@@ -462,7 +462,7 @@ fun RideInRideChatSheet(
                         Icon(
                             imageVector = Icons.Default.AddPhotoAlternate,
                             contentDescription = "Enviar foto",
-                            tint = Color(0xFFC85CFF),
+                            tint = MeetColors.hotMagenta,
                             modifier = Modifier.size(20.dp)
                         )
                     }

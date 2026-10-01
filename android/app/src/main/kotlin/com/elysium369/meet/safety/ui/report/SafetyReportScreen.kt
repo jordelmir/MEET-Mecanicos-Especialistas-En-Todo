@@ -130,7 +130,7 @@ fun SafetyReportScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(stringResource(R.string.safety_report_header_title), fontWeight = FontWeight.Black, fontSize = 17.sp, color = Color.White)
+                        Text(stringResource(R.string.safety_report_header_title), fontWeight = FontWeight.Black, fontSize = 17.sp, color = MeetColors.textPrimary)
                         Text(
                             stringResource(R.string.safety_report_header_step, state.step + 1, state.totalSteps + 1),
                             fontSize = 11.sp,
@@ -143,7 +143,7 @@ fun SafetyReportScreen(
                         SafetyHaptics.selectionTick(view)
                         if (state.step > 0) viewModel.previousStep() else onBack()
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.safety_back), tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.safety_back), tint = MeetColors.textPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MeetColors.backgroundDeep),
@@ -495,8 +495,8 @@ private fun VictimNumberField(
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = Color.White,
-            unfocusedTextColor = Color.White,
+            focusedTextColor = MeetColors.textPrimary,
+            unfocusedTextColor = MeetColors.textPrimary,
             focusedBorderColor = MeetColors.cyberCyan,
             unfocusedBorderColor = MeetColors.borderSubtle,
             focusedLabelColor = MeetColors.cyberCyan,
@@ -532,8 +532,8 @@ private fun StepNarrative(state: SafetyReportUiState, viewModel: SafetyReportVie
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MeetColors.neonGreen,
                     unfocusedBorderColor = MeetColors.borderSubtle,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = MeetColors.textPrimary,
+                    unfocusedTextColor = MeetColors.textPrimary,
                     cursorColor = MeetColors.neonGreen,
                 ),
             )
@@ -598,8 +598,8 @@ private fun StepWhen(state: SafetyReportUiState, viewModel: SafetyReportViewMode
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MeetColors.neonGreen,
                     unfocusedBorderColor = MeetColors.borderSubtle,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = MeetColors.textPrimary,
+                    unfocusedTextColor = MeetColors.textPrimary,
                     cursorColor = MeetColors.neonGreen,
                 ),
             )
@@ -642,8 +642,8 @@ private fun StepWhere(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MeetColors.cyberCyan,
                     unfocusedBorderColor = MeetColors.borderSubtle,
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
+                    focusedTextColor = MeetColors.textPrimary,
+                    unfocusedTextColor = MeetColors.textPrimary,
                 ),
             )
             if (state.searchingLocation) LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 4.dp), color = MeetColors.cyberCyan)
@@ -657,7 +657,7 @@ private fun StepWhere(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Column(Modifier.fillMaxWidth()) {
-                        Text(place.primaryLabel, color = Color.White, fontWeight = FontWeight.Bold)
+                        Text(place.primaryLabel, color = MeetColors.textPrimary, fontWeight = FontWeight.Bold)
                         Text(place.secondaryLabel, color = MeetColors.textSecondary, fontSize = 11.sp)
                     }
                 }
@@ -776,7 +776,7 @@ private fun StepEvidence(
         border = BorderStroke(1.dp, MeetColors.borderSubtle),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.safety_report_step_evidence_title), fontWeight = FontWeight.Black, fontSize = 15.sp, color = Color.White)
+            Text(stringResource(R.string.safety_report_step_evidence_title), fontWeight = FontWeight.Black, fontSize = 15.sp, color = MeetColors.textPrimary)
             Text(stringResource(R.string.safety_report_step_evidence_desc), color = MeetColors.textSecondary, fontSize = 12.sp)
 
             state.evidence.forEach { item ->
@@ -793,7 +793,7 @@ private fun StepEvidence(
                     Text(
                         stringResource(R.string.safety_report_step_evidence_item, item.mimeType, item.byteCount / 1024),
                         Modifier.weight(1f),
-                        color = Color.White,
+                        color = MeetColors.textPrimary,
                         fontSize = 12.sp,
                     )
                     IconButton(
@@ -835,7 +835,7 @@ private fun StepReview(state: SafetyReportUiState) {
         border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(stringResource(R.string.safety_report_step_review_title), fontWeight = FontWeight.Black, fontSize = 16.sp, color = Color.White)
+            Text(stringResource(R.string.safety_report_step_review_title), fontWeight = FontWeight.Black, fontSize = 16.sp, color = MeetColors.textPrimary)
 
             ReviewRow(
                 label = "FUENTE",
@@ -897,7 +897,7 @@ private fun ReviewRow(label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MeetColors.cyberCyan)
-        Text(value, fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Medium)
+        Text(value, fontSize = 12.sp, color = MeetColors.textPrimary, fontWeight = FontWeight.Medium)
     }
 }
 
@@ -916,11 +916,11 @@ private fun SafetyReportReceiptScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(stringResource(R.string.safety_report_receipt_title), fontWeight = FontWeight.Black, fontSize = 17.sp, color = Color.White)
+                    Text(stringResource(R.string.safety_report_receipt_title), fontWeight = FontWeight.Black, fontSize = 17.sp, color = MeetColors.textPrimary)
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.safety_back), tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.safety_back), tint = MeetColors.textPrimary)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MeetColors.backgroundDeep),
@@ -943,7 +943,7 @@ private fun SafetyReportReceiptScreen(
                 stringResource(R.string.safety_report_receipt_saved_title),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Black,
-                color = Color.White,
+                color = MeetColors.textPrimary,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -972,7 +972,7 @@ private fun SafetyReportReceiptScreen(
                     ) {
                         Column {
                             Text(stringResource(R.string.safety_report_receipt_id), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary)
-                            Text(reportId.take(12) + "...", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Text(reportId.take(12) + "...", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
                         }
                         IconButton(onClick = {
                             clipboard.setText(AnnotatedString(reportId))

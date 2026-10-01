@@ -1,0 +1,554 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "552178c58b86316aba99d34bd2a5f004",
+    "entities": [
+      {
+        "tableName": "installed_ir_profiles",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `displayName` TEXT NOT NULL, `brandId` TEXT NOT NULL, `deviceTypeId` TEXT NOT NULL, `deviceModelId` TEXT, `remoteId` TEXT, `codeSetId` TEXT NOT NULL, `catalogVersion` TEXT NOT NULL, `catalogCanonicalHash` TEXT NOT NULL, `verificationStatus` TEXT NOT NULL, `createdAtEpochMs` INTEGER NOT NULL, `updatedAtEpochMs` INTEGER NOT NULL, `lastSuccessfulUseEpochMs` INTEGER NOT NULL, `needsRevalidation` INTEGER NOT NULL, `isEnabled` INTEGER NOT NULL, PRIMARY KEY(`profileId`))",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "displayName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brandId",
+            "columnName": "brandId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceTypeId",
+            "columnName": "deviceTypeId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceModelId",
+            "columnName": "deviceModelId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "remoteId",
+            "columnName": "remoteId",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "codeSetId",
+            "columnName": "codeSetId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "catalogVersion",
+            "columnName": "catalogVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "catalogCanonicalHash",
+            "columnName": "catalogCanonicalHash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verificationStatus",
+            "columnName": "verificationStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "createdAtEpochMs",
+            "columnName": "createdAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "updatedAtEpochMs",
+            "columnName": "updatedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSuccessfulUseEpochMs",
+            "columnName": "lastSuccessfulUseEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "needsRevalidation",
+            "columnName": "needsRevalidation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isEnabled",
+            "columnName": "isEnabled",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "installed_ir_commands",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`profileId` TEXT NOT NULL, `actionKey` TEXT NOT NULL, `signalId` TEXT NOT NULL, `codeSetId` TEXT NOT NULL, `physicalSha256` TEXT NOT NULL, `sourceRevisionId` TEXT NOT NULL, `verificationStatus` TEXT NOT NULL, `successCount` INTEGER NOT NULL, `failureCount` INTEGER NOT NULL, `lastSuccessEpochMs` INTEGER NOT NULL, `lastFailureEpochMs` INTEGER NOT NULL, PRIMARY KEY(`profileId`, `actionKey`))",
+        "fields": [
+          {
+            "fieldPath": "profileId",
+            "columnName": "profileId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionKey",
+            "columnName": "actionKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "signalId",
+            "columnName": "signalId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "codeSetId",
+            "columnName": "codeSetId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "physicalSha256",
+            "columnName": "physicalSha256",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRevisionId",
+            "columnName": "sourceRevisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verificationStatus",
+            "columnName": "verificationStatus",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "successCount",
+            "columnName": "successCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "failureCount",
+            "columnName": "failureCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSuccessEpochMs",
+            "columnName": "lastSuccessEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastFailureEpochMs",
+            "columnName": "lastFailureEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "profileId",
+            "actionKey"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "probe_sessions",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`sessionId` TEXT NOT NULL, `brand` TEXT NOT NULL, `deviceType` TEXT NOT NULL, `targetModel` TEXT, `startedAtEpochMs` INTEGER NOT NULL, `completedAtEpochMs` INTEGER, `status` TEXT NOT NULL, `winnerCodeSetId` TEXT, PRIMARY KEY(`sessionId`))",
+        "fields": [
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brand",
+            "columnName": "brand",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceType",
+            "columnName": "deviceType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "targetModel",
+            "columnName": "targetModel",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "startedAtEpochMs",
+            "columnName": "startedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "completedAtEpochMs",
+            "columnName": "completedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "winnerCodeSetId",
+            "columnName": "winnerCodeSetId",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "sessionId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "probe_attempts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`attemptId` TEXT NOT NULL, `sessionId` TEXT NOT NULL, `candidateId` TEXT NOT NULL, `codeSetId` TEXT NOT NULL, `signalId` TEXT NOT NULL, `actionKey` TEXT NOT NULL, `transmittedAtEpochMs` INTEGER NOT NULL, `result` TEXT NOT NULL, `transmitDurationMs` INTEGER NOT NULL, PRIMARY KEY(`attemptId`))",
+        "fields": [
+          {
+            "fieldPath": "attemptId",
+            "columnName": "attemptId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sessionId",
+            "columnName": "sessionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "candidateId",
+            "columnName": "candidateId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "codeSetId",
+            "columnName": "codeSetId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "signalId",
+            "columnName": "signalId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionKey",
+            "columnName": "actionKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transmittedAtEpochMs",
+            "columnName": "transmittedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "result",
+            "columnName": "result",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "transmitDurationMs",
+            "columnName": "transmitDurationMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "attemptId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "compatibility_evidence",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `codeSetId` TEXT NOT NULL, `brand` TEXT NOT NULL, `deviceType` TEXT NOT NULL, `actionKey` TEXT NOT NULL, `success` INTEGER NOT NULL, `reportSource` TEXT NOT NULL, `reportedAtEpochMs` INTEGER NOT NULL, `notes` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "codeSetId",
+            "columnName": "codeSetId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "brand",
+            "columnName": "brand",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deviceType",
+            "columnName": "deviceType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "actionKey",
+            "columnName": "actionKey",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "success",
+            "columnName": "success",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reportSource",
+            "columnName": "reportSource",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reportedAtEpochMs",
+            "columnName": "reportedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "candidate_penalties",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`codeSetId` TEXT NOT NULL, `penaltyScore` INTEGER NOT NULL, `failCount` INTEGER NOT NULL, `lastFailEpochMs` INTEGER NOT NULL, `reason` TEXT NOT NULL, PRIMARY KEY(`codeSetId`))",
+        "fields": [
+          {
+            "fieldPath": "codeSetId",
+            "columnName": "codeSetId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "penaltyScore",
+            "columnName": "penaltyScore",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "failCount",
+            "columnName": "failCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastFailEpochMs",
+            "columnName": "lastFailEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reason",
+            "columnName": "reason",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "codeSetId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "catalog_migrations",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`migrationId` TEXT NOT NULL, `fromVersion` TEXT NOT NULL, `toVersion` TEXT NOT NULL, `migratedAtEpochMs` INTEGER NOT NULL, `profileCount` INTEGER NOT NULL, `status` TEXT NOT NULL, PRIMARY KEY(`migrationId`))",
+        "fields": [
+          {
+            "fieldPath": "migrationId",
+            "columnName": "migrationId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fromVersion",
+            "columnName": "fromVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "toVersion",
+            "columnName": "toVersion",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "migratedAtEpochMs",
+            "columnName": "migratedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "profileCount",
+            "columnName": "profileCount",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "status",
+            "columnName": "status",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "migrationId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "signal_sources",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`signalId` TEXT NOT NULL, `sourceId` TEXT NOT NULL, `sourceRevisionId` TEXT NOT NULL, `evidenceLevel` TEXT NOT NULL, `verificationSource` TEXT, `verifiedAtEpochMs` INTEGER, `deviceModel` TEXT, `notes` TEXT, PRIMARY KEY(`signalId`, `sourceId`))",
+        "fields": [
+          {
+            "fieldPath": "signalId",
+            "columnName": "signalId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceId",
+            "columnName": "sourceId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sourceRevisionId",
+            "columnName": "sourceRevisionId",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceLevel",
+            "columnName": "evidenceLevel",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verificationSource",
+            "columnName": "verificationSource",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "verifiedAtEpochMs",
+            "columnName": "verifiedAtEpochMs",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "deviceModel",
+            "columnName": "deviceModel",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "notes",
+            "columnName": "notes",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "signalId",
+            "sourceId"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '552178c58b86316aba99d34bd2a5f004')"
+    ]
+  }
+}

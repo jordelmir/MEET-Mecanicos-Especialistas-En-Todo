@@ -27,7 +27,7 @@ fun ExplainClaimBottomSheet(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF0C1524),
+        containerColor = MeetColors.backgroundDark,
         dragHandle = {
             Surface(
                 modifier = Modifier
@@ -72,7 +72,7 @@ fun ExplainClaimBottomSheet(
             EliteCard(
                 glowColor = MeetColors.cyberCyan,
                 borderColor = MeetColors.cyberCyan.copy(alpha = 0.35f),
-                backgroundColor = Color(0xFF132035),
+                backgroundColor = MeetColors.cardBackgroundLighter,
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -97,7 +97,7 @@ fun ExplainClaimBottomSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF081220))
+                    .background(MeetColors.backgroundDark)
                     .border(1.dp, MeetColors.borderSubtle, RoundedCornerShape(10.dp))
                     .padding(12.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -127,7 +127,7 @@ fun ExplainClaimBottomSheet(
                     Surface(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(8.dp),
-                        color = Color(0xFF101B2E),
+                        color = MeetColors.cardBackground,
                         border = androidx.compose.foundation.BorderStroke(1.dp, MeetColors.borderSubtle)
                     ) {
                         Row(

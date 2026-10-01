@@ -54,6 +54,7 @@ import com.elysium369.meet.ui.ObdViewModel
 import com.elysium369.meet.ui.navigation.MeetDestinations
 import com.elysium369.meet.ui.navigation.safeNavigate
 import com.elysium369.meet.ui.theme.MeetColors
+import com.elysium369.meet.provider.domain.models.*
 import com.elysium369.meet.ui.util.WazeNavigationButton
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -84,8 +85,11 @@ import java.util.Locale
 fun ElysiumServicesMarketplaceScreen(
     navController: NavController,
     viewModel: ObdViewModel,
+    onPrepareRequest: ((ServicesRequestDraft) -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val openAuthoritativeServices = LocalServiceOnlineAction.current
+    val prepareOffer = LocalServiceOfferDraft.current
     val scope = rememberCoroutineScope()
 
     var isSpecialistMode by rememberSaveable { mutableStateOf(false) }
@@ -135,6 +139,63 @@ fun ElysiumServicesMarketplaceScreen(
     var voiceSearchActive by remember { mutableStateOf(false) }
     var selectedViewMode by rememberSaveable { mutableStateOf("LIST") } // "LIST" or "MAP"
     var focusedMapRequest by remember { mutableStateOf<ServiceRequestEntity?>(null) }
+
+    // Provider profile & constitutional wallet state (5% platform fee)
+    val userProfiles by viewModel.userProviderProfiles.collectAsState()
+    val activePrincipal by viewModel.activePrincipal.collectAsState()
+    val activeProfile = userProfiles.firstOrNull { it.isActive && it.userId == activePrincipal?.id }
+    val profileData = remember(activeProfile) {
+        if (activeProfile != null && activeProfile.specialties.isNotBlank()) {
+            ProviderServiceProfileData.fromJsonString(activeProfile.specialties)
+        } else {
+            ProviderServiceProfileData.defaultTemplateForCategory(ProviderDomainCategory.AUTOMOTIVE_MECHANIC)
+        }
+    }
+    var showTopUpDialog by remember { mutableStateOf(false) }
+    var pendingTopUpRequest by remember { mutableStateOf<ServiceRequestEntity?>(null) }
+    var requiredFeeForTopUp by remember { mutableLongStateOf(0L) }
+    var pendingProofRequest by remember { mutableStateOf<Triple<Long, String, String>?>(null) }
+    val topupProofPicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        val pending = pendingProofRequest
+        pendingProofRequest = null
+        if (uri != null && pending != null) scope.launch {
+            var proofFile: java.io.File? = null
+            runCatching {
+                check(viewModel.currentUserId == pending.third) { "La sesión cambió" }
+                val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+                        val output = java.io.ByteArrayOutputStream()
+                        val buffer = ByteArray(8192)
+                        while (true) {
+                            val count = input.read(buffer)
+                            if (count < 0) break
+                            require(output.size().toLong() + count <= com.elysium369.meet.ride.domain.RideProofFormat.MAX_BYTES) {
+                                "Comprobante mayor de 12 MB"
+                            }
+                            output.write(buffer, 0, count)
+                        }
+                        output.toByteArray()
+                    } ?: error("No se pudo leer el comprobante")
+                    val extension = com.elysium369.meet.ride.domain.RideProofFormat.extension(bytes)
+                        ?: error("Selecciona JPG, PNG, WEBP o PDF")
+                    java.io.File.createTempFile("sinpe-proof-", ".$extension", context.cacheDir).apply { writeBytes(bytes) }
+                }
+                proofFile = file
+                check(viewModel.currentUserId == pending.third) { "La sesión cambió" }
+                com.elysium369.meet.ride.data.remote.PlatformTrustCenterGateway.submitWalletTopup(
+                    file.absolutePath, pending.first, null, pending.second
+                )
+            }.onSuccess {
+                Toast.makeText(context, "Comprobante recibido por el servidor. Pendiente de validación del propietario; saldo sin abonar.", Toast.LENGTH_LONG).show()
+            }.onFailure {
+                Toast.makeText(context, "No se pudo enviar el comprobante. Reintenta; el saldo no fue abonado.", Toast.LENGTH_LONG).show()
+            }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { proofFile?.delete() }
+        }
+    }
+
 
     // Multi-domain technical inspection state (Pillar 4)
     var dtcCodeInput by rememberSaveable { mutableStateOf("") }
@@ -190,7 +251,7 @@ fun ElysiumServicesMarketplaceScreen(
                             letterSpacing = 0.5.sp,
                         )
                         Text(
-                            text = if (isSpecialistMode) "Modo Especialista (Tomar / Contraofertar)" else "Modo Cliente (Solicitar con Escrow)",
+                            text = if (isSpecialistMode) "Modo Especialista (Tomar / Contraofertar)" else "Modo Cliente (Preparar solicitud)",
                             fontSize = 11.sp,
                             color = if (isSpecialistMode) MeetColors.neonGreen else MeetColors.cyberCyan,
                         )
@@ -533,27 +594,17 @@ fun ElysiumServicesMarketplaceScreen(
                                             else -> ""
                                         }
                                         val fullProblemDescription = "${activeCategory.name}: $problemInput$techSummary"
-                                        viewModel.createServiceRequest(
-                                            vehicleId = viewModel.selectedVehicle.value?.id ?: "V_COMMERCIAL",
-                                            problem = fullProblemDescription,
-                                            description = "$problemInput$techSummary",
-                                            location = locationInput,
-                                            priority = "MEDIUM",
-                                            priceOffer = price,
-                                            phone = "8888-8888",
-                                            latitude = locationLat,
-                                            longitude = locationLon
-                                        )
-                                        problemInput = ""
-                                        dtcCodeInput = ""
-                                        Toast.makeText(context, "¡Solicitud técnica publicada en la red con Escrow!", Toast.LENGTH_LONG).show()
+                                        val definitionId = when(activeCategory.domainKey) {
+                                            "AUTO_MECHANICAL" -> "mechanical"; "AUTO_TOW" -> "roadside"
+                                            "LOCKSMITH" -> "hardware_locksmith"; "BATTERY" -> "mechanical"
+                                            "HARDWARE" -> "hardware_materials"; "DETAILING" -> "vehicle_detailing"
+                                            "PLUMBING" -> "plumbing"; "ELECTRICAL" -> "electrical_home"
+                                            "PULPERIA" -> "pulperia_groceries"; else -> "soda_traditional_food"
+                                        }
+                                        onPrepareRequest?.invoke(ServicesRequestDraft(definitionId,fullProblemDescription,
+                                            "$problemInput$techSummary",locationInput,price.toLong(),"PHYSICAL",locationLat,locationLon))
+                                        if(onPrepareRequest==null) openAuthoritativeServices("Continúa la solicitud técnica en línea; todavía no se ha publicado.")
 
-                                        // DigiSoul XP
-                                        EvairDigiSoulEngine.shared.recordInteraction(
-                                            action = "SERVICE_REQUEST_CREATED",
-                                            xpGained = 30,
-                                            narrative = "Publicamos solicitud técnica de ${activeCategory.name} con respaldo forense."
-                                        )
                                     },
                                     modifier = Modifier
                                         .weight(1.2f)
@@ -686,15 +737,8 @@ fun ElysiumServicesMarketplaceScreen(
                                 selectedViewMode = "MAP"
                             },
                             onTakeDirect = {
-                                viewModel.placeServiceBid(
-                                    requestId = req.requestId,
-                                    providerName = "Especialista Certificado MEET",
-                                    price = req.priceOffer,
-                                    estimatedHours = 1.0,
-                                    warrantyDays = 30,
-                                    message = "Acepto el precio propuesto por el cliente. En camino con equipo profesional."
-                                )
-                                Toast.makeText(context, "¡Oferta enviada al cliente por ₡${req.priceOffer}!", Toast.LENGTH_SHORT).show()
+                                prepareOffer(ServicesOfferDraft(req.priceOffer.toLong(),1.0,30,"Oferta para ${req.problem}"))
+                                openAuthoritativeServices("Esta solicitud pertenece al historial anterior. La nueva propuesta y su comisión requieren confirmación en línea; no se ha cobrado saldo.")
                             },
                             onCounterOffer = {
                                 counterOfferDialogRequest = req
@@ -716,16 +760,33 @@ fun ElysiumServicesMarketplaceScreen(
             request = req,
             onDismiss = { counterOfferDialogRequest = null },
             onSubmitCounterOffer = { price, hours, warranty, note ->
-                viewModel.placeServiceBid(
-                    requestId = req.requestId,
-                    providerName = "Especialista Profesional Certificado",
-                    price = price,
-                    estimatedHours = hours,
-                    warrantyDays = warranty,
-                    message = note
-                )
+                prepareOffer(ServicesOfferDraft(price.toLong(),hours,warranty,note))
+                openAuthoritativeServices("Borrador de contraoferta histórica: ₡$price · $hours horas · garantía $warranty días · $note. Aún no se ha enviado ni cobrado comisión; selecciona una solicitud en línea.")
                 counterOfferDialogRequest = null
-                Toast.makeText(context, "¡Contraoferta de ₡$price enviada al cliente con éxito!", Toast.LENGTH_LONG).show()
+            }
+        )
+    }
+
+    // ── Dialog: Recarga SINPE Móvil de Saldo Constitucional (5%) ──
+    if (showTopUpDialog) {
+        SinpeTopUpDialog(
+            currentBalanceCrc = profileData.walletBalanceCrc,
+            requiredFeeCrc = requiredFeeForTopUp,
+            onDismiss = {
+                showTopUpDialog = false
+                pendingTopUpRequest = null
+            },
+            onConfirmTopUp = submit@ { amountCrc, ref ->
+                // Only server review can confirm a top-up; never mutate a JSON balance.
+                val owner = viewModel.currentUserId?.takeIf(String::isNotBlank)
+                if (owner == null) {
+                    Toast.makeText(context, "Inicia sesión antes de solicitar la validación.", Toast.LENGTH_LONG).show()
+                    return@submit
+                }
+                pendingProofRequest = Triple(amountCrc, ref, owner)
+                showTopUpDialog = false
+                pendingTopUpRequest = null
+                topupProofPicker.launch(arrayOf("image/jpeg", "image/png", "image/webp", "application/pdf"))
             }
         )
     }
@@ -736,57 +797,8 @@ fun ElysiumServicesMarketplaceScreen(
             request = req,
             onDismiss = { ratingDialogRequest = null },
             onSubmitRating = { stars, praiseTags, reviewText ->
-                viewModel.completeMechanicRequest(req.requestId)
-
-                // 1. Cierre Forense con Hash SHA-256 y Escrow Release (Pillar 1)
-                val epochMs = System.currentTimeMillis()
-                val certReportId = "rep_svc_${req.requestId.take(8)}_$epochMs"
-                val vehicleId = if (req.vehicleId.isNotBlank()) req.vehicleId else "veh_client_${req.requestId.take(8)}"
-                val rawCertPayload = "$certReportId|${req.requestId}|${req.priceOffer}|$stars|$epochMs|ESCROW_RELEASED"
-                val certHash = HashEngine.sha256Hex(rawCertPayload)
-                val verifierUrl = "https://meet.elysium369.cr/verify?id=$certReportId"
-                val qrMinimalPayload = "$certReportId|$certHash|$vehicleId|$epochMs|SERVICE_COMPLETION_REPORT|$verifierUrl"
-
-                // 2. Inyección inmutable en la historia del vehículo
-                viewModel.vehicleHistoryTimeline.addEvent(
-                    vehicleId = vehicleId,
-                    type = VehicleEventType.REPAIR_COMPLETED,
-                    title = "Servicio Especializado: ${req.problem.take(30)}",
-                    description = "Servicio completado satisfactoriamente. Calificación ⭐ $stars. Tags: ${praiseTags.joinToString()}. Escrow liberado: ₡${String.format("%,.0f", req.priceOffer)} CRC.",
-                    details = mapOf(
-                        "reportId" to certReportId,
-                        "integrityHash" to certHash,
-                        "escrowStatus" to "RELEASED",
-                        "priceOffer" to "${req.priceOffer}"
-                    ),
-                    actorName = "Especialista Certificado MEET",
-                    relatedReportId = certReportId
-                )
-
-                // 3. DigiSoul XP & Memoria de Agente (Pillar 5)
-                EvairDigiSoulEngine.shared.recordInteraction(
-                    action = "SERVICE_COMPLETED_RATED",
-                    xpGained = 150,
-                    narrative = "Servicio cerrado con certificación forense SHA-256 ($certHash). Calificación de $stars estrellas. Tags: ${praiseTags.joinToString()}."
-                )
-
-                completionCertificateData = ServiceCompletionCertificateData(
-                    reportId = certReportId,
-                    integrityHash = certHash,
-                    vehicleId = vehicleId,
-                    generatedAt = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date(epochMs)),
-                    reportType = "CERTIFICADO DE SERVICIO FORENSE",
-                    verifierUrl = verifierUrl,
-                    escrowStatus = "FONDOS LIBERADOS (RELEASED)",
-                    amountCrc = req.priceOffer,
-                    specialistName = "Especialista Certificado MEET",
-                    problemDescription = req.problem,
-                    ratingStars = stars,
-                    qrMinimalPayload = qrMinimalPayload
-                )
-
+                openAuthoritativeServices("Calificación histórica pendiente: $stars estrellas · ${praiseTags.joinToString()} · $reviewText. No se ha confirmado cierre, certificado ni liberación de fondos; utiliza el servicio en línea correspondiente.")
                 ratingDialogRequest = null
-                Toast.makeText(context, "¡Servicio completado! Certificado forense generado y fondos liberados.", Toast.LENGTH_LONG).show()
             }
         )
     }
@@ -1014,6 +1026,7 @@ private fun ClientActiveRequestCard(
     onCompleteAndRate: () -> Unit,
     onTrackOnMap: () -> Unit = {},
 ) {
+    val openAuthoritativeServices = LocalServiceOnlineAction.current
     val bids by viewModel.getBidsForRequest(request.requestId).collectAsState(initial = emptyList())
     val isAccepted = request.status == "ACCEPTED"
 
@@ -1232,7 +1245,7 @@ private fun ClientActiveRequestCard(
                                 Spacer(Modifier.height(8.dp))
                                 Button(
                                     onClick = {
-                                        viewModel.acceptBid(request.requestId, bid.bidId)
+                                        openAuthoritativeServices("La oferta histórica necesita reconciliación con el servidor. No se ha asignado ni cobrado un servicio.")
                                     },
                                     modifier = Modifier.fillMaxWidth(),
                                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
@@ -1342,33 +1355,77 @@ private fun SpecialistRequestItemCard(
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(10.dp))
+
+            // Desglose transparente de comisión constitucional (5%)
+            val grossAmount = request.priceOffer.toLong()
+            val feeAmount = maxOf(1L, (grossAmount * 500L) / 10000L)
+            val netEarnings = maxOf(0L, grossAmount - feeAmount)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFF061524), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Ganancia neta: ₡${"%,d".format(netEarnings)} CRC",
+                    color = MeetColors.neonGreen,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+                Text(
+                    text = "Comisión 5%: -₡${"%,d".format(feeAmount)}",
+                    color = Color.LightGray,
+                    fontSize = 10.sp
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // Fila 1: Navegación & Radar (Responsive)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(
+                OutlinedButton(
                     onClick = onViewOnMap,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .border(1.dp, MeetColors.cyberCyan, RoundedCornerShape(10.dp))
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
+                    border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
                 ) {
-                    Icon(Icons.Default.Map, contentDescription = "Ver en Radar", tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Map, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(15.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Radar", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
 
                 WazeNavigationButton(
                     destinationLat = reqLat,
                     destinationLng = reqLon,
                     destinationLabel = request.problem,
+                    modifier = Modifier.weight(1f)
                 )
+            }
 
+            Spacer(Modifier.height(8.dp))
+
+            // Fila 2: Ofertas & Negociación (Responsive)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 OutlinedButton(
                     onClick = onCounterOffer,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.cyberCyan),
                     border = BorderStroke(1.dp, MeetColors.cyberCyan),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(4.dp))
@@ -1379,9 +1436,10 @@ private fun SpecialistRequestItemCard(
                     onClick = onTakeDirect,
                     modifier = Modifier.weight(1.1f),
                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, tint = MeetColors.backgroundDark, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.Check, contentDescription = null, tint = MeetColors.backgroundDark, modifier = Modifier.size(15.dp))
                     Spacer(Modifier.width(4.dp))
                     Text("Tomar Directo", color = MeetColors.backgroundDark, fontSize = 11.sp, fontWeight = FontWeight.Black)
                 }
@@ -2916,6 +2974,190 @@ private fun AuraSentinelEmergencyHavenDialog(
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text("Cancelar", color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SinpeTopUpDialog(
+    currentBalanceCrc: Long,
+    requiredFeeCrc: Long,
+    onDismiss: () -> Unit,
+    onConfirmTopUp: (amountCrc: Long, reference: String) -> Unit,
+) {
+    var amountText by remember { mutableStateOf(maxOf(5000L, requiredFeeCrc).toString()) }
+    var referenceText by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth(0.96f),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF081422)),
+            border = BorderStroke(1.dp, MeetColors.cyberCyan)
+        ) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.AccountBalanceWallet,
+                        contentDescription = null,
+                        tint = MeetColors.neonGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "RECARGA DE SALDO SINPE MÓVIL",
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 15.sp
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Comisión Constitucional MEET (5%)",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(Modifier.height(14.dp))
+
+                // Estado actual del saldo
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF0C1F33), RoundedCornerShape(10.dp))
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("Saldo actual:", color = Color.LightGray, fontSize = 11.sp)
+                        Text(
+                            "₡${"%,d".format(currentBalanceCrc)} CRC",
+                            color = if (currentBalanceCrc >= requiredFeeCrc) MeetColors.neonGreen else Color(0xFFFF5252),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Comisión requerida:", color = Color.LightGray, fontSize = 11.sp)
+                        Text(
+                            "₡${"%,d".format(requiredFeeCrc)} CRC",
+                            color = MeetColors.cyberCyan,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                // Instrucciones SINPE Móvil
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF0A1828), RoundedCornerShape(8.dp))
+                        .border(1.dp, Color(0xFF1B354D), RoundedCornerShape(8.dp))
+                        .padding(10.dp)
+                ) {
+                    Text(
+                        "📱 Paga vía SINPE Móvil al número:",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "8888-6338 (8888-MEET)",
+                        color = MeetColors.neonGreen,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Black
+                    )
+                    Text(
+                        "A nombre de: MEET Especialistas S.A.",
+                        color = Color.LightGray,
+                        fontSize = 10.sp
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = amountText,
+                    onValueChange = {
+                        amountText = it.filter(Char::isDigit)
+                        errorMessage = null
+                    },
+                    label = { Text("Monto a Recargar (₡ CRC)") },
+                    prefix = { Text("₡ ", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    singleLine = true
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = referenceText,
+                    onValueChange = {
+                        referenceText = it
+                        errorMessage = null
+                    },
+                    label = { Text("Número de Comprobante / Referencia") },
+                    placeholder = { Text("Ej: 20260925-123456", color = Color.Gray) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    singleLine = true
+                )
+
+                if (errorMessage != null) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        errorMessage!!,
+                        color = Color(0xFFFF5252),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text("Cancelar", color = Color.White)
+                    }
+
+                    Button(
+                        onClick = {
+                            val amount = amountText.toLongOrNull() ?: 0L
+                            val ref = referenceText.trim()
+                            if (amount < 1000L) {
+                                errorMessage = "El monto mínimo de recarga es ₡1,000 CRC."
+                                return@Button
+                            }
+                            if (ref.length < 4) {
+                                errorMessage = "Ingresa el comprobante o referencia bancaria."
+                                return@Button
+                            }
+                            onConfirmTopUp(amount, ref)
+                        },
+                        modifier = Modifier.weight(1.3f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Text(
+                            "SOLICITAR VALIDACIÓN",
+                            color = MeetColors.backgroundDark,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
         }

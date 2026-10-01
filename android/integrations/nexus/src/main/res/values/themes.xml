@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Elysium Nexus — base theme.
+
+      Phase ULT.9: The base theme is now a dark
+      NoActionBar theme to match the Compose dark
+      color scheme. This prevents a flash of white
+      during cold start (the XML theme paints the
+      window background before Compose renders).
+
+      The windowBackground is set to the Elysium
+      near-black (#050008) so the cold-start window
+      is already visually consistent with the
+      animated splash.
+    -->
+    <style name="Theme.ElysiumNexus" parent="@android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/elysium_background</item>
+        <item name="android:statusBarColor">@color/elysium_background</item>
+        <item name="android:navigationBarColor">@color/elysium_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
