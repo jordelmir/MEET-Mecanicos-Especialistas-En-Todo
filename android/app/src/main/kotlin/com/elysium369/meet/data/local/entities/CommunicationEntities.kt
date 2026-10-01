@@ -64,6 +64,7 @@ data class CommunicationParticipantEntity(
 
 @Entity(
     tableName = "communication_events",
+    primaryKeys = ["eventId", "ownerPrincipalId"],
     foreignKeys = [
         ForeignKey(
             entity = CommunicationConversationEntity::class,
@@ -75,12 +76,12 @@ data class CommunicationParticipantEntity(
     indices = [
         Index(value = ["conversationId", "ownerPrincipalId", "createdAtEpochMs"]),
         Index(value = ["ownerPrincipalId", "syncState"]),
-        Index(value = ["conversationId", "serverSequence"], unique = true),
+        Index(value = ["conversationId", "ownerPrincipalId", "serverSequence"], unique = true),
         Index(value = ["conversationId", "ownerPrincipalId"]),
     ],
 )
 data class CommunicationEventEntity(
-    @androidx.room.PrimaryKey val eventId: String,
+    val eventId: String,
     val conversationId: String,
     val ownerPrincipalId: String,
     val senderPrincipalId: String,

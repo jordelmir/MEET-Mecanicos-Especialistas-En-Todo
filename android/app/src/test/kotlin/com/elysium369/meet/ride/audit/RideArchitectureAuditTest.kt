@@ -176,10 +176,10 @@ class RideArchitectureAuditTest {
     @Test
     fun `Costa Rica fare engine produces correct amounts for zero distance`() {
         val quote = RideFareEngine.quoteCostaRica(distanceMeters = 0, durationSeconds = 0)
-        assertEquals(0L, quote.estimatedTotalMinor)
+        assertEquals(1_000L, quote.estimatedTotalMinor)
         assertEquals(RideFareMode.METERED_TIME_DISTANCE, quote.mode)
         assertEquals("CRC", quote.currency.name)
-        assertEquals(1L, quote.rateCardVersion)
+        assertEquals(2L, quote.rateCardVersion)
     }
 
     @Test
@@ -202,7 +202,7 @@ class RideArchitectureAuditTest {
         assertEquals(1L, quote.distanceFareMinor)
         // Time: ceil(1 * 60 / 60) = ceil(1) = 1
         assertEquals(1L, quote.timeFareMinor)
-        assertEquals(2L, quote.estimatedTotalMinor)
+        assertEquals(1_000L, quote.estimatedTotalMinor)
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.elysium369.meet.ui.screens
 
+import com.elysium369.meet.ui.theme.MeetColors
 import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
@@ -94,7 +95,7 @@ import java.util.Locale
 private object PartColors {
     val darkBackground = Color(0xFF0A0E1A)
     val cardBackground = Color(0xFF121829)
-    val cyanAccent = Color(0xFF00E5FF)
+    val cyanAccent: Color get() = MeetColors.electricBlue
     val orangeAccent = Color(0xFFFF6D00)
     val greenAccent = Color(0xFF00E676)
     val redAccent = Color(0xFFFF1744)
@@ -244,7 +245,7 @@ private fun CompatibilityResultPanel(
     val hasBlock = result.warnings.any { it.severity == WarningSeverity.BLOCK }
     val borderColor = if (hasBlock) PartColors.redAccent else accentColor
     Surface(
-        color = Color(0xFF0F172A),
+        color = MeetColors.cardBackground,
         border = BorderStroke(1.dp, borderColor.copy(alpha = 0.55f)),
         shape = RoundedCornerShape(8.dp),
         modifier = modifier.fillMaxWidth()
@@ -294,7 +295,7 @@ private fun QuoteValidationPanel(
 
     val color = if (validation.level == ValidationLevel.BLOCK) PartColors.redAccent else PartColors.orangeAccent
     Surface(
-        color = Color(0xFF0F172A),
+        color = MeetColors.cardBackground,
         border = BorderStroke(1.dp, color.copy(alpha = 0.55f)),
         shape = RoundedCornerShape(8.dp),
         modifier = modifier.fillMaxWidth()
@@ -696,7 +697,7 @@ private fun ClientWorkspaceView(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1728)),
                 border = BorderStroke(
                     1.2.dp,
-                    Brush.horizontalGradient(listOf(PartColors.cyanAccent.copy(alpha = 0.6f), Color(0xFF3D5AFE).copy(alpha = 0.6f)))
+                    Brush.horizontalGradient(listOf(PartColors.cyanAccent.copy(alpha = 0.6f), MeetColors.cyberCyan.copy(alpha = 0.6f)))
                 ),
                 shape = RoundedCornerShape(18.dp),
                 modifier = Modifier
@@ -1510,7 +1511,7 @@ private fun PartRequestStepHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFF0F172A), RoundedCornerShape(8.dp))
+            .background(MeetColors.cardBackground, RoundedCornerShape(8.dp))
             .padding(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -1558,7 +1559,7 @@ private fun PartRequestSummaryPanel(
 ) {
     val hasBlock = compatibilityResult?.warnings?.any { it.severity == WarningSeverity.BLOCK } == true
     Surface(
-        color = if (hasBlock) PartColors.redAccent.copy(alpha = 0.08f) else Color(0xFF0F172A),
+        color = if (hasBlock) PartColors.redAccent.copy(alpha = 0.08f) else MeetColors.cardBackground,
         border = BorderStroke(
             1.dp,
             if (hasBlock) PartColors.redAccent.copy(alpha = 0.45f) else PartColors.cyanAccent.copy(alpha = 0.25f)

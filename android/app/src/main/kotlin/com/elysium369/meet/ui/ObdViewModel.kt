@@ -203,10 +203,11 @@ private data class RemoteRideDriverVehicleSummary(
     val seats: Int,
     @kotlinx.serialization.SerialName("verification_status") val verificationStatus: String,
     @kotlinx.serialization.SerialName("is_active") val active: Boolean,
+    @kotlinx.serialization.SerialName("vehicle_kind") val vehicleKind: String = "CAR",
 ) {
     fun toDomain() = RideDriverVehicleSummary(
         id, displayName, make, model, modelYear, color, plateMasked,
-        fleetName, seats, verificationStatus, active,
+        fleetName, seats, verificationStatus, active, vehicleKind,
     )
 }
 
@@ -1419,7 +1420,7 @@ class ObdViewModel @Inject constructor(
                 deliveryFeeMinor = deliveryFeeMinor,
                 totalAmountMinor = total,
                 paymentMethod = paymentMethod,
-                paymentStatus = if (paymentMethod == "SINPE") "ESCROW_HELD" else "PENDING",
+                paymentStatus = "PENDING", // A selected payment method is not confirmed funds.
                 deliveryPin = pin,
                 status = "PLACED",
                 createdAt = System.currentTimeMillis()
@@ -1489,8 +1490,23 @@ class ObdViewModel @Inject constructor(
     }
 
     fun cancelServiceRequest(requestId: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
+            val req = marketplaceDao.getRequestById(requestId)
             marketplaceDao.markServiceCancelled(requestId)
+            // Reembolso constitucional: si el especialista asignado pagó la comisión del 5%, se le reembolsa
+            val mechanicId = req?.assignedMechanicId
+            if (req != null && !mechanicId.isNullOrBlank()) {
+                val providerProfile = providerProfileDao.getProfile(mechanicId)
+                    ?: providerProfileDao.getProfilesForUser(mechanicId).firstOrNull()?.firstOrNull()
+                if (providerProfile != null && providerProfile.specialties.isNotBlank()) {
+                    runCatching {
+                        val profile = com.elysium369.meet.provider.domain.models.ProviderServiceProfileData.fromJsonString(providerProfile.specialties)
+                        val fee = profile.calculateFee(req.priceOffer.toLong())
+                        val refunded = profile.withTopUp(fee, "REFUND-$requestId")
+                        providerProfileDao.updateSpecialties(providerProfile.profileId, refunded.toJsonString(), System.currentTimeMillis())
+                    }.onFailure { Log.w("ObdViewModel", "Service cancellation refund failed", it) }
+                }
+            }
         }
     }
 
@@ -2444,6 +2460,20 @@ class ObdViewModel @Inject constructor(
                     mapOf("is_active" to false, "deleted_at" to System.currentTimeMillis().toString())
                 ) { filter { eq("profile_id", profileId) } }
             }.onFailure { Log.w("ObdViewModel", "Provider delete: Supabase sync failed", it) }
+        }
+    }
+
+    /** Update specialties JSON (including wallet balance and transactions) for a provider profile */
+    fun updateProviderProfileSpecialties(profileId: String, specialtiesJson: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val now = System.currentTimeMillis()
+            providerProfileDao.updateSpecialties(profileId, specialtiesJson, now)
+            refreshProviderRoles()
+            runCatching {
+                SupabaseManager.client.postgrest["provider_profiles"].update(
+                    mapOf("specialties" to specialtiesJson, "updated_at" to now.toString())
+                ) { filter { eq("profile_id", profileId) } }
+            }.onFailure { Log.w("ObdViewModel", "Provider specialties: Supabase sync failed", it) }
         }
     }
 
@@ -7520,9 +7550,17 @@ class ObdViewModel @Inject constructor(
         transmissionType: String,
         fuelType: String,
         plate: String,
-        vin: String?
+        vin: String?,
+        vehicleKind: String = "CAR",
+        onResult: ((Boolean, String) -> Unit)? = null,
     ) {
+        if (vehicleKind !in setOf("CAR", "MOTORCYCLE")) {
+            onResult?.invoke(false, "Tipo de vehículo inválido")
+            return
+        }
+        val ownerAtRequest=activePrincipalKernel.current().id
         viewModelScope.launch {
+            if(activePrincipalKernel.current().id!=ownerAtRequest) return@launch
             val displacement = engineDisplacement.replace(Regex("[^0-9]"), "").toIntOrNull() ?: 0
             val enginePart = listOf(engineDisplacement, engineTech).filter { it.isNotBlank() }.joinToString(" ")
             val transPart = listOf(transmission, transmissionType).filter { it.isNotBlank() }.joinToString(" - ")
@@ -7530,7 +7568,7 @@ class ObdViewModel @Inject constructor(
 
             val vehicle = Vehicle(
                 id = UUID.randomUUID().toString(),
-                user_id = currentProviderUserId(),
+                user_id = ownerAtRequest,
                 year = year.toIntOrNull() ?: 2024,
                 make = make,
                 model = model,
@@ -7541,28 +7579,35 @@ class ObdViewModel @Inject constructor(
                 transmission_subtype = transmissionType,
                 fuel_type = fuelType,
                 vin = vin?.ifBlank { "NOT_READ" } ?: "NOT_READ",
-                plate = plate.ifBlank { "NOT_SET" }
+                plate = plate.ifBlank { "NOT_SET" },
+                vehicle_kind = vehicleKind,
             )
 
-            android.util.Log.d("ObdVM", "Saving vehicle: ${vehicle.make} ${vehicle.model} (ID: ${vehicle.id})")
             when (val result = vehicleRepository.insertVehicle(vehicle)) {
                 is com.elysium369.meet.core.remote.RemoteResult.Success -> {
                     voiceFeedbackManager.speak(
                         "Vehículo $make $model guardado exitosamente.",
                         "Vehicle $make $model saved successfully."
                     )
+                    onResult?.invoke(true, "Vehículo confirmado en línea")
+                }
+                is com.elysium369.meet.core.remote.RemoteResult.Forbidden,
+                is com.elysium369.meet.core.remote.RemoteResult.Unauthorized -> {
+                    onResult?.invoke(false, "No se pudo confirmar la propiedad del vehículo. Inicia sesión y reintenta.")
+                    return@launch
                 }
                 else -> {
                     voiceFeedbackManager.speak(
                         "Vehículo guardado localmente; sincronización remota pendiente.",
                         "Vehicle saved locally; remote sync pending."
                     )
-                    Log.w("ObdVM", "Insert vehicle failed: $result")
+                    Log.w("ObdVM", "La sincronización del vehículo sigue pendiente")
+                    onResult?.invoke(false, "Guardado en este teléfono; pendiente de sincronización en línea")
                 }
             }
 
             // Fix: Call selectVehicle to ensure persistence of the selected ID
-            selectVehicle(vehicle, ActiveVehicleChangeReason.USER_CREATED)
+            if(activePrincipalKernel.current().id==ownerAtRequest) selectVehicle(vehicle, ActiveVehicleChangeReason.USER_CREATED)
         }
     }
 
@@ -8984,17 +9029,19 @@ class ObdViewModel @Inject constructor(
         color: String,
         plate: String,
         fleetName: String?,
+        vehicleKind: String = "CAR",
     ) {
         val normalized = listOf(make, model, color, plate).map(String::trim)
-        if (normalized.any(String::isBlank) || year !in 1900..2200) return
+        if (normalized.any(String::isBlank) || year !in 1900..2200 || vehicleKind !in setOf("CAR", "MOTORCYCLE")) return
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 SupabaseManager.client.postgrest.rpc(
-                    "ride_upsert_driver_vehicle_v1",
+                    "ride_upsert_driver_vehicle_v2",
                     buildJsonObject {
                         put("p_vehicle_id", UUID.randomUUID().toString())
                         put("p_display_name", "$make $model $year $color")
-                        put("p_seats", 4)
+                        put("p_seats", if (vehicleKind == "MOTORCYCLE") 1 else 4)
+                        put("p_vehicle_kind", vehicleKind)
                         put("p_make", make.trim())
                         put("p_model", model.trim())
                         put("p_model_year", year)
@@ -9240,6 +9287,7 @@ class ObdViewModel @Inject constructor(
                 dumpAiStateSnapshot()
             }
             is com.elysium369.meet.automation.AiAction.InjectGps -> {
+                if (!BuildConfig.DEBUG) return
                 _currentGpsLocation.value = GpsLocationInfo(
                     latitude = action.latitude,
                     longitude = action.longitude,
@@ -9927,6 +9975,12 @@ class ObdViewModel @Inject constructor(
         passengerPreferences: RidePassengerPreferences? = null,
     ) {
         viewModelScope.launch(Dispatchers.IO) {
+            if (passengerPreferences?.vehicleKind == com.elysium369.meet.ride.domain.RideVehicleKind.MOTORCYCLE &&
+                (passengerPreferences.kidsCount != 0 || passengerPreferences.fivePassengers ||
+                    passengerPreferences.pet != com.elysium369.meet.ride.domain.RidePetType.NONE)) {
+                _rideVerificationNotice.emit("La moto admite un solo pasajero, sin acompañantes ni mascotas.")
+                return@launch
+            }
             // A route cannot be calculated from a text label alone. Reject an
             // incomplete destination before writing a request locally or
             // publishing it remotely; otherwise both clients only receive two
@@ -10657,38 +10711,16 @@ class ObdViewModel @Inject constructor(
     fun cancellationCommands(requestId: String) = rideCommandRepository.cancellationCommands(requestId)
 
     fun localCancelStuckRide(requestId: String) {
-        viewModelScope.launch(Dispatchers.IO) {
-            val request = rideDao.getRequestById(requestId) ?: return@launch
-            rideCommandRepository.cancelPublicationCommands(requestId)
-            rideCommandRepository.cancelStuckPendingPublication(requestId)
-            rideDao.markRequestCancelledLocally(requestId)
-            rideDao.clearActiveRideSelectionsForRide(requestId)
-            applyActiveRide(null)
-            _rideVerificationNotice.emit("Viaje local cancelado.")
-            val queued = reportRideCommandEnqueue(
-                rideCommandRepository.enqueue(
-                    envelope = rideCommandEnvelope(requestId, 0L, RideCommandType.CANCEL),
-                    payload = RideCommandPayload(reasonCode = RideCancellationReason.DUPLICATE_OR_ACCIDENTAL.name),
-                ),
-                acceptedMessage = "Cancelación registrada.",
-            )
-            if (queued) RideCommandSyncWorker.enqueueNow(context)
-        }
+        cancelRide(requestId,RideCancellationReason.DUPLICATE_OR_ACCIDENTAL,null,"PASSENGER")
     }
 
     fun clearAllStuckRides() {
         viewModelScope.launch(Dispatchers.IO) {
-            val principal = activePrincipalKernel.current().id
-            val myPassengerId = currentRideActorId.ifBlank { principal }
-            rideDao.cancelUnpublishedRidesForPassenger(myPassengerId)
-            selectedRideRequestId?.let { rideDao.clearActiveRideSelectionsForRide(it) }
-            val roleKey = com.elysium369.meet.ride.domain.RideRoleContextPolicy
-                .selectionOwnerKey(principal, _rideDriverMode.value)
-            if (roleKey != null) {
-                rideDao.clearActiveRideSelection(roleKey)
-            }
-            applyActiveRide(null)
-            _rideVerificationNotice.emit("Viajes activos restablecidos.")
+            val actor=currentRideActorId
+            val requests=rideDao.getRequestsByPassenger(actor).first()
+            requests.filter { it.serverVersion==0L && it.status in setOf("PENDING_PUBLICATION","OPEN") }
+                .forEach { localCancelStuckRide(it.requestId) }
+            _rideVerificationNotice.emit("Cancelaciones solicitadas; pendientes de confirmación del servidor.")
         }
     }
 
@@ -10722,9 +10754,7 @@ class ObdViewModel @Inject constructor(
                 return@launch
             }
             // If already completed or cancelled, release local pointer immediately:
-            if (request.status in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED") ||
-                request.serverState in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED")
-            ) {
+            if (com.elysium369.meet.ride.domain.RideAuthorityEvidence.isTerminalSnapshot(request.serverState,request.serverVersion)) {
                 rideDao.clearActiveRideSelectionsForRide(requestId)
                 applyActiveRide(null)
                 _rideVerificationNotice.emit("El servicio ya se encuentra finalizado o cancelado.")
@@ -10732,12 +10762,7 @@ class ObdViewModel @Inject constructor(
             }
             // If still in PENDING_PUBLICATION (version 0):
             if (request.serverVersion == 0L || request.status == "PENDING_PUBLICATION") {
-                rideCommandRepository.cancelPublicationCommands(requestId)
-                rideCommandRepository.cancelStuckPendingPublication(requestId)
-                rideDao.markRequestCancelledLocally(requestId)
-                rideDao.clearActiveRideSelectionsForRide(requestId)
-                applyActiveRide(null)
-                _rideVerificationNotice.emit("Viaje cancelado exitosamente.")
+                _rideVerificationNotice.emit("Cancelación guardada; pendiente de confirmación del servidor.")
                 rideCommandRepository.enqueue(
                     envelope = rideCommandEnvelope(
                         requestId = requestId,

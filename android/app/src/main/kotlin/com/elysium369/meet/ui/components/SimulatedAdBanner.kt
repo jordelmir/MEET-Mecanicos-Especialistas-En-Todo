@@ -23,7 +23,7 @@ fun SimulatedAdBanner(viewModel: ObdViewModel) {
 
     Card(
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1B2A)),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)

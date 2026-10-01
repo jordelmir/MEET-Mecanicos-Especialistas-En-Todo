@@ -26,8 +26,8 @@ else
   scan_revision="HEAD"
 fi
 # These immutable historical blobs were reviewed manually. One contains a
-# synthetic Google-key-shaped value used to test SecretRedactor; the other
-# contains only PEM BEGIN/END delimiters in a parser (never key material).
+# synthetic Google-key-shaped value used to test SecretRedactor; the others
+# contain only PEM BEGIN/END delimiters in parsers/formatters (never key material).
 # Pinning object IDs keeps the exception narrow: any content change produces a
 # new blob and is scanned normally.
 # Feed all reachable, non-reviewed blobs through one batch reader. The original
@@ -38,7 +38,7 @@ set +o pipefail
 if git rev-list --objects "$scan_revision" \
   | awk '{print $1}' \
   | git cat-file --batch-check='%(objectname) %(objecttype)' \
-  | awk '$2 == "blob" && $1 != "9ce4a0d1cc2b9a03c645f07a14d828cec04d42e3" && $1 != "43b0a9daf8fa57dcc29ff1cb6aa5d8be31c023e8" && $1 != "a48542f2b36ff41eb2dc7436745fcac2a2955477" {print $1}' \
+  | awk '$2 == "blob" && $1 != "9ce4a0d1cc2b9a03c645f07a14d828cec04d42e3" && $1 != "43b0a9daf8fa57dcc29ff1cb6aa5d8be31c023e8" && $1 != "a48542f2b36ff41eb2dc7436745fcac2a2955477" && $1 != "5bd9a0dabb08d0a34cfa7c051ee85bf16ff97268" {print $1}' \
   | git cat-file --batch \
   | LC_ALL=C grep -aEq "$SECRET_PATTERN"; then
   scan_status=0

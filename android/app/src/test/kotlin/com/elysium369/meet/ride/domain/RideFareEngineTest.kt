@@ -26,7 +26,14 @@ class RideFareEngineTest {
 
         assertEquals(1L, quote.distanceFareMinor)
         assertEquals(1L, quote.timeFareMinor)
-        assertEquals(2L, quote.estimatedTotalMinor)
+        assertEquals(1_000L, quote.estimatedTotalMinor)
+    }
+
+    @Test
+    fun `metered fare stays at minimum until raw total exceeds it`() {
+        assertEquals(1_000L, RideFareEngine.quoteCostaRica(0, 0).estimatedTotalMinor)
+        assertEquals(1_000L, RideFareEngine.quoteCostaRica(3_000, 100).estimatedTotalMinor)
+        assertEquals(1_001L, RideFareEngine.quoteCostaRica(3_000, 101).estimatedTotalMinor)
     }
 
     @Test

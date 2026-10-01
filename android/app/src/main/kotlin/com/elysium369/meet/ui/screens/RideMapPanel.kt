@@ -123,6 +123,10 @@ fun RideMapPanel(
     val lifecycleOwner = LocalLifecycleOwner.current
     val avatarSelection = remember(context) { RideMapAvatarStore(context).load() }
     val routePulseController = remember { RoutePulseController() }
+    val interaction = remember { com.elysium369.meet.core.geo.runtime.MapInteractionPolicy() }
+    var gestureRevision by remember { mutableIntStateOf(0) }
+    val iconCache = remember { mutableMapOf<RideMarkerRole, Icon>() }
+    val renderKey = state.visualKey()
     var styleRequested by remember { mutableStateOf(false) }
     var styleReady by remember { mutableStateOf(false) }
     var mapError by remember { mutableStateOf<String?>(null) }
@@ -147,6 +151,7 @@ fun RideMapPanel(
     }
     var pinSelectionPoint by remember { mutableStateOf(pinSelectionInitialPoint ?: effectiveInitialPoint) }
     var pinCameraInitialized by remember { mutableStateOf(false) }
+    var lastEmittedPinCoordinates: Pair<Double, Double>? by remember { mutableStateOf(null) }
     var recenterRequest by remember { mutableIntStateOf(0) }
     val currentPinSelectionEnabled by rememberUpdatedState(pinSelectionEnabled)
     val currentOnPinSelectionChanged by rememberUpdatedState(onPinSelectionChanged)
@@ -181,13 +186,17 @@ fun RideMapPanel(
             applyVanguardRoadHierarchy(map)
             styleReady = true
             mapError = null
-            renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = false)
+            interaction.invalidate()
+            if (interaction.shouldRender(renderKey)) {
+                renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = false, iconCache = iconCache)
+                interaction.rendered(renderKey)
+            }
         }
     }
 
     LaunchedEffect(pinSelectionEnabled, effectiveInitialPoint, latestMap, styleReady) {
         if (!pinSelectionEnabled) return@LaunchedEffect
-        if (pinCameraInitialized) return@LaunchedEffect
+        if (pinCameraInitialized || interaction.interacting || interaction.userOwnsCamera) return@LaunchedEffect
         val map = latestMap ?: return@LaunchedEffect
         if (!styleReady) return@LaunchedEffect
         pinCameraInitialized = true
@@ -287,27 +296,10 @@ fun RideMapPanel(
                                 )
                             )
                         }
-                        view.setOnTouchListener { touchedView, event ->
-                            when (event.actionMasked) {
-                                MotionEvent.ACTION_DOWN,
-                                MotionEvent.ACTION_POINTER_DOWN,
-                                MotionEvent.ACTION_MOVE,
-                                -> touchedView.parent?.requestDisallowInterceptTouchEvent(true)
-                                MotionEvent.ACTION_UP,
-                                MotionEvent.ACTION_CANCEL,
-                                -> {
-                                    touchedView.parent?.requestDisallowInterceptTouchEvent(false)
-                                    if (event.actionMasked == MotionEvent.ACTION_UP) {
-                                        touchedView.performClick()
-                                    }
-                                }
-                            }
-                            false
-                        }
-                        map.addOnCameraMoveStartedListener { reason ->
-                            if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
-                                userControlsCamera = true
-                            }
+                        com.elysium369.meet.core.geo.runtime.bindSmoothMapGestures(view, map, interaction) {
+                            gestureRevision++
+                            userControlsCamera = interaction.userOwnsCamera
+                            routePulseController.setPaused(interaction.interacting)
                         }
                         map.addOnCameraIdleListener {
                             if (currentPinSelectionEnabled) {
@@ -316,6 +308,9 @@ fun RideMapPanel(
                                 if (kotlin.math.abs(target.latitude) < 0.01 && kotlin.math.abs(target.longitude) < 0.01) {
                                     return@addOnCameraIdleListener
                                 }
+                                val previous = lastEmittedPinCoordinates
+                                if (previous != null && kotlin.math.abs(previous.first - target.latitude) < 1e-7 && kotlin.math.abs(previous.second - target.longitude) < 1e-7) return@addOnCameraIdleListener
+                                lastEmittedPinCoordinates = target.latitude to target.longitude
                                 val point = RideGeoPoint(
                                     latitude = target.latitude,
                                     longitude = target.longitude,
@@ -327,13 +322,15 @@ fun RideMapPanel(
                             }
                         }
                     }
+                    gestureRevision
                     when {
-                        styleReady -> {
+                        styleReady && interaction.shouldRender(renderKey) -> {
                             val signature = state.cameraSignature()
                             val shouldMoveCamera = !pinSelectionEnabled &&
-                                (!userControlsCamera || recenterRequest > 0) &&
+                                !userControlsCamera &&
                                 signature != lastCameraSignature
-                            renderRideState(context, map, state, avatarSelection, routePulseController, shouldMoveCamera)
+                            renderRideState(context, map, state, avatarSelection, routePulseController, shouldMoveCamera, iconCache)
+                            interaction.rendered(renderKey)
                             if (shouldMoveCamera) lastCameraSignature = signature
                         }
                         !styleRequested && styleCandidates.isNotEmpty() -> {
@@ -342,7 +339,7 @@ fun RideMapPanel(
                                 applyVanguardRoadHierarchy(map)
                                 styleReady = true
                                 mapError = null
-                                if (pinSelectionEnabled) {
+                                if (pinSelectionEnabled && !interaction.interacting && !interaction.userOwnsCamera) {
                                     map.moveCamera(
                                         CameraUpdateFactory.newLatLngZoom(
                                             LatLng(effectiveInitialPoint.latitude, effectiveInitialPoint.longitude),
@@ -351,7 +348,11 @@ fun RideMapPanel(
                                     )
                                 }
                                 val signature = state.cameraSignature()
-                                renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = !pinSelectionEnabled)
+                                interaction.invalidate()
+                                if (interaction.shouldRender(renderKey)) {
+                                renderRideState(context, map, state, avatarSelection, routePulseController, moveCamera = !pinSelectionEnabled && !interaction.userOwnsCamera, iconCache = iconCache)
+                                interaction.rendered(renderKey)
+                                }
                                 lastCameraSignature = signature
                             }
                         }
@@ -478,6 +479,7 @@ fun RideMapPanel(
         if (showRecenterButton && !pinSelectionEnabled) {
             FloatingActionButton(
                 onClick = {
+                    interaction.recenter()
                     userControlsCamera = false
                     lastCameraSignature = null
                     recenterRequest += 1
@@ -496,17 +498,17 @@ fun RideMapPanel(
                     .size(48.dp)
                     .zIndex(20f)
                     .border(
-                        BorderStroke(1.5.dp, ComposeColor(0xFF00E5FF)),
+                        BorderStroke(1.5.dp, com.elysium369.meet.ui.theme.MeetColors.secondary),
                         CircleShape,
                     ),
                 shape = CircleShape,
                 containerColor = ComposeColor(0xFF07131E).copy(alpha = 0.94f),
-                contentColor = ComposeColor(0xFF00E5FF),
+                contentColor = com.elysium369.meet.ui.theme.MeetColors.secondary,
             ) {
                 ComposeIcon(
                     imageVector = Icons.Default.MyLocation,
                     contentDescription = "Centrar en mi ubicación GPS",
-                    tint = ComposeColor(0xFF00E5FF),
+                    tint = com.elysium369.meet.ui.theme.MeetColors.secondary,
                     modifier = Modifier.size(26.dp),
                 )
             }
@@ -570,7 +572,7 @@ private fun MapControlButton(
         modifier = Modifier.size(46.dp),
         shape = CircleShape,
         containerColor = ComposeColor(0xFF07131E).copy(alpha = 0.94f),
-        contentColor = ComposeColor(0xFF00E5FF),
+        contentColor = com.elysium369.meet.ui.theme.MeetColors.secondary,
     ) {
         Text(label, fontWeight = FontWeight.Black, style = MaterialTheme.typography.titleLarge)
     }
@@ -650,12 +652,13 @@ private fun renderRideState(
     avatarSelection: RideMapAvatarSelection,
     routePulseController: RoutePulseController,
     moveCamera: Boolean,
+    iconCache: MutableMap<RideMarkerRole, Icon>,
 ) {
     routePulseController.bind(null, null)
     map.clear()
     val iconFactory = IconFactory.getInstance(context)
     val icons = RideMarkerRole.entries.associateWith { role ->
-        createMarkerIcon(context, iconFactory, role, avatarSelection)
+        iconCache.getOrPut(role) { createMarkerIcon(context, iconFactory, role, avatarSelection) }
     }
 
     state.route
@@ -927,6 +930,9 @@ private class RoutePulseController {
         }
     }
 
+    fun setPaused(paused: Boolean) {
+        animator?.let { if (paused && !it.isPaused) it.pause() else if (!paused && it.isPaused) it.resume() }
+    }
     fun release() = bind(null, null)
 }
 
@@ -947,3 +953,8 @@ private fun createMarkerIcon(
 ): Icon {
     return iconFactory.fromBitmap(RideMapAvatarRenderer.render(context, role, selection))
 }
+
+private fun RideMapState.visualKey(): RideMapState = copy(
+    markers = markers.map { marker -> marker.copy(point = marker.point.copy(capturedAtEpochMs = marker.point.freshness(System.currentTimeMillis(), 30_000L).ordinal.toLong())) },
+    route = route.map { it.copy(capturedAtEpochMs = 0) },
+)

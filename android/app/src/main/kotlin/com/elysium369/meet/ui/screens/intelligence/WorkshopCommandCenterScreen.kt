@@ -124,7 +124,7 @@ fun WorkshopCommandCenterScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF091726)),
-                    border = BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(Color(0xFF00E5FF), MeetColors.neonGreen))),
+                    border = BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(MeetColors.electricBlue, MeetColors.neonGreen))),
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Row(

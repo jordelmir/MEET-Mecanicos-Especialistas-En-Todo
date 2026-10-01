@@ -7,6 +7,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import com.elysium369.meet.ui.theme.MeetColors
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -17,7 +19,7 @@ import androidx.compose.ui.unit.sp
  *
  * Reglas:
  * - Dark por defecto (nocturno/tecnológico).
- * - Teal neón primario + Purple neón secundario.
+ * - Cuatro canales reactivos de MeetColors: verde, cian, azul y violeta.
  * - Status colors (success/warning/error) para provenance labels.
  * - Cards con borde sutil neón.
  *
@@ -26,23 +28,23 @@ import androidx.compose.ui.unit.sp
 object ForgeColors {
 
     // Base dark
-    val Background = Color(0xFF0A0E1A)
-    val Surface = Color(0xFF121826)
-    val SurfaceVariant = Color(0xFF1B2235)
-    val OnBackground = Color(0xFFE5EAF2)
-    val OnSurface = Color(0xFFD1D6E0)
+    val Background: Color get() = MeetColors.backgroundDeep
+    val Surface: Color get() = MeetColors.cardBackground
+    val SurfaceVariant: Color get() = MeetColors.cardBackgroundLighter
+    val OnBackground: Color get() = MeetColors.textPrimary
+    val OnSurface: Color get() = MeetColors.textPrimary
 
     // Brand neón
-    val Primary = Color(0xFF00E5D0)         // Teal neón
-    val OnPrimary = Color(0xFF003B36)
-    val PrimaryContainer = Color(0xFF00524B)
-    val Secondary = Color(0xFF9B6BFF)        // Purple neón
-    val OnSecondary = Color(0xFF1F0F4D)
-    val SecondaryContainer = Color(0xFF3B2A8C)
+    val Primary: Color get() = MeetColors.neonGreen
+    val OnPrimary: Color get() = brandContent(Primary)
+    val PrimaryContainer: Color get() = MeetColors.neonGreenSubtle
+    val Secondary: Color get() = MeetColors.electricBlue
+    val OnSecondary: Color get() = brandContent(Secondary)
+    val SecondaryContainer: Color get() = MeetColors.electricBlueSubtle
 
     // Accents
-    val Tertiary = Color(0xFFFFB347)        // Amber
-    val Accent = Color(0xFF00B4FF)
+    val Tertiary: Color get() = MeetColors.cyberCyan
+    val Accent: Color get() = MeetColors.hotMagenta
 
     // Status
     val Success = Color(0xFF34D399)
@@ -65,11 +67,14 @@ object ForgeColors {
     val SeverityHigh = Color(0xFFEF4444)
     val SeverityCritical = Color(0xFF991B1B)
 
-    val Outline = Color(0xFF2A3349)
-    val OutlineVariant = Color(0xFF1F2738)
+    val Outline: Color get() = MeetColors.borderBlue
+    val OutlineVariant: Color get() = MeetColors.borderSubtle
 }
 
-private val DarkColorScheme = darkColorScheme(
+private fun brandContent(color: Color): Color =
+    if (color.luminance() > 0.179f) MeetColors.backgroundDeep else MeetColors.textPrimary
+
+private fun forgeDarkColorScheme() = darkColorScheme(
     primary = ForgeColors.Primary,
     onPrimary = ForgeColors.OnPrimary,
     primaryContainer = ForgeColors.PrimaryContainer,
@@ -77,20 +82,27 @@ private val DarkColorScheme = darkColorScheme(
     onSecondary = ForgeColors.OnSecondary,
     secondaryContainer = ForgeColors.SecondaryContainer,
     tertiary = ForgeColors.Tertiary,
+    onTertiary = brandContent(ForgeColors.Tertiary),
+    onPrimaryContainer = MeetColors.textPrimary,
+    onSecondaryContainer = MeetColors.textPrimary,
     background = ForgeColors.Background,
     onBackground = ForgeColors.OnBackground,
     surface = ForgeColors.Surface,
     onSurface = ForgeColors.OnSurface,
     surfaceVariant = ForgeColors.SurfaceVariant,
+    onSurfaceVariant = MeetColors.textSecondary,
     outline = ForgeColors.Outline,
     outlineVariant = ForgeColors.OutlineVariant,
     error = ForgeColors.Error
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Color(0xFF0F766E),
-    onPrimary = Color.White,
-    secondary = Color(0xFF6D28D9),
+private fun forgeLightColorScheme() = lightColorScheme(
+    primary = ForgeColors.Primary,
+    onPrimary = ForgeColors.OnPrimary,
+    secondary = ForgeColors.Secondary,
+    onSecondary = ForgeColors.OnSecondary,
+    tertiary = ForgeColors.Tertiary,
+    onTertiary = brandContent(ForgeColors.Tertiary),
     background = Color(0xFFF8FAFC),
     surface = Color(0xFFFFFFFF),
     error = Color(0xFFDC2626)
@@ -143,7 +155,7 @@ fun ForgeTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = if (darkTheme) forgeDarkColorScheme() else forgeLightColorScheme()
     MaterialTheme(
         colorScheme = colorScheme,
         typography = ForgeTypographyImpl,

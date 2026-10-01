@@ -10,6 +10,7 @@
   "distanceRateMinorPerKm": 300,
   "timeRateMinorPerMinute": 60,
   "minimumFareMinor": 0,
+  "meteredMinimumFareMinor": 1000,
   "bookingFeeMinor": 0,
   "platformCommissionBasisPoints": 500
 }

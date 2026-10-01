@@ -88,6 +88,45 @@ data class OfferedSubService(
     }
 }
 
+/**
+ * Registro inmutable de transacciones en la Billetera del Proveedor de Servicios.
+ */
+data class ProviderWalletTransaction(
+    val id: String,
+    val entryType: String, // "WELCOME_BONUS", "CONSTITUTIONAL_FEE_5_PERCENT", "TOPUP_SINPE_CONFIRMED"
+    val amountCrc: Long,
+    val direction: String, // "CREDIT" or "DEBIT"
+    val description: String,
+    val timestamp: Long = System.currentTimeMillis(),
+    val referenceId: String = ""
+) {
+    fun toJson(): JSONObject {
+        return JSONObject().apply {
+            put("id", id)
+            put("entryType", entryType)
+            put("amountCrc", amountCrc)
+            put("direction", direction)
+            put("description", description)
+            put("timestamp", timestamp)
+            put("referenceId", referenceId)
+        }
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): ProviderWalletTransaction {
+            return ProviderWalletTransaction(
+                id = json.optString("id", java.util.UUID.randomUUID().toString()),
+                entryType = json.optString("entryType", "WELCOME_BONUS"),
+                amountCrc = json.optLong("amountCrc", 5000L),
+                direction = json.optString("direction", "CREDIT"),
+                description = json.optString("description", "Bono Constitucional MEET"),
+                timestamp = json.optLong("timestamp", System.currentTimeMillis()),
+                referenceId = json.optString("referenceId", "")
+            )
+        }
+    }
+}
+
 data class ProviderServiceProfileData(
     val domainCategory: ProviderDomainCategory = ProviderDomainCategory.AUTOMOTIVE_MECHANIC,
     val hourlyLaborRateCrc: Long = 15000L,
@@ -101,7 +140,90 @@ data class ProviderServiceProfileData(
     val operatingRadiusKm: Double = 25.0,
     val certifiedEquipment: List<String> = emptyList(),
     val subServices: List<OfferedSubService> = emptyList(),
+    // ── Billetera Constitucional & Saldo Operativo (5% Comisión MEET) ──
+    val walletBalanceCrc: Long = 5000L, // Bono de bienvenida inicial de ₡5,000 CRC otorgado a todos
+    val platformCommissionBps: Long = 500L, // 5.0% Constitucional (500 bps)
+    val walletTransactions: List<ProviderWalletTransaction> = listOf(
+        ProviderWalletTransaction(
+            id = "starter-bonus",
+            entryType = "WELCOME_BONUS",
+            amountCrc = 5000L,
+            direction = "CREDIT",
+            description = "Bono Constitucional de Bienvenida MEET (₡5,000 CRC)",
+            timestamp = System.currentTimeMillis(),
+            referenceId = "START-5000"
+        )
+    ),
 ) {
+    /**
+     * Calcula la comisión constitucional exacta del 5% (500 bps) sobre el monto bruto.
+     * Mínimo 1 CRC.
+     */
+    fun calculateFee(grossAmountCrc: Long): Long {
+        if (grossAmountCrc <= 0) return 0L
+        val fee = (grossAmountCrc * platformCommissionBps) / 10000L
+        return if (fee <= 0) 1L else fee
+    }
+
+    /**
+     * Verifica si el proveedor cuenta con saldo suficiente para cubrir la comisión del 5% del trabajo.
+     */
+    fun canAcceptJob(grossAmountCrc: Long): Boolean {
+        val requiredFee = calculateFee(grossAmountCrc)
+        return walletBalanceCrc >= requiredFee
+    }
+
+    fun hasSufficientBalance(requiredFeeCrc: Long): Boolean {
+        return walletBalanceCrc >= requiredFeeCrc
+    }
+
+    /**
+     * Deduce la comisión constitucional del 5% del saldo y registra la transacción en el ledger inmutable.
+     * Retorna el nuevo perfil con el saldo debitado o null si los fondos son insuficientes.
+     */
+    fun withDeductedFee(
+        grossAmountCrc: Long,
+        serviceId: String,
+        categoryName: String = domainCategory.name
+    ): Pair<ProviderServiceProfileData, Long>? {
+        val fee = calculateFee(grossAmountCrc)
+        if (walletBalanceCrc < fee) return null
+
+        val tx = ProviderWalletTransaction(
+            id = java.util.UUID.randomUUID().toString(),
+            entryType = "CONSTITUTIONAL_FEE_5_PERCENT",
+            amountCrc = fee,
+            direction = "DEBIT",
+            description = "Comisión 5% servicio #$serviceId ($categoryName)",
+            timestamp = System.currentTimeMillis(),
+            referenceId = serviceId
+        )
+        val updatedProfile = copy(
+            walletBalanceCrc = walletBalanceCrc - fee,
+            walletTransactions = listOf(tx) + walletTransactions
+        )
+        return Pair(updatedProfile, fee)
+    }
+
+    /**
+     * Recarga saldo a la billetera (SINPE Móvil u otro canal de pago verificado).
+     */
+    fun withTopUp(amountCrc: Long, reference: String): ProviderServiceProfileData {
+        val tx = ProviderWalletTransaction(
+            id = java.util.UUID.randomUUID().toString(),
+            entryType = "TOPUP_SINPE_CONFIRMED",
+            amountCrc = amountCrc,
+            direction = "CREDIT",
+            description = "Recarga de saldo SINPE Móvil ($reference)",
+            timestamp = System.currentTimeMillis(),
+            referenceId = reference
+        )
+        return copy(
+            walletBalanceCrc = walletBalanceCrc + amountCrc,
+            walletTransactions = listOf(tx) + walletTransactions
+        )
+    }
+
     fun toJsonString(): String {
         val root = JSONObject().apply {
             put("domainCategory", domainCategory.id)
@@ -119,6 +241,13 @@ data class ProviderServiceProfileData(
             val servicesArray = JSONArray()
             subServices.forEach { servicesArray.put(it.toJson()) }
             put("subServices", servicesArray)
+
+            put("walletBalanceCrc", walletBalanceCrc)
+            put("platformCommissionBps", platformCommissionBps)
+
+            val txArray = JSONArray()
+            walletTransactions.forEach { txArray.put(it.toJson()) }
+            put("walletTransactions", txArray)
         }
         return root.toString()
     }
@@ -149,6 +278,32 @@ data class ProviderServiceProfileData(
                     }
                 }
 
+                val balance = json.optLong("walletBalanceCrc", 5000L)
+                val commBps = json.optLong("platformCommissionBps", 500L)
+                val txArray = json.optJSONArray("walletTransactions")
+                val txList = mutableListOf<ProviderWalletTransaction>()
+                if (txArray != null) {
+                    for (i in 0 until txArray.length()) {
+                        val tObj = txArray.optJSONObject(i)
+                        if (tObj != null) {
+                            txList.add(ProviderWalletTransaction.fromJson(tObj))
+                        }
+                    }
+                }
+                if (txList.isEmpty()) {
+                    txList.add(
+                        ProviderWalletTransaction(
+                            id = "starter-bonus",
+                            entryType = "WELCOME_BONUS",
+                            amountCrc = 5000L,
+                            direction = "CREDIT",
+                            description = "Bono Constitucional de Bienvenida MEET (₡5,000 CRC)",
+                            timestamp = System.currentTimeMillis(),
+                            referenceId = "START-5000"
+                        )
+                    )
+                }
+
                 ProviderServiceProfileData(
                     domainCategory = domain,
                     hourlyLaborRateCrc = json.optLong("hourlyLaborRateCrc", 15000L),
@@ -161,7 +316,10 @@ data class ProviderServiceProfileData(
                     emergencySurchargePercent = json.optDouble("emergencySurchargePercent", 25.0),
                     operatingRadiusKm = json.optDouble("operatingRadiusKm", 25.0),
                     certifiedEquipment = equip,
-                    subServices = if (services.isNotEmpty()) services else defaultTemplateForCategory(domain).subServices
+                    subServices = if (services.isNotEmpty()) services else defaultTemplateForCategory(domain).subServices,
+                    walletBalanceCrc = balance,
+                    platformCommissionBps = commBps,
+                    walletTransactions = txList
                 )
             } catch (_: Exception) {
                 defaultTemplateForCategory(ProviderDomainCategory.AUTOMOTIVE_MECHANIC)

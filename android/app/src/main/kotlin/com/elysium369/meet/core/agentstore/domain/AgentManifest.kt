@@ -45,6 +45,7 @@ data class AgentManifest(
     val minimumAppVersion: String = "4.26.0",
     val requiredEntitlement: String? = null,
     val isFree: Boolean = (requiredEntitlement == null),
+    val commerce: AgentCommerceDescriptor? = null,
     val priceFiatCrc: Long = 0L,
     val originalPriceFiatCrc: Long? = null,
     val badgeTag: String? = null,
@@ -59,126 +60,10 @@ data class AgentManifest(
 
 /**
  * Standard roster of official Elysium collectible agents with real capabilities.
- * Master Order Omega §30, §31, §32, §33.
+ * Cleaned of third-party IP (ASCENSION §5).
+ * All characters, silhouettes, descriptions, names, voices, and assets belong to the original Elysium universe.
  */
 object OfficialAgents {
-
-    val DRACO_DRAGON = AgentManifest(
-        id = "agent.draco_dragon",
-        displayName = "Draco Ignis",
-        subtitle = "Dragón Místico & Potencia de Motor",
-        description = "Dragón cibernético ancestral: guardián de la combustión, empuje cinemático y refrigeración de motor con visión térmica y aliento de datos.",
-        category = AgentCategory.AUTOMOTIVE,
-        avatarAssetId = "avatar_draco_dragon",
-        voiceProfileId = "voice_dragon_deep",
-        personalityProfileId = "personality_dragon_fierce",
-        capabilityIds = listOf(
-            "vehicle.power_boost",
-            "vehicle.thermal_monitor",
-            "system.voice_assistant",
-        ),
-        detailedCapabilities = listOf(
-            CapabilityPackDetail(
-                name = "Aliento Térmico de Diagnóstico",
-                capabilityId = "vehicle.thermal_monitor",
-                domain = "Diagnostic",
-                riskLevel = "READ_ONLY",
-                physicalModelDescription = "Supervisión de curva de temperatura de refrigerante y aceite",
-            ),
-            CapabilityPackDetail(
-                name = "Empuje de Potencia Cinemática",
-                capabilityId = "vehicle.power_boost",
-                domain = "Performance",
-                riskLevel = "READ_ONLY",
-                physicalModelDescription = "Análisis dinámico de par motor y flujo volumétrico de admisión",
-            ),
-        ),
-        isFree = true,
-        requiredEntitlement = null,
-        priceFiatCrc = 0L,
-        badgeTag = "DESBLOQUEADO",
-        voiceSampleText = "¡Roaaar! Soy Draco Ignis. La fuerza de tu motor ruge bajo mis alas. ¡Listos para devorar el asfalto!",
-        avatarVisualType = "DRAGON",
-        themeColorHex = 0xFFFF3B30L,
-    )
-
-    val POKEMON_VOLT = AgentManifest(
-        id = "agent.pokemon_volt",
-        displayName = "Volt Sparky",
-        subtitle = "Compañero Eléctrico & Baterías",
-        description = "Criatura eléctrica hiperactiva estilo Pokémon: cuida la salud de la batería, alternador, bobinas de encendido y chispa de bujías con ternura y poder voltaico.",
-        category = AgentCategory.CORE,
-        avatarAssetId = "avatar_pokemon_volt",
-        voiceProfileId = "voice_sparky_chirp",
-        personalityProfileId = "personality_sparky_playful",
-        capabilityIds = listOf(
-            "battery.state_of_health",
-            "ignition.spark_monitor",
-            "system.voice_assistant",
-        ),
-        detailedCapabilities = listOf(
-            CapabilityPackDetail(
-                name = "Chispa Eléctrica Volt",
-                capabilityId = "battery.state_of_health",
-                domain = "Electrical",
-                riskLevel = "READ_ONLY",
-                physicalModelDescription = "Monitoreo continuo de CCA de batería y ondulación del alternador",
-            ),
-            CapabilityPackDetail(
-                name = "Descarga de Apoyo",
-                capabilityId = "ignition.spark_monitor",
-                domain = "Ignition",
-                riskLevel = "READ_ONLY",
-                physicalModelDescription = "Detección de pérdidas de chispa por cilindro en tiempo real",
-            ),
-        ),
-        isFree = true,
-        requiredEntitlement = null,
-        priceFiatCrc = 0L,
-        badgeTag = "DESBLOQUEADO",
-        voiceSampleText = "¡Pika-volt! ¡Chispas listas y batería al cien! ¡Vamos a rodar felices por Costa Rica!",
-        avatarVisualType = "POKEMON_VOLT",
-        themeColorHex = 0xFFFFD700L,
-    )
-
-    val SAIYAN_SSJ4 = AgentManifest(
-        id = "agent.saiyan_ssj4",
-        displayName = "Titan Saiyan SSJ4",
-        subtitle = "Ki Primordial & Telemetría Extrema",
-        description = "Guerrero legendario del Ki Carmesí: fuerza descomunal para rescate en carretera, telemetría de impacto extrema, tracción en pendientes y protección inquebrantable.",
-        category = AgentCategory.SAFETY,
-        avatarAssetId = "avatar_saiyan_ssj4",
-        voiceProfileId = "voice_saiyan_primal",
-        personalityProfileId = "personality_saiyan_warrior",
-        capabilityIds = listOf(
-            "safety.collision_telemetry",
-            "traction.ki_burst",
-            "sos.authoritative_dispatch",
-        ),
-        detailedCapabilities = listOf(
-            CapabilityPackDetail(
-                name = "Aura de Ki Protectora",
-                capabilityId = "safety.collision_telemetry",
-                domain = "Safety",
-                riskLevel = "SAFETY_CRITICAL",
-                physicalModelDescription = "Escudo cinemático de desaceleración y telemetría inercial extrema",
-            ),
-            CapabilityPackDetail(
-                name = "Despacho SOS Sayayin",
-                capabilityId = "sos.authoritative_dispatch",
-                domain = "Emergency",
-                riskLevel = "SAFETY_CRITICAL",
-                physicalModelDescription = "Rutas de rescate prioritarias y enlace directo con auxilio 24/7",
-            ),
-        ),
-        isFree = true,
-        requiredEntitlement = null,
-        priceFiatCrc = 0L,
-        badgeTag = "DESBLOQUEADO",
-        voiceSampleText = "¡Siento el Ki de este vehículo al máximo nivel! ¡Ningún obstáculo en el camino podrá detenernos!",
-        avatarVisualType = "SAIYAN_SSJ4",
-        themeColorHex = 0xFFFF1744L,
-    )
 
     val EVAIR_CORE = AgentManifest(
         id = "agent.evair_core",
@@ -213,8 +98,9 @@ object OfficialAgents {
         ),
         isFree = true,
         requiredEntitlement = null,
+        commerce = null,
         priceFiatCrc = 0L,
-        badgeTag = "DESBLOQUEADO",
+        badgeTag = "INCLUIDO",
         voiceSampleText = "¡Hola! Soy EVAIR. Tu espíritu compañero en cada kilómetro.",
         avatarVisualType = "EVAIR_SPIRIT",
         themeColorHex = 0xFF00E5FFL,
@@ -224,7 +110,7 @@ object OfficialAgents {
         id = "agent.master_mechanic",
         displayName = "Vanguard Mecha",
         subtitle = "Master Mechanic & Forense OBD",
-        description = "Mecha de combate y diagnóstico: análisis profundo de DTCs, Mode $01, Mode $06, trim de combustible, guías de reparación y auditoría antifraude de cotizaciones de taller.",
+        description = "Mecha de diagnóstico de nivel de ingeniería: análisis profundo de DTCs, Mode $01, Mode $06, trim de combustible, guías de reparación y auditoría antifraude de cotizaciones de taller.",
         category = AgentCategory.AUTOMOTIVE,
         avatarAssetId = "avatar_master_mechanic",
         voiceProfileId = "voice_mechanic_pro",
@@ -251,13 +137,150 @@ object OfficialAgents {
                 physicalModelDescription = "Tablas de mano de obra OEM y regla estricta de compatibilidad de repuestos",
             ),
         ),
-        isFree = true,
-        requiredEntitlement = null,
-        priceFiatCrc = 0L,
-        badgeTag = "DESBLOQUEADO",
+        isFree = false,
+        requiredEntitlement = "agent.master_mechanic",
+        commerce = AgentCommerceDescriptor(
+            storeProductId = "agent_master_mechanic_lifetime",
+            entitlementId = "agent.master_mechanic",
+        ),
+        priceFiatCrc = 2990L,
+        originalPriceFiatCrc = 4500L,
+        badgeTag = "PREMIUM",
         voiceSampleText = "Sistemas Mecha online. Escaneo de sensores completado sin errores.",
         avatarVisualType = "CYBER_MECHA",
         themeColorHex = 0xFFFF9100L,
+    )
+
+    val DRACO_DRAGON = AgentManifest(
+        id = "agent.draco_dragon",
+        displayName = "Draco Ignis",
+        subtitle = "Dragón Cuántico & Potencia Térmica",
+        description = "Dragón cibernético ancestral: guardián de la combustión, empuje cinemático y refrigeración de motor con visión termodinámica y aliento de datos.",
+        category = AgentCategory.AUTOMOTIVE,
+        avatarAssetId = "avatar_draco_dragon",
+        voiceProfileId = "voice_dragon_deep",
+        personalityProfileId = "personality_dragon_fierce",
+        capabilityIds = listOf(
+            "vehicle.power_boost",
+            "vehicle.thermal_monitor",
+            "system.voice_assistant",
+        ),
+        detailedCapabilities = listOf(
+            CapabilityPackDetail(
+                name = "Aliento Térmico de Diagnóstico",
+                capabilityId = "vehicle.thermal_monitor",
+                domain = "Diagnostic",
+                riskLevel = "READ_ONLY",
+                physicalModelDescription = "Supervisión de curva de temperatura de refrigerante y aceite",
+            ),
+            CapabilityPackDetail(
+                name = "Empuje de Potencia Cinemática",
+                capabilityId = "vehicle.power_boost",
+                domain = "Performance",
+                riskLevel = "READ_ONLY",
+                physicalModelDescription = "Análisis dinámico de par motor y flujo volumétrico de admisión",
+            ),
+        ),
+        isFree = false,
+        requiredEntitlement = "agent.draco_dragon",
+        commerce = AgentCommerceDescriptor(
+            storeProductId = "agent_draco_dragon_lifetime",
+            entitlementId = "agent.draco_dragon",
+        ),
+        priceFiatCrc = 1990L,
+        originalPriceFiatCrc = 3000L,
+        badgeTag = "DESTACADO",
+        voiceSampleText = "¡La fuerza de tu motor ruge bajo mis alas! Listos para devorar el asfalto.",
+        avatarVisualType = "DRAGON",
+        themeColorHex = 0xFFFF3B30L,
+    )
+
+    val VOLT_AETHER = AgentManifest(
+        id = "agent.volt_aether",
+        displayName = "Volt Aether",
+        subtitle = "Compañero Eléctrico & Baterías",
+        description = "Espíritu voltaico de alta frecuencia: cuida la salud de la batería, alternador, bobinas de encendido y chispa de bujías con precisión electrodinámica.",
+        category = AgentCategory.CORE,
+        avatarAssetId = "avatar_volt_aether",
+        voiceProfileId = "voice_volt_chirp",
+        personalityProfileId = "personality_volt_playful",
+        capabilityIds = listOf(
+            "battery.state_of_health",
+            "ignition.spark_monitor",
+            "system.voice_assistant",
+        ),
+        detailedCapabilities = listOf(
+            CapabilityPackDetail(
+                name = "Chispa Eléctrica Volt",
+                capabilityId = "battery.state_of_health",
+                domain = "Electrical",
+                riskLevel = "READ_ONLY",
+                physicalModelDescription = "Monitoreo continuo de CCA de batería y ondulación del alternador",
+            ),
+            CapabilityPackDetail(
+                name = "Descarga de Apoyo",
+                capabilityId = "ignition.spark_monitor",
+                domain = "Ignition",
+                riskLevel = "READ_ONLY",
+                physicalModelDescription = "Detección de pérdidas de chispa por cilindro en tiempo real",
+            ),
+        ),
+        isFree = false,
+        requiredEntitlement = "agent.volt_aether",
+        commerce = AgentCommerceDescriptor(
+            storeProductId = "agent_volt_aether_lifetime",
+            entitlementId = "agent.volt_aether",
+        ),
+        priceFiatCrc = 1490L,
+        originalPriceFiatCrc = 2500L,
+        badgeTag = "ENERGÍA",
+        voiceSampleText = "¡Volt Aether en línea! Chispas listas y batería al cien por ciento.",
+        avatarVisualType = "VOLT_AETHER",
+        themeColorHex = 0xFFFFD700L,
+    )
+
+    val TITAN_VANGUARD = AgentManifest(
+        id = "agent.titan_vanguard",
+        displayName = "Titan Vanguard",
+        subtitle = "Escudo Primordial & Telemetría Extrema",
+        description = "Guardián cinemático de fuerza primordial: telemetría de impacto extrema, control dinámico de tracción en pendientes y protección SOS en carretera.",
+        category = AgentCategory.SAFETY,
+        avatarAssetId = "avatar_titan_vanguard",
+        voiceProfileId = "voice_titan_primal",
+        personalityProfileId = "personality_titan_warrior",
+        capabilityIds = listOf(
+            "safety.collision_telemetry",
+            "traction.ki_burst",
+            "sos.authoritative_dispatch",
+        ),
+        detailedCapabilities = listOf(
+            CapabilityPackDetail(
+                name = "Aura Protectora de Impacto",
+                capabilityId = "safety.collision_telemetry",
+                domain = "Safety",
+                riskLevel = "SAFETY_CRITICAL",
+                physicalModelDescription = "Escudo cinemático de desaceleración y telemetría inercial extrema",
+            ),
+            CapabilityPackDetail(
+                name = "Despacho SOS Vanguard",
+                capabilityId = "sos.authoritative_dispatch",
+                domain = "Emergency",
+                riskLevel = "SAFETY_CRITICAL",
+                physicalModelDescription = "Rutas de rescate prioritarias y enlace directo con auxilio 24/7",
+            ),
+        ),
+        isFree = false,
+        requiredEntitlement = "agent.titan_vanguard",
+        commerce = AgentCommerceDescriptor(
+            storeProductId = "agent_titan_vanguard_lifetime",
+            entitlementId = "agent.titan_vanguard",
+        ),
+        priceFiatCrc = 1990L,
+        originalPriceFiatCrc = 3500L,
+        badgeTag = "SEGURIDAD",
+        voiceSampleText = "¡Titan Vanguard al mando! Escudo inercial activo. Ningún obstáculo detendrá nuestra marcha.",
+        avatarVisualType = "TITAN_VANGUARD",
+        themeColorHex = 0xFFFF1744L,
     )
 
     val LAYA_VALKYRIE = AgentManifest(
@@ -285,23 +308,25 @@ object OfficialAgents {
         ),
         isFree = true,
         requiredEntitlement = null,
+        commerce = null,
         priceFiatCrc = 0L,
-        badgeTag = "DESBLOQUEADO",
+        badgeTag = "INCLUIDO",
         voiceSampleText = "Soy Laya Celestial. El camino está despejado. Guiando tus pasos con precisión absoluta.",
         avatarVisualType = "LAYA_VALKYRIE",
         themeColorHex = 0xFFBB00FFL,
     )
 
-    val VANGUARD_SENTINEL = SAIYAN_SSJ4
-    val MOBILITY_PRIME = POKEMON_VOLT
+    // Backward-compatible architectural aliases
+    val VANGUARD_SENTINEL = TITAN_VANGUARD
+    val MOBILITY_PRIME = VOLT_AETHER
     val EMISSIONS_SPECIALIST = DRACO_DRAGON
 
     val ALL = listOf(
-        DRACO_DRAGON,
-        POKEMON_VOLT,
-        SAIYAN_SSJ4,
         EVAIR_CORE,
         MASTER_MECHANIC,
+        DRACO_DRAGON,
+        VOLT_AETHER,
+        TITAN_VANGUARD,
         LAYA_VALKYRIE,
     )
 }

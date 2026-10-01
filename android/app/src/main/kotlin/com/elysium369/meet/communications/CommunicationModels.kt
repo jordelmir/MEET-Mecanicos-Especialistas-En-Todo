@@ -21,6 +21,7 @@ data class ConversationSummary(
     val participantCount: Int? = null,
     val lastActivityAtEpochMs: Long?,
     val proofState: CommunicationProofState,
+    val canRespondToRequest: Boolean = false,
 )
 
 data class DecryptedMessage(
@@ -44,6 +45,7 @@ sealed interface SendMessageOutcome {
 }
 
 sealed interface StartCallOutcome {
+    data class Ringing(val callId:String) : StartCallOutcome
     data object WaitingForAuthorizedParticipant : StartCallOutcome
     data object ServerTransportNotConfigured : StartCallOutcome
     data object AuthenticationRequired : StartCallOutcome

@@ -142,8 +142,8 @@ fun ActiveRideTrackingScreen(
                         ride.state == RideState.ARRIVED -> "Conductor en el sitio"
                         trackingTruth == com.elysium369.meet.ride.domain.TrackingFreshness.LIVE -> "Ubicación en vivo"
                         trackingTruth == com.elysium369.meet.ride.domain.TrackingFreshness.RECENT -> "Ubicación reciente"
-                        ride.driverLocation != null -> "Ubicación en vivo"
-                        else -> "Ubicación GPS activa"
+                        ride.driverLocation != null -> "Última ubicación conocida"
+                        else -> "Ubicación del conductor pendiente"
                     }
                     Text(
                         statusHeader,

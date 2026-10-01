@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 85,
-    "identityHash": "265cd6d4e316292562635d44e66675ed",
+    "identityHash": "b578efa4dc0380f1a70c3b75cbbaf3fe",
     "entities": [
       {
         "tableName": "vehicles",
@@ -14516,7 +14516,7 @@
       },
       {
         "tableName": "safety_public_cases_local",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`caseId` TEXT NOT NULL, `caseType` TEXT NOT NULL, `title` TEXT NOT NULL, `publicSummary` TEXT NOT NULL, `lifecycle` TEXT NOT NULL, `confidenceScore` REAL, `eventCount` INTEGER, `claimCount` INTEGER, `sourceCount` INTEGER, `evidenceCount` INTEGER, `publishedAt` INTEGER NOT NULL, `lastUpdatedAt` INTEGER NOT NULL, `serverVersion` INTEGER NOT NULL, PRIMARY KEY(`caseId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`caseId` TEXT NOT NULL, `caseType` TEXT NOT NULL, `title` TEXT NOT NULL, `publicSummary` TEXT NOT NULL, `lifecycle` TEXT NOT NULL, `confidenceScore` REAL NOT NULL, `eventCount` INTEGER NOT NULL, `claimCount` INTEGER NOT NULL, `sourceCount` INTEGER NOT NULL, `evidenceCount` INTEGER NOT NULL, `publishedAt` INTEGER NOT NULL, `lastUpdatedAt` INTEGER NOT NULL, `serverVersion` INTEGER NOT NULL, PRIMARY KEY(`caseId`))",
         "fields": [
           {
             "fieldPath": "caseId",
@@ -14551,27 +14551,32 @@
           {
             "fieldPath": "confidenceScore",
             "columnName": "confidenceScore",
-            "affinity": "REAL"
+            "affinity": "REAL",
+            "notNull": true
           },
           {
             "fieldPath": "eventCount",
             "columnName": "eventCount",
-            "affinity": "INTEGER"
+            "affinity": "INTEGER",
+            "notNull": true
           },
           {
             "fieldPath": "claimCount",
             "columnName": "claimCount",
-            "affinity": "INTEGER"
+            "affinity": "INTEGER",
+            "notNull": true
           },
           {
             "fieldPath": "sourceCount",
             "columnName": "sourceCount",
-            "affinity": "INTEGER"
+            "affinity": "INTEGER",
+            "notNull": true
           },
           {
             "fieldPath": "evidenceCount",
             "columnName": "evidenceCount",
-            "affinity": "INTEGER"
+            "affinity": "INTEGER",
+            "notNull": true
           },
           {
             "fieldPath": "publishedAt",
@@ -15585,11 +15590,246 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_commerce_orders_courierId` ON `${TABLE_NAME}` (`courierId`)"
           }
         ]
+      },
+      {
+        "tableName": "eaos_operation_cases",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`case_id` TEXT NOT NULL, `correlation_id` TEXT NOT NULL, `domain` TEXT NOT NULL, `severity` TEXT NOT NULL, `state` TEXT NOT NULL, `reconciliation_state` TEXT NOT NULL, `remediation_outcome` TEXT NOT NULL, `title` TEXT NOT NULL, `what_happened` TEXT NOT NULL, `what_automation_did` TEXT NOT NULL, `evidence_summary` TEXT NOT NULL, `what_remains_uncertain` TEXT NOT NULL, `requested_owner_action` TEXT NOT NULL, `consequence_of_inaction` TEXT NOT NULL, `observed_metric_json` TEXT, `evidence_snapshot_json` TEXT NOT NULL DEFAULT '{}', `money_exposure_minor` INTEGER, `money_exposure_currency` TEXT, `event_count` INTEGER NOT NULL DEFAULT 1, `occurred_at_epoch_ms` INTEGER NOT NULL, `resolved_at_epoch_ms` INTEGER, `resolution_reason` TEXT, PRIMARY KEY(`case_id`))",
+        "fields": [
+          {
+            "fieldPath": "caseId",
+            "columnName": "case_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correlationId",
+            "columnName": "correlation_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "domain",
+            "columnName": "domain",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "severity",
+            "columnName": "severity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "state",
+            "columnName": "state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reconciliationState",
+            "columnName": "reconciliation_state",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "remediationOutcome",
+            "columnName": "remediation_outcome",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "whatHappened",
+            "columnName": "what_happened",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "whatAutomationDid",
+            "columnName": "what_automation_did",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "evidenceSummary",
+            "columnName": "evidence_summary",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "whatRemainsUncertain",
+            "columnName": "what_remains_uncertain",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "requestedOwnerAction",
+            "columnName": "requested_owner_action",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "consequenceOfInaction",
+            "columnName": "consequence_of_inaction",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "observedMetricJson",
+            "columnName": "observed_metric_json",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "evidenceSnapshotJson",
+            "columnName": "evidence_snapshot_json",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'{}'"
+          },
+          {
+            "fieldPath": "moneyExposureMinor",
+            "columnName": "money_exposure_minor",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "moneyExposureCurrency",
+            "columnName": "money_exposure_currency",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "eventCount",
+            "columnName": "event_count",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1"
+          },
+          {
+            "fieldPath": "occurredAtEpochMs",
+            "columnName": "occurred_at_epoch_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "resolvedAtEpochMs",
+            "columnName": "resolved_at_epoch_ms",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "resolutionReason",
+            "columnName": "resolution_reason",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "case_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_eaos_operation_cases_state",
+            "unique": false,
+            "columnNames": [
+              "state"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_eaos_operation_cases_state` ON `${TABLE_NAME}` (`state`)"
+          }
+        ]
+      },
+      {
+        "tableName": "eaos_correlated_incidents",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`incident_id` TEXT NOT NULL, `correlation_key` TEXT NOT NULL, `domain` TEXT NOT NULL, `title` TEXT NOT NULL, `severity` TEXT NOT NULL, `event_count` INTEGER NOT NULL, `first_seen_epoch_ms` INTEGER NOT NULL, `last_seen_epoch_ms` INTEGER NOT NULL, `is_auto_remediated` INTEGER NOT NULL DEFAULT 0, `active_case_id` TEXT, PRIMARY KEY(`incident_id`))",
+        "fields": [
+          {
+            "fieldPath": "incidentId",
+            "columnName": "incident_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "correlationKey",
+            "columnName": "correlation_key",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "domain",
+            "columnName": "domain",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "title",
+            "columnName": "title",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "severity",
+            "columnName": "severity",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "eventCount",
+            "columnName": "event_count",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "firstSeenEpochMs",
+            "columnName": "first_seen_epoch_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "lastSeenEpochMs",
+            "columnName": "last_seen_epoch_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isAutoRemediated",
+            "columnName": "is_auto_remediated",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "activeCaseId",
+            "columnName": "active_case_id",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "incident_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_eaos_correlated_incidents_key",
+            "unique": false,
+            "columnNames": [
+              "correlation_key"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_eaos_correlated_incidents_key` ON `${TABLE_NAME}` (`correlation_key`)"
+          }
+        ]
       }
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '265cd6d4e316292562635d44e66675ed')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b578efa4dc0380f1a70c3b75cbbaf3fe')"
     ]
   }
 }

@@ -22,7 +22,9 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class SupabaseSafetyCommandGateway @Inject constructor() : SafetyCommandGateway {
+class SupabaseSafetyCommandGateway @Inject constructor(
+    private val deviceTrust: SafetyDeviceTrustRepository,
+) : SafetyCommandGateway {
 
     private val json = Json {
         ignoreUnknownKeys = true
@@ -73,23 +75,21 @@ class SupabaseSafetyCommandGateway @Inject constructor() : SafetyCommandGateway 
         command: SafetyCommandOutboxEntity,
         payload: JsonObject,
     ): SafetyGatewayResult = try {
-            val response = SupabaseModule.client.postgrest
-                .rpc(
-                    "safety_create_report_v2",
-                    buildJsonObject {
-                        put("p_report_id", command.aggregateId)
-                        put("p_idempotency_key", command.idempotencyKey)
-                        put("p_category", payload["category"]?.jsonPrimitive?.contentOrNull ?: "OTHER")
-                        put("p_narrative", payload["narrative"]?.jsonPrimitive?.contentOrNull ?: "")
-                        put("p_source_relation", payload["sourceRelation"]?.jsonPrimitive?.contentOrNull ?: "UNKNOWN")
-                        put("p_occurred_at", payload["occurredAtIso"] ?: JsonNull)
-                        put("p_latitude", payload["latitude"] ?: JsonNull)
-                        put("p_longitude", payload["longitude"] ?: JsonNull)
-                        put("p_accuracy_meters", payload["accuracyMeters"] ?: JsonNull)
-                        put("p_client_payload_sha256", command.clientPayloadSha256)
-                    },
-                )
-                .decodeAs<JsonObject>()
+            val params = safetyCreateReportParameters(command.aggregateId, command.idempotencyKey, command.clientPayloadSha256, payload)
+            suspend fun submit(): JsonObject {
+                check(SupabaseModule.client.auth.currentUserOrNull()?.id == command.actorSessionUserId) { "OWNER_CHANGED" }
+                val result = SupabaseModule.client.postgrest.rpc("safety_create_report_v3", params).decodeAs<JsonObject>()
+                check(SupabaseModule.client.auth.currentUserOrNull()?.id == command.actorSessionUserId) { "OWNER_CHANGED" }
+                return result
+            }
+            val response = try { submit() } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                if (error.message?.contains("SAFETY_DEVICE_TRUST_REQUIRED") != true) throw error
+                // Intake policy is server-owned. Optional policy does no attestation;
+                // required policy invokes Google and retries the identical durable command once.
+                deviceTrust.ensureServerVerified(command.actorSessionUserId)
+                submit()
+            }
 
             // RPC returns: { report_id, state, server_version, server_payload_sha256, correlation_id }
             val reportId = response["report_id"]?.jsonPrimitive?.contentOrNull

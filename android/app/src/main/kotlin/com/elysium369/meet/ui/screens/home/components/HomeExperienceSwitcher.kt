@@ -65,13 +65,13 @@ fun HomeExperienceSelectionDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color(0xFF0F1B30),
+        containerColor = MeetColors.cardBackground,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("⌘", fontSize = 20.sp, color = MeetColors.neonGreen)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "EXPERIENCIA DE INICIO",
+                    "TEMA DE ELYSIUM",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
@@ -94,6 +94,16 @@ fun HomeExperienceSelectionDialog(
                     isSelected = currentExperience == HomeExperience.CLASSIC,
                     onClick = {
                         onSelectExperience(HomeExperience.CLASSIC)
+                        onDismiss()
+                    }
+                )
+
+                ExperienceOptionCard(
+                    title = HomeExperience.VANGUARD.displayName,
+                    subtitle = HomeExperience.VANGUARD.description,
+                    isSelected = currentExperience == HomeExperience.VANGUARD,
+                    onClick = {
+                        onSelectExperience(HomeExperience.VANGUARD)
                         onDismiss()
                     }
                 )

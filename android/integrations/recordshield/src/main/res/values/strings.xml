@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Record Shield</string>
+
+    <!--
+      Google OAuth2 credentials
+      Configure in local.properties (gitignored):
+        oauth.client.id=YOUR_CLIENT_ID
+        oauth.client.secret=YOUR_CLIENT_SECRET
+    -->
+    <string name="default_web_client_id" translatable="false"></string>
+    <string name="default_web_client_secret" translatable="false"></string>
+
+    <!-- Privacy Policy URL (host this HTML file) -->
+    <string name="privacy_policy_url">https://your-domain.com/privacy-policy.html</string>
+</resources>

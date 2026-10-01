@@ -16,7 +16,6 @@ data class GeoPoint(
         require(capturedAtEpochMs >= 0) { "Captured time cannot be negative" }
     }
 }
-
 /**
  * Bounding box for map camera fitting.
  */
@@ -47,7 +46,6 @@ data class GeoBounds(
         }
     }
 }
-
 /**
  * Universal marker roles across all service verticals.
  */
@@ -137,4 +135,3 @@ data class CommonMapState(
 
     fun marker(role: GeoMarkerRole): GeoMarker? = markers.firstOrNull { it.role == role }
 }
-

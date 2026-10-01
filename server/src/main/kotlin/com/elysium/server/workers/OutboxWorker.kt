@@ -176,8 +176,8 @@ class InMemoryOutboxRepository : OutboxRepository {
 }
 
 class OutboxWorker(
-    private val repository: OutboxRepository = InMemoryOutboxRepository(),
-    private val publisher: EventPublisher = EventPublisher { EventPublishResult.Success },
+    private val repository: OutboxRepository,
+    private val publisher: EventPublisher,
     private val pollIntervalMs: Long = 1000L,
     private val leaseDurationMs: Long = 30_000L,
     private val batchSize: Int = 25,

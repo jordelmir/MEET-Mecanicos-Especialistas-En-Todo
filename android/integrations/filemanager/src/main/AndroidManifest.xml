@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <application>
+        <activity android:name="com.elysium.vanguard.MainActivity" android:exported="false" />
+        <provider android:name="com.elysium.vanguard.core.util.FileManagerProvider"
+            android:authorities="${applicationId}.filemanager.provider"
+            android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/elysium_filemanager_paths" />
+        </provider>
+        <service android:name="com.elysium.vanguard.core.services.CompressionService"
+            android:exported="false" android:foregroundServiceType="dataSync" />
+    </application>
+</manifest>

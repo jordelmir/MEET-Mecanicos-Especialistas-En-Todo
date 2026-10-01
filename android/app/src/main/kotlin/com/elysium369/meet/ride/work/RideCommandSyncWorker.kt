@@ -54,12 +54,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
             ?: return Result.retry()
         val startedAt = System.currentTimeMillis()
 
-        // Auto-cancel rides stuck in PENDING_PUBLICATION for > 10 minutes
-        val staleThreshold = startedAt - STALE_PUBLICATION_MS
-        outboxDao.findStalePendingPublications(staleThreshold).forEach { rideId ->
-            outboxDao.cancelStuckPendingPublication(rideId)
-            rideDao.clearActiveRideSelectionsForRide(rideId)
-        }
+        // Time and transport failure never prove that a trip was cancelled.
 
         // Deduplicate PENDING cancels and prune old completed commands
         outboxDao.supersedeDuplicatePendingCancels(startedAt)
@@ -108,7 +103,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
                 when (val snapshot = gateway.fetchSnapshot(entity.rideId)) {
                     is RideSnapshotResult.Found -> {
                         val state = snapshot.snapshot.state
-                        if (state in setOf("COMPLETED", "CANCELLED", "EXPIRED", "VOIDED")) {
+                        if (com.elysium369.meet.ride.domain.RideAuthorityEvidence.isTerminalSnapshot(state,snapshot.snapshot.version)) {
                             // Trip is already terminated on the server.
                             rideDao.applyServerProjection(
                                 requestId = entity.rideId,
@@ -137,35 +132,13 @@ class RideCommandSyncWorker @AssistedInject constructor(
                         command = command.copy(expectedVersion = snapshot.snapshot.version)
                     }
                     is RideSnapshotResult.NotFound -> {
-                        // The trip was never published to the remote authority or was removed.
-                        // Reconcile locally as cancelled, cancel unsent publications, clear active selection, and acknowledge.
-                        outboxDao.cancelPublicationCommands(entity.rideId)
-                        outboxDao.cancelStuckPendingPublication(entity.rideId)
-                        rideDao.markRequestCancelledLocally(entity.rideId)
-                        rideDao.clearActiveRideSelectionsForRide(entity.rideId)
-                        outboxDao.acknowledge(
-                            idempotencyKey = entity.idempotencyKey,
-                            correlationId = "local_cancel_unpublished",
-                            now = System.currentTimeMillis(),
-                        )
+                        retryNeeded = true
+                        finishRetry(entity,"CANCEL_AWAITING_PUBLICATION","La publicación todavía no tiene una proyección autoritativa; cancelación pendiente.")
                         return@forEach
                     }
                     else -> {
-                        // Network/transport error during snapshot check:
-                        if (entity.attemptCount >= 2) {
-                            outboxDao.cancelPublicationCommands(entity.rideId)
-                            outboxDao.cancelStuckPendingPublication(entity.rideId)
-                            rideDao.markRequestCancelledLocally(entity.rideId)
-                            rideDao.clearActiveRideSelectionsForRide(entity.rideId)
-                            outboxDao.acknowledge(
-                                idempotencyKey = entity.idempotencyKey,
-                                correlationId = "local_cancel_fallback",
-                                now = System.currentTimeMillis(),
-                            )
-                            return@forEach
-                        }
                         retryNeeded = true
-                        finishRetry(entity, "CANCEL_AWAITING_PUBLICATION", "Cancelación guardada; esperando reconciliar la publicación.")
+                        finishRetry(entity,"CANCEL_AWAITING_PUBLICATION","Cancelación guardada; esperando reconciliar la publicación.")
                         return@forEach
                     }
                 }
@@ -337,19 +310,17 @@ class RideCommandSyncWorker @AssistedInject constructor(
                             correlationId = result.correlationId,
                         )
                     }
-                    val isTerminal = result.code == "TERMINAL_STATE"
-                    if (isTerminal || result.code == "NOT_FOUND") {
-                        // Server is already in a terminal state (or trip not found on remote authority).
-                        // Clear active ride selections, mark local request cancelled if cancel command, and acknowledge outbox.
-                        rideDao.clearActiveRideSelectionsForRide(entity.rideId)
-                        if (entity.commandType == RideCommandType.CANCEL.name) {
-                            rideDao.markRequestCancelledLocally(entity.rideId)
+                    if(result.code in setOf("TERMINAL_STATE","NOT_FOUND")) {
+                        val observed=gateway.fetchSnapshot(entity.rideId)
+                        if(observed is RideSnapshotResult.Found &&
+                            com.elysium369.meet.ride.domain.RideAuthorityEvidence.isTerminalSnapshot(observed.snapshot.state,observed.snapshot.version)) {
+                            reconcileSnapshot(entity,"SYNCED",result.correlationId)
+                            rideDao.clearActiveRideSelectionsForRide(entity.rideId)
+                            outboxDao.acknowledge(entity.idempotencyKey,result.correlationId ?: "terminal_remote_snapshot",System.currentTimeMillis())
+                        } else {
+                            retryNeeded=true
+                            finishRetry(entity,"TERMINAL_PROJECTION_PENDING","Falta una proyección autoritativa para cerrar el comando.",result.correlationId)
                         }
-                        outboxDao.acknowledge(
-                            idempotencyKey = entity.idempotencyKey,
-                            correlationId = result.correlationId ?: "terminal_ack",
-                            now = System.currentTimeMillis(),
-                        )
                         return@forEach
                     }
 
@@ -380,10 +351,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
                             correlationId = result.correlationId,
                             now = System.currentTimeMillis(),
                         )
-                        if (isPublicationDeadLettered(entity)) {
-                            outboxDao.cancelStuckPendingPublication(entity.rideId)
-                            rideDao.clearActiveRideSelectionsForRide(entity.rideId)
-                        }
+                        // Failure is not proof of cancellation; retain projection and selection for reconciliation.
                     }
                 }
                 is RideCommandGatewayResult.TransportFailure -> {
@@ -414,10 +382,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
                             correlationId = null,
                             now = System.currentTimeMillis(),
                         )
-                        if (isPublicationDeadLettered(entity)) {
-                            outboxDao.cancelStuckPendingPublication(entity.rideId)
-                            rideDao.clearActiveRideSelectionsForRide(entity.rideId)
-                        }
+                        // Failure is not proof of cancellation; retain projection and selection for reconciliation.
                     }
                 }
             }
@@ -434,6 +399,7 @@ class RideCommandSyncWorker @AssistedInject constructor(
     ) {
         is RideSnapshotResult.Found -> {
             val snapshot = snapshotResult.snapshot
+            check(snapshot.version>0L) { "INVALID_AUTHORITY_VERSION" }
             rideDao.reconcileServerSnapshot(
                 requestId = snapshot.rideId,
                 legacyStatus = snapshot.state.toLegacyStatus(),

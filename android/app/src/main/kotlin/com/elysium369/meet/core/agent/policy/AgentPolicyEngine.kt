@@ -38,7 +38,9 @@ sealed interface PolicyDecision {
  * THE FUNDAMENTAL LAW:
  * "AI interprets. Policy authorizes. Domains enforce. Servers confirm. Evidence proves."
  */
-class AgentPolicyEngine {
+class AgentPolicyEngine(
+    private val entitlementRepository: com.elysium369.meet.core.agentstore.data.AgentEntitlementRepository? = null,
+) {
 
     private val safeIdempotencyRegex = Regex("^[A-Za-z0-9._:-]{16,128}$")
 
@@ -60,13 +62,17 @@ class AgentPolicyEngine {
         confirmationPrompt: String? = null,
         previewPayload: Map<String, String> = emptyMap(),
     ): PolicyDecision {
-        // 1. Entitlement check (§37, §91)
+        // 1. Authoritative Entitlement check (§37, §91) - fail-closed
         val requiredEntitlement = capability.requiredEntitlement
-        if (requiredEntitlement != null && requiredEntitlement !in currentContext.userEntitlements) {
-            return PolicyDecision.EntitlementRequired(
-                entitlement = requiredEntitlement,
-                message = "Esta función requiere el agente especializado con licencia '$requiredEntitlement'.",
-            )
+        if (requiredEntitlement != null) {
+            val isAuthorized = entitlementRepository?.hasEntitlement(requiredEntitlement)
+                ?: (requiredEntitlement in currentContext.userEntitlements)
+            if (!isAuthorized) {
+                return PolicyDecision.EntitlementRequired(
+                    entitlement = requiredEntitlement,
+                    message = "Esta función requiere el agente especializado con licencia '$requiredEntitlement'.",
+                )
+            }
         }
 
         // 2. Concurrency & Context Freshness check (§23, §88)

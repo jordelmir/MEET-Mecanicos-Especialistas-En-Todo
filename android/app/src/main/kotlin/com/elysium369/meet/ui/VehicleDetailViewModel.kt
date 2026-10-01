@@ -16,6 +16,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -38,7 +41,8 @@ class VehicleDetailViewModel @Inject constructor(
     private val vehicleDao: VehicleDao,
     private val diagnosticFindingRepository: DiagnosticFindingRepository,
     private val dtcDefinitionDao: DtcDefinitionDao,
-    private val localExpertSystem: com.elysium369.meet.core.obd.LocalExpertSystem
+    private val localExpertSystem: com.elysium369.meet.core.obd.LocalExpertSystem,
+    private val principalKernel: com.elysium369.meet.identity.ActivePrincipalKernel,
 ) : ViewModel() {
 
     private val _maintenanceLogs = MutableStateFlow<List<MaintenanceLogEntity>>(emptyList())
@@ -70,103 +74,141 @@ class VehicleDetailViewModel @Inject constructor(
 
     private var currentVehicleId: String? = null
 
+    private var vehicleLoadJob: Job? = null
+    private fun clearVehicleData() {
+        _vehicle.value=null;_maintenanceLogs.value=emptyList();_repairHistory.value=emptyList()
+        _totalMaintenanceCost.value=0.0;_totalRepairCost.value=0.0
+        _activeDtcs.value=emptyList();_dtcDefinitions.value=emptyMap();_expertProcedures.value=emptyList()
+        _recallsState.value=NhtsaRecallsState.Idle
+    }
     fun loadVehicleData(vehicleId: String) {
-        currentVehicleId = vehicleId
-        viewModelScope.launch {
-            val veh = vehicleDao.getVehicleById(vehicleId)
-            _vehicle.value = veh
-            if (veh != null) {
-                fetchNhtsaRecalls(veh.make, veh.model, veh.year)
-            }
-        }
-        viewModelScope.launch {
-            maintenanceLogDao.getLogsForVehicle(vehicleId).collect { logs ->
-                _maintenanceLogs.value = logs
-                _totalMaintenanceCost.value = logs.sumOf { it.cost.toDouble() }
-            }
-        }
-        viewModelScope.launch {
-            repairHistoryDao.getRepairsForVehicle(vehicleId).collect { repairs ->
-                _repairHistory.value = repairs
-                _totalRepairCost.value = repairs.sumOf { it.totalCost.toDouble() }
-            }
-        }
-        viewModelScope.launch {
-            val veh = vehicleDao.getVehicleById(vehicleId)
-            val make = com.elysium369.meet.ui.components.DtcUtils.normalizeManufacturer(veh?.make)
-            diagnosticFindingRepository.observeOpenFindings(vehicleId).collect { findings ->
-                val summaries = findings.map { it.toSummary() }
-                val codes = summaries.map { it.code }
-                _activeDtcs.value = codes
+        currentVehicleId=vehicleId
+        vehicleLoadJob?.cancel()
+        clearVehicleData()
+        vehicleLoadJob=viewModelScope.launch {
+            principalKernel.activePrincipal.collectLatest { principal ->
+                clearVehicleData()
+                val owner=principal.id
+                vehicleDao.getVehicleByIdForUser(owner,vehicleId) ?: return@collectLatest
+                if(principalKernel.current().id!=owner) return@collectLatest
+                coroutineScope {
+                    launch {
+                        val veh = vehicleDao.getVehicleByIdForUser(owner, vehicleId)
+                        if(principalKernel.current().id!=owner) return@launch
+                        _vehicle.value = veh
+                        if (veh != null) {
+                            fetchNhtsaRecalls(veh.make, veh.model, veh.year)
+                        }
+                    }
+                    launch {
+                        maintenanceLogDao.getLogsForVehicle(vehicleId).collect { logs ->
+                            if(principalKernel.current().id!=owner) return@collect
+                            _maintenanceLogs.value = logs
+                            _totalMaintenanceCost.value = logs.sumOf { it.cost.toDouble() }
+                        }
+                    }
+                    launch {
+                        repairHistoryDao.getRepairsForVehicle(vehicleId).collect { repairs ->
+                            if(principalKernel.current().id!=owner) return@collect
+                            _repairHistory.value = repairs
+                            _totalRepairCost.value = repairs.sumOf { it.totalCost.toDouble() }
+                        }
+                    }
+                    launch {
+                        val veh = vehicleDao.getVehicleByIdForUser(owner, vehicleId)
+                        val make = com.elysium369.meet.ui.components.DtcUtils.normalizeManufacturer(veh?.make)
+                        diagnosticFindingRepository.observeOpenFindings(vehicleId).collect { findings ->
+                            if(principalKernel.current().id!=owner) return@collect
+                            val summaries = findings.map { it.toSummary() }
+                            val codes = summaries.map { it.code }
+                            _activeDtcs.value = codes
 
-                val definitionsMap = mutableMapOf<String, com.elysium369.meet.data.local.entities.DtcDefinitionEntity>()
-                summaries.forEach { finding ->
-                    val def = dtcDefinitionDao.getDefinitionForCode(finding.code, make)
-                    if (def != null) {
-                        definitionsMap[finding.code] = def
-                    } else {
-                        definitionsMap[finding.code] = com.elysium369.meet.data.local.entities.DtcDefinitionEntity(
-                            code = finding.code,
-                            descriptionEs = finding.description,
-                            descriptionEn = "Definition pending vehicle applicability validation",
-                            system = com.elysium369.meet.ui.components.DtcUtils.getDynamicDtcFallbackDescription(finding.code, isSpanish = true),
-                            severity = finding.severity,
-                            possibleCauses = "Verifique arnés de cableado, conectores y funcionamiento mecánico del componente.",
-                            urgency = com.elysium369.meet.ui.components.DtcUtils.getDynamicUrgency(finding.code)
-                        )
+                            val definitionsMap = mutableMapOf<String, com.elysium369.meet.data.local.entities.DtcDefinitionEntity>()
+                            summaries.forEach { finding ->
+                                val def = dtcDefinitionDao.getDefinitionForCode(finding.code, make)
+                                if (def != null) {
+                                    definitionsMap[finding.code] = def
+                                } else {
+                                    definitionsMap[finding.code] = com.elysium369.meet.data.local.entities.DtcDefinitionEntity(
+                                        code = finding.code,
+                                        descriptionEs = finding.description,
+                                        descriptionEn = "Definition pending vehicle applicability validation",
+                                        system = com.elysium369.meet.ui.components.DtcUtils.getDynamicDtcFallbackDescription(finding.code, isSpanish = true),
+                                        severity = finding.severity,
+                                        possibleCauses = "Verifique arnés de cableado, conectores y funcionamiento mecánico del componente.",
+                                        urgency = com.elysium369.meet.ui.components.DtcUtils.getDynamicUrgency(finding.code)
+                                    )
+                                }
+                            }
+                            if(principalKernel.current().id!=owner) return@collect
+                            _dtcDefinitions.value = definitionsMap
+
+                            _expertProcedures.value = localExpertSystem.analyzeLiveTelemetry(
+                                liveData = emptyMap(),
+                                activeDtcs = codes,
+                                dtcDefinitions = definitionsMap
+                            )
+                        }
                     }
                 }
-                _dtcDefinitions.value = definitionsMap
-
-                _expertProcedures.value = localExpertSystem.analyzeLiveTelemetry(
-                    liveData = emptyMap(),
-                    activeDtcs = codes,
-                    dtcDefinitions = definitionsMap
-                )
             }
         }
     }
 
     fun fetchNhtsaRecalls(make: String, model: String, year: Int) {
+        val owner=principalKernel.current().id
+        val vehicleId=_vehicle.value?.takeIf { it.userId==owner }?.id ?: return
         _recallsState.value = NhtsaRecallsState.Loading
         viewModelScope.launch {
             try {
                 val list = ElysiumCloudServices.fetchNhtsaRecalls(make, model, year)
-                _recallsState.value = NhtsaRecallsState.Success(list)
+                if(principalKernel.current().id==owner && _vehicle.value?.id==vehicleId) _recallsState.value = NhtsaRecallsState.Success(list)
             } catch (e: Exception) {
-                _recallsState.value = NhtsaRecallsState.Error(e.localizedMessage ?: "Error al obtener recalls de la NHTSA")
+                if(principalKernel.current().id==owner && _vehicle.value?.id==vehicleId) _recallsState.value = NhtsaRecallsState.Error("No se pudieron consultar recalls")
             }
         }
     }
 
     fun addMaintenanceLog(log: MaintenanceLogEntity) {
+        val owner = principalKernel.current().id
         viewModelScope.launch { 
+            if(vehicleDao.getVehicleByIdForUser(owner,log.vehicleId)==null) return@launch
+            if (principalKernel.current().id != owner) return@launch
             maintenanceLogDao.insertLog(log) 
         }
     }
 
     fun copyImageAndSaveMaintenance(context: android.content.Context, uri: android.net.Uri?, logBuilder: (String?) -> MaintenanceLogEntity) {
+        val owner = principalKernel.current().id
         viewModelScope.launch {
             val localPath = if (uri != null) {
                 com.elysium369.meet.core.utils.FileUtils.copyUriToInternalStorage(context, uri)
             } else null
             val log = logBuilder(localPath)
+            if(vehicleDao.getVehicleByIdForUser(owner,log.vehicleId)==null) return@launch
+            if (principalKernel.current().id != owner) return@launch
             maintenanceLogDao.insertLog(log)
         }
     }
 
     fun addRepairHistory(repair: RepairHistoryEntity) {
+        val owner = principalKernel.current().id
         viewModelScope.launch { 
+            if(vehicleDao.getVehicleByIdForUser(owner,repair.vehicleId)==null) return@launch
+            if (principalKernel.current().id != owner) return@launch
             repairHistoryDao.insertRepair(repair) 
         }
     }
 
     fun copyImageAndSaveRepair(context: android.content.Context, uri: android.net.Uri?, repairBuilder: (String?) -> RepairHistoryEntity) {
+        val owner = principalKernel.current().id
         viewModelScope.launch {
             val localPath = if (uri != null) {
                 com.elysium369.meet.core.utils.FileUtils.copyUriToInternalStorage(context, uri)
             } else null
             val repair = repairBuilder(localPath)
+            if(vehicleDao.getVehicleByIdForUser(owner,repair.vehicleId)==null) return@launch
+            if (principalKernel.current().id != owner) return@launch
             repairHistoryDao.insertRepair(repair)
         }
     }
@@ -205,7 +247,7 @@ class VehicleDetailViewModel @Inject constructor(
     }
 
     fun exportHistoryPdf(context: android.content.Context) {
-        val currentVehicle = _vehicle.value ?: return
+        val currentVehicle = _vehicle.value?.takeIf { it.userId==principalKernel.current().id } ?: return
         val generator = com.elysium369.meet.core.export.ReportGenerator(context)
         val file = generator.generateVehicleHistoryReport(
             vehicle = currentVehicle,
@@ -226,7 +268,7 @@ class VehicleDetailViewModel @Inject constructor(
         includeBranding: Boolean = true,
         includeExpert: Boolean = false
     ): File? {
-        val currentVehicle = _vehicle.value ?: return null
+        val currentVehicle = _vehicle.value?.takeIf { it.userId==principalKernel.current().id } ?: return null
         val generator = com.elysium369.meet.core.export.ReportGenerator(context)
         val procedures = if (includeExpert) _expertProcedures.value else emptyList()
         return withContext(Dispatchers.IO) {

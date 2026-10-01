@@ -46,6 +46,9 @@ enum class RidePetType {
         }
 }
 
+@Serializable
+enum class RideVehicleKind { CAR, MOTORCYCLE }
+
 data class RidePreferenceBadge(
     val icon: String,
     val label: String,
@@ -57,16 +60,24 @@ data class RidePassengerPreferences(
     val pet: RidePetType = RidePetType.NONE,
     val kidsCount: Int = 0,
     val fivePassengers: Boolean = false,
+    val vehicleKind: RideVehicleKind = RideVehicleKind.CAR,
 ) {
     init {
         require(kidsCount in 0..4) { "El número de niños debe estar entre 0 y 4" }
+        require(vehicleKind != RideVehicleKind.MOTORCYCLE ||
+            (pet == RidePetType.NONE && kidsCount == 0 && !fivePassengers)) {
+            "La moto admite un solo pasajero, sin acompañantes ni mascotas"
+        }
     }
 
     val hasSpecialPreferences: Boolean
-        get() = pet != RidePetType.NONE || kidsCount > 0 || fivePassengers
+        get() = vehicleKind == RideVehicleKind.MOTORCYCLE || pet != RidePetType.NONE || kidsCount > 0 || fivePassengers
 
     fun toBadges(): List<RidePreferenceBadge> {
         val badges = mutableListOf<RidePreferenceBadge>()
+        if (vehicleKind == RideVehicleKind.MOTORCYCLE) {
+            badges.add(RidePreferenceBadge("🛵", "Moto · 1 pasajero", Color(0xFF4FC3F7)))
+        }
         when (pet) {
             RidePetType.DOG -> badges.add(
                 RidePreferenceBadge("🐶", "Perro", Color(0xFFFFB74D))
@@ -136,10 +147,16 @@ data class RidePassengerPreferences(
                             it.content.toBooleanStrictOrNull() ?: (it.content == "1" || it.content.equals("true", ignoreCase = true))
                         } else false
                     } ?: false
+                    val vehicleKind = when ((targetObj["vehicleKind"] ?: targetObj["vehicle_kind"])
+                        ?.let { it as? kotlinx.serialization.json.JsonPrimitive }?.content?.uppercase()) {
+                        "MOTORCYCLE", "MOTO" -> RideVehicleKind.MOTORCYCLE
+                        else -> RideVehicleKind.CAR
+                    }
                     RidePassengerPreferences(
                         pet = pet,
                         kidsCount = kids.coerceIn(0, 4),
                         fivePassengers = five,
+                        vehicleKind = vehicleKind,
                     )
                 } else {
                     jsonConfig.decodeFromString(serializer(), rawJson)
@@ -171,6 +188,23 @@ fun PassengerPreferencesSelector(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            Text("Tipo de transporte", color = MeetColors.textPrimary, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(RideVehicleKind.CAR to "🚗 Carro", RideVehicleKind.MOTORCYCLE to "🛵 Moto").forEach { (kind, label) ->
+                    FilterChip(
+                        selected = preferences.vehicleKind == kind,
+                        onClick = {
+                            onPreferencesChange(if (kind == RideVehicleKind.MOTORCYCLE) {
+                                RidePassengerPreferences(vehicleKind = kind)
+                            } else preferences.copy(vehicleKind = kind))
+                        },
+                        label = { Text(label) },
+                    )
+                }
+            }
+            if (preferences.vehicleKind == RideVehicleKind.MOTORCYCLE) {
+                Text("Moto: máximo 1 pasajero. Entregas de comida y objetos pequeños se solicitan en Entregas, no en Viajes.", color = MeetColors.cyberCyan, fontSize = 12.sp)
+            } else {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -389,6 +423,7 @@ fun PassengerPreferencesSelector(
                         uncheckedTrackColor = Color(0xFF142032)
                     )
                 )
+            }
             }
         }
     }

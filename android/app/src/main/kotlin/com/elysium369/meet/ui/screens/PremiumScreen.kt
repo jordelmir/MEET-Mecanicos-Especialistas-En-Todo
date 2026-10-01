@@ -81,7 +81,7 @@ fun PremiumScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFF0F1B30), shape = RoundedCornerShape(12.dp))
+                    .background(MeetColors.cardBackground, shape = RoundedCornerShape(12.dp))
                     .padding(4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
@@ -113,7 +113,7 @@ fun PremiumScreen(
             // Plan Details Card
             Card(
                 shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1B30)),
+                colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
                 modifier = Modifier
                     .fillMaxWidth()
                     .border(

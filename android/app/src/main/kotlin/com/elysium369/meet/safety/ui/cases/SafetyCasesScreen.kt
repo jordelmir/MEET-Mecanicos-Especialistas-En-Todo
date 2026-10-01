@@ -66,7 +66,7 @@ fun SafetyCasesScreen(
                             stringResource(R.string.safety_cases_title),
                             fontWeight = FontWeight.Black,
                             fontSize = 17.sp,
-                            color = Color.White,
+                            color = MeetColors.textPrimary,
                         )
                         Text(
                             if (uiState.isLoading) stringResource(R.string.safety_loading)
@@ -81,7 +81,7 @@ fun SafetyCasesScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.safety_back),
-                            tint = Color.White,
+                            tint = MeetColors.textPrimary,
                         )
                     }
                 },
@@ -124,8 +124,8 @@ fun SafetyCasesScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MeetColors.cyberCyan,
                         unfocusedBorderColor = MeetColors.borderSubtle,
-                        focusedTextColor = Color.White,
-                        unfocusedTextColor = Color.White,
+                        focusedTextColor = MeetColors.textPrimary,
+                        unfocusedTextColor = MeetColors.textPrimary,
                     ),
                 )
 
@@ -247,7 +247,7 @@ private fun CaseCard(case: SafetyPublicCaseEntity, onClick: () -> Unit) {
                     case.title,
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
-                    color = Color.White,
+                    color = MeetColors.textPrimary,
                     modifier = Modifier.weight(1f),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
@@ -304,7 +304,7 @@ private fun CaseCard(case: SafetyPublicCaseEntity, onClick: () -> Unit) {
                 }
                 Column {
                     Text(stringResource(R.string.safety_cases_confidence), fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary)
-                    Text(case.confidenceScore?.let { "${(it * 100).toInt()}%" } ?: stringResource(R.string.safety_public_unknown), fontSize = 15.sp, fontWeight = FontWeight.Black, color = Color.White)
+                    Text(case.confidenceScore?.let { "${(it * 100).toInt()}%" } ?: stringResource(R.string.safety_public_unknown), fontSize = 15.sp, fontWeight = FontWeight.Black, color = MeetColors.textPrimary)
                 }
             }
         }

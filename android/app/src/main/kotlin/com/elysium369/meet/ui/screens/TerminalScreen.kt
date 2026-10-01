@@ -196,7 +196,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         ) {
                             Text(
                                 "ASISTENTE UDS",
-                                color = Color(0xFFBD00FF),
+                                color = MeetColors.hotMagenta,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace
@@ -345,7 +345,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         TerminalLineType.RESPONSE -> Color.White
                         TerminalLineType.EXPLANATION -> MeetColors.cyberCyan
                         TerminalLineType.ERROR -> MeetColors.error
-                        TerminalLineType.DECODED -> Color(0xFFBD00FF)
+                        TerminalLineType.DECODED -> MeetColors.hotMagenta
                         else -> MeetColors.cyberCyan.copy(alpha = 0.8f)
                     }
                     TerminalFilterChip(
@@ -623,7 +623,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                     val activeColor = when (distroId) {
                         "android" -> MeetColors.cyberCyan
                         "alpine" -> MeetColors.neonGreen
-                        "debian" -> Color(0xFFBD00FF)
+                        "debian" -> MeetColors.hotMagenta
                         "ubuntu" -> Color(0xFFFF5500)
                         else -> MeetColors.cyberCyan
                     }
@@ -759,7 +759,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                                 CircularProgressIndicator(
                                     color = when (activeDistro) {
                                         "alpine" -> MeetColors.neonGreen
-                                        "debian" -> Color(0xFFBD00FF)
+                                        "debian" -> MeetColors.hotMagenta
                                         "ubuntu" -> Color(0xFFFF5500)
                                         else -> MeetColors.cyberCyan
                                     },
@@ -783,7 +783,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = when (activeDistro) {
                                         "alpine" -> MeetColors.neonGreen
-                                        "debian" -> Color(0xFFBD00FF)
+                                        "debian" -> MeetColors.hotMagenta
                                         "ubuntu" -> Color(0xFFFF5500)
                                         else -> MeetColors.cyberCyan
                                     }
@@ -952,7 +952,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                                 when (activeDistro) {
                                     "android" -> MeetColors.cyberCyan
                                     "alpine" -> MeetColors.neonGreen
-                                    "debian" -> Color(0xFFBD00FF)
+                                    "debian" -> MeetColors.hotMagenta
                                     "ubuntu" -> Color(0xFFFF5500)
                                     else -> MeetColors.cyberCyan
                                 }.copy(alpha = 0.15f),
@@ -1010,13 +1010,13 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                                         Text(
                                             text = line,
                                             color = when {
-                                                isYouPrompt -> Color(0xFFBD00FF)
+                                                isYouPrompt -> MeetColors.hotMagenta
                                                 isAgyResponse -> Color(0xFF38EF7D)
                                                 isAgyLogo -> Color(0xFF00E5FF)
                                                 line.startsWith("❯") -> when (activeDistro) {
                                                     "android" -> MeetColors.cyberCyan
                                                     "alpine" -> MeetColors.neonGreen
-                                                    "debian" -> Color(0xFFBD00FF)
+                                                    "debian" -> MeetColors.hotMagenta
                                                     "ubuntu" -> Color(0xFFFF5500)
                                                     else -> MeetColors.cyberCyan
                                                 }
@@ -1046,7 +1046,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         val activeColor = when (activeDistro) {
                             "android" -> MeetColors.cyberCyan
                             "alpine" -> MeetColors.neonGreen
-                            "debian" -> Color(0xFFBD00FF)
+                            "debian" -> MeetColors.hotMagenta
                             "ubuntu" -> Color(0xFFFF5500)
                             else -> MeetColors.cyberCyan
                         }
@@ -1196,7 +1196,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         val activeColor = when (activeDistro) {
                             "android" -> MeetColors.cyberCyan
                             "alpine" -> MeetColors.neonGreen
-                            "debian" -> Color(0xFFBD00FF)
+                            "debian" -> MeetColors.hotMagenta
                             "ubuntu" -> Color(0xFFFF5500)
                             else -> MeetColors.cyberCyan
                         }
@@ -1246,7 +1246,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                     .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
                     .background(MeetColors.backgroundDeep)
                     .border(
-                        BorderStroke(1.5.dp, Color(0xFFBD00FF)),
+                        BorderStroke(1.5.dp, MeetColors.hotMagenta),
                         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                     )
                     .clickable(enabled = true, onClick = {}) // consume click
@@ -1259,7 +1259,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                 ) {
                     Text(
                         "⚙️ ASISTENTE UDS / ISO 14229",
-                        color = Color(0xFFBD00FF),
+                        color = MeetColors.hotMagenta,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
@@ -1301,12 +1301,12 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSrvSelected) Color(0xFFBD00FF).copy(alpha = 0.2f) else MeetColors.cardBackgroundLighter)
-                                .border(1.dp, if (isSrvSelected) Color(0xFFBD00FF) else MeetColors.textMuted.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+                                .background(if (isSrvSelected) MeetColors.hotMagenta.copy(alpha = 0.2f) else MeetColors.cardBackgroundLighter)
+                                .border(1.dp, if (isSrvSelected) MeetColors.hotMagenta else MeetColors.textMuted.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
                                 .clickable { selectedService = srv }
                                 .padding(horizontal = 8.dp, vertical = 6.dp)
                         ) {
-                            Text(label, color = if (isSrvSelected) Color(0xFFBD00FF) else MeetColors.textMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                            Text(label, color = if (isSrvSelected) MeetColors.hotMagenta else MeetColors.textMuted, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                         }
                     }
                 }
@@ -1511,7 +1511,7 @@ fun TerminalScreen(viewModel: ObdViewModel) {
                             commandInput = generatedCommand
                             showUdsWizard = false
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFBD00FF)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.hotMagenta),
                         enabled = generatedCommand.isNotBlank(),
                         modifier = Modifier.weight(1f)
                     ) {

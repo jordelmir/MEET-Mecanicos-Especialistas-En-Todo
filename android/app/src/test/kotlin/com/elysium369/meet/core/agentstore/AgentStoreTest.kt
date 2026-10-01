@@ -3,20 +3,40 @@ package com.elysium369.meet.core.agentstore
 import com.elysium369.meet.core.agentstore.data.AgentCatalogRepository
 import com.elysium369.meet.core.agentstore.data.AgentEntitlementRepository
 import com.elysium369.meet.core.agentstore.domain.AgentCategory
+import com.elysium369.meet.core.agentstore.domain.AgentEntitlementGateway
+import com.elysium369.meet.core.agentstore.domain.EntitlementSnapshot
 import com.elysium369.meet.core.agentstore.domain.OfficialAgents
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 
 class AgentStoreTest {
 
+    private class TestGateway : AgentEntitlementGateway {
+            override fun currentPrincipalId(): String = "test_user"
+        var entitlements: Set<String> = emptySet()
+        override suspend fun fetchAuthoritativeEntitlements(): Result<EntitlementSnapshot> {
+            return Result.success(
+                EntitlementSnapshot(
+                    principalId = "test_user",
+                    entitlements = entitlements,
+                    asOfEpochMs = System.currentTimeMillis(),
+                    revision = 1L,
+                )
+            )
+        }
+    }
+
     private lateinit var catalogRepo: AgentCatalogRepository
     private lateinit var entitlementRepo: AgentEntitlementRepository
+    private lateinit var testGateway: TestGateway
 
     @Before
     fun setUp() {
         catalogRepo = AgentCatalogRepository()
-        entitlementRepo = AgentEntitlementRepository()
+        testGateway = TestGateway()
+        entitlementRepo = AgentEntitlementRepository(testGateway)
     }
 
     @Test
@@ -28,8 +48,8 @@ class AgentStoreTest {
         assertTrue(ids.contains("agent.evair_core"))
         assertTrue(ids.contains("agent.master_mechanic"))
         assertTrue(ids.contains("agent.draco_dragon"))
-        assertTrue(ids.contains("agent.pokemon_volt"))
-        assertTrue(ids.contains("agent.saiyan_ssj4"))
+        assertTrue(ids.contains("agent.volt_aether"))
+        assertTrue(ids.contains("agent.titan_vanguard"))
         assertTrue(ids.contains("agent.laya_valkyrie"))
     }
 
@@ -46,23 +66,27 @@ class AgentStoreTest {
     }
 
     @Test
-    fun `master mechanic has valid descriptor and visual attributes`() {
+    fun `master mechanic is premium with valid descriptor and localized CRC pricing`() {
         val mecha = OfficialAgents.MASTER_MECHANIC
-        assertTrue(mecha.isFree)
-        assertNull(mecha.requiredEntitlement)
-        assertEquals(0L, mecha.priceFiatCrc)
+        assertFalse(mecha.isFree)
+        assertEquals("agent.master_mechanic", mecha.requiredEntitlement)
+        assertNotNull(mecha.commerce)
+        assertEquals("agent_master_mechanic_lifetime", mecha.commerce?.storeProductId)
+        assertEquals("agent.master_mechanic", mecha.commerce?.entitlementId)
+        assertEquals(2_990L, mecha.priceFiatCrc)
+        assertEquals(4_500L, mecha.originalPriceFiatCrc)
         assertEquals("CYBER_MECHA", mecha.avatarVisualType)
     }
 
     @Test
     fun `catalog repository filters by category accurately`() {
-        val mechanics = catalogRepo.listByCategory(AgentCategory.AUTOMOTIVE)
-        assertTrue(mechanics.any { it.id == "agent.master_mechanic" })
-        assertTrue(mechanics.any { it.id == "agent.draco_dragon" })
+        val automotive = catalogRepo.listByCategory(AgentCategory.AUTOMOTIVE)
+        assertTrue(automotive.any { it.id == "agent.master_mechanic" })
+        assertTrue(automotive.any { it.id == "agent.draco_dragon" })
 
         val safety = catalogRepo.listByCategory(AgentCategory.SAFETY)
         assertEquals(1, safety.size)
-        assertEquals("agent.saiyan_ssj4", safety.first().id)
+        assertEquals("agent.titan_vanguard", safety.first().id)
 
         val mobility = catalogRepo.listByCategory(AgentCategory.MOBILITY)
         assertEquals(1, mobility.size)
@@ -73,15 +97,25 @@ class AgentStoreTest {
     }
 
     @Test
-    fun `granting entitlement and equipping agent updates state`() {
-        val mecha = OfficialAgents.MASTER_MECHANIC
+    fun `authoritative entitlement unlock enables equipping`() = runBlocking {
+        val titan = OfficialAgents.MASTER_MECHANIC
 
-        assertTrue(entitlementRepo.isAgentOwned(mecha.id, mecha.requiredEntitlement))
+        // Initially locked
+        entitlementRepo.refresh()
+        assertFalse(entitlementRepo.hasEntitlement(titan.requiredEntitlement))
+        assertFalse(entitlementRepo.isAgentOwned(titan.id, titan.requiredEntitlement))
 
-        // Grant custom entitlement
-        entitlementRepo.grantEntitlement("agent.custom_pack")
-        entitlementRepo.equipAgent(mecha.id)
-        assertEquals(mecha.id, entitlementRepo.equippedAgentId.value)
+        // Authoritative server grant
+        testGateway.entitlements = setOf(titan.requiredEntitlement!!)
+        entitlementRepo.refresh()
+
+        // Now unlocked
+        assertTrue(entitlementRepo.hasEntitlement(titan.requiredEntitlement))
+        assertTrue(entitlementRepo.isAgentOwned(titan.id, titan.requiredEntitlement))
+
+        // Equip agent
+        entitlementRepo.equipAgent(titan.id)
+        assertEquals(titan.id, entitlementRepo.equippedAgentId.value)
     }
 
     @Test

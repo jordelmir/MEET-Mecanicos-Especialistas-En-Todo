@@ -33,7 +33,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -48,8 +51,11 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.elysium369.meet.automation.AiAction
 import com.elysium369.meet.automation.AiAutomationBridge
+import com.elysium369.meet.core.agent.ui.*
 import com.elysium369.meet.core.agentstore.domain.OfficialAgents
 import com.elysium369.meet.core.agentstore.ui.Agent3dAvatarCanvas
+import com.elysium369.meet.core.audio.VoiceInteractionBus
+import com.elysium369.meet.core.audio.VoiceTranscriptEvent
 import com.elysium369.meet.ride.domain.RideCancellationReason
 import com.elysium369.meet.ride.domain.RidePassengerPreferences
 import com.elysium369.meet.ride.domain.RidePetType
@@ -107,12 +113,106 @@ fun ElysiumLivingCompanionOverlay(
     var equippedCompanion by remember { mutableStateOf(availableCompanions.first()) } // Default: Draco Dragon
 
     // POSICIÓN INICIAL: Centro en la parte superior al abrir el APK
-    var offsetX by remember { mutableFloatStateOf((screenWidthPx / 2f) - with(density) { 40.dp.toPx() }) }
-    var offsetY by remember { mutableFloatStateOf(with(density) { 56.dp.toPx() }) }
+    var homeOffsetX by remember { mutableFloatStateOf((screenWidthPx / 2f) - with(density) { 40.dp.toPx() }) }
+    var homeOffsetY by remember { mutableFloatStateOf(with(density) { 56.dp.toPx() }) }
+
+    val avatarAnimX = remember { Animatable(homeOffsetX) }
+    val avatarAnimY = remember { Animatable(homeOffsetY) }
+    val avatarAnimScale = remember { Animatable(1.0f) }
+    val avatarAnimAlpha = remember { Animatable(1.0f) }
+
+    var highlightedTargetBounds by remember { mutableStateOf<Rect?>(null) }
+    var quantumBurstOrigin by remember { mutableStateOf<Offset?>(null) }
+    val burstProgress = remember { Animatable(0f) }
+
+    val motionPort = remember(coroutineScope, density) {
+        object : CompanionMotionPort {
+            override val currentHomePose: CompanionHomePose
+                get() = CompanionHomePose(homeOffsetX, homeOffsetY, 1.0f)
+
+            override fun updateHomePose(pose: CompanionHomePose) {
+                homeOffsetX = pose.x
+                homeOffsetY = pose.y
+            }
+
+            override suspend fun teleportTo(target: Rect) {
+                val avatarSize = with(density) { 80.dp.toPx() }
+                val origin = Offset(
+                    avatarAnimX.value + avatarSize / 2f,
+                    avatarAnimY.value + avatarSize / 2f
+                )
+                // 1. Quantum Burst en la posición de origen
+                quantumBurstOrigin = origin
+                burstProgress.snapTo(0f)
+                coroutineScope.launch { burstProgress.animateTo(1f, tween(250)) }
+
+                // 2. Encogimiento y desvanecimiento
+                avatarAnimScale.animateTo(0.18f, tween(180, easing = FastOutLinearInEasing))
+                avatarAnimAlpha.animateTo(0.0f, tween(80))
+
+                // 3. Teletransportación instantánea al botón destino
+                val targetCenter = Offset(target.center.x, target.center.y)
+                avatarAnimX.snapTo(targetCenter.x - avatarSize / 2f)
+                avatarAnimY.snapTo(targetCenter.y - avatarSize / 2f)
+                highlightedTargetBounds = target
+
+                // 4. Reaparición condensada sobre el botón
+                quantumBurstOrigin = targetCenter
+                burstProgress.snapTo(0f)
+                coroutineScope.launch { burstProgress.animateTo(1f, tween(250)) }
+                avatarAnimAlpha.animateTo(1.0f, tween(80))
+                avatarAnimScale.animateTo(
+                    0.38f,
+                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                )
+            }
+
+            override suspend fun tapPulse() {
+                avatarAnimScale.animateTo(0.28f, tween(90))
+                avatarAnimScale.animateTo(0.38f, tween(90))
+            }
+
+            override suspend fun returnHome() {
+                val avatarSize = with(density) { 80.dp.toPx() }
+                val targetPos = Offset(
+                    avatarAnimX.value + avatarSize / 2f,
+                    avatarAnimY.value + avatarSize / 2f
+                )
+                // 1. Burst en el botón
+                quantumBurstOrigin = targetPos
+                burstProgress.snapTo(0f)
+                coroutineScope.launch { burstProgress.animateTo(1f, tween(250)) }
+
+                // 2. Desvanecimiento
+                avatarAnimScale.animateTo(0.12f, tween(140))
+                avatarAnimAlpha.animateTo(0.0f, tween(70))
+                highlightedTargetBounds = null
+
+                // 3. Snap a la posición hogar
+                avatarAnimX.snapTo(homeOffsetX)
+                avatarAnimY.snapTo(homeOffsetY)
+
+                // 4. Reaparición con tamaño completo
+                val homeCenter = Offset(
+                    homeOffsetX + avatarSize / 2f,
+                    homeOffsetY + avatarSize / 2f
+                )
+                quantumBurstOrigin = homeCenter
+                burstProgress.snapTo(0f)
+                coroutineScope.launch { burstProgress.animateTo(1f, tween(250)) }
+                avatarAnimAlpha.animateTo(1.0f, tween(80))
+                avatarAnimScale.animateTo(
+                    1.0f,
+                    spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+                )
+            }
+        }
+    }
+
 
     var isMenuOpen by remember { mutableStateOf(false) }
     var isVisible by remember { mutableStateOf(true) }
-    var isListening by remember { mutableStateOf(false) }
+    val isListening by obdViewModel.isVoiceCopilotListening.collectAsState()
     var speechBubbleText by remember { mutableStateOf<String?>("¡Draco listo! Tócame para hablar.") }
     var customCommandText by remember { mutableStateOf("") }
 
@@ -130,6 +230,26 @@ fun ElysiumLivingCompanionOverlay(
     val activeRide by obdViewModel.activeRideRequest.collectAsState(initial = null)
     val isDriver by obdViewModel.rideDriverMode.collectAsState(initial = false)
 
+    val principalKernel = remember(context.applicationContext) {
+        dagger.hilt.android.EntryPointAccessors.fromApplication(
+            context.applicationContext, CompanionPrincipalEntryPoint::class.java).principalKernel()
+    }
+    val latestAgentContext by rememberUpdatedState(newValue = {
+        com.elysium369.meet.core.agent.context.AgentContextSnapshot(
+            principalId = principalKernel.current().id,
+            activeVehicleId = obdViewModel.selectedVehicle.value?.id,
+            activeRideId = activeRide?.requestId,
+            currentScreen = activeRoute,
+            activeDtcCodes = obdViewModel.activeDtcs.value,
+            isObdConnected = obdViewModel.connectionState.value == com.elysium369.meet.core.obd.ObdState.CONNECTED,
+        )
+    })
+    val orchestrator = remember(principalKernel) {
+        EvairInteractionOrchestrator(contextProvider = object : com.elysium369.meet.core.agent.context.AgentContextProvider {
+            override fun currentSnapshot() = latestAgentContext()
+        })
+    }
+
     // Text to speech instance
     var tts by remember { mutableStateOf<TextToSpeech?>(null) }
     DisposableEffect(Unit) {
@@ -146,49 +266,30 @@ fun ElysiumLivingCompanionOverlay(
         }
     }
 
-    // Declaración previa de SpeechRecognizer
-    var speechRecognizer by remember { mutableStateOf<SpeechRecognizer?>(null) }
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            obdViewModel.toggleVoiceCopilot(true)
+        } else {
+            speechBubbleText = "Permiso de micrófono no otorgado."
+        }
+    }
 
     fun startVoiceInput() {
         val hasPermission = ContextCompat.checkSelfPermission(
             context,
             Manifest.permission.RECORD_AUDIO
         ) == PackageManager.PERMISSION_GRANTED
-        if (!hasPermission) return
-
-        if (speechRecognizer != null) {
-            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-CR")
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "es-CR")
-                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            }
-            try {
-                speechRecognizer?.startListening(intent)
-                isListening = true
-            } catch (_: Exception) {
-                isListening = false
-            }
+        if (!hasPermission) {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            return
         }
+        obdViewModel.toggleVoiceCopilot(true)
     }
 
     fun stopVoiceInput() {
-        try {
-            speechRecognizer?.stopListening()
-        } catch (_: Exception) {}
-        isListening = false
-    }
-
-    // Permission launcher for microphone
-    val audioPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            startVoiceInput()
-        } else {
-            speechBubbleText = "Permiso de micrófono no otorgado."
-        }
+        obdViewModel.toggleVoiceCopilot(false)
     }
 
     // Motor de ejecución de intenciones por voz
@@ -251,10 +352,10 @@ fun ElysiumLivingCompanionOverlay(
                             counterPrice = targetRide.priceOffer,
                             currency = targetRide.currency,
                             estArrivalMin = 8,
-                            message = "Aceptado por comando de voz"
+                            message = "Oferta solicitada por voz"
                         )
-                        val resp = "¡Aceptando el viaje de ${targetRide.passengerName}! Oferta de ₡${targetRide.priceOffer.toInt()} enviada."
-                        speechBubbleText = "✓ Viaje de ${targetRide.passengerName} aceptado."
+                        val resp = "Solicité enviar tu oferta a ${targetRide.passengerName}. Espera la confirmación y la aceptación del pasajero."
+                        speechBubbleText = "Oferta pendiente de confirmación."
                         tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_accept_name")
                         return
                     } else {
@@ -273,10 +374,10 @@ fun ElysiumLivingCompanionOverlay(
                         counterPrice = singleRide.priceOffer,
                         currency = singleRide.currency,
                         estArrivalMin = 8,
-                        message = "Aceptado por comando de voz"
+                        message = "Oferta solicitada por voz"
                     )
-                    val resp = "¡Viaje de ${singleRide.passengerName} aceptado! En camino a recoger al pasajero."
-                    speechBubbleText = "✓ Viaje de ${singleRide.passengerName} aceptado."
+                    val resp = "Solicité enviar tu oferta a ${singleRide.passengerName}. El pasajero debe aceptarla."
+                    speechBubbleText = "Oferta pendiente de confirmación."
                     tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_accept_single")
                     return
                 } else if (openRides.size > 1) {
@@ -297,9 +398,9 @@ fun ElysiumLivingCompanionOverlay(
             if (query.contains("llegué") || query.contains("ya llegue") || query.contains("estoy en el punto")) {
                 val ride = activeRide
                 if (ride != null) {
-                    AiAutomationBridge.dispatchAction(AiAction.AdvanceRideStatus(ride.requestId, "ARRIVED"))
-                    val resp = "Notificando al pasajero que has llegado al punto de recogida."
-                    speechBubbleText = "📍 Chofer en el punto de recogida."
+                    obdViewModel.updateRideStatus(ride.requestId, "ARRIVED")
+                    val resp = "Solicité el siguiente paso del viaje. Espera la confirmación del servidor antes de anunciar tu llegada."
+                    speechBubbleText = "Llegada pendiente de confirmación."
                     tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_arrived")
                     return
                 }
@@ -307,9 +408,9 @@ fun ElysiumLivingCompanionOverlay(
             if (query.contains("pasajero a bordo") || query.contains("iniciar viaje") || query.contains("comenzar viaje")) {
                 val ride = activeRide
                 if (ride != null) {
-                    AiAutomationBridge.dispatchAction(AiAction.AdvanceRideStatus(ride.requestId, "IN_PROGRESS"))
-                    val resp = "Abordaje verificado. Viaje iniciado hacia el destino."
-                    speechBubbleText = "🚗 Viaje en curso."
+                    navController.navigate(com.elysium369.meet.ui.navigation.MeetDestinations.RIDE_HOME)
+                    val resp = "Ingresa el PIN del pasajero en Viajes para verificar el abordaje. El viaje todavía no se ha iniciado."
+                    speechBubbleText = "Verifica el PIN en Viajes."
                     tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_in_progress")
                     return
                 }
@@ -317,9 +418,9 @@ fun ElysiumLivingCompanionOverlay(
             if (query.contains("completar viaje") || query.contains("terminar viaje") || query.contains("finalizar viaje")) {
                 val ride = activeRide
                 if (ride != null) {
-                    AiAutomationBridge.dispatchAction(AiAction.AdvanceRideStatus(ride.requestId, "COMPLETED"))
-                    val resp = "¡Viaje completado exitosamente! Aplicando comisión oficial del 5%."
-                    speechBubbleText = "✅ Viaje completado."
+                    obdViewModel.updateRideStatus(ride.requestId, "COMPLETED")
+                    val resp = "Solicité finalizar el viaje. Espera la confirmación del servidor."
+                    speechBubbleText = "Finalización pendiente de confirmación."
                     tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "driver_completed")
                     return
                 }
@@ -417,27 +518,13 @@ fun ElysiumLivingCompanionOverlay(
 
                 if (isAffirmative) {
                     bookingStep = RideBookingStep.IDLE
-                    val summaryMsg = "¡Entendido y confirmado por ti! Publicando tu viaje hacia $destinationLocation en la red oficial MEET."
-                    speechBubbleText = "✓ Publicando viaje a $destinationLocation"
+                    val summaryMsg = "¡Entendido y confirmado por ti! Abriendo tu solicitud hacia $destinationLocation en la red oficial MEET."
+                    speechBubbleText = "✓ Preparando viaje a $destinationLocation"
                     tts?.speak(summaryMsg, TextToSpeech.QUEUE_FLUSH, null, "publish_ride")
 
-                    // Asegurar modo pasajero y navegación
+                    // Asegurar modo pasajero y navegación autoritativa
                     obdViewModel.setRideDriverMode(false)
                     navController.safeNavigate(MeetDestinations.RIDE_HOME)
-
-                    // Crear solicitud oficial de viaje
-                    AiAutomationBridge.dispatchAction(
-                        AiAction.CreateRide(
-                            pickupAddress = pickupLocation,
-                            pickupLat = 9.9333,
-                            pickupLng = -84.0833,
-                            destAddress = destinationLocation,
-                            destLat = 9.8644,
-                            destLng = -83.9194,
-                            priceOffer = 4500.0,
-                            currency = "CRC"
-                        )
-                    )
                     return
                 } else if (isNegative) {
                     bookingStep = RideBookingStep.IDLE
@@ -496,8 +583,8 @@ fun ElysiumLivingCompanionOverlay(
         val isServiciosFinalizados = query.contains("servicios finalizados") || query.contains("historial") || query.contains("pedidos finalizados") || query.contains("completados")
         val isScanner = query.contains("scanner") || query.contains("escan") || query.contains("falla") || query.contains("dtc")
         val isDragon = query.contains("dragon") || query.contains("dragón") || query.contains("draco")
-        val isVolt = query.contains("volt") || query.contains("sparky") || query.contains("pokemon") || query.contains("eléctrico")
-        val isSaiyan = query.contains("goku") || query.contains("saiyajin") || query.contains("sayayin")
+        val isVolt = query.contains("volt") || query.contains("aether") || query.contains("chispa") || query.contains("eléctrico")
+        val isTitan = query.contains("titan") || query.contains("vanguard") || query.contains("defensa") || query.contains("escudo")
 
         when {
             isPulperia -> {
@@ -555,16 +642,16 @@ fun ElysiumLivingCompanionOverlay(
                 tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "switch_dragon")
             }
             isVolt -> {
-                availableCompanions.find { it.avatarVisualType == "POKEMON_VOLT" }?.let { equippedCompanion = it }
-                val resp = "¡Volt Sparky listo! Batería al 100%."
+                availableCompanions.find { it.avatarVisualType == "VOLT_AETHER" }?.let { equippedCompanion = it }
+                val resp = "¡Volt Aether listo! Batería al 100%."
                 speechBubbleText = resp
                 tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "switch_volt")
             }
-            isSaiyan -> {
-                availableCompanions.find { it.avatarVisualType == "SAIYAN_SSJ4" }?.let { equippedCompanion = it }
-                val resp = "¡Goku SSJ4 al mando! Ki protector al máximo."
+            isTitan -> {
+                availableCompanions.find { it.avatarVisualType == "TITAN_VANGUARD" }?.let { equippedCompanion = it }
+                val resp = "¡Titan Vanguard al mando! Escudo protector activado."
                 speechBubbleText = resp
-                tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "switch_saiyan")
+                tts?.speak(resp, TextToSpeech.QUEUE_FLUSH, null, "switch_titan")
             }
             query.contains("ocultar") || query.contains("cerrar") -> {
                 isVisible = false
@@ -578,54 +665,70 @@ fun ElysiumLivingCompanionOverlay(
         }
     }
 
-    // Inicialización del SpeechRecognizer
-    DisposableEffect(Unit) {
-        if (SpeechRecognizer.isRecognitionAvailable(context)) {
-            val recognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) {
-                        isListening = true
-                        speechBubbleText = when (bookingStep) {
-                            RideBookingStep.ASKING_PICKUP -> "🎙️ Dime: 'Actual' o tu dirección"
-                            RideBookingStep.ASKING_DESTINATION -> "🎙️ Dime tu destino..."
-                            RideBookingStep.ASKING_PAYMENT -> "🎙️ Dime: 'Efectivo' o 'SINPE'"
-                            RideBookingStep.ASKING_PREFERENCES -> "🎙️ ¿Niños, mascota o 5 personas?"
-                            else -> "🎙️ Te escucho... Di tu orden"
+    // Suscripción al bus unificado de transcripciones de voz (VoiceInteractionBus)
+    LaunchedEffect(Unit) {
+        VoiceInteractionBus.default.transcripts.collect { event ->
+            when (event) {
+                is VoiceTranscriptEvent.Partial -> {
+                    speechBubbleText = "🗣️ \"${event.text}...\""
+                    orchestrator.handlePartialTranscript(event)
+                }
+                is VoiceTranscriptEvent.Final -> {
+                    speechBubbleText = "🗣️ \"${event.text}\""
+                    val interactionResult = orchestrator.handleFinalTranscript(
+                        event = event,
+                        motion = motionPort,
+                        onNavigate = { route -> navController.safeNavigate(route) }
+                    )
+                    when (interactionResult) {
+                        is EvairInteractionResult.MagicSelectExecuted -> {
+                            val msg = "✓ Seleccionado: ${interactionResult.label}"
+                            speechBubbleText = msg
+                            tts?.speak("Seleccionando ${interactionResult.label}", TextToSpeech.QUEUE_FLUSH, null, "magic_select")
+                        }
+                        is EvairInteractionResult.MagicSectionNavigated -> {
+                            val msg = "✓ Sección: ${interactionResult.label}"
+                            speechBubbleText = msg
+                            tts?.speak("Entrando a sección ${interactionResult.label}", TextToSpeech.QUEUE_FLUSH, null, "magic_section")
+                        }
+                        is EvairInteractionResult.MagicAmbiguous -> {
+                            val names = interactionResult.candidates.take(3).mapIndexed { index, match -> "${index + 1}: ${match.control.label}" }.joinToString(", ")
+                            val msg = "Opciones: $names. Di la primera, segunda o tercera."
+                            speechBubbleText = msg
+                            tts?.speak("Encontré varias opciones: $names. Di la primera, segunda o tercera.", TextToSpeech.QUEUE_FLUSH, null, "magic_ambiguous")
+                        }
+                        is EvairInteractionResult.MagicNotFound -> {
+                            val msg = "No encontré \"${interactionResult.query}\" en pantalla."
+                            speechBubbleText = msg
+                            tts?.speak("No encontré ese botón en pantalla", TextToSpeech.QUEUE_FLUSH, null, "magic_not_found")
+                        }
+                        is EvairInteractionResult.FormBound -> {
+                            speechBubbleText = "✍️ ${interactionResult.text}"
+                        }
+                        is EvairInteractionResult.MultiSlotFormBound -> {
+                            speechBubbleText = "✍️ Datos ingresados por voz"
+                        }
+                        is EvairInteractionResult.FormRejected -> {
+                            speechBubbleText = interactionResult.message
+                            tts?.speak(interactionResult.message, TextToSpeech.QUEUE_FLUSH, null, "form_rejected")
+                        }
+                        is EvairInteractionResult.GoalDeferred -> {
+                            speechBubbleText = interactionResult.message
+                            tts?.speak(interactionResult.message, TextToSpeech.QUEUE_FLUSH, null, "goal_deferred")
+                        }
+                        is EvairInteractionResult.Unhandled -> {
+                            executeCompanionCommand(interactionResult.text)
+                            if (speechBubbleText?.startsWith("Te escuché:") == true && interactionResult.unavailableMessage != null) {
+                                speechBubbleText = interactionResult.unavailableMessage
+                                tts?.speak(interactionResult.unavailableMessage, TextToSpeech.QUEUE_FLUSH, null, "goal_unavailable")
+                            }
                         }
                     }
-                    override fun onBeginningOfSpeech() {}
-                    override fun onRmsChanged(rmsdB: Float) {}
-                    override fun onBufferReceived(buffer: ByteArray?) {}
-                    override fun onEndOfSpeech() {
-                        isListening = false
-                        speechBubbleText = "Procesando orden..."
-                    }
-                    override fun onError(error: Int) {
-                        isListening = false
-                    }
-                    override fun onResults(results: Bundle?) {
-                        isListening = false
-                        val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        val text = matches?.firstOrNull() ?: ""
-                        if (text.isNotBlank()) {
-                            executeCompanionCommand(text)
-                        }
-                    }
-                    override fun onPartialResults(partialResults: Bundle?) {
-                        val matches = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                        matches?.firstOrNull()?.let {
-                            speechBubbleText = "🗣️ \"$it...\""
-                        }
-                    }
-                    override fun onEvent(eventType: Int, params: Bundle?) {}
-                })
+                }
+                is VoiceTranscriptEvent.Failure -> {
+                    // Silently ignore or reset status
+                }
             }
-            speechRecognizer = recognizer
-        }
-        onDispose {
-            try {
-                speechRecognizer?.destroy()
-            } catch (_: Exception) {}
         }
     }
 
@@ -633,7 +736,24 @@ fun ElysiumLivingCompanionOverlay(
     LaunchedEffect(Unit) {
         AiAutomationBridge.actionEvents.collect { action ->
             if (action is AiAction.VoiceCommand) {
-                executeCompanionCommand(action.command)
+                val event = VoiceTranscriptEvent.Final(
+                    utteranceId = System.currentTimeMillis().toString(),
+                    text = action.command,
+                    confidence = 1.0f
+                )
+                val interactionResult = orchestrator.handleFinalTranscript(
+                    event = event,
+                    motion = motionPort,
+                    onNavigate = { route -> navController.safeNavigate(route) }
+                )
+                if (interactionResult is EvairInteractionResult.Unhandled) {
+                    executeCompanionCommand(action.command)
+                    if (speechBubbleText?.startsWith("Te escuché:") == true && interactionResult.unavailableMessage != null) {
+                        speechBubbleText = interactionResult.unavailableMessage
+                    }
+                } else if (interactionResult is EvairInteractionResult.GoalDeferred) {
+                    speechBubbleText = interactionResult.message
+                }
             }
         }
     }
@@ -645,8 +765,8 @@ fun ElysiumLivingCompanionOverlay(
             speechBubbleText = when (activeRoute) {
                 "home" -> when (equippedCompanion.avatarVisualType) {
                     "DRAGON" -> "¡El motor ruge! 🔥 Pídeme un viaje."
-                    "POKEMON_VOLT" -> "¡Pika-volt! ⚡ Listo para viajar."
-                    "SAIYAN_SSJ4" -> "¡Ki protector activo! 💥 Tócame para hablar."
+                    "VOLT_AETHER" -> "¡Volt Aether listo! ⚡ Batería al máximo."
+                    "TITAN_VANGUARD" -> "¡Titan Vanguard activo! 🛡️ Tócame para hablar."
                     else -> "A tu lado en el camino. Tócame para hablar."
                 }
                 "ride_service", "rides" -> if (isDriver) {
@@ -657,7 +777,7 @@ fun ElysiumLivingCompanionOverlay(
                 "scanner", "obd" -> "Monitoreando sensores en vivo ⏱️"
                 "dtcs" -> "Escaneando fallas de motor..."
                 "elysium_services" -> "¿Ocupas grúa o cerrajero? Tócame 🚨"
-                "agent_store" -> "¡Todos los agentes están desbloqueados! ✨"
+                "agent_store" -> "Explora inteligencias con capacidades reales. 🚀"
                 else -> "A tu lado en el camino. Tócame para hablar."
             }
             delay(7000)
@@ -694,21 +814,47 @@ fun ElysiumLivingCompanionOverlay(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        // Efecto cuántico de anillo y resplandor sobre el botón objetivo seleccionado
+        highlightedTargetBounds?.let { bounds ->
+            EvairTargetHighlightFx(
+                targetBounds = bounds,
+                highlightColor = Color(equippedCompanion.themeColorHex)
+            )
+        }
+
+        // Estallido de partículas cuánticas en origen/llegada de teletransportación
+        quantumBurstOrigin?.let { origin ->
+            EvairQuantumBurstFx(
+                origin = origin,
+                progress = burstProgress.value,
+                color = Color(equippedCompanion.themeColorHex)
+            )
+        }
+
         Box(
             modifier = Modifier
-                .offset { IntOffset(offsetX.roundToInt(), offsetY.roundToInt()) }
+                .offset { IntOffset(avatarAnimX.value.roundToInt(), avatarAnimY.value.roundToInt()) }
+                .graphicsLayer {
+                    scaleX = avatarAnimScale.value
+                    scaleY = avatarAnimScale.value
+                    alpha = avatarAnimAlpha.value
+                }
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
-                        offsetX = (offsetX + dragAmount.x).coerceIn(10f, screenWidthPx - 210f)
-                        offsetY = (offsetY + dragAmount.y).coerceIn(40f, screenHeightPx - 240f)
+                        homeOffsetX = (homeOffsetX + dragAmount.x).coerceIn(10f, screenWidthPx - 210f)
+                        homeOffsetY = (homeOffsetY + dragAmount.y).coerceIn(40f, screenHeightPx - 240f)
+                        coroutineScope.launch {
+                            avatarAnimX.snapTo(homeOffsetX)
+                            avatarAnimY.snapTo(homeOffsetY)
+                        }
                     }
                 }
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // Speech Bubble
+                // Speech Bubble (solo visible si el avatar no está en estado condensado sobre un botón)
                 AnimatedVisibility(
-                    visible = speechBubbleText != null,
+                    visible = speechBubbleText != null && avatarAnimScale.value >= 0.8f,
                     enter = fadeIn() + scaleIn(),
                     exit = fadeOut() + scaleOut()
                 ) {
@@ -1241,4 +1387,10 @@ fun ElysiumLivingCompanionOverlay(
             }
         }
     }
+}
+
+@dagger.hilt.EntryPoint
+@dagger.hilt.InstallIn(dagger.hilt.components.SingletonComponent::class)
+interface CompanionPrincipalEntryPoint {
+    fun principalKernel(): com.elysium369.meet.identity.ActivePrincipalKernel
 }

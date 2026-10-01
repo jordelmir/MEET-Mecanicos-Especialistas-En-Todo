@@ -1,26 +1,40 @@
 package com.elysium369.meet.core.operations
 
 import com.elysium369.meet.core.finance.Money
+import com.elysium369.meet.core.operations.data.CorrelatedIncidentDao
+import com.elysium369.meet.core.operations.data.CorrelatedIncidentEntity
+import com.elysium369.meet.core.operations.data.OperationCaseDao
+import com.elysium369.meet.core.operations.data.OperationCaseEntity
 import com.elysium369.meet.core.owner.domain.DataFreshness
 import com.elysium369.meet.core.owner.domain.OwnerCommandCenterSnapshot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Autonomous Operations Engine (EAOS) for Elysium Vanguard.
- * Enforces Master Order Omega §53–§69:
- * 1. Incident Correlation (§54): 5,000 upstream errors coalesce into 1 incident.
+ * Enforces Master Order Omega §53–§69 & Ascension Maxima Directives 22, 23, 24, 25, 46:
+ * 1. Incident Correlation (§54): Upstream errors coalesce into deduplicated incidents.
  * 2. Specialized Internal Agents (§56–§59): SRE, Finance, Security.
  * 3. Owner Inbox & Solo-Operator Metrics (§66, §67).
- * 4. Conversational Owner Agent (§65, §69).
+ * 4. Truthful Remediation & Zero Fake Statements.
+ * 5. DURABLE PERSISTENCE: Write-through to Room when DAO is provided (ASCENSION §23-25).
  */
-class AutonomousOperationsEngine {
+class AutonomousOperationsEngine(
+    private val caseDao: OperationCaseDao? = null,
+    private val incidentDao: CorrelatedIncidentDao? = null,
+    private val persistenceScope: CoroutineScope = CoroutineScope(Dispatchers.IO),
+) {
 
     private val cases = ConcurrentHashMap<String, OperationCase>()
     private val incidents = ConcurrentHashMap<String, CorrelatedIncident>()
 
     /**
      * Correlates an event stream into a deduplicated incident (§54).
-     * Prevents alert storms: 5,000 downstream failures produce exactly 1 incident record.
+     * Prevents alert storms: downstream failures produce exactly 1 incident record.
      */
     @Synchronized
     fun ingestEvent(
@@ -51,11 +65,13 @@ class AutonomousOperationsEngine {
             )
         }
         incidents[correlationKey] = incident
+        persistIncident(correlationKey, incident)
         return incident
     }
 
     /**
      * Evaluates SRE telemetry and auto-remediates or escalates (§57).
+     * Factual and truthful: records verified metrics without synthetic claims.
      */
     fun evaluateSreHealth(
         outboxLagSeconds: Long,
@@ -73,6 +89,8 @@ class AutonomousOperationsEngine {
                 domain = "SRE",
                 severity = CaseSeverity.P0,
                 state = CaseState.REQUIRES_OWNER,
+                reconciliationState = ReconciliationState.QUARANTINED,
+                remediationOutcome = RemediationOutcome.MANUAL_REQUIRED,
                 title = "Mensajes no procesables en Dead-Letter Queue (DLQ)",
                 whatHappened = "Se detectaron $count mensajes que fallaron tras reintentos con retroceso exponencial.",
                 whatAutomationDid = "Los mensajes fueron aislados en DLQ para proteger la cola de eventos y evitar bloqueos en el Outbox.",
@@ -80,9 +98,17 @@ class AutonomousOperationsEngine {
                 whatRemainsUncertain = "Si el fallo se debió a un esquema de payload incompatible o a un error en el RPC de destino.",
                 requestedOwnerAction = "Inspeccionar los payloads en DLQ y decidir si reinyectar tras parche o descartar.",
                 consequenceOfInaction = "Los eventos de negocio no se propagarán hacia analíticas o sistemas externos.",
+                observedMetric = ObservedMetric(
+                    metricName = "dead_letter_count",
+                    value = count.toDouble(),
+                    unit = "messages",
+                    threshold = 0.0,
+                    isAnomalous = true,
+                ),
                 eventCount = count,
             )
             cases[caseId] = sreCase
+            persistCase(sreCase)
             return sreCase
         }
 
@@ -94,15 +120,25 @@ class AutonomousOperationsEngine {
                 domain = "SRE",
                 severity = CaseSeverity.P1,
                 state = CaseState.AUTO_PROCESSING,
+                reconciliationState = ReconciliationState.ANALYZING,
+                remediationOutcome = RemediationOutcome.PROPOSED,
                 title = "Latencia elevada en Outbox Worker",
                 whatHappened = "El lag de publicación de eventos superó los 60 segundos (actual: $outboxLagSeconds s).",
-                whatAutomationDid = "Se escaló la concurrencia del OutboxWorker y se redujo el tiempo de lease para evitar starvation.",
-                evidenceSummary = "Outbox lag: ${outboxLagSeconds}s.",
-                whatRemainsUncertain = "Rendimiento del broker de mensajería.",
-                requestedOwnerAction = "Ninguna requerida de inmediato (auto-recuperación en curso).",
-                consequenceOfInaction = "Demora temporal en sincronización.",
+                whatAutomationDid = "Alerta operativa emitida y registrada en casos de plataforma para priorización del operador.",
+                evidenceSummary = "Outbox lag medido: ${outboxLagSeconds}s.",
+                whatRemainsUncertain = "Rendimiento y latencia de conexión hacia el broker o base de datos.",
+                requestedOwnerAction = "Inspeccionar métricas de concurrencia y estado de red del host.",
+                consequenceOfInaction = "Demora temporal en sincronización de eventos de dominio.",
+                observedMetric = ObservedMetric(
+                    metricName = "outbox_lag_seconds",
+                    value = outboxLagSeconds.toDouble(),
+                    unit = "seconds",
+                    threshold = 60.0,
+                    isAnomalous = true,
+                ),
             )
             cases[caseId] = sreCase
+            persistCase(sreCase)
             return sreCase
         }
 
@@ -124,6 +160,8 @@ class AutonomousOperationsEngine {
                 domain = "FINANCE",
                 severity = CaseSeverity.P0,
                 state = CaseState.REQUIRES_OWNER,
+                reconciliationState = ReconciliationState.DETECTED,
+                remediationOutcome = RemediationOutcome.MANUAL_REQUIRED,
                 title = "Discrepancia en conciliación de libro contable (Ledger)",
                 whatHappened = "Se detectaron $mismatchedTransactionsCount transacciones con montos no concordantes entre webhook de pago y registro local.",
                 whatAutomationDid = "Se aplicó HOLD financiero preventivo. Cero inferencias o asientos inventados.",
@@ -134,6 +172,7 @@ class AutonomousOperationsEngine {
                 moneyExposure = unbalancedMoneyExposure,
             )
             cases[caseId] = financeCase
+            persistCase(financeCase)
             return financeCase
         }
         return null
@@ -146,10 +185,13 @@ class AutonomousOperationsEngine {
         val current = cases[caseId] ?: return null
         val updated = current.copy(
             state = if (approved) CaseState.OWNER_APPROVED else CaseState.OWNER_REJECTED,
+            reconciliationState = if (approved) ReconciliationState.RECONCILED else ReconciliationState.QUARANTINED,
+            remediationOutcome = if (approved) RemediationOutcome.EXECUTED else RemediationOutcome.FAILED,
             resolvedAtEpochMs = System.currentTimeMillis(),
             resolutionReason = reason,
         )
         cases[caseId] = updated
+        persistCase(updated)
         return updated
     }
 
@@ -165,6 +207,7 @@ class AutonomousOperationsEngine {
 
     /**
      * Answers conversational queries from the platform owner (§65).
+     * Calibrated strictly to truth: no false assertions of perfection.
      */
     fun answerOwnerQuery(query: String, snapshot: OwnerCommandCenterSnapshot?): String {
         val lower = query.lowercase().trim()
@@ -173,7 +216,7 @@ class AutonomousOperationsEngine {
             lower.contains("atención") || lower.contains("aprobación") || lower.contains("pendiente") -> {
                 val pending = listCasesRequiringOwner()
                 if (pending.isEmpty()) {
-                    "Elysium opera con total normalidad autónoma. No hay ningún caso ni incidente que requiera tu intervención manual en este momento."
+                    "Elysium opera con normalidad autónoma. No hay casos prioritarios que requieran intervención manual en este momento."
                 } else {
                     val summary = pending.joinToString("\n") { case ->
                         "• [${case.severity}] ${case.title} (${case.domain}): ${case.requestedOwnerAction}"
@@ -185,7 +228,7 @@ class AutonomousOperationsEngine {
             lower.contains("descuadrado") || lower.contains("dinero") || lower.contains("plata") || lower.contains("saldo") -> {
                 val financeCases = cases.values.filter { it.domain == "FINANCE" && it.state == CaseState.REQUIRES_OWNER }
                 if (financeCases.isEmpty()) {
-                    "Libro mayor 100% conciliado. Cero colones o dólares en estado ambiguo o descuadrado."
+                    "No se registran discrepancias no resueltas en los casos de operación analizados. Monitoreo financiero en curso."
                 } else {
                     val totalDispute = financeCases.mapNotNull { it.moneyExposure?.minorUnits }.sum()
                     "ALERTA: Se detectaron ${financeCases.size} discrepancia(s) contable(s) con un total en disputa de ₡$totalDispute CRC en estado HOLD preventivo."
@@ -205,4 +248,62 @@ class AutonomousOperationsEngine {
             }
         }
     }
+
+    // ── Write-through persistence helpers (ASCENSION §23-25) ──
+
+    private fun persistCase(case: OperationCase) {
+        val dao = caseDao ?: return
+        persistenceScope.launch {
+            try {
+                dao.upsert(case.toEntity())
+            } catch (_: Exception) { /* Fail-open on local persistence — cases exist in memory */ }
+        }
+    }
+
+    private fun persistIncident(key: String, incident: CorrelatedIncident) {
+        val dao = incidentDao ?: return
+        persistenceScope.launch {
+            try {
+                dao.upsert(incident.toEntity(key))
+            } catch (_: Exception) { /* Fail-open on local persistence */ }
+        }
+    }
+
+    private fun OperationCase.toEntity(): OperationCaseEntity = OperationCaseEntity(
+        caseId = id,
+        correlationId = correlationId,
+        domain = domain,
+        severity = severity.name,
+        state = state.name,
+        reconciliationState = reconciliationState.name,
+        remediationOutcome = remediationOutcome.name,
+        title = title,
+        whatHappened = whatHappened,
+        whatAutomationDid = whatAutomationDid,
+        evidenceSummary = evidenceSummary,
+        whatRemainsUncertain = whatRemainsUncertain,
+        requestedOwnerAction = requestedOwnerAction,
+        consequenceOfInaction = consequenceOfInaction,
+        observedMetricJson = observedMetric?.let { Json.encodeToString(it) },
+        evidenceSnapshotJson = evidenceSnapshotJson,
+        moneyExposureMinor = moneyExposure?.minorUnits,
+        moneyExposureCurrency = moneyExposure?.currency,
+        eventCount = eventCount,
+        occurredAtEpochMs = occurredAtEpochMs,
+        resolvedAtEpochMs = resolvedAtEpochMs,
+        resolutionReason = resolutionReason,
+    )
+
+    private fun CorrelatedIncident.toEntity(correlationKey: String): CorrelatedIncidentEntity = CorrelatedIncidentEntity(
+        incidentId = incidentId,
+        correlationKey = correlationKey,
+        domain = domain,
+        title = title,
+        severity = severity.name,
+        eventCount = eventCount,
+        firstSeenEpochMs = firstSeenEpochMs,
+        lastSeenEpochMs = lastSeenEpochMs,
+        isAutoRemediated = isAutoRemediated,
+        activeCaseId = activeCaseId,
+    )
 }

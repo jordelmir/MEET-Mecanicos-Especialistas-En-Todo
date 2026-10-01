@@ -139,8 +139,8 @@ fun RideProfileScreen(
     if (showAddVehicle) {
         RideAddVehicleDialog(
             onDismiss = { showAddVehicle = false },
-            onSubmit = { make, model, year, color, plate, fleet ->
-                viewModel.addRideDriverVehicle(make, model, year, color, plate, fleet)
+            onSubmit = { make, model, year, color, plate, fleet, vehicleKind ->
+                viewModel.addRideDriverVehicle(make, model, year, color, plate, fleet, vehicleKind)
                 showAddVehicle = false
             },
         )
@@ -440,7 +440,7 @@ private fun RideProfileOverview(
         item { RideMetricGrid(summary, isDriver) }
         if (isDriver) {
             item {
-                ProfileSection("AUTOS Y FLOTILLAS") {
+                ProfileSection("CARROS, MOTOS Y FLOTILLAS") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
                             modifier = Modifier.size(48.dp),
@@ -490,7 +490,7 @@ private fun RideProfileOverview(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Column(Modifier.weight(1f)) {
-                                    Text(vehicle.displayName, color = Color.White, fontWeight = FontWeight.Bold)
+                                    Text("${if (vehicle.vehicleKind == "MOTORCYCLE") "🛵 Moto" else "🚗 Carro"} · ${vehicle.displayName}", color = Color.White, fontWeight = FontWeight.Bold)
                                     Text(
                                         listOfNotNull(vehicle.plateMasked, vehicle.fleetName, vehicle.verificationStatus)
                                             .joinToString(" · "),
@@ -542,8 +542,9 @@ private fun RideProfileOverview(
 @Composable
 private fun RideAddVehicleDialog(
     onDismiss: () -> Unit,
-    onSubmit: (String, String, Int, String, String, String?) -> Unit,
+    onSubmit: (String, String, Int, String, String, String?, String) -> Unit,
 ) {
+    var vehicleKind by remember { mutableStateOf("CAR") }
     var make by remember { mutableStateOf("") }
     var model by remember { mutableStateOf("") }
     var year by remember { mutableStateOf("") }
@@ -556,12 +557,18 @@ private fun RideAddVehicleDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = Color(0xFF071019),
-        title = { Text("AGREGAR AUTO", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black) },
+        title = { Text("AGREGAR CARRO O MOTO", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black) },
         text = {
             Column(
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("CAR" to "🚗 Carro", "MOTORCYCLE" to "🛵 Moto").forEach { (kind, label) ->
+                        FilterChip(selected = vehicleKind == kind, onClick = { vehicleKind = kind }, label = { Text(label) })
+                    }
+                }
+                Text(if (vehicleKind == "MOTORCYCLE") "Moto: máximo 1 pasajero en Viajes. Entregas solo de comida y objetos pequeños." else "Carro: capacidad según asientos verificados.", color = MeetColors.cyberCyan, fontSize = 11.sp)
                 OutlinedTextField(make, { make = it.take(60) }, label = { Text("Marca") })
                 OutlinedTextField(model, { model = it.take(60) }, label = { Text("Modelo") })
                 OutlinedTextField(year, { year = it.filter(Char::isDigit).take(4) }, label = { Text("Año") })
@@ -569,7 +576,7 @@ private fun RideAddVehicleDialog(
                 OutlinedTextField(plate, { plate = it.take(20) }, label = { Text("Placa") })
                 OutlinedTextField(fleet, { fleet = it.take(80) }, label = { Text("Nombre de flotilla (opcional)") })
                 Text(
-                    "El auto se agrega como pendiente. No podrá activarse ni recibir viajes hasta completar revisión.",
+                    "El vehículo se agrega como pendiente. No podrá activarse ni recibir viajes hasta completar revisión.",
                     color = MeetColors.warning,
                     fontSize = 10.sp,
                 )
@@ -577,7 +584,7 @@ private fun RideAddVehicleDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSubmit(make, model, requireNotNull(year.toIntOrNull()), color, plate, fleet.ifBlank { null }) },
+                onClick = { onSubmit(make, model, requireNotNull(year.toIntOrNull()), color, plate, fleet.ifBlank { null }, vehicleKind) },
                 enabled = valid,
             ) { Text("GUARDAR PARA REVISIÓN") }
         },

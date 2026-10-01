@@ -2,8 +2,9 @@ package com.elysium.server.app
 
 import com.elysium.server.api.configureHealthRoutes
 import com.elysium.server.api.configureV1BusinessRoutes
+import com.elysium.server.database.DatabaseFactory
 import com.elysium.server.realtime.configureRealtimeGateway
-import com.elysium.server.workers.OutboxWorker
+import com.elysium.server.workers.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -36,8 +37,21 @@ fun Application.module() {
         })
     }
 
+    val isProduction = System.getenv("ELYSIUM_ENV") == "production" || System.getenv("ENV") == "prod"
+    val isTestEnv = System.getenv("ELYSIUM_ENV") == "test" || System.getProperty("elysium.env") == "test"
+
     install(CORS) {
-        anyHost()
+        if (isProduction) {
+            val allowedOrigins = System.getenv("ALLOWED_ORIGINS")?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() }
+            if (!allowedOrigins.isNullOrEmpty()) {
+                allowedOrigins.forEach { allowHost(it) }
+            } else {
+                allowHost("elysium.app", schemes = listOf("https"))
+                allowHost("api.elysium.app", schemes = listOf("https"))
+            }
+        } else {
+            anyHost()
+        }
         allowHeader("Authorization")
         allowHeader("Content-Type")
         allowHeader("Idempotency-Key")
@@ -51,7 +65,8 @@ fun Application.module() {
     install(WebSockets) {
         pingPeriod = Duration.ofSeconds(15)
         timeout = Duration.ofSeconds(30)
-        maxFrameSize = Long.MAX_VALUE
+        // Directive 49: Bound max frame size to 1MB to prevent memory exhaustion DoS
+        maxFrameSize = 1L * 1024L * 1024L
         masking = false
     }
 
@@ -89,7 +104,51 @@ fun Application.module() {
         }
     }
 
-    val outboxWorker = OutboxWorker()
+    // ── OUTBOX WORKER PRODUCTION WIRING (Master Order Directives 47 & 48) ──
+    val (outboxRepo, eventPublisher) = if (isTestEnv) {
+        environment.log.info("Running in explicit TEST environment: using InMemoryOutboxRepository")
+        Pair(InMemoryOutboxRepository(), ProductionDomainEventPublisher())
+    } else {
+        val dbUrl = System.getenv("DATABASE_URL")
+            ?: System.getenv("POSTGRES_URL")
+            ?: System.getenv("SUPABASE_DB_URL")
+            ?: if (isProduction) "" else "jdbc:postgresql://localhost:5432/elysium_db"
+
+        if (isProduction && dbUrl.isBlank()) {
+            throw IllegalStateException("CRITICAL: DATABASE_URL not provided in PRODUCTION environment. Fail-closed law halts initialization.")
+        }
+
+        val config = DatabaseFactory.DatabaseConfig(
+            jdbcUrl = dbUrl,
+            user = System.getenv("DATABASE_USER") ?: System.getenv("POSTGRES_USER") ?: "postgres",
+            pass = System.getenv("DATABASE_PASSWORD") ?: System.getenv("POSTGRES_PASSWORD") ?: "postgres",
+            maxPoolSize = System.getenv("DB_POOL_MAX_SIZE")?.toIntOrNull() ?: 10,
+            minIdle = 2,
+            connectionTimeoutMs = 5000L,
+            validationTimeoutMs = 2500L,
+            idleTimeoutMs = 60000L,
+            maxLifetimeMs = 1800000L,
+        )
+
+        try {
+            val dataSource = DatabaseFactory.createDataSource(config)
+            environment.log.info("Production Outbox initialized with PostgreSQL connection pool.")
+            Pair(PostgresOutboxRepository(dataSource), ProductionDomainEventPublisher())
+        } catch (e: Exception) {
+            if (isProduction) {
+                environment.log.error("FATAL: PostgreSQL pool connection failed in PRODUCTION: ${e.message}", e)
+                throw IllegalStateException("CRITICAL: Authoritative PostgreSQL database failed to initialize in PRODUCTION environment. Fail-closed law prevents starting with volatile in-memory outbox.", e)
+            } else {
+                environment.log.warn("Database connection pool failed to start in non-production, falling back to local quarantine: ${e.message}")
+                Pair(InMemoryOutboxRepository(), ProductionDomainEventPublisher())
+            }
+        }
+    }
+
+    val outboxWorker = OutboxWorker(
+        repository = outboxRepo,
+        publisher = eventPublisher,
+    )
     outboxWorker.start(this)
 
     routing {

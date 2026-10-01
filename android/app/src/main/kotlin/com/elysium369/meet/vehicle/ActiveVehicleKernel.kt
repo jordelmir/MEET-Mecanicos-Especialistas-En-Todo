@@ -72,12 +72,12 @@ class ActiveVehicleKernel @Inject constructor(
     }
 
     fun updateIfActive(vehicle: Vehicle) {
-        if (mutableActiveVehicle.value?.id == vehicle.id) mutableActiveVehicle.value = vehicle
+        if (vehicle.user_id == principalKernel.current().id && mutableActiveVehicle.value?.id == vehicle.id) mutableActiveVehicle.value = vehicle
     }
 
     fun clearIfDeleted(vehicle: Vehicle) {
         val ownerId = principalKernel.current().id
-        if (mutableActiveVehicle.value?.id != vehicle.id) return
+        if (vehicle.user_id != ownerId || mutableActiveVehicle.value?.id != vehicle.id) return
         mutableActiveVehicle.value = null
         record(vehicle.id, null, ActiveVehicleChangeReason.VEHICLE_DELETED, resultCode = "CLEARED")
         applicationScope.launch(Dispatchers.IO) {
@@ -110,6 +110,7 @@ class ActiveVehicleKernel @Inject constructor(
             return
         }
 
+        if (principalKernel.current().id != ownerId || vehicle.user_id != ownerId) return
         mutableActiveVehicle.value = vehicle
         val reason = if (durable == null) {
             selectionDao.upsert(

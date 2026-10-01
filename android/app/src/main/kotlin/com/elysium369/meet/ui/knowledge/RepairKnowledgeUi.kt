@@ -113,11 +113,11 @@ fun Vehicle.toActiveVehicleIdentity(): ActiveVehicleIdentity = ActiveVehicleIden
 fun RepairKnowledgeEvidencePanel(
     state: RepairKnowledgeUiState,
     modifier: Modifier = Modifier,
-    accentColor: Color = Color(0xFF00E5FF)
+    accentColor: Color = com.elysium369.meet.ui.theme.MeetColors.secondary
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF101827)),
+        colors = CardDefaults.cardColors(containerColor = com.elysium369.meet.ui.theme.MeetColors.cardBackground),
         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f))
     ) {
         Column(

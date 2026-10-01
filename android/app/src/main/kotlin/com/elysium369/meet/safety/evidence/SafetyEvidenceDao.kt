@@ -14,6 +14,8 @@ interface SafetyEvidenceDao {
     fun observeOwner(owner: String): Flow<List<SafetyEvidenceEntity>>
     @Query("SELECT * FROM safety_evidence_local WHERE ownerUserId = :owner AND uploadState IN ('STAGED', 'UPLOADING', 'UPLOADED', 'RETRY') ORDER BY stagedAt LIMIT 20")
     suspend fun pending(owner: String): List<SafetyEvidenceEntity>
+    @Query("SELECT * FROM safety_evidence_local WHERE ownerUserId = :owner AND uploadState = 'RECEIVED' ORDER BY stagedAt LIMIT 20")
+    suspend fun verificationPending(owner: String): List<SafetyEvidenceEntity>
     @Query("UPDATE safety_evidence_local SET uploadState = :state, attemptCount = :attempts, lastErrorCode = :error, serverReceipt = COALESCE(:receipt, serverReceipt) WHERE evidenceId = :id AND ownerUserId = :owner")
     suspend fun update(id: String, owner: String, state: String, attempts: Int, error: String?, receipt: String? = null)
     @Query("SELECT * FROM safety_evidence_local WHERE evidenceId = :id AND ownerUserId = :owner")

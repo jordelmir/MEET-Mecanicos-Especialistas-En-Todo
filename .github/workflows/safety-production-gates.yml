@@ -10,12 +10,13 @@ jobs:
   safety-integrity-and-authority-gates:
     name: Safety Architecture, Boundary & Authority Gates
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 20
+          node-version: 24
       - name: Install dependencies
         run: npm ci
       - name: Install PostgreSQL for real Safety authority tests
@@ -29,6 +30,14 @@ jobs:
         run: bash tests/safety/verify-safety-publication-postgres.sh
       - name: Verify Safety RLS and 100 concurrent publication attempts
         run: bash tests/safety/verify-safety-rls-concurrency-postgres.sh
+      - name: Verify evidence custody, intake and institutional domains in PostgreSQL
+        run: bash tests/safety/verify-safety-closure-postgres.sh
+      - name: Run Safety core and byte verification conformance
+        run: npx vitest run tests/safety
+      - name: Verify pinned device and institutional gateway identities
+        run: npx tsx tests/safety/safety-device-gateway-contract.ts
+      - name: Build reusable Safety core dependency
+        run: npm run build --prefix packages/elysium-safety-core
       - name: Run Adversarial RLS Test Suite (26 tests)
         run: npx vitest run tests/adversarial/safety-rls-adversarial.test.ts
       - name: Verify Authority Isolation & SECURITY DEFINER Contracts
@@ -45,26 +54,38 @@ jobs:
   safety-android-and-parity-gates:
     name: Safety Android OS, Unit Tests & Parity Gate
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Setup Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
-          node-version: 20
+          node-version: 24
       - name: Install root dependencies
         run: npm ci
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
+      - name: Install checksum-pinned Kotlin compiler for standalone parity
+        run: |
+          compiler_archive="$RUNNER_TEMP/safety-kotlin-compiler.zip"
+          curl --fail --location --retry 3 --output "$compiler_archive" https://github.com/JetBrains/kotlin/releases/download/v2.3.10/kotlin-compiler-2.3.10.zip
+          echo "c8d546f9ff433b529fb0ad43feceb39831040cae2ca8d17e7df46364368c9a9e  $compiler_archive" | sha256sum --check --strict
+          unzip -q "$compiler_archive" -d "$RUNNER_TEMP/safety-kotlin"
+          echo "$RUNNER_TEMP/safety-kotlin/kotlinc/bin" >> "$GITHUB_PATH"
+      - name: Verify custody canonical bytes across TypeScript and Kotlin
+        run: bash tests/parity/verify-safety-custody.sh
       - name: Make gradlew executable
         run: chmod +x android/gradlew
       - name: Run Cross-Runtime Parity Verification
         run: bash tests/parity/ci-verify.sh
       - name: Run Safety Android Unit & Contract Tests
         working-directory: android
-        run: ./gradlew :app:testDebugUnitTest --tests "com.elysium369.meet.safety.*"
+        run: ./gradlew :app:testDebugUnitTest --tests "com.elysium369.meet.safety.*" --tests "com.elysium369.meet.core.mesh.*" --no-daemon --max-workers=1
+      - name: Verify mesh wire bytes across TypeScript and Android Kotlin
+        run: bash tests/parity/verify-mesh-wire.sh
       - name: Assemble Debug APK
         working-directory: android
-        run: ./gradlew :app:assembleDebug
+        run: ./gradlew :app:assembleDebug --no-daemon --max-workers=1

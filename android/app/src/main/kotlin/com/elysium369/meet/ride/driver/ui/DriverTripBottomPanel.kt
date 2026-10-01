@@ -41,11 +41,13 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import com.elysium369.meet.ride.domain.RideFareEngine
+import com.elysium369.meet.ride.meter.SharedRideMeterGateway
+import com.elysium369.meet.ride.meter.SharedRideMeterSnapshot
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,6 +76,24 @@ fun DriverTripBottomPanel(
     onOpenMessages: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var sharedMeter by remember(state.rideId) { mutableStateOf<SharedRideMeterSnapshot?>(null) }
+    LaunchedEffect(state.rideId, state.phase, state.fareMode) {
+        if (state.rideId.isBlank() || state.phase != DriverTripPhase.InProgress ||
+            state.fareMode != "METERED_TIME_DISTANCE") {
+            sharedMeter = null
+            return@LaunchedEffect
+        }
+        while (true) {
+            try {
+                sharedMeter = SharedRideMeterGateway.fetch(state.rideId)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                sharedMeter = null
+            }
+            delay(5_000L)
+        }
+    }
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
@@ -290,12 +310,16 @@ fun DriverTripBottomPanel(
             }
 
             if (state.phase == DriverTripPhase.InProgress) {
-                val elapsedSeconds = state.tripStartedAtEpochMs?.let {
+                val isMetered = state.fareMode == "METERED_TIME_DISTANCE"
+                val elapsedSeconds = if (isMetered) sharedMeter?.elapsed_seconds ?: 0L
+                else state.tripStartedAtEpochMs?.let {
                     ((System.currentTimeMillis() - it) / 1000L).coerceAtLeast(0L)
                 } ?: 0L
                 val elapsedMinutes = (elapsedSeconds / 60).toInt()
                 val elapsedSecs = (elapsedSeconds % 60).toInt()
-                val isMetered = state.fareMode == "METERED_TIME_DISTANCE"
+                val meterFresh = sharedMeter?.let {
+                    it.last_capture_ms != null && it.server_as_of_ms - it.last_capture_ms <= 30_000L
+                } == true
 
                 Surface(
                     color = Color(0xFF0F172A),
@@ -310,7 +334,9 @@ fun DriverTripBottomPanel(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "MÉTRICAS EN VIVO · SINCRONIZADO",
+                                text = if (isMetered && meterFresh) "MARÍA · MEDICIÓN COMPARTIDA"
+                                else if (isMetered) "MARÍA · GPS / SINCRONIZACIÓN PENDIENTE"
+                                else "TARIFA FIJA ACORDADA",
                                 color = MeetColors.cyberCyan,
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Black,
@@ -339,7 +365,9 @@ fun DriverTripBottomPanel(
                         ) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    "%02d:%02d".format(elapsedMinutes, elapsedSecs),
+                                    if ((isMetered && sharedMeter?.started_at_ms == null) ||
+                                        (!isMetered && state.tripStartedAtEpochMs == null)) "Pendiente"
+                                    else "%02d:%02d".format(elapsedMinutes, elapsedSecs),
                                     color = Color.White,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Black,
@@ -348,23 +376,18 @@ fun DriverTripBottomPanel(
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
-                                    "${String.format(java.util.Locale.US, "%.1f", state.estimatedDistanceKm)} km",
+                                    if (isMetered && sharedMeter?.last_capture_ms == null) "Pendiente"
+                                    else if (isMetered) "${String.format(java.util.Locale.US, "%.1f", sharedMeter!!.validated_distance_meters / 1000.0)} km"
+                                    else "${String.format(java.util.Locale.US, "%.1f", state.estimatedDistanceKm)} km",
                                     color = Color.White,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.Black,
                                 )
-                                Text("DISTANCIA", color = MeetColors.textMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                Text(if (isMetered) "DISTANCIA VALIDADA" else "DISTANCIA ESTIMADA", color = MeetColors.textMuted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                val fareDisplay = if (isMetered) {
-                                    val quote = RideFareEngine.quoteCostaRica(
-                                        distanceMeters = (state.estimatedDistanceKm * 1000).toLong(),
-                                        durationSeconds = elapsedSeconds,
-                                    )
-                                    "₡${quote.estimatedTotalMinor}"
-                                } else {
-                                    "₡${state.agreedFareMinor}"
-                                }
+                                val fareDisplay = if (isMetered) (if (sharedMeter?.is_final == true) sharedMeter?.final_fare_minor else sharedMeter?.measured_fare_minor)?.let { "₡$it" }
+                                    ?: "Pendiente" else "₡${state.agreedFareMinor}"
                                 Text(
                                     fareDisplay,
                                     color = MeetColors.neonGreen,
@@ -372,7 +395,7 @@ fun DriverTripBottomPanel(
                                     fontWeight = FontWeight.Black,
                                 )
                                 Text(
-                                    if (isMetered) "TAXÍMETRO" else "TARIFA FIJA",
+                                    if (isMetered && sharedMeter?.is_final == true) "TOTAL CONFIRMADO" else if (isMetered) "PROVISIONAL · NO COBRO FINAL" else "TARIFA FIJA",
                                     color = MeetColors.textMuted,
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.Bold

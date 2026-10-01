@@ -53,7 +53,7 @@ fun SafetyAccountabilityScreen(
                             stringResource(R.string.safety_accountability_title),
                             fontWeight = FontWeight.Black,
                             fontSize = 17.sp,
-                            color = Color.White,
+                            color = MeetColors.textPrimary,
                         )
                         Text(
                             if (uiState.isLoading) stringResource(R.string.safety_loading)
@@ -73,7 +73,7 @@ fun SafetyAccountabilityScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.safety_back),
-                            tint = Color.White,
+                            tint = MeetColors.textPrimary,
                         )
                     }
                 },
@@ -224,7 +224,7 @@ private fun AccountabilityEventCard(event: PublicAccountabilityEvent) {
                         event.event_type.replace("_", " "),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
-                        color = Color.White,
+                        color = MeetColors.textPrimary,
                     )
                     Text(
                         event.occurred_at.take(10),
@@ -276,7 +276,7 @@ private fun AccountabilityClockCard(events: List<PublicAccountabilityEvent>) {
                         firstEvent?.case_title ?: stringResource(R.string.safety_accountability_case_default),
                         fontWeight = FontWeight.Black,
                         fontSize = 15.sp,
-                        color = Color.White,
+                        color = MeetColors.textPrimary,
                     )
                     Text(
                         firstEvent?.institution_ref ?: "",
@@ -354,7 +354,7 @@ private fun AccountabilityClockCard(events: List<PublicAccountabilityEvent>) {
                         metrics.daysSinceLastAction?.let { "${it}d" } ?: "—",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Black,
-                        color = Color.White,
+                        color = MeetColors.textPrimary,
                     )
                 }
             }

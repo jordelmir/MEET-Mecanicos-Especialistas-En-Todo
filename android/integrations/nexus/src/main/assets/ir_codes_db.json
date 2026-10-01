@@ -1,0 +1,215 @@
+{
+  "version": 2,
+  "source": "Elysium Nexus Verified IR Code Database",
+  "brands": [
+    {
+      "id": "universal_tv",
+      "name": "Control Universal TV",
+      "categories": [
+        {
+          "type": "TV",
+          "protocols": ["NEC", "SAMSUNG32", "SIRC15", "RC5"],
+          "codesets": [
+            {
+              "id": "universal_nec_std",
+              "name": "Control Universal TV (Multimarca)",
+              "frequency_hz": 38000,
+              "protocol": "NEC",
+              "commands": {
+                "POWER": "0x00FF02FD",
+                "VOL_UP": "0x00FF07F8",
+                "VOL_DOWN": "0x00FF0AF5",
+                "MUTE": "0x00FF09F6",
+                "CH_UP": "0x00FF12ED",
+                "CH_DOWN": "0x00FF10EF",
+                "INPUT_SOURCE": "0x00FF0BF4",
+                "MENU": "0x00FF1AE5",
+                "INFO": "0x00FF1CE3",
+                "BACK": "0x00FF1BE4",
+                "UP": "0x00FF0EF1",
+                "DOWN": "0x00FF0CF3",
+                "LEFT": "0x00FF0FF0",
+                "RIGHT": "0x00FF11EE",
+                "ENTER": "0x00FF0DF2",
+                "HOME": "0x00FF20DF",
+                "NETFLIX": "0x00FF21DE",
+                "YOUTUBE": "0x00FF22DD",
+                "PLAY_PAUSE": "0x00FF24DB",
+                "NUM_0": "0x00FF00FF",
+                "NUM_1": "0x00FF01FE",
+                "NUM_2": "0x00FF02FD",
+                "NUM_3": "0x00FF03FC",
+                "NUM_4": "0x00FF04FB",
+                "NUM_5": "0x00FF05FA",
+                "NUM_6": "0x00FF06F9",
+                "NUM_7": "0x00FF07F8",
+                "NUM_8": "0x00FF08F7",
+                "NUM_9": "0x00FF09F6"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kintech",
+      "name": "Kintech",
+      "categories": [
+        {
+          "type": "TV",
+          "protocols": ["NEC"],
+          "codesets": [
+            {
+              "id": "kintech_smart_tv",
+              "name": "Kintech Smart / LED TV",
+              "frequency_hz": 38000,
+              "protocol": "NEC",
+              "commands": {
+                "POWER": "0x00FF12ED",
+                "VOL_UP": "0x00FF07F8",
+                "VOL_DOWN": "0x00FF0AF5",
+                "MUTE": "0x00FF09F6",
+                "CH_UP": "0x00FF10EF",
+                "CH_DOWN": "0x00FF11EE",
+                "INPUT_SOURCE": "0x00FF0BF4",
+                "MENU": "0x00FF1AE5",
+                "INFO": "0x00FF1CE3",
+                "BACK": "0x00FF1BE4",
+                "UP": "0x00FF0EF1",
+                "DOWN": "0x00FF0CF3",
+                "LEFT": "0x00FF0FF0",
+                "RIGHT": "0x00FF13EC",
+                "ENTER": "0x00FF0DF2",
+                "HOME": "0x00FF20DF",
+                "NETFLIX": "0x00FF21DE",
+                "YOUTUBE": "0x00FF22DD",
+                "PLAY_PAUSE": "0x00FF24DB",
+                "NUM_0": "0x00FF00FF",
+                "NUM_1": "0x00FF01FE",
+                "NUM_2": "0x00FF02FD",
+                "NUM_3": "0x00FF03FC",
+                "NUM_4": "0x00FF04FB",
+                "NUM_5": "0x00FF05FA",
+                "NUM_6": "0x00FF06F9",
+                "NUM_7": "0x00FF07F8",
+                "NUM_8": "0x00FF08F7",
+                "NUM_9": "0x00FF09F6"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "samsung",
+      "name": "Samsung",
+      "categories": [
+        {
+          "type": "TV",
+          "protocols": ["SAMSUNG32"],
+          "codesets": [
+            {
+              "id": "samsung_tv_std",
+              "name": "Samsung Smart TV (2010+)",
+              "frequency_hz": 37900,
+              "protocol": "SAMSUNG32",
+              "commands": {
+                "POWER": "0xE0E040BF",
+                "VOL_UP": "0xE0E0E01F",
+                "VOL_DOWN": "0xE0E0D02F",
+                "MUTE": "0xE0E0F00F",
+                "CH_UP": "0xE0E048B7",
+                "CH_DOWN": "0xE0E008F7",
+                "INPUT_SOURCE": "0xE0E0807F",
+                "MENU": "0xE0E058A7",
+                "INFO": "0xE0E0F807",
+                "BACK": "0xE0E01AE5",
+                "UP": "0xE0E006F9",
+                "DOWN": "0xE0E08679",
+                "LEFT": "0xE0E0A659",
+                "RIGHT": "0xE0E046B9",
+                "ENTER": "0xE0E016E9",
+                "HOME": "0xE0E09E61",
+                "NETFLIX": "0xE0E0B14E",
+                "YOUTUBE": "0xE0E0C13E",
+                "PLAY_PAUSE": "0xE0E052AD"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "lg",
+      "name": "LG",
+      "categories": [
+        {
+          "type": "TV",
+          "protocols": ["NEC"],
+          "codesets": [
+            {
+              "id": "lg_tv_std",
+              "name": "LG OLED / Smart TV",
+              "frequency_hz": 38000,
+              "protocol": "NEC",
+              "commands": {
+                "POWER": "0x20DF10EF",
+                "VOL_UP": "0x20DF40BF",
+                "VOL_DOWN": "0x20DFC03F",
+                "MUTE": "0x20DF906F",
+                "CH_UP": "0x20DF00FF",
+                "CH_DOWN": "0x20DF807F",
+                "INPUT_SOURCE": "0x20DFD02F",
+                "MENU": "0x20DFC23D",
+                "INFO": "0x20DF55AA",
+                "BACK": "0x20DF14EB",
+                "UP": "0x20DF02FD",
+                "DOWN": "0x20DF827D",
+                "LEFT": "0x20DFE01F",
+                "RIGHT": "0x20DF609F",
+                "ENTER": "0x20DF22DD",
+                "HOME": "0x20DF3EC1",
+                "NETFLIX": "0x20DF58A7",
+                "YOUTUBE": "0x20DF7887"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sony",
+      "name": "Sony",
+      "categories": [
+        {
+          "type": "TV",
+          "protocols": ["SIRC15", "SIRC20"],
+          "codesets": [
+            {
+              "id": "sony_bravia_std",
+              "name": "Sony Bravia Smart TV",
+              "frequency_hz": 40000,
+              "protocol": "SIRC15",
+              "commands": {
+                "POWER": "0x000A8A",
+                "VOL_UP": "0x000484",
+                "VOL_DOWN": "0x000C8C",
+                "MUTE": "0x000282",
+                "CH_UP": "0x000080",
+                "CH_DOWN": "0x000888",
+                "INPUT_SOURCE": "0x000A5A",
+                "MENU": "0x000070",
+                "BACK": "0x000C70",
+                "UP": "0x0002F0",
+                "DOWN": "0x000AF0",
+                "LEFT": "0x000CE0",
+                "RIGHT": "0x0002E0",
+                "ENTER": "0x000AE0"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

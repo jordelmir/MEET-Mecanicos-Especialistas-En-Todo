@@ -23,7 +23,7 @@ fun SoftPaywallDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F1B30)),
+            colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
             modifier = Modifier.padding(16.dp).fillMaxWidth()
         ) {
             Column(

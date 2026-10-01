@@ -59,7 +59,7 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                             stringResource(R.string.safety_public_case_title),
                             fontWeight = FontWeight.Black,
                             fontSize = 17.sp,
-                            color = Color.White,
+                            color = MeetColors.textPrimary,
                         )
                         Text(
                             if (state.loading) stringResource(R.string.safety_loading) else "Expediente público auditado",
@@ -73,7 +73,7 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.safety_public_back),
-                            tint = Color.White,
+                            tint = MeetColors.textPrimary,
                         )
                     }
                 },
@@ -166,7 +166,7 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                                 case.title,
                                 fontWeight = FontWeight.Black,
                                 fontSize = 18.sp,
-                                color = Color.White,
+                                color = MeetColors.textPrimary,
                             )
 
                             Text(
@@ -192,7 +192,7 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                                 }
                                 Column {
                                     Text("CONFIANZA", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.sp)
-                                    Text(case.confidenceScore?.let { "${(it * 100).toInt()}%" } ?: stringResource(R.string.safety_public_unknown), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+                                    Text(case.confidenceScore?.let { "${(it * 100).toInt()}%" } ?: stringResource(R.string.safety_public_unknown), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = MeetColors.textPrimary)
                                 }
                             }
                         }
@@ -259,7 +259,7 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                         stringResource(R.string.safety_public_timeline),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MeetColors.textPrimary,
                     )
                 }
 
@@ -297,7 +297,7 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                         stringResource(R.string.safety_public_claims),
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        color = MeetColors.textPrimary,
                     )
                 }
 
@@ -323,7 +323,7 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                                         claim.predicate,
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.White,
+                                        color = MeetColors.textPrimary,
                                         modifier = Modifier.weight(1f),
                                     )
                                     Text(
@@ -445,7 +445,7 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
             title = {
                 Text(
                     stringResource(R.string.safety_challenge_title),
-                    color = Color.White,
+                    color = MeetColors.textPrimary,
                     fontWeight = FontWeight.Bold,
                 )
             },
@@ -467,7 +467,7 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                                     SafetyChallengeKind.CONTRARY_EVIDENCE -> stringResource(R.string.safety_challenge_contrary)
                                     SafetyChallengeKind.RECTIFICATION -> stringResource(R.string.safety_challenge_rectification)
                                 },
-                                color = Color.White,
+                                color = MeetColors.textPrimary,
                                 fontSize = 13.sp,
                                 modifier = Modifier.padding(start = 4.dp),
                             )
@@ -481,8 +481,8 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MeetColors.cyberCyan,
                             unfocusedBorderColor = MeetColors.borderSubtle,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
                             focusedLabelColor = MeetColors.cyberCyan,
                             unfocusedLabelColor = MeetColors.textSecondary,
                         ),
@@ -495,8 +495,8 @@ fun SafetyCaseDetailScreen(onBack: () -> Unit, viewModel: SafetyCaseDetailViewMo
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MeetColors.cyberCyan,
                             unfocusedBorderColor = MeetColors.borderSubtle,
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
                             focusedLabelColor = MeetColors.cyberCyan,
                             unfocusedLabelColor = MeetColors.textSecondary,
                         ),

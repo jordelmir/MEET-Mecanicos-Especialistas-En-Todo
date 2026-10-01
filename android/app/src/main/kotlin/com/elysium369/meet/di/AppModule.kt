@@ -5035,28 +5035,103 @@ object AppModule {
         }
     }
 
+    val MIGRATION_85_86 = object : Migration(85, 86) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE communication_events_v86 (
+                    eventId TEXT NOT NULL,
+                    conversationId TEXT NOT NULL,
+                    ownerPrincipalId TEXT NOT NULL,
+                    senderPrincipalId TEXT NOT NULL,
+                    senderDeviceId TEXT NOT NULL,
+                    eventType TEXT NOT NULL,
+                    localCiphertextBase64 TEXT NOT NULL,
+                    localNonceBase64 TEXT NOT NULL,
+                    remoteEnvelopeJson TEXT,
+                    replyToEventId TEXT,
+                    syncState TEXT NOT NULL,
+                    serverSequence INTEGER,
+                    createdAtEpochMs INTEGER NOT NULL,
+                    receivedAtEpochMs INTEGER,
+                    PRIMARY KEY(eventId, ownerPrincipalId),
+                    FOREIGN KEY(conversationId, ownerPrincipalId)
+                        REFERENCES communication_conversations(conversationId, ownerPrincipalId)
+                        ON UPDATE NO ACTION ON DELETE CASCADE
+                )
+            """.trimIndent())
+            db.execSQL("INSERT INTO communication_events_v86 SELECT * FROM communication_events")
+            db.execSQL("DROP TABLE communication_events")
+            db.execSQL("ALTER TABLE communication_events_v86 RENAME TO communication_events")
+            db.execSQL("CREATE INDEX index_communication_events_conversationId_ownerPrincipalId_createdAtEpochMs ON communication_events(conversationId,ownerPrincipalId,createdAtEpochMs)")
+            db.execSQL("CREATE INDEX index_communication_events_ownerPrincipalId_syncState ON communication_events(ownerPrincipalId,syncState)")
+            db.execSQL("CREATE UNIQUE INDEX index_communication_events_conversationId_ownerPrincipalId_serverSequence ON communication_events(conversationId,ownerPrincipalId,serverSequence)")
+            db.execSQL("CREATE INDEX index_communication_events_conversationId_ownerPrincipalId ON communication_events(conversationId,ownerPrincipalId)")
+        }
+    }
+
+    val MIGRATION_86_87 = object : Migration(86, 87) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("ALTER TABLE vehicles ADD COLUMN vehicleKind TEXT NOT NULL DEFAULT 'CAR'")
+        }
+    }
+
     val MIGRATION_84_85 = object : Migration(84, 85) {
-        override fun migrate(
-            db: SupportSQLiteDatabase,
-        ) {
-            // All pre-V3 public projections were produced under an authority
-            // contract that V3 explicitly retired.
-            //
-            // These are reconstructible public caches, not private evidence.
-            db.execSQL(
-                "DELETE FROM `safety_public_timeline_local`",
-            )
-            db.execSQL(
-                "DELETE FROM `safety_public_claims_local`",
-            )
-            db.execSQL(
-                "DELETE FROM `safety_public_points_local`",
-            )
-            db.execSQL(
-                """
-                ALTER TABLE `safety_public_cases_local` RENAME TO `safety_public_cases_local_v84`
-                """.trimIndent(),
-            )
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `eaos_operation_cases` (
+                    `case_id` TEXT NOT NULL,
+                    `correlation_id` TEXT NOT NULL,
+                    `domain` TEXT NOT NULL,
+                    `severity` TEXT NOT NULL,
+                    `state` TEXT NOT NULL,
+                    `reconciliation_state` TEXT NOT NULL,
+                    `remediation_outcome` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `what_happened` TEXT NOT NULL,
+                    `what_automation_did` TEXT NOT NULL,
+                    `evidence_summary` TEXT NOT NULL,
+                    `what_remains_uncertain` TEXT NOT NULL,
+                    `requested_owner_action` TEXT NOT NULL,
+                    `consequence_of_inaction` TEXT NOT NULL,
+                    `observed_metric_json` TEXT,
+                    `evidence_snapshot_json` TEXT NOT NULL DEFAULT '{}',
+                    `money_exposure_minor` INTEGER,
+                    `money_exposure_currency` TEXT,
+                    `event_count` INTEGER NOT NULL DEFAULT 1,
+                    `occurred_at_epoch_ms` INTEGER NOT NULL,
+                    `resolved_at_epoch_ms` INTEGER,
+                    `resolution_reason` TEXT,
+                    PRIMARY KEY(`case_id`)
+                )
+            """.trimIndent())
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `eaos_correlated_incidents` (
+                    `incident_id` TEXT NOT NULL,
+                    `correlation_key` TEXT NOT NULL,
+                    `domain` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `severity` TEXT NOT NULL,
+                    `event_count` INTEGER NOT NULL,
+                    `first_seen_epoch_ms` INTEGER NOT NULL,
+                    `last_seen_epoch_ms` INTEGER NOT NULL,
+                    `is_auto_remediated` INTEGER NOT NULL DEFAULT 0,
+                    `active_case_id` TEXT,
+                    PRIMARY KEY(`incident_id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_eaos_operation_cases_state` ON `eaos_operation_cases` (`state`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_eaos_correlated_incidents_key` ON `eaos_correlated_incidents` (`correlation_key`)")
+        }
+    }
+
+    // V3 retires reconstructible V2 public caches, including while offline.
+    // Private reports, evidence, payloads and pending commands remain intact.
+    val MIGRATION_87_88 = object : Migration(87, 88) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("DELETE FROM `safety_public_timeline_local`")
+            db.execSQL("DELETE FROM `safety_public_claims_local`")
+            db.execSQL("DELETE FROM `safety_public_points_local`")
+            db.execSQL("ALTER TABLE `safety_public_cases_local` RENAME TO `safety_public_cases_local_pre_v3`")
             db.execSQL(
                 """
                 CREATE TABLE `safety_public_cases_local` (
@@ -5077,20 +5152,14 @@ object AppModule {
                 )
                 """.trimIndent(),
             )
-            // Deliberately NO COPY.
-            // Legacy public projections have no V3 publication authority.
+            db.execSQL("DROP TABLE `safety_public_cases_local_pre_v3`")
             db.execSQL(
-                "DROP TABLE `safety_public_cases_local_v84`",
+                "CREATE INDEX `index_safety_public_cases_local_lifecycle` " +
+                    "ON `safety_public_cases_local` (`lifecycle`)",
             )
             db.execSQL(
-                """
-                CREATE INDEX `index_safety_public_cases_local_lifecycle` ON `safety_public_cases_local` (`lifecycle`)
-                """.trimIndent(),
-            )
-            db.execSQL(
-                """
-                CREATE INDEX `index_safety_public_cases_local_publishedAt` ON `safety_public_cases_local` (`publishedAt`)
-                """.trimIndent(),
+                "CREATE INDEX `index_safety_public_cases_local_publishedAt` " +
+                    "ON `safety_public_cases_local` (`publishedAt`)",
             )
         }
     }
@@ -5167,6 +5236,9 @@ object AppModule {
             MIGRATION_82_83,
             MIGRATION_83_84,
             MIGRATION_84_85,
+            MIGRATION_85_86,
+            MIGRATION_86_87,
+            MIGRATION_87_88,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

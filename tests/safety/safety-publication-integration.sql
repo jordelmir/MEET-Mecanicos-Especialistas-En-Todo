@@ -208,6 +208,7 @@ begin
      or v_point.claim_id <> '77777777-7777-4777-8777-777777777777'
      or v_point.publication_decision_id is null
      or v_point.independent_source_count <> 1
+     or v_point.geo_disclosure <> 'COARSE_GRID_25KM_PLUS'
      or v_point.location_accuracy_meters < 25000
      or v_point.display_latitude = 9.93333
      or v_point.display_longitude = -84.08333
@@ -274,6 +275,48 @@ reset role;
 update public.runtime_feature_gates set enabled = true
 where key = 'safety_public_map';
 
+-- Savepoint rollback proves each authority field revokes the same public fixture.
+insert into public.safety_reports(id, reporter_user_id, category)
+values ('45454545-4545-4545-8545-454545454545', '11111111-1111-1111-1111-111111111111', 'OTHER');
+do $$
+declare v_assignment text; v_candidate uuid;
+begin
+ foreach v_assignment in array array[
+   'report_id = ''45454545-4545-4545-8545-454545454545''::uuid',
+   'subject_ref = ''changed-subject''', 'predicate = ''changed-predicate''',
+   'methodology_version = ''changed-methodology''', 'state_version = state_version + 1',
+   'state = ''CORROBORATED'''
+ ] loop
+   begin
+     perform set_config('request.jwt.claim.sub', '55555555-5555-4555-8555-555555555555', true);
+     perform set_config('request.jwt.claims', '{"sub":"55555555-5555-4555-8555-555555555555","aal":"aal2"}', true);
+     v_candidate := public.safety_recommend_claim_publication_v1(
+       '77777777-7777-4777-8777-777777777777', 'READY_TO_PUBLISH', 'MUTATION_REVIEW', 'Authority mutation review fixture');
+     execute 'update public.safety_claims set ' || v_assignment ||
+       ' where id = ''77777777-7777-4777-8777-777777777777''';
+     if exists (select 1 from public.safety_public_points where claim_id = '77777777-7777-4777-8777-777777777777') then
+       raise exception 'CLAIM_MUTATION_DID_NOT_REVOKE: %', v_assignment;
+     end if;
+     if not exists (select 1 from safety_private.claim_reevaluation_v3
+       where claim_id = '77777777-7777-4777-8777-777777777777'
+         and reason_code = 'CLAIM_AUTHORITY_CHANGED' and status = 'PENDING') then
+       raise exception 'CLAIM_MUTATION_DID_NOT_REQUEST_REVIEW: %', v_assignment;
+     end if;
+     perform set_config('request.jwt.claim.sub', '66666666-6666-4666-8666-666666666666', true);
+     perform set_config('request.jwt.claims', '{"sub":"66666666-6666-4666-8666-666666666666","aal":"aal2"}', true);
+     begin
+       perform public.safety_finalize_claim_publication_v1(v_candidate, 'PUBLISH', 'MUTATION_REVIEW', gen_random_uuid());
+       raise exception 'STALE_AUTHORITY_FINGERPRINT_WAS_ACCEPTED';
+     exception when serialization_failure then
+       if sqlerrm <> 'PUBLICATION_CANDIDATE_STALE' then raise; end if;
+     end;
+     raise exception using errcode = 'P0002', message = 'ROLLBACK_MUTATION_FIXTURE';
+   exception when no_data_found then
+     if sqlerrm <> 'ROLLBACK_MUTATION_FIXTURE' then raise; end if;
+   end;
+ end loop;
+end $$;
+
 -- A candidate records claim/report versions. A later version change must
 -- invalidate that recommendation before a distinct publisher can finalize it.
 set role authenticated;
@@ -305,8 +348,8 @@ reset role;
 do $$
 begin
   if (select count(*) from public.safety_public_points
-      where claim_id = '77777777-7777-4777-8777-777777777777') <> 1 then
-    raise exception 'Stale candidate changed the prior public point';
+      where claim_id = '77777777-7777-4777-8777-777777777777') <> 0 then
+    raise exception 'Changed claim authority left a stale prior public point';
   end if;
 end $$;
 

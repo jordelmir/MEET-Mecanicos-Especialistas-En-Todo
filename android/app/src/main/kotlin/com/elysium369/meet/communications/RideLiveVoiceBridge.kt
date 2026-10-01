@@ -67,7 +67,7 @@ sealed interface LiveCallState {
         val startedAtEpochMs: Long = System.currentTimeMillis(),
         val isMuted: Boolean = false,
         val peerConnected: Boolean = false,
-        val transport: String = "DUAL (Cloud + Red Mesh Local)",
+        val transport: String = "Cloud",
     ) : LiveCallState
     data class Ended(val reason: String) : LiveCallState
     data class Error(val message: String) : LiveCallState
@@ -78,7 +78,7 @@ sealed interface LiveCallState {
  *
  * Implements dual-transport architecture:
  * 1. Cloud: Supabase Realtime broadcast channel (`call_ride_$rideId`)
- * 2. Mesh: Local UDP broadcast on port 42424 (`255.255.255.255`) for 0ms offline/local Wi-Fi latency
+ * Legacy plaintext local UDP is disabled; it does not establish a Mesh or E2EE link.
  *
  * Captures 16kHz PCM mono with hardware AEC/NS/AGC and streams directly with de-duplication.
  */
@@ -89,6 +89,8 @@ class RideLiveVoiceBridge @Inject constructor(
 ) {
     companion object {
         private const val TAG = "RideLiveVoiceBridge"
+        // Legacy plaintext audio/signaling broadcast is disabled pending reviewed authenticated transport.
+        private const val LEGACY_UDP_ENABLED = false
         const val UDP_PORT = 42424
         const val UDP_PORT_FALLBACK = 42425
         private const val MAGIC_0: Byte = 0x45 // 'E'
@@ -201,7 +203,7 @@ class RideLiveVoiceBridge @Inject constructor(
         callScope = scope
 
         return runCatching {
-            // 1. Initialize UDP Mesh Socket
+            // 1. Initialize UDP LAN Socket
             val socket = createUdpSocket()
             udpSocket = socket
 
@@ -284,7 +286,7 @@ class RideLiveVoiceBridge @Inject constructor(
                         )
                     }
                 }
-                // Broadcast chunk over Local UDP Mesh (0ms local latency)
+                // Broadcast chunk over Local UDP LAN (network-dependent latency)
                 sendUdpPacket(socket, TYPE_AUDIO, rideId, normalizedRole, seq, chunkBytes)
             }
 
@@ -292,7 +294,7 @@ class RideLiveVoiceBridge @Inject constructor(
                 error("No fue posible inicializar el subsistema de audio de llamadas.")
             }
 
-            // Announce presence via Cloud and Mesh immediately and periodically until connected
+            // Announce presence via Cloud and LAN immediately and periodically until connected
             sendSignal(channel, socket, rideId, normalizedRole, "JOIN")
             sendUdpPacket(socket, TYPE_JOIN, rideId, normalizedRole, 0L, ByteArray(0))
             scope.launch {
@@ -411,6 +413,7 @@ class RideLiveVoiceBridge @Inject constructor(
     }
 
     private fun createUdpSocket(): DatagramSocket {
+        if (!LEGACY_UDP_ENABLED) return DatagramSocket(null)
         return runCatching {
             DatagramSocket(null).apply {
                 reuseAddress = true
@@ -433,6 +436,7 @@ class RideLiveVoiceBridge @Inject constructor(
         localRole: String,
         scope: CoroutineScope,
     ) {
+        if (!LEGACY_UDP_ENABLED) return
         scope.launch(Dispatchers.IO) {
             val buffer = ByteArray(2048)
             val packet = DatagramPacket(buffer, buffer.size)
@@ -461,10 +465,10 @@ class RideLiveVoiceBridge @Inject constructor(
 
                     when (type) {
                         TYPE_JOIN, TYPE_PING -> {
-                            Log.i(TAG, "Peer detected via UDP Mesh: $incomingRole")
+                            Log.i(TAG, "Peer detected via UDP LAN: $incomingRole")
                             _callState.update { current ->
                                 if (current is LiveCallState.Active) {
-                                    current.copy(peerConnected = true, transport = "Red Mesh Local Directa")
+                                    current.copy(peerConnected = true, transport = "Red local UDP directa")
                                 } else current
                             }
                         }
@@ -481,7 +485,7 @@ class RideLiveVoiceBridge @Inject constructor(
                             }
                         }
                         TYPE_LEAVE -> {
-                            Log.i(TAG, "Peer left via UDP Mesh")
+                            Log.i(TAG, "Peer left via UDP LAN")
                             withContext(Dispatchers.Main) {
                                 endCall("PEER_HANGUP_MESH")
                             }
@@ -502,6 +506,7 @@ class RideLiveVoiceBridge @Inject constructor(
         seq: Long,
         payload: ByteArray,
     ) {
+        if (!LEGACY_UDP_ENABLED) return
         runCatching {
             val totalSize = 2 + 1 + 4 + 1 + 8 + 4 + payload.size
             val buffer = ByteBuffer.allocate(totalSize)

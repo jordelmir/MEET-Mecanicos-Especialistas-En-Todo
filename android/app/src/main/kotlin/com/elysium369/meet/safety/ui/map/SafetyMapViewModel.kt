@@ -28,7 +28,7 @@ enum class SafetyTimeRange(val days: Long?) { DAYS_7(7), DAYS_30(30), YEAR_1(365
 fun List<SafetyPublicPointEntity>.filterFor(layer: SafetyMapLayer, range: SafetyTimeRange, now: Long): List<SafetyPublicPointEntity> {
     val cutoff = range.days?.let { now - it * 86_400_000L }
     return filter { point ->
-        point.serverVersion > 0 && point.geoDisclosure in setOf("COARSE_GRID_25KM_PLUS", "APPROXIMATE_1000M", "APPROXIMATE_500M", "STREET_SEGMENT", "EXACT_PUBLIC_PLACE") &&
+        point.serverVersion > 0 && point.geoDisclosure == "COARSE_GRID_25KM_PLUS" && (point.locationAccuracyMeters ?: 0) >= 25_000 &&
             point.displayLatitude.isFinite() && point.displayLatitude in -90.0..90.0 &&
             point.displayLongitude.isFinite() && point.displayLongitude in -180.0..180.0 &&
             (layer.category == null || point.category == layer.category) &&

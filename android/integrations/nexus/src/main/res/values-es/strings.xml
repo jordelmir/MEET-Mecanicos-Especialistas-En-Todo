@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Elysium Nexus</string>
+
+    <!--
+      Phase 1.2 — Editor toolbar (Spanish).
+      Translation of the English keys in res/values/strings.xml.
+    -->
+    <string name="editor_add_button">Agregar botón</string>
+    <string name="editor_add_stick">Agregar stick</string>
+    <string name="editor_add_trigger">Agregar trigger</string>
+    <string name="editor_save">Guardar</string>
+    <string name="editor_reset">Restablecer</string>
+    <string name="editor_undo">Deshacer</string>
+    <string name="editor_redo">Rehacer</string>
+    <string name="editor_opacity">Opacidad</string>
+    <string name="editor_new_profile">Nuevo perfil</string>
+    <string name="editor_delete_profile">Eliminar</string>
+    <string name="editor_align_left">Alinear izq</string>
+    <string name="editor_align_right">Alinear der</string>
+    <string name="editor_align_top">Alinear sup</string>
+    <string name="editor_align_bottom">Alinear inf</string>
+    <string name="editor_distribute_horizontally">Distr H</string>
+    <string name="editor_distribute_vertically">Distr V</string>
+    <string name="delete_profile_confirm_title">¿Eliminar perfil?</string>
+    <string name="delete_profile_confirm_message">Los controles de este perfil se eliminarán. Esta acción no se puede deshacer.</string>
+    <string name="delete_profile_confirm_ok">Eliminar</string>
+    <string name="delete_profile_confirm_cancel">Cancelar</string>
+    <string name="editor_neutralize">Neutralizar (§38)</string>
+    <string name="editor_diag_seq">seq</string>
+    <string name="editor_diag_touches">toques</string>
+    <string name="editor_title">Elysium Nexus</string>
+    <string name="editor_saved">Guardado</string>
+    <string name="editor_added_control">Se agregó %1$s</string>
+    <!--
+      Phase 1.17 — Compartir perfil (es).
+    -->
+    <string name="editor_share_profile">Compartir</string>
+    <string name="share_profile_chooser_title">Compartir perfil</string>
+    <string name="share_profile_failed">No se pudo compartir</string>
+    <!--
+      Phase 1.18 — Diálogo de ajustes (es).
+    -->
+    <string name="editor_settings">Ajustes</string>
+    <string name="editor_import_profile">Importar</string>
+    <string name="import_profile_paste_hint">Pegue un documento JSON de perfil abajo.</string>
+    <string name="import_profile_placeholder">{ "schemaVersion": 1, … }</string>
+    <string name="import_profile_button">Importar</string>
+    <string name="editor_duplicate_profile">Duplicar</string>
+    <string name="editor_rename_profile">Renombrar</string>
+    <string name="rename_profile_hint">Ingrese un nuevo nombre para este perfil.</string>
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_section_sticks">Sticks</string>
+    <string name="settings_left_stick_sensitivity">Sensibilidad stick izquierdo</string>
+    <string name="settings_right_stick_sensitivity">Sensibilidad stick derecho</string>
+    <string name="settings_section_inversion">Inversión de ejes</string>
+    <string name="settings_invert_left_x">Invertir X izquierdo</string>
+    <string name="settings_invert_left_y">Invertir Y izquierdo</string>
+    <string name="settings_invert_right_x">Invertir X derecho</string>
+    <string name="settings_invert_right_y">Invertir Y derecho</string>
+    <string name="settings_section_haptics">Hápticos</string>
+    <string name="settings_haptics_enabled">Vibración háptica</string>
+    <string name="settings_close">Cerrar</string>
+    <string name="settings_reset">Restablecer</string>
+    <!--
+      Phase ULT.2 — Rediseño visual (es).
+    -->
+    <string name="hero_eyebrow">Elysium Nexus</string>
+    <string name="hero_subtitle_default">%1$d controles · perfil %2$d · motor %3$d</string>
+    <string name="section_profiles">Perfiles</string>
+    <string name="section_transport">Transporte</string>
+    <string name="section_controls">Controles</string>
+    <string name="empty_state_title">Aún no hay controles</string>
+    <string name="empty_state_body">Toca + para añadir tu primer botón, stick o trigger.</string>
+    <string name="empty_state_cta">Añadir control</string>
+    <string name="fab_add_content_description">Añadir control</string>
+</resources>

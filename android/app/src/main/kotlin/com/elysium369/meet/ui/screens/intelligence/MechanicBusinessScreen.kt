@@ -103,7 +103,7 @@ fun MechanicBusinessScreen(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = Color(0xFF091724)),
-                    border = BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(Color(0xFF00E5FF), Color(0xFFFFB300)))),
+                    border = BorderStroke(1.5.dp, Brush.horizontalGradient(listOf(MeetColors.electricBlue, Color(0xFFFFB300)))),
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Row(
@@ -119,11 +119,11 @@ fun MechanicBusinessScreen(
                             )
                             Surface(
                                 shape = RoundedCornerShape(4.dp),
-                                color = Color(0xFF00E5FF).copy(alpha = 0.15f),
+                                color = MeetColors.electricBlue.copy(alpha = 0.15f),
                             ) {
                                 Text(
                                     "${biz.jobsCompletedCount} TRABAJOS",
-                                    color = Color(0xFF00E5FF),
+                                    color = MeetColors.electricBlue,
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),

@@ -6,4 +6,6 @@
     <cache-path name="gauge_qr_shares" path="gauge_qr_shares/" />
     <files-path name="verification_captures" path="meet_verifications/" />
     <cache-path name="safety_evidence" path="safety_evidence/" />
+    <cache-path name="nexus_profile_shares" path="shares/" />
+    <cache-path name="dragoncalc_exports" path="DragonCalcExports/" />
 </paths>

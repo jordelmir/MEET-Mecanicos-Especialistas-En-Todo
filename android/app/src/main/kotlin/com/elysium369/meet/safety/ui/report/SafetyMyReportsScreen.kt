@@ -55,7 +55,7 @@ fun SafetyMyReportsScreen(
                             stringResource(R.string.safety_my_reports_title),
                             fontWeight = FontWeight.Black,
                             fontSize = 17.sp,
-                            color = Color.White,
+                            color = MeetColors.textPrimary,
                         )
                         Text(
                             stringResource(R.string.safety_my_reports_subtitle, state.totalReports, state.pendingCount),
@@ -69,7 +69,7 @@ fun SafetyMyReportsScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.safety_back),
-                            tint = Color.White,
+                            tint = MeetColors.textPrimary,
                         )
                     }
                 },
@@ -141,7 +141,7 @@ fun SafetyMyReportsScreen(
             title = {
                 Text(
                     stringResource(R.string.safety_my_reports_withdraw_dialog_title),
-                    color = Color.White,
+                    color = MeetColors.textPrimary,
                     fontWeight = FontWeight.Bold,
                 )
             },
@@ -216,7 +216,7 @@ private fun MyReportCard(
                         report.category.replace("_", " "),
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
-                        color = Color.White,
+                        color = MeetColors.textPrimary,
                     )
                 }
 

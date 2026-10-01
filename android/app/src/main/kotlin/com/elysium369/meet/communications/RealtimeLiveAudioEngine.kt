@@ -5,6 +5,11 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioDeviceInfo
+import android.os.Build
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.MediaRecorder
@@ -42,6 +47,24 @@ class RealtimeLiveAudioEngine @Inject constructor(
         const val CHUNK_SIZE = 1280
     }
 
+    private val mutableSpeakerEnabled = MutableStateFlow(false)
+    val speakerEnabled: StateFlow<Boolean> = mutableSpeakerEnabled.asStateFlow()
+
+    @Synchronized
+    fun setSpeakerEnabled(enabled: Boolean): Boolean = runCatching {
+        val applied = if (Build.VERSION.SDK_INT >= 31) {
+            val type = if (enabled) AudioDeviceInfo.TYPE_BUILTIN_SPEAKER else AudioDeviceInfo.TYPE_BUILTIN_EARPIECE
+            val device = audioManager.availableCommunicationDevices.firstOrNull { it.type == type }
+            device != null && audioManager.setCommunicationDevice(device)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.isSpeakerphoneOn = enabled
+            true
+        }
+        if (applied) mutableSpeakerEnabled.value = enabled
+        applied
+    }.getOrDefault(false)
+
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     private var audioRecord: AudioRecord? = null
     private var audioTrack: AudioTrack? = null
@@ -53,14 +76,17 @@ class RealtimeLiveAudioEngine @Inject constructor(
     private val isRecording = AtomicBoolean(false)
     private val isPlaying = AtomicBoolean(false)
     private val isMuted = AtomicBoolean(false)
+    private val droppedPlaybackFrames = java.util.concurrent.atomic.AtomicLong(0)
+    fun droppedPlaybackFrames(): Long = droppedPlaybackFrames.get()
 
     @SuppressLint("MissingPermission")
     @Synchronized
     fun start(
         scope: CoroutineScope,
+        useEarpiece: Boolean = false,
         onAudioChunk: (ByteArray) -> Unit,
     ): Boolean {
-        if (isRecording.get()) return true
+        if (isRecording.get()) return false
 
         return runCatching {
             val minRecordBufferSize = AudioRecord.getMinBufferSize(
@@ -106,7 +132,7 @@ class RealtimeLiveAudioEngine @Inject constructor(
                 SAMPLE_RATE,
                 CHANNEL_CONFIG_OUT,
                 AUDIO_FORMAT,
-            ).coerceAtLeast(CHUNK_SIZE * 4)
+            ).coerceAtLeast(CHUNK_SIZE * 10)
 
             val track = AudioTrack.Builder()
                 .setAudioAttributes(
@@ -138,7 +164,7 @@ class RealtimeLiveAudioEngine @Inject constructor(
 
             // Configure audio routing for speaker / earpiece call
             audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
-            audioManager.isSpeakerphoneOn = true
+            check(setSpeakerEnabled(!useEarpiece)) { "CALL_AUDIO_ROUTE_UNAVAILABLE" }
 
             track.play()
             isPlaying.set(true)
@@ -174,7 +200,8 @@ class RealtimeLiveAudioEngine @Inject constructor(
         val track = audioTrack ?: return
         if (!isPlaying.get()) return
         runCatching {
-            track.write(chunk, 0, chunk.size)
+            val accepted = track.write(chunk, 0, chunk.size, AudioTrack.WRITE_NON_BLOCKING)
+            if (accepted != chunk.size) droppedPlaybackFrames.incrementAndGet()
         }.onFailure { error ->
             Log.w(TAG, "Error writing audio chunk to AudioTrack", error)
         }
@@ -216,6 +243,8 @@ class RealtimeLiveAudioEngine @Inject constructor(
         gainControl = null
 
         runCatching {
+            if (Build.VERSION.SDK_INT >= 31) audioManager.clearCommunicationDevice()
+            mutableSpeakerEnabled.value = false
             audioManager.mode = AudioManager.MODE_NORMAL
             audioManager.isSpeakerphoneOn = false
         }

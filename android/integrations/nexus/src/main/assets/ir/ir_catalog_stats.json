@@ -1,0 +1,31 @@
+{
+  "catalogBuildId": "923c870464b14d418c56dd86b583541f6b5d6b1a3d94e033901a34c5d73c5078",
+  "schemaVersion": 5,
+  "profile": "production",
+  "generatedAtUtc": "2026-08-13T04:19:57Z",
+  "pipelineVersion": "5.1.0-v5-native",
+  "databaseSha256": "4f189c65f2a6e021ded8b0608825054cb9c5478350a60a02ff762b169b0f9c97",
+  "canonicalContentSha256": "593a7729e6f60b92fe31af6d6af5c44ae477f73c5bf9e41614918aa2aa4d1dde",
+  "databaseSizeBytes": 262770688,
+  "counts": {
+    "sources": 6,
+    "source_revisions": 6,
+    "source_files": 5642,
+    "brands": 1430,
+    "device_types": 264,
+    "device_models": 0,
+    "remotes": 5004,
+    "code_sets": 4715,
+    "actions": 51659,
+    "signals": 106033,
+    "command_bindings": 223571,
+    "code_set_models": 0,
+    "device_families": 0,
+    "protocol_definitions": 23,
+    "protocol_variants": 24,
+    "compatibility_assertions": 0,
+    "physical_test_evidence": 0,
+    "catalog_rejections": 37753,
+    "signal_sources": 106074
+  }
+}

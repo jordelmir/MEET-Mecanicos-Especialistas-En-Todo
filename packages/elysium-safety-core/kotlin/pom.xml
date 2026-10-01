@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>io.elysium.safety</groupId><artifactId>custody</artifactId><version>0.1.0</version><packaging>jar</packaging>
+  <name>Elysium Safety Custody</name><description>Platform-free exact V2 custody canonicalization</description>
+  <properties><maven.compiler.release>17</maven.compiler.release><project.build.sourceEncoding>UTF-8</project.build.sourceEncoding><kotlin.version>2.3.20</kotlin.version></properties>
+  <dependencies><dependency><groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-stdlib</artifactId><version>${kotlin.version}</version></dependency></dependencies>
+  <build><sourceDirectory>src/main/kotlin</sourceDirectory><plugins><plugin>
+    <groupId>org.jetbrains.kotlin</groupId><artifactId>kotlin-maven-plugin</artifactId><version>${kotlin.version}</version>
+    <executions><execution><id>compile-kotlin</id><phase>compile</phase><goals><goal>compile</goal></goals></execution></executions>
+    <configuration><jvmTarget>17</jvmTarget></configuration>
+  </plugin></plugins></build>
+</project>

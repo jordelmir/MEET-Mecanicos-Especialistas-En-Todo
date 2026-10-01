@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      USB HID device filter.
+      Matches any USB accessory (vendor-specific
+      product). The Nexus Receiver (Phase 4) will
+      have a specific vendorId/productId; for now
+      we match all accessories so the transport
+      can work with any USB-C connection.
+    -->
+    <usb-device />
+</resources>

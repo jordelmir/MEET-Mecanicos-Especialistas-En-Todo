@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
+import com.elysium369.meet.ui.theme.MeetColors
 import com.elysium369.meet.core.share.GaugeQrImport
 import com.elysium369.meet.core.share.QrCodeSharing
 import com.elysium369.meet.data.local.MeetDatabase

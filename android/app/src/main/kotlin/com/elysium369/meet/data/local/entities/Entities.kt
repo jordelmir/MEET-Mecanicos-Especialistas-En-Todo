@@ -26,7 +26,8 @@ data class VehicleEntity(
     val syncedAt: Long?,
     val businessId: String? = null,
     val fleetId: String? = null,
-    val assignedDriverId: String? = null
+    val assignedDriverId: String? = null,
+    @ColumnInfo(defaultValue = "'CAR'") val vehicleKind: String = "CAR",
 )
 
 @Entity(

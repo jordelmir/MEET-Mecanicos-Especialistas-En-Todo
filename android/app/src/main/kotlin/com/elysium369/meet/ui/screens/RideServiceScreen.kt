@@ -8,6 +8,9 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
+import com.elysium369.meet.core.agent.ui.AgentTextFieldRole
+import com.elysium369.meet.core.agent.ui.AgentUiControlId
+import com.elysium369.meet.core.agent.ui.agentTextInput
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -1412,7 +1415,7 @@ fun PassengerDashboard(
         Column(modifier = Modifier.fillMaxSize()) {
             TabRow(
                 selectedTabIndex = passengerModeTab,
-                containerColor = Color(0xFF0F172A),
+                containerColor = MeetColors.cardBackground,
                 contentColor = MeetColors.cyberCyan,
                 indicator = { tabPositions ->
                     val indicatorColor = when (passengerModeTab) {
@@ -2725,7 +2728,7 @@ fun PassengerDashboard(
                             contentAlignment = Alignment.Center,
                         ) {
                             Card(
-                                colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                                colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
                                 border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
                                 shape = RoundedCornerShape(20.dp),
                                 modifier = Modifier.fillMaxWidth(),
@@ -2963,7 +2966,7 @@ private fun RideFareModeSelector(
                 RideFareMode.entries.forEach { mode ->
                     val active = selected == mode
                     val accent = if (mode == RideFareMode.OPEN_BID) {
-                        Color(0xFFBE35FF)
+                        MeetColors.hotMagenta
                     } else {
                         MeetColors.neonGreen
                     }
@@ -3530,7 +3533,7 @@ fun DriverDashboard(
         Column(modifier = Modifier.fillMaxSize()) {
         TabRow(
             selectedTabIndex = driverModeTab,
-            containerColor = Color(0xFF0F172A),
+            containerColor = MeetColors.cardBackground,
             contentColor = MeetColors.cyberCyan,
             indicator = { tabPositions ->
                 val indicatorColor = when (driverModeTab) {
@@ -4017,7 +4020,7 @@ fun DriverDashboard(
                         contentAlignment = Alignment.Center,
                     ) {
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+                            colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
                             border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
                             shape = RoundedCornerShape(20.dp),
                             modifier = Modifier.fillMaxWidth(),
@@ -4505,7 +4508,7 @@ fun FleetKpiBox(
     accentColor: Color
 ) {
     Surface(
-        color = Color(0xFF0F172A),
+        color = MeetColors.cardBackground,
         shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, accentColor.copy(alpha = 0.35f)),
         modifier = modifier
@@ -4599,7 +4602,7 @@ fun FleetMogulUnitCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Surface(
-                color = Color(0xFF0F172A),
+                color = MeetColors.cardBackground,
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -6462,6 +6465,7 @@ fun ActiveRidePanel(
                         ride = ride,
                         currentSpeed = (currentGps?.speed ?: 0f) * 3.6f,
                         activeRouteMeters = activeRoadRoute?.distanceMeters?.toLong(),
+                        ownerId = notificationPrincipal.id,
                     )
                 }
                 if (!isDriver && ride.status !in setOf("COMPLETED", "CANCELLED")) {
@@ -9141,6 +9145,7 @@ fun CaptureGuideOverlay(
 @Composable
 fun LiveRideMetrics(
     ride: RideRequestEntity,
+    ownerId: String,
     currentSpeed: Float,
     activeRouteMeters: Long?,
     modifier: Modifier = Modifier,
@@ -9150,40 +9155,32 @@ fun LiveRideMetrics(
 
     val isArrivedWaiting = (ride.status == "ARRIVED" || ride.serverState == "ARRIVED") && !isTripActive
 
-    val tripStartedAtFromBreakdown = remember(ride.fareBreakdownJson) {
-        runCatching {
-            val jsonElement = Json.parseToJsonElement(ride.fareBreakdownJson)
-            (jsonElement as? kotlinx.serialization.json.JsonObject)?.get("tripStartedAt")?.let {
-                it.toString().trim('"').toLongOrNull()
+    var meter by remember(ride.requestId, ownerId) { mutableStateOf<com.elysium369.meet.ride.meter.SharedRideMeterSnapshot?>(null) }
+    var meterConnected by remember(ride.requestId, ownerId) { mutableStateOf(false) }
+    LaunchedEffect(ride.requestId, ownerId) {
+        if (ownerId != ride.passengerId && ownerId != ride.assignedDriverId) return@LaunchedEffect
+        while (true) {
+            try {
+                val snapshot = com.elysium369.meet.ride.meter.SharedRideMeterGateway.fetch(ride.requestId)
+                meter = snapshot
+                meterConnected = true
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                meterConnected = false
+                meter = null
             }
-        }.getOrNull()
+            kotlinx.coroutines.delay(5_000L)
+        }
     }
-
-    // El tiempo del viaje del usuario corre ÚNICAMENTE cuando el viaje inicia (IN_PROGRESS), NUNCA antes de iniciar.
-    val startedAtMs = tripStartedAtFromBreakdown ?: (ride.driverArrivedAt ?: ride.createdAt)
-    val elapsedSeconds = if (isTripActive) {
-        ((System.currentTimeMillis() - startedAtMs) / 1000L).coerceAtLeast(0L)
-    } else {
-        0L
-    }
+    val startedAtMs = meter?.started_at_ms
+    val elapsedSeconds = meter?.elapsed_seconds ?: 0L
     val elapsedMinutes = (elapsedSeconds / 60).toInt()
     val elapsedSecs = (elapsedSeconds % 60).toInt()
-
-    val distanceTraveledKm = if (isTripActive) {
-        ride.estimatedDistanceKm.coerceAtLeast(0.0)
-    } else {
-        0.0
-    }
-
+    val distanceTraveledKm = (meter?.validated_distance_meters ?: 0L) / 1000.0
     val isOpenBid = ride.fareMode == RideFareMode.OPEN_BID.name
-    val meteredQuote = if (!isOpenBid && isTripActive) {
-        RideFareEngine.quoteCostaRica(
-            distanceMeters = (distanceTraveledKm * 1000).toLong(),
-            durationSeconds = elapsedSeconds,
-        )
-    } else null
-
-    val liveFareMinor = meteredQuote?.estimatedTotalMinor
+    val gpsFresh = meter?.let { it.last_capture_ms != null && it.server_as_of_ms - it.last_capture_ms <= 30_000L } == true
+    val liveFareMinor = if (meter?.is_final == true) meter?.final_fare_minor else meter?.measured_fare_minor
 
     Surface(
         color = MeetColors.cyberCyan.copy(alpha = 0.08f),
@@ -9198,13 +9195,15 @@ fun LiveRideMetrics(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "MÉTRICAS EN VIVO · SINCRONIZADO",
+                    if (meter?.is_final == true) "MARÍA · TOTAL CONFIRMADO" else if (meterConnected && gpsFresh) "MARÍA · MEDICIÓN COMPARTIDA" else "MARÍA · SINCRONIZACIÓN / GPS PENDIENTE",
                     color = MeetColors.cyberCyan,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.sp,
                 )
-                if (isTripActive) {
+                if (meter?.is_final == true) {
+                    Text("FINALIZADO", color = MeetColors.neonGreen, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                } else if (isTripActive) {
                     Surface(
                         color = MeetColors.neonGreen.copy(alpha = 0.15f),
                         shape = RoundedCornerShape(6.dp),
@@ -9243,10 +9242,10 @@ fun LiveRideMetrics(
             ) {
                 MetricPill(
                     label = "TIEMPO VIAJE",
-                    value = "%02d:%02d".format(elapsedMinutes, elapsedSecs),
+                    value = if (startedAtMs != null && isTripActive) "%02d:%02d".format(elapsedMinutes, elapsedSecs) else "Pendiente",
                 )
                 MetricPill(
-                    label = "VELOCIDAD",
+                    label = "MI VELOCIDAD",
                     value = "${currentSpeed.toInt()} km/h",
                 )
                 MetricPill(
@@ -9271,7 +9270,7 @@ fun LiveRideMetrics(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "Tarifa en tiempo real:",
+                                if (meter?.is_final == true) "Tarifa final confirmada:" else if (gpsFresh && meterConnected) "Medición provisional (no cobro final):" else "Última medición parcial:",
                                 color = Color.White,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold
@@ -9286,7 +9285,7 @@ fun LiveRideMetrics(
                     }
                 } else {
                     Text(
-                        "El taxímetro comenzará a computar tarifa al iniciar el viaje tras ingresar el PIN.",
+                        "Esperando inicio confirmado y puntos GPS del conductor. Sin datos válidos no se calcula un cobro.",
                         color = MeetColors.textSecondary,
                         fontSize = 11.sp,
                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
@@ -9329,10 +9328,10 @@ fun LiveRideMetrics(
             }
 
             if (activeRouteMeters != null && activeRouteMeters > 0) {
-                val remainingKm = ((activeRouteMeters / 1000.0) - distanceTraveledKm).coerceAtLeast(0.0)
+                val remainingKm = activeRouteMeters / 1000.0
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Restante estimado: ~${"%.1f".format(remainingKm)} km",
+                    "Ruta estimada: ~${"%.1f".format(remainingKm)} km",
                     color = MeetColors.textSecondary,
                     fontSize = 10.sp,
                 )
@@ -9506,9 +9505,7 @@ private fun AuthoritativeRideCancellationDialog(
     val currentRequest = request
     LaunchedEffect(currentRequest?.serverState, currentRequest?.syncState, currentRequest?.status) {
         if (currentRequest == null ||
-            currentRequest.serverState in setOf("CANCELLED", "COMPLETED") ||
-            currentRequest.syncState == "LOCAL_CANCELLED" ||
-            currentRequest.status in setOf("CANCELLED", "COMPLETED")
+            com.elysium369.meet.ride.domain.RideAuthorityEvidence.isTerminalSnapshot(currentRequest.serverState,currentRequest.serverVersion)
         ) {
             delay(300L)
             onDismiss()

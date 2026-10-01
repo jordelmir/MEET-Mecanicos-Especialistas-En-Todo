@@ -60,6 +60,8 @@ logs/
 
 # --- Android Build Outputs ---
 android/app/build/
+android/features/*/build/
+android/integrations/*/build/
 android/.gradle/
 android/build/
 android/.kotlin/

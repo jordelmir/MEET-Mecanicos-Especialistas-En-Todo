@@ -30,7 +30,8 @@ object RideFareEngine {
     const val COSTA_RICA_CURRENCY = "CRC"
     const val CRC_DISTANCE_RATE_MINOR_PER_KM = 300L
     const val CRC_TIME_RATE_MINOR_PER_MINUTE = 60L
-    const val COSTA_RICA_RATE_CARD_VERSION = 1L
+    const val CRC_METERED_MINIMUM_FARE_MINOR = 1_000L
+    const val COSTA_RICA_RATE_CARD_VERSION = 2L
 
     fun quoteCostaRica(
         distanceMeters: Long,
@@ -60,7 +61,7 @@ object RideFareEngine {
             timeRateMinorPerMinute = CRC_TIME_RATE_MINOR_PER_MINUTE,
             distanceFareMinor = distanceFare,
             timeFareMinor = timeFare,
-            estimatedTotalMinor = total,
+            estimatedTotalMinor = total.coerceAtLeast(CRC_METERED_MINIMUM_FARE_MINOR),
             rateCardVersion = COSTA_RICA_RATE_CARD_VERSION,
             allowsStopsDuringTrip = true,
         )

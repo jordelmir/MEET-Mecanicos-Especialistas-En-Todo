@@ -17,7 +17,7 @@ KOTLIN_DIR="$REPO_ROOT/android/app/src/main/kotlin/com/elysium369/meet/safety"
 
 echo "=== [1/3] Checking V3 SQL location publication boundary ==="
 
-v3_authority="$MIGRATIONS_DIR/20260928100000_safety_moderation_authority_v3.sql"
+v3_authority="$MIGRATIONS_DIR/20260930120000_safety_review_closure_v3.sql"
 v3_firewall="$MIGRATIONS_DIR/20260928090000_safety_publication_firewall_v3.sql"
 for contract in \
   "round(v_content.latitude::numeric * 4) / 4" \
@@ -25,6 +25,7 @@ for contract in \
   "new.location_accuracy_meters < 25000" \
   "COARSE_GRID_25KM_PLUS" \
   "safety_guard_public_point_v3" \
+  "COARSE_GRID_25KM_PLUS" \
   "PUBLIC_LOCATION_SUPPRESSED"; do
   if ! grep -Fq "$contract" "$v3_authority"; then
     echo "FAIL: V3 location contract missing: $contract"
