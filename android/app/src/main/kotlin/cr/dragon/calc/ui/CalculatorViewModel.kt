@@ -358,7 +358,16 @@ class CalculatorViewModel @Inject constructor(
 
     fun addCell(type: CellType = CellType.MATH) {
         updateAndSave { state ->
-            val newCell = Cell(type = type)
+            val defaultText = when (type) {
+                CellType.GRAPH_3D -> "sin(x) * cos(y)"
+                CellType.GRAPH -> "sin(x)"
+                else -> ""
+            }
+            val newCell = Cell(
+                type = type,
+                rawText = defaultText,
+                content = androidx.compose.ui.text.input.TextFieldValue(defaultText)
+            )
             val newCells = state.document.cells + newCell
             state.copy(
                 document = state.document.copy(cells = evaluateDAG(newCells, state.angleMode)),

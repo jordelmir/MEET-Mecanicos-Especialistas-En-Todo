@@ -103,17 +103,21 @@ class FileManagerViewModel @Inject constructor(
         updateStorageStats()
         loadShortcuts()
 
-        ContextCompat.registerReceiver(
-            context,
-            progressReceiver,
-            IntentFilter("com.elysium.vanguard.COMPRESSION_PROGRESS"),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
+        try {
+            ContextCompat.registerReceiver(
+                context,
+                progressReceiver,
+                IntentFilter("com.elysium.vanguard.COMPRESSION_PROGRESS"),
+                ContextCompat.RECEIVER_NOT_EXPORTED
+            )
+        } catch (_: Exception) {}
     }
 
     override fun onCleared() {
         super.onCleared()
-        context.unregisterReceiver(progressReceiver)
+        try {
+            context.unregisterReceiver(progressReceiver)
+        } catch (_: Exception) {}
     }
 
     private fun loadShortcuts() {

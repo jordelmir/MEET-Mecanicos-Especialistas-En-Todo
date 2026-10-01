@@ -70,7 +70,7 @@ fun Graph3DCell(
             BasicTextField(
                 value = cell.content,
                 onValueChange = onContentChange,
-                readOnly = true,
+                readOnly = false,
                 textStyle = TextStyle(
                     color = DragonCyan,
                     fontSize = 18.sp,

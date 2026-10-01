@@ -15,7 +15,17 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class SafetyHomeUiState(
-    val featureGates: Map<String, Boolean> = emptyMap(),
+    val featureGates: Map<String, Boolean> = mapOf(
+        "safety_foundation" to true,
+        "safety_reporting" to true,
+        "safety_evidence_upload" to true,
+        "safety_public_map" to true,
+        "safety_public_cases" to true,
+        "safety_accountability" to true,
+        "safety_observatory" to true,
+        "safety_realtime" to true,
+        "safety_guardian" to true,
+    ),
     val pendingLocalReports: Int = 0,
     val totalReportCount: Int = 0,
     val publishedCaseCount: Int = 0,

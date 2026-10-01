@@ -1878,25 +1878,42 @@ fun MeetApp(
                 androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
             }
             composable(MeetDestinations.SCREEN_MIRROR) {
-                com.elysium369.meet.ui.screens.home.OnDemandFeatureScreen(
-                    module = "jsm",
-                    activityClass = "com.jsm.core.MainActivity",
-                    title = "Elysium ScreenMirror",
-                    onBack = { navController.backOrHome() },
-                )
+                val context = androidx.compose.ui.platform.LocalContext.current
+                val hasClass = androidx.compose.runtime.remember {
+                    runCatching { Class.forName("com.jsm.core.MainActivity") }.isSuccess
+                }
+                if (hasClass) {
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        try {
+                            context.startActivity(android.content.Intent().setClassName(context.packageName, "com.jsm.core.MainActivity"))
+                        } catch (e: Exception) {
+                            android.util.Log.e("MeetNav", "Failed to launch ScreenMirror", e)
+                        }
+                        navController.popBackStack()
+                    }
+                    androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
+                } else {
+                    com.elysium369.meet.ui.screens.home.OnDemandFeatureScreen(
+                        module = "jsm",
+                        activityClass = "com.jsm.core.MainActivity",
+                        title = "Elysium ScreenMirror",
+                        onBack = { navController.backOrHome() },
+                    )
+                }
             }
             composable(MeetDestinations.FILE_MANAGER) {
                 val context = androidx.compose.ui.platform.LocalContext.current
-                val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
-                    contract = androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
-                ) { _ -> navController.backOrHome() }
                 androidx.compose.runtime.LaunchedEffect(Unit) {
-                    launcher.launch(
-                        android.content.Intent(context, com.elysium.vanguard.MainActivity::class.java)
-                            .putExtra("MEET_HOSTED", true),
-                    )
+                    try {
+                        context.startActivity(
+                            android.content.Intent(context, com.elysium.vanguard.MainActivity::class.java)
+                                .putExtra("MEET_HOSTED", true)
+                        )
+                    } catch (e: Exception) {
+                        android.util.Log.e("MeetNav", "Failed to launch FileManager", e)
+                    }
+                    navController.popBackStack()
                 }
-                androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
             }
             composable(MeetDestinations.RECORD_SHIELD) {
                 val context = androidx.compose.ui.platform.LocalContext.current

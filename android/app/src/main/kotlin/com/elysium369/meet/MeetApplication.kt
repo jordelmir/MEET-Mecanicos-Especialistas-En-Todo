@@ -45,6 +45,7 @@ class MeetApplication : Application(), Configuration.Provider {
         super.onCreate()
         com.elysium.vanguard.recordshield.RecordShieldIdentity.install {
             com.elysium369.meet.data.remote.SupabaseModule.client.auth.currentUserOrNull()?.id
+                ?: ("local_device_" + (android.provider.Settings.Secure.getString(contentResolver, android.provider.Settings.Secure.ANDROID_ID) ?: "default_shield"))
         }
 
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()

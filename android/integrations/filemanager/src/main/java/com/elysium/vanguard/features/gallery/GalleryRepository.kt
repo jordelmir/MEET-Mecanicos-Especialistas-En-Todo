@@ -38,25 +38,37 @@ class GalleryRepository @Inject constructor(
         projection: Array<String>,
         list: MutableList<GalleryMedia>
     ) {
-        context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
-            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
-            val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATA)
-            val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.MIME_TYPE)
-            val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.MediaColumns.DATE_MODIFIED)
+        try {
+            context.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                val idColumn = cursor.getColumnIndex(MediaStore.MediaColumns._ID)
+                val nameColumn = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                val pathColumn = cursor.getColumnIndex(MediaStore.MediaColumns.DATA)
+                val mimeColumn = cursor.getColumnIndex(MediaStore.MediaColumns.MIME_TYPE)
+                val dateColumn = cursor.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED)
 
-            while (cursor.moveToNext()) {
-                list.add(
-                    GalleryMedia(
-                        id = cursor.getLong(idColumn),
-                        name = cursor.getString(nameColumn),
-                        path = cursor.getString(pathColumn),
-                        mimeType = cursor.getString(mimeColumn),
-                        dateModified = cursor.getLong(dateColumn)
-                    )
-                )
+                while (cursor.moveToNext()) {
+                    try {
+                        val name = if (nameColumn >= 0) cursor.getString(nameColumn) ?: "Untitled" else "Untitled"
+                        val path = if (pathColumn >= 0) cursor.getString(pathColumn) ?: "" else ""
+                        val mime = if (mimeColumn >= 0) cursor.getString(mimeColumn) ?: "image/*" else "image/*"
+                        val date = if (dateColumn >= 0) cursor.getLong(dateColumn) else 0L
+                        val id = if (idColumn >= 0) cursor.getLong(idColumn) else 0L
+
+                        if (path.isNotEmpty()) {
+                            list.add(
+                                GalleryMedia(
+                                    id = id,
+                                    name = name,
+                                    path = path,
+                                    mimeType = mime,
+                                    dateModified = date
+                                )
+                            )
+                        }
+                    } catch (_: Exception) {}
+                }
             }
-        }
+        } catch (_: Exception) {}
     }
 
     fun deleteMedia(media: GalleryMedia): Boolean {

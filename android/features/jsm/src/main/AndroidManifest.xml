@@ -1,8 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:dist="http://schemas.android.com/apk/distribution">
     <dist:module dist:instant="false" dist:title="@string/jsm_module_name">
-        <dist:delivery><dist:on-demand /></dist:delivery>
-        <dist:fusing dist:include="false" />
+        <dist:delivery>
+            <dist:install-time />
+        </dist:delivery>
+        <dist:fusing dist:include="true" />
     </dist:module>
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

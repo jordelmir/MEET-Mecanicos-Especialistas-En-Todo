@@ -30,31 +30,46 @@ class MusicRepository @Inject constructor(
         val uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val selection = null // Include all audio types (AMR, OGG, MIDI, etc.)
 
-        context.contentResolver.query(uri, projection, selection, null, null)?.use { cursor ->
-            val idColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
-            val nameColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
-            val pathColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
-            val mimeColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.MIME_TYPE)
-            val albumColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM)
-            val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
-            val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
-            val dateColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_MODIFIED)
+        try {
+            context.contentResolver.query(uri, projection, selection, null, null)?.use { cursor ->
+                val idColumn = cursor.getColumnIndex(MediaStore.Audio.Media._ID)
+                val nameColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME)
+                val pathColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DATA)
+                val mimeColumn = cursor.getColumnIndex(MediaStore.Audio.Media.MIME_TYPE)
+                val albumColumn = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM)
+                val artistColumn = cursor.getColumnIndex(MediaStore.Audio.Media.ARTIST)
+                val durationColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DURATION)
+                val dateColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DATE_MODIFIED)
 
-            while (cursor.moveToNext()) {
-                musicList.add(
-                    MusicTrack(
-                        id = cursor.getLong(idColumn),
-                        name = cursor.getString(nameColumn),
-                        path = cursor.getString(pathColumn),
-                        mimeType = cursor.getString(mimeColumn),
-                        album = cursor.getString(albumColumn),
-                        artist = cursor.getString(artistColumn),
-                        duration = cursor.getLong(durationColumn),
-                        dateModified = cursor.getLong(dateColumn)
-                    )
-                )
+                while (cursor.moveToNext()) {
+                    try {
+                        val name = if (nameColumn >= 0) cursor.getString(nameColumn) ?: "Unknown Track" else "Unknown Track"
+                        val path = if (pathColumn >= 0) cursor.getString(pathColumn) ?: "" else ""
+                        val mime = if (mimeColumn >= 0) cursor.getString(mimeColumn) ?: "audio/*" else "audio/*"
+                        val album = if (albumColumn >= 0) cursor.getString(albumColumn) else null
+                        val artist = if (artistColumn >= 0) cursor.getString(artistColumn) else null
+                        val duration = if (durationColumn >= 0) cursor.getLong(durationColumn) else 0L
+                        val date = if (dateColumn >= 0) cursor.getLong(dateColumn) else 0L
+                        val id = if (idColumn >= 0) cursor.getLong(idColumn) else 0L
+
+                        if (path.isNotEmpty()) {
+                            musicList.add(
+                                MusicTrack(
+                                    id = id,
+                                    name = name,
+                                    path = path,
+                                    mimeType = mime,
+                                    album = album,
+                                    artist = artist,
+                                    duration = duration,
+                                    dateModified = date
+                                )
+                            )
+                        }
+                    } catch (_: Exception) {}
+                }
             }
-        }
+        } catch (_: Exception) {}
         emit(musicList.sortedByDescending { it.dateModified })
     }.flowOn(Dispatchers.IO)
 }

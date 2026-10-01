@@ -79,7 +79,7 @@ class MusicHubViewModel @Inject constructor(
     private val _selectedPlaylist = MutableStateFlow<Playlist?>(null)
     val selectedPlaylist: StateFlow<Playlist?> = _selectedPlaylist.asStateFlow()
 
-    private val _boostLevel = MutableStateFlow(1.0f) // 1.0 to 4.0 (Elite Boost)
+    private val _boostLevel = MutableStateFlow(1.0f) // 1.0 to 10.0 (Supreme Boost)
     val boostLevel: StateFlow<Float> = _boostLevel.asStateFlow()
 
     private val _activeQueue = MutableStateFlow<List<MusicTrack>>(emptyList())
@@ -298,9 +298,17 @@ class MusicHubViewModel @Inject constructor(
                 val bassBand = preEq.getBand(0)
                 bassBand.isEnabled = true
                 bassBand.cutoffFrequency = 200f
-                // We add up to 6dB extra just for the bass band when boost is high
-                bassBand.gain = (gainDb * 0.5f).coerceAtMost(6f)
+                // Aggressive bass: up to 18dB for the sub-bass band
+                bassBand.gain = (gainDb * 1.8f).coerceAtMost(18f)
                 preEq.setBand(0, bassBand)
+                // Mid-bass emphasis (200-500Hz) for fullness
+                if (preEq.bandCount > 1) {
+                    val midBassBand = preEq.getBand(1)
+                    midBassBand.isEnabled = true
+                    midBassBand.cutoffFrequency = 500f
+                    midBassBand.gain = (gainDb * 0.8f).coerceAtMost(10f)
+                    preEq.setBand(1, midBassBand)
+                }
                 dp.setPreEqByChannelIndex(0, preEq)
 
                 // 2. MULTI-BAND COMPRESSION (TONE CONTROL)
@@ -308,15 +316,21 @@ class MusicHubViewModel @Inject constructor(
                 for (i in 0 until 4) {
                     val band = mbc.getBand(i)
                     band.isEnabled = true
-                    band.attackTime = 5f
-                    band.releaseTime = 40f
-                    band.ratio = 2f
-                    band.threshold = -10f
+                    band.attackTime = 3f   // Faster attack for punchier bass
+                    band.releaseTime = 30f
+                    band.ratio = 3f        // Harder compression for loudness
+                    band.threshold = -15f  // Lower threshold catches more signal
                     band.kneeWidth = 0f
                     band.noiseGateThreshold = -60f
                     band.expanderRatio = 1f
-                    band.preGain = 0f
-                    band.postGain = (gainDb * 0.2f) // Subtle thickening
+                    // Bass bands get more pre-gain, highs less
+                    band.preGain = when (i) {
+                        0 -> (gainDb * 1.2f).coerceAtMost(20f)  // Sub-bass
+                        1 -> (gainDb * 0.8f).coerceAtMost(14f)  // Mid-bass
+                        2 -> (gainDb * 0.3f).coerceAtMost(8f)   // Mids
+                        else -> (gainDb * 0.1f).coerceAtMost(4f) // Highs
+                    }
+                    band.postGain = (gainDb * 0.5f).coerceAtMost(12f) // More output
                     mbc.setBand(i, band)
                 }
                 dp.setMbcByChannelIndex(0, mbc)
@@ -324,12 +338,12 @@ class MusicHubViewModel @Inject constructor(
                 // 3. MASTER LIMITER (VOLUME BOOST)
                 val limiter = dp.getLimiterByChannelIndex(0)
                 limiter.isEnabled = true
-                limiter.ratio = 10f
-                limiter.postGain = gainDb
+                limiter.ratio = 8f  // Slightly less limiting to let peaks through
+                limiter.postGain = (gainDb * 1.3f).coerceAtMost(30f) // Aggressive output
                 dp.setLimiterByChannelIndex(0, limiter)
 
                 dp.setEnabled(boost > 1.0f)
-                Log.d("SupremeBass", "Applied Elite Boost: ${boost}x (${gainDb}dB + Bass Focus)")
+                Log.d("SupremeBass", "Applied Supreme Boost: ${boost}x (${gainDb}dB + Bass Focus)")
             }
         } catch (e: Exception) {
             Log.e("SupremeBass", "Error applying Elite Audio processing", e)
@@ -337,9 +351,12 @@ class MusicHubViewModel @Inject constructor(
     }
 
     private fun boostToDb(boost: Float): Float {
-        // Simple linear to dB mapping for digital gain
-        // 1x = 0dB, 2x = ~6dB, 3.5x = ~11dB
-        return if (boost <= 1.0f) 0f else (20 * kotlin.math.log10(boost.toDouble())).toFloat()
+        // Exponential curve: each step feels noticeably louder
+        // 1x = 0dB, 2x = 8dB, 4x = 16dB, 7x = 22dB, 10x = 27dB
+        if (boost <= 1.0f) return 0f
+        val normalized = (boost - 1.0f) / 9.0f // 0..1 range
+        // Quadratic curve for perceived loudness increase
+        return (normalized * normalized * 18f + normalized * 12f).coerceAtMost(30f)
     }
 
     fun toggleShuffle() {

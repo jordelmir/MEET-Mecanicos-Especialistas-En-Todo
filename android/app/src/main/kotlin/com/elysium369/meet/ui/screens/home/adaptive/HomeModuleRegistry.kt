@@ -63,7 +63,7 @@ object HomeModuleRegistry {
             listOf(
                 HomeModuleItem("ai_copilot", "IA Especialista", "Diagnóstico guiado por inteligencia", MeetDestinations.AI, HomeSectionCategory.TOOLS, "ai", isHighlight = true),
                 HomeModuleItem("dragon_calc", "DragonCalc Elysium", "Calculadora científica y simbólica", MeetDestinations.DRAGON_CALC, HomeSectionCategory.TOOLS, "dragon_calc", isHighlight = true),
-                HomeModuleItem("nexxus_control", "Elysium Nexxus Control", "Control de dispositivos, IR y Bluetooth", MeetDestinations.NEXUS_CONTROL, HomeSectionCategory.TOOLS, "nexxus_control", isHighlight = true),
+                HomeModuleItem("nexxus_control", "Elysium Nexus Control", "Control de dispositivos, IR y Bluetooth", MeetDestinations.NEXUS_CONTROL, HomeSectionCategory.TOOLS, "nexxus_control", isHighlight = true),
                 HomeModuleItem("screen_mirror", "Elysium ScreenMirror", "Compartir pantalla con consentimiento", MeetDestinations.SCREEN_MIRROR, HomeSectionCategory.TOOLS, "screen_mirror", isHighlight = true),
                 HomeModuleItem("file_manager", "Elysium FileManager", "Archivos, multimedia y almacenamiento", MeetDestinations.FILE_MANAGER, HomeSectionCategory.TOOLS, "file_manager", isHighlight = true),
                 HomeModuleItem("record_shield", "Elysium RecordShield", "Grabación local con aviso visible", MeetDestinations.RECORD_SHIELD, HomeSectionCategory.TOOLS, "record_shield", isHighlight = true),

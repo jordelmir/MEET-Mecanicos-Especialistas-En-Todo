@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -49,79 +50,80 @@ fun DragonKeyboard(
     onNavigate: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var mode by remember { mutableStateOf(KeyboardMode.NUMERIC) }
+    var mode by remember { mutableStateOf(KeyboardMode.NUMPAD) }
 
     val config = LocalConfiguration.current
     val screenHeightDp = config.screenHeightDp
     val screenWidthDp = config.screenWidthDp
 
-    // Adaptive parameters based on screen size
-    // Force 4 columns to preserve the "Calculator" logic (7-8-9 row, etc.)
-    // on all screen sizes, as requested for a "World Class" experience.
+    // Adaptive grid columns: 4 for clean ergonomic calculator layout
     val gridColumns = 4
 
-    // Max keyboard height: never exceed 35% of screen on tall screens,
-    // 40% on medium, 45% on small
+    // Max keyboard height dynamically adjusted to screen
     val maxKeyboardHeightDp = when {
-        screenHeightDp > 800 -> (screenHeightDp * 0.32).dp
-        screenHeightDp > 600 -> (screenHeightDp * 0.38).dp
-        else -> (screenHeightDp * 0.45).dp
+        screenHeightDp > 850 -> (screenHeightDp * 0.35).dp
+        screenHeightDp > 600 -> (screenHeightDp * 0.40).dp
+        else -> (screenHeightDp * 0.48).dp
     }
 
-    // Button height adapts to screen — shorter on larger displays
     val buttonHeight: Dp = when {
-        screenHeightDp > 800 -> 42.dp
-        screenHeightDp > 600 -> 46.dp
+        screenHeightDp > 850 -> 44.dp
+        screenHeightDp > 600 -> 48.dp
         else -> 52.dp
     }
 
-    // Tab text size adapts
-    val tabFontSize = when {
-        screenWidthDp > 600 -> 12.sp
-        else -> 14.sp
-    }
-    val tabVertPadding = when {
-        screenHeightDp > 800 -> 4.dp
-        else -> 8.dp
-    }
-
-    // Button text size adapts
-    val baseFontScale = when {
-        screenHeightDp > 800 -> 0.85f
-        else -> 1f
-    }
+    val tabFontSize = if (screenWidthDp > 600) 11.sp else 12.sp
+    val baseFontScale = if (screenHeightDp > 800) 0.9f else 1f
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(max = maxKeyboardHeightDp) // Hard cap!
-            .background(DragonBlack)
+            .heightIn(max = maxKeyboardHeightDp)
+            .background(Color(0xFF070B12))
+            .border(
+                width = 1.dp,
+                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                    listOf(Color(0xFF00E5FF).copy(alpha = 0.35f), Color.Transparent)
+                ),
+                shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+            )
+            .padding(top = 4.dp)
     ) {
-        // ── Tab Bar (compact on large screens) ──
+        // ── Elysium Cyber Tab Bar ──
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             KeyboardMode.entries.forEach { tabMode ->
                 val isSelected = (mode == tabMode)
+                val label = when (tabMode) {
+                    KeyboardMode.NUMPAD -> "PAD"
+                    KeyboardMode.NUMERIC -> "CALC"
+                    KeyboardMode.SCIENTIFIC -> "SCI"
+                    KeyboardMode.MATRIX -> "MAT"
+                    KeyboardMode.SCRIPT -> "CODE"
+                }
                 Surface(
                     modifier = Modifier
                         .weight(1f)
-                        .padding(horizontal = 2.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(10.dp))
                         .clickable { mode = tabMode },
-                    color = if (isSelected) DragonMidGray else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp)
+                    color = if (isSelected) Color(0xFF00E5FF).copy(alpha = 0.18f) else Color(0xFF0D121D),
+                    shape = RoundedCornerShape(10.dp),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = 1.dp,
+                        color = if (isSelected) Color(0xFF00E5FF) else Color(0x22FFFFFF)
+                    )
                 ) {
                     Text(
-                        text = tabMode.name.take(3),
-                        color = if (isSelected) DragonCyan else DragonGray,
+                        text = label,
+                        color = if (isSelected) Color(0xFF00E5FF) else Color(0xFF7E8B9B),
                         fontSize = tabFontSize,
-                        fontWeight = FontWeight.Bold,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(vertical = tabVertPadding)
+                        modifier = Modifier.padding(vertical = 6.dp)
                     )
                 }
             }
@@ -133,11 +135,12 @@ fun DragonKeyboard(
         AnimatedContent(
             targetState = mode,
             transitionSpec = {
-                fadeIn(animationSpec = tween(200)) togetherWith fadeOut(animationSpec = tween(200))
+                fadeIn(animationSpec = tween(150)) togetherWith fadeOut(animationSpec = tween(150))
             },
             label = "keyboard_anim"
         ) { targetMode ->
             val buttons = when (targetMode) {
+                KeyboardMode.NUMPAD -> DragonKeyboardLayouts.NUMPAD
                 KeyboardMode.NUMERIC -> DragonKeyboardLayouts.NUMERIC
                 KeyboardMode.SCIENTIFIC -> DragonKeyboardLayouts.SCIENTIFIC
                 KeyboardMode.MATRIX -> DragonKeyboardLayouts.MATRIX
@@ -149,7 +152,7 @@ fun DragonKeyboard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 6.dp)
-                    .padding(bottom = 4.dp),
+                    .padding(bottom = 6.dp),
                 contentPadding = PaddingValues(2.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -157,7 +160,7 @@ fun DragonKeyboard(
                 items(buttons, key = { it.label }) { btn ->
                     val onClick = {
                         when (btn.label) {
-                            "AC" -> onClear()
+                            "AC", "C" -> onClear()
                             "DEL" -> onDelete()
                             "=" -> onEquals()
                             "\u2190" -> onNavigate(-1)
@@ -188,22 +191,36 @@ private fun CalcButton(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
-    val bgColor = when (btn.type) {
-        BtnType.EQUAL -> DragonTeal
-        else -> if (isPressed) DragonMidGray else DragonDarkGray
+    val baseBgColor = when (btn.type) {
+        BtnType.EQUAL   -> Color(0xFF00B0FF)
+        BtnType.SPECIAL -> Color(0xFF221118)
+        BtnType.OP      -> Color(0xFF0D1D2B)
+        BtnType.FUNC    -> Color(0xFF1A1329)
+        BtnType.NAV     -> Color(0xFF1B1B26)
+        BtnType.NUM     -> Color(0xFF121722)
+    }
+
+    val borderColor = when (btn.type) {
+        BtnType.EQUAL   -> Color(0xFF00E5FF)
+        BtnType.SPECIAL -> Color(0xFFFF4081).copy(alpha = 0.5f)
+        BtnType.OP      -> Color(0xFF00E5FF).copy(alpha = 0.45f)
+        BtnType.FUNC    -> Color(0xFFB388FF).copy(alpha = 0.45f)
+        BtnType.NAV     -> Color(0xFFFFD700).copy(alpha = 0.45f)
+        BtnType.NUM     -> Color(0x33FFFFFF)
     }
 
     val textColor = when (btn.type) {
-        BtnType.NUM     -> DragonWhite
-        BtnType.OP      -> DragonTeal
-        BtnType.FUNC    -> DragonCyan
-        BtnType.SPECIAL -> DragonOrange
-        BtnType.EQUAL   -> DragonWhite
-        BtnType.NAV     -> DragonOrange
+        BtnType.NUM     -> Color(0xFFF0F4F8)
+        BtnType.OP      -> Color(0xFF00E5FF)
+        BtnType.FUNC    -> Color(0xFFC792EA)
+        BtnType.SPECIAL -> Color(0xFFFF5252)
+        BtnType.EQUAL   -> Color(0xFF000814)
+        BtnType.NAV     -> Color(0xFFFFD700)
     }
 
     val textSize = when {
-        btn.label.length > 2 -> (14 * fontScale).sp
+        btn.label.length > 3 -> (12 * fontScale).sp
+        btn.label.length > 2 -> (13 * fontScale).sp
         btn.type == BtnType.EQUAL -> (22 * fontScale).sp
         btn.type == BtnType.NAV -> (16 * fontScale).sp
         btn.type == BtnType.FUNC -> (13 * fontScale).sp
@@ -212,7 +229,7 @@ private fun CalcButton(
 
     Surface(
         modifier = modifier
-            .height(buttonHeight)    // Fixed height instead of aspectRatio
+            .height(buttonHeight)
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .clickable(
@@ -221,15 +238,18 @@ private fun CalcButton(
                 onClick = onClick
             ),
         shape = RoundedCornerShape(12.dp),
-        color = bgColor,
-        tonalElevation = if (btn.type == BtnType.EQUAL) 8.dp else 2.dp
+        color = if (isPressed) baseBgColor.copy(alpha = 0.7f) else baseBgColor,
+        border = androidx.compose.foundation.BorderStroke(
+            width = if (isPressed) 1.5.dp else 1.dp,
+            color = if (isPressed) Color.White else borderColor
+        )
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
             Text(
                 text = btn.label,
                 color = textColor,
                 fontSize = textSize,
-                fontWeight = if (btn.type == BtnType.EQUAL) FontWeight.Bold else FontWeight.Medium,
+                fontWeight = if (btn.type == BtnType.EQUAL || btn.type == BtnType.SPECIAL) FontWeight.ExtraBold else FontWeight.SemiBold,
                 textAlign = TextAlign.Center
             )
         }

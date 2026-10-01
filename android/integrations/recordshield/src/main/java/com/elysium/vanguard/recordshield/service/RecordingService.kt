@@ -406,36 +406,41 @@ class RecordingService : LifecycleService() {
                         .setResolutionSelector(resolutionSelector)
                         .build()
                 }
+                // Dynamic surface switch — does not interrupt active recording
                 previewUseCase?.setSurfaceProvider(activeSurfaceProvider)
 
-                // Atomic Binding Check: Ensure all necessary use cases are bound without unbinding first
                 val useCasesToBind = mutableListOf<UseCase>()
-                previewUseCase?.let { useCasesToBind.add(it) }
-                if (videoUseCase != null) {
+                previewUseCase?.let { if (!provider.isBound(it)) useCasesToBind.add(it) }
+                if (videoUseCase != null && !provider.isBound(videoUseCase)) {
                     useCasesToBind.add(videoUseCase)
                 }
 
                 if (useCasesToBind.isNotEmpty()) {
                     try {
-                        // Atomic Binding: Ensure all necessary use cases are bound.
-                        // We use an explicit Typed Array to avoid Kotlin vararg inference issues.
                         val useCaseArray = useCasesToBind.toTypedArray()
                         provider.bindToLifecycle(
                             currentLifecycleOwner,
                             CameraSelector.DEFAULT_BACK_CAMERA,
                             *useCaseArray
                         )
-                        Log.d(TAG, "Camera Atomic Binding: ${if (isScreenOff) "BACKGROUND" else "UI"} mode active")
+                        Log.d(TAG, "Camera Binding: ${if (isScreenOff) "BACKGROUND" else "UI"} mode bound")
                     } catch (e: Exception) {
-                        Log.e(TAG, "Atomic bind failed - attempting standard recovery", e)
-                        // Emergency recovery: Some sensors can't handle live binding switches
-                        provider.unbindAll()
-                        provider.bindToLifecycle(
-                            currentLifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            *useCasesToBind.toTypedArray()
-                        )
+                        Log.e(TAG, "Bind to lifecycle failed", e)
+                        if (!_isRecording.value) {
+                            try {
+                                provider.unbindAll()
+                                provider.bindToLifecycle(
+                                    currentLifecycleOwner,
+                                    CameraSelector.DEFAULT_BACK_CAMERA,
+                                    *useCasesToBind.toTypedArray()
+                                )
+                            } catch (e2: Exception) {
+                                Log.e(TAG, "Recovery bind failed", e2)
+                            }
+                        }
                     }
+                } else {
+                    Log.d(TAG, "Camera use cases already bound, updated surface provider to ${if (isScreenOff || uiSurfaceProvider == null) "MOCK" else "UI"}")
                 }
 
             } catch (e: Exception) {

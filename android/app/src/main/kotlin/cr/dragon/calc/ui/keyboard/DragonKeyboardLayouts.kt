@@ -12,6 +12,25 @@ data class CalcBtn(
 
 object DragonKeyboardLayouts {
 
+    val NUMPAD = listOf(
+        CalcBtn("C", "", BtnType.SPECIAL),
+        CalcBtn("DEL", "", BtnType.SPECIAL),
+        CalcBtn("%", " % ", BtnType.OP),
+        CalcBtn("\u00F7", " / ", BtnType.OP),
+
+        CalcBtn("7"), CalcBtn("8"), CalcBtn("9"),
+        CalcBtn("\u00D7", " * ", BtnType.OP),
+
+        CalcBtn("4"), CalcBtn("5"), CalcBtn("6"),
+        CalcBtn("-", " - ", BtnType.OP),
+
+        CalcBtn("1"), CalcBtn("2"), CalcBtn("3"),
+        CalcBtn("+", " + ", BtnType.OP),
+
+        CalcBtn("00"), CalcBtn("0"), CalcBtn("."),
+        CalcBtn("=", "", BtnType.EQUAL)
+    )
+
     val NUMERIC = listOf(
         CalcBtn("AC", "", BtnType.SPECIAL),
         CalcBtn("DEL", "", BtnType.SPECIAL),

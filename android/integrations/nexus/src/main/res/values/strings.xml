@@ -4,7 +4,7 @@
       Bilingual strings: English + Spanish per project convention.
       The Spanish translation lives in res/values-es/strings.xml.
     -->
-    <string name="app_name">Elysium Nexus</string>
+    <string name="app_name">Elysium Vanguard AI OS</string>
 
     <!--
       Phase 1.2 — Editor toolbar.

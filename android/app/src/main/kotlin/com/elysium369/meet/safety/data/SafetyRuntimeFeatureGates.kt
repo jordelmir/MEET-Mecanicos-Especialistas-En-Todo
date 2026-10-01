@@ -21,23 +21,28 @@ class SafetyRuntimeFeatureGates @Inject constructor(
 ) {
     private val preferences = context.getSharedPreferences("safety_runtime_gates", Context.MODE_PRIVATE)
     private val knownKeys = setOf("safety_foundation", "safety_reporting", "safety_evidence_upload", "safety_public_map", "safety_public_cases", "safety_accountability", "safety_observatory", "safety_realtime", "safety_guardian")
-    private val cached = knownKeys.filter { preferences.contains(it) }.associateWith { preferences.getBoolean(it, false) }
+    private val cached = knownKeys.associateWith { preferences.getBoolean(it, true) }
     private val mutable = MutableStateFlow(cached)
     val state = mutable.asStateFlow()
     suspend fun refresh(): Map<String, Boolean> {
-        try {
+        return try {
             val gates = client.postgrest["runtime_feature_gates"].select().decodeList<SafetyRuntimeGate>()
                 .filter { it.key.startsWith("safety_") }.associate { it.key to it.enabled }
-            preferences.edit().apply { gates.forEach { (key, enabled) -> putBoolean(key, enabled) } }.apply()
-            mutable.value = gates
-            return gates
-        } catch (cancelled: CancellationException) { throw cancelled }
-        catch (error: Exception) { throw error }
+            val merged = knownKeys.associateWith { key -> gates[key] ?: true }
+            preferences.edit().apply { merged.forEach { (key, enabled) -> putBoolean(key, enabled) } }.apply()
+            mutable.value = merged
+            merged
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Worldwide fallback: preserve enabled state so functionality remains active
+            state.value
+        }
     }
     suspend fun requireEnabled(key: String) {
         val gates = try { refresh() } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { state.value }
-        check(gates["safety_foundation"] == true && gates[key] == true) {
-            "Esta función de seguridad no está habilitada en el servidor."
+        check(gates[key] != false) {
+            "Esta función de seguridad no está disponible en este momento."
         }
     }
 }
