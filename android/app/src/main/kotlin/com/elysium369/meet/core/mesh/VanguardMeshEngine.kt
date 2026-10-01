@@ -260,22 +260,12 @@ class VanguardMeshEngine {
             payloadSizeBytes = encryptedPayload.length,
         )
 
-        // Check if recipient is a nearby peer
-        val nearbyRecipient = peers.firstOrNull {
-            it.fingerprint == recipientFingerprint &&
-                it.connectionState == PeerConnectionState.DATA_CHANNEL
-        }
-
-        if (nearbyRecipient != null) {
-            // Direct delivery
-            deliveredIds.add(message.messageId)
-        } else {
-            // Store for relay
-            messageStore.add(message)
-            localNode = localNode?.copy(
-                messagesInCustody = messageStore.count { it.isDeliverable },
-            )
-        }
+        // Presence of a connected peer does NOT synthesize delivery acknowledgment.
+        // Direct messages are queued in custody until cryptographically or physically acknowledged.
+        messageStore.add(message)
+        localNode = localNode?.copy(
+            messagesInCustody = messageStore.count { it.isDeliverable },
+        )
 
         return message
     }
@@ -335,7 +325,6 @@ class VanguardMeshEngine {
         val forwarded = message.forwarded()
         messageStore.add(forwarded)
         localNode = localNode?.copy(
-            messagesRelayed = (localNode?.messagesRelayed ?: 0) + 1,
             messagesInCustody = messageStore.count { it.isDeliverable },
         )
         return RelayDecision.ACCEPTED
