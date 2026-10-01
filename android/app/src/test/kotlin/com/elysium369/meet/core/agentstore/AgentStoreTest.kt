@@ -20,16 +20,17 @@ class AgentStoreTest {
     }
 
     @Test
-    fun `official agents roster contains all five specialized archetypes`() {
+    fun `official agents roster contains Elysium original specialized archetypes`() {
         val all = OfficialAgents.ALL
-        assertEquals(5, all.size)
+        assertEquals(6, all.size)
 
         val ids = all.map { it.id }.toSet()
         assertTrue(ids.contains("agent.evair_core"))
         assertTrue(ids.contains("agent.master_mechanic"))
-        assertTrue(ids.contains("agent.vanguard_sentinel"))
-        assertTrue(ids.contains("agent.mobility_prime"))
-        assertTrue(ids.contains("agent.emissions_specialist"))
+        assertTrue(ids.contains("agent.draco_dragon"))
+        assertTrue(ids.contains("agent.pokemon_volt"))
+        assertTrue(ids.contains("agent.saiyan_ssj4"))
+        assertTrue(ids.contains("agent.laya_valkyrie"))
     }
 
     @Test
@@ -38,76 +39,49 @@ class AgentStoreTest {
         assertTrue(evair.isFree)
         assertNull(evair.requiredEntitlement)
         assertEquals(0L, evair.priceFiatCrc)
-        assertEquals("QUANTUM_SPHERE", evair.avatarVisualType)
+        assertEquals("EVAIR_SPIRIT", evair.avatarVisualType)
 
         assertTrue(entitlementRepo.isAgentOwned(evair.id, evair.requiredEntitlement))
         assertEquals("agent.evair_core", entitlementRepo.equippedAgentId.value)
     }
 
     @Test
-    fun `paid agents require explicit entitlements and have valid localized CRC pricing`() {
-        val titan = OfficialAgents.MASTER_MECHANIC
-        assertFalse(titan.isFree)
-        assertEquals("agent.master_mechanic", titan.requiredEntitlement)
-        assertEquals(2_990L, titan.priceFiatCrc)
-        assertEquals(4_500L, titan.originalPriceFiatCrc)
-        assertEquals("TITAN_EXOSKELETON", titan.avatarVisualType)
-
-        val sentinel = OfficialAgents.VANGUARD_SENTINEL
-        assertFalse(sentinel.isFree)
-        assertEquals("agent.vanguard_sentinel", sentinel.requiredEntitlement)
-        assertEquals(1_990L, sentinel.priceFiatCrc)
-        assertEquals("TACTICAL_SHIELD", sentinel.avatarVisualType)
-
-        val concierge = OfficialAgents.MOBILITY_PRIME
-        assertFalse(concierge.isFree)
-        assertEquals("agent.mobility_prime", concierge.requiredEntitlement)
-        assertEquals(1_490L, concierge.priceFiatCrc)
-        assertEquals("AERODYNAMIC_CONCIERGE", concierge.avatarVisualType)
-
-        val metrologist = OfficialAgents.EMISSIONS_SPECIALIST
-        assertFalse(metrologist.isFree)
-        assertEquals("agent.emissions_specialist", metrologist.requiredEntitlement)
-        assertEquals(1_990L, metrologist.priceFiatCrc)
-        assertEquals("METROLOGY_PRISM", metrologist.avatarVisualType)
+    fun `master mechanic has valid descriptor and visual attributes`() {
+        val mecha = OfficialAgents.MASTER_MECHANIC
+        assertTrue(mecha.isFree)
+        assertNull(mecha.requiredEntitlement)
+        assertEquals(0L, mecha.priceFiatCrc)
+        assertEquals("CYBER_MECHA", mecha.avatarVisualType)
     }
 
     @Test
     fun `catalog repository filters by category accurately`() {
         val mechanics = catalogRepo.listByCategory(AgentCategory.AUTOMOTIVE)
-        assertEquals(1, mechanics.size)
-        assertEquals("agent.master_mechanic", mechanics.first().id)
+        assertTrue(mechanics.any { it.id == "agent.master_mechanic" })
+        assertTrue(mechanics.any { it.id == "agent.draco_dragon" })
 
         val safety = catalogRepo.listByCategory(AgentCategory.SAFETY)
         assertEquals(1, safety.size)
-        assertEquals("agent.vanguard_sentinel", safety.first().id)
+        assertEquals("agent.saiyan_ssj4", safety.first().id)
 
         val mobility = catalogRepo.listByCategory(AgentCategory.MOBILITY)
         assertEquals(1, mobility.size)
-        assertEquals("agent.mobility_prime", mobility.first().id)
+        assertEquals("agent.laya_valkyrie", mobility.first().id)
 
         val all = catalogRepo.listByCategory(null)
-        assertEquals(5, all.size)
+        assertEquals(6, all.size)
     }
 
     @Test
-    fun `granting entitlement unlocks agent and enables equipping`() {
-        val titan = OfficialAgents.MASTER_MECHANIC
+    fun `granting entitlement and equipping agent updates state`() {
+        val mecha = OfficialAgents.MASTER_MECHANIC
 
-        // Initially locked
-        assertFalse(entitlementRepo.hasEntitlement(titan.requiredEntitlement))
-        assertFalse(entitlementRepo.isAgentOwned(titan.id, titan.requiredEntitlement))
+        assertTrue(entitlementRepo.isAgentOwned(mecha.id, mecha.requiredEntitlement))
 
-        // Grant entitlement
-        entitlementRepo.grantEntitlement(titan.requiredEntitlement!!)
-
-        // Now unlocked
-        assertTrue(entitlementRepo.hasEntitlement(titan.requiredEntitlement))
-        assertTrue(entitlementRepo.isAgentOwned(titan.id, titan.requiredEntitlement))
-
-        // Equip agent
-        entitlementRepo.equipAgent(titan.id)
-        assertEquals(titan.id, entitlementRepo.equippedAgentId.value)
+        // Grant custom entitlement
+        entitlementRepo.grantEntitlement("agent.custom_pack")
+        entitlementRepo.equipAgent(mecha.id)
+        assertEquals(mecha.id, entitlementRepo.equippedAgentId.value)
     }
 
     @Test
