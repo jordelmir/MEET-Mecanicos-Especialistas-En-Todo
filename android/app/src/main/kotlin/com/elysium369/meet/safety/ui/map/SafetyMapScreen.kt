@@ -375,13 +375,18 @@ private fun PublicPointDetail(
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         val isDrug = point.category == "DRUG_SALE_ACTIVITY" || point.category.contains("DRUG", ignoreCase = true)
         val isMissing = point.category == "MISSING_PERSON" || point.category.contains("MISSING", ignoreCase = true)
-        if (isDrug || isMissing) {
+        val isHomicide = point.category == "HOMICIDE" || point.category.contains("HOMICID", ignoreCase = true)
+        if (isDrug || isMissing || isHomicide) {
             item {
                 DrugMarketImpunityClockCard(
                     pointId = point.publicPointId,
                     initialReportedAt = point.firstDocumentedAt ?: point.publishedAt,
                     store = store,
-                    clockType = if (isMissing) com.elysium369.meet.safety.drugimpunity.ImpunityClockType.MISSING_PERSON else com.elysium369.meet.safety.drugimpunity.ImpunityClockType.DRUG_SALE,
+                    clockType = when {
+                        isMissing -> com.elysium369.meet.safety.drugimpunity.ImpunityClockType.MISSING_PERSON
+                        isHomicide -> com.elysium369.meet.safety.drugimpunity.ImpunityClockType.HOMICIDE
+                        else -> com.elysium369.meet.safety.drugimpunity.ImpunityClockType.DRUG_SALE
+                    },
                 )
             }
         }
@@ -488,13 +493,18 @@ private fun PrivateReportDetailSheet(
     ) {
         val isDrug = point.category == "DRUG_SALE_ACTIVITY" || point.category.contains("DRUG", ignoreCase = true)
         val isMissing = point.category == "MISSING_PERSON" || point.category.contains("MISSING", ignoreCase = true)
-        if (isDrug || isMissing) {
+        val isHomicide = point.category == "HOMICIDE" || point.category.contains("HOMICID", ignoreCase = true)
+        if (isDrug || isMissing || isHomicide) {
             item {
                 DrugMarketImpunityClockCard(
                     pointId = point.reportId,
                     initialReportedAt = point.occurredAt.takeIf { it > 0 } ?: point.createdAt,
                     store = store,
-                    clockType = if (isMissing) com.elysium369.meet.safety.drugimpunity.ImpunityClockType.MISSING_PERSON else com.elysium369.meet.safety.drugimpunity.ImpunityClockType.DRUG_SALE,
+                    clockType = when {
+                        isMissing -> com.elysium369.meet.safety.drugimpunity.ImpunityClockType.MISSING_PERSON
+                        isHomicide -> com.elysium369.meet.safety.drugimpunity.ImpunityClockType.HOMICIDE
+                        else -> com.elysium369.meet.safety.drugimpunity.ImpunityClockType.DRUG_SALE
+                    },
                 )
             }
         }

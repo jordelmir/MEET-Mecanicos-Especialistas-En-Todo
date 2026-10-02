@@ -16,6 +16,7 @@ import javax.inject.Singleton
 enum class ImpunityClockType {
     DRUG_SALE,
     MISSING_PERSON,
+    HOMICIDE,
 }
 
 @Serializable

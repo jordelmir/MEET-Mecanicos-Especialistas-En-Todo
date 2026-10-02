@@ -124,6 +124,7 @@ fun DrugMarketImpunityClockCard(
     val seconds = totalSeconds % 60
 
     val isMissingPerson = clockType == ImpunityClockType.MISSING_PERSON
+    val isHomicide = clockType == ImpunityClockType.HOMICIDE
 
     // Pulsing indicator
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -134,16 +135,22 @@ fun DrugMarketImpunityClockCard(
         label = "pulse_alpha",
     )
 
-    val activeColor = if (isMissingPerson) Color(0xFFFF9100) else Color(0xFFFF1744)
+    val activeColor = when {
+        isHomicide -> Color(0xFFFF1744)
+        isMissingPerson -> Color(0xFFFF9100)
+        else -> Color(0xFFFF5252)
+    }
     val containerBg = when {
         record.isIntervened -> Color(0xFF071B1E)
+        isHomicide -> Color(0xFF220508)
         isMissingPerson -> Color(0xFF1E1305)
         else -> Color(0xFF1F0B0E)
     }
     val borderColor = when {
         record.isIntervened -> MeetColors.neonGreen.copy(alpha = 0.6f)
+        isHomicide -> Color(0xFFFF1744).copy(alpha = 0.85f)
         isMissingPerson -> Color(0xFFFF9100).copy(alpha = 0.8f)
-        else -> Color(0xFFFF1744).copy(alpha = 0.8f)
+        else -> Color(0xFFFF5252).copy(alpha = 0.8f)
     }
 
     Card(
@@ -174,8 +181,10 @@ fun DrugMarketImpunityClockCard(
                     )
                     Text(
                         text = when {
+                            record.isIntervened && isHomicide -> "JUSTICIA Y CAPTURA VERIFICADA (PRENSA)"
                             record.isIntervened && isMissingPerson -> "PERSONA LOCALIZADA (CONFIRMADO POR PRENSA)"
                             record.isIntervened -> "ACCIÓN OFICIAL VERIFICADA"
+                            isHomicide -> "HOMICIDIO IMPUNE · SIN JUSTICIA NI CAPTURAS"
                             isMissingPerson -> "BÚSQUEDA ACTIVA · PERSONA NO LOCALIZADA"
                             else -> "CRONÓMETRO DE INACCIÓN"
                         },
@@ -186,7 +195,7 @@ fun DrugMarketImpunityClockCard(
                     )
                 }
 
-                if (record.cycleCount > 1 && !isMissingPerson) {
+                if (record.cycleCount > 1 && !isMissingPerson && !isHomicide) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
@@ -239,8 +248,10 @@ fun DrugMarketImpunityClockCard(
 
                 Text(
                     text = when {
+                        record.isIntervened && isHomicide -> "TIEMPO TRANSCURRIDO HASTA LA CAPTURA / ESCLARECIMIENTO"
                         record.isIntervened && isMissingPerson -> "TIEMPO TRANSCURRIDO HASTA LA LOCALIZACIÓN"
                         record.isIntervened -> "TIEMPO TRANSCURRIDO HASTA LA INTERVENCIÓN"
+                        isHomicide -> "TIEMPO TRANSCURRIDO SIN JUSTICIA NI CAPTURAS"
                         isMissingPerson -> "TIEMPO DESDE LA DESAPARICIÓN REPORTADA"
                         else -> "TIEMPO PERMITIDO SIN INTERVENCIÓN EFECTIVA"
                     },
@@ -254,11 +265,17 @@ fun DrugMarketImpunityClockCard(
             // Mandatory Legend
             Text(
                 text = when {
+                    record.isIntervened && isHomicide -> {
+                        "Las autoridades esclarecieron el homicidio y aprehendieron a los responsables tras ${formatDurationText(years, months, days, hours, minutes)}. Cobertura periodística certificada."
+                    }
                     record.isIntervened && isMissingPerson -> {
                         "Persona localizada tras ${formatDurationText(years, months, days, hours, minutes)} de búsqueda. Confirmado oficialmente con cobertura periodística."
                     }
                     record.isIntervened -> {
                         "Las autoridades intervinieron este punto tras ${formatDurationText(years, months, days, hours, minutes)}. Cobertura periodística certificada."
+                    }
+                    isHomicide -> {
+                        "Las autoridades han permanecido sin capturar a los perpetradores ni esclarecer este homicidio en esta ubicación durante este tiempo desde la fecha del reporte."
                     }
                     isMissingPerson -> {
                         "Tiempo transcurrido desde la desaparición reportada. Persona aún no localizada. La búsqueda ciudadana continúa activa."
@@ -318,7 +335,11 @@ fun DrugMarketImpunityClockCard(
                                 Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    if (isMissingPerson) "VER NOTICIA DE LA LOCALIZACIÓN" else "VER NOTICIA DEL OPERATIVO",
+                                    when {
+                                        isHomicide -> "VER NOTICIA DE LA CAPTURA"
+                                        isMissingPerson -> "VER NOTICIA DE LA LOCALIZACIÓN"
+                                        else -> "VER NOTICIA DEL OPERATIVO"
+                                    },
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
                                 )
@@ -345,7 +366,11 @@ fun DrugMarketImpunityClockCard(
                         .height(48.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isMissingPerson) Color(0xFFE65100) else Color(0xFFC62828),
+                        containerColor = when {
+                            isHomicide -> Color(0xFFB71C1C)
+                            isMissingPerson -> Color(0xFFE65100)
+                            else -> Color(0xFFC62828)
+                        },
                         contentColor = Color.White,
                     ),
                 ) {
@@ -356,12 +381,16 @@ fun DrugMarketImpunityClockCard(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        if (isMissingPerson) "DETENER CONTADOR (PERSONA APARECIÓ - PRENSA)" else "DETENER CONTADOR (PRENSA / PERIODISTAS)",
+                        when {
+                            isHomicide -> "DETENER CONTADOR (JUSTICIA / CAPTURA - PRENSA)"
+                            isMissingPerson -> "DETENER CONTADOR (PERSONA APARECIÓ - PRENSA)"
+                            else -> "DETENER CONTADOR (PRENSA / PERIODISTAS)"
+                        },
                         fontWeight = FontWeight.Black,
                         fontSize = 11.sp,
                     )
                 }
-            } else if (!isMissingPerson) {
+            } else if (!isMissingPerson && !isHomicide) {
                 // Drug sales can be reactivated by community
                 Button(
                     onClick = { showReactivationModal = true },
@@ -399,20 +428,20 @@ fun DrugMarketImpunityClockCard(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        if (isMissingPerson) {
-                            "Por seguridad fáctica, solo periodistas y medios de comunicación registrados pueden certificar oficialmente la localización de una persona desaparecida y detener el contador."
-                        } else {
-                            "Por protocolo de seguridad y rigor de rendición de cuentas, solo periodistas y medios de comunicación registrados pueden certificar la intervención de las autoridades y detener el cronómetro."
+                        when {
+                            isHomicide -> "Por protocolo de rigor fáctico y justicia ciudadana, solo periodistas y medios de comunicación registrados pueden certificar la captura oficial de responsables o esclarecimiento del homicidio y detener el contador."
+                            isMissingPerson -> "Por seguridad fáctica, solo periodistas y medios de comunicación registrados pueden certificar oficialmente la localización de una persona desaparecida y detener el contador."
+                            else -> "Por protocolo de seguridad y rigor de rendición de cuentas, solo periodistas y medios de comunicación registrados pueden certificar la intervención de las autoridades y detener el cronómetro."
                         },
                         fontSize = 13.sp,
                         color = MeetColors.textSecondary,
                         lineHeight = 18.sp,
                     )
                     Text(
-                        if (isMissingPerson) {
-                            "Esto evita que agresores o terceras personas difundan falsamente que la persona ya apareció para frenar las labores de búsqueda."
-                        } else {
-                            "Esto impide que los vendedores o terceras personas intenten apagar el contador alegando falsamente que ya no operan."
+                        when {
+                            isHomicide -> "Esto evita que sicarios, cómplices o personas interesadas intenten silenciar el contador alegando falsamente que el caso ya fue resuelto."
+                            isMissingPerson -> "Esto evita que agresores o terceras personas difundan falsamente que la persona ya apareció para frenar las labores de búsqueda."
+                            else -> "Esto impide que los vendedores o terceras personas intenten apagar el contador alegando falsamente que ya no operan."
                         },
                         fontSize = 12.sp,
                         color = Color(0xFFFFCDD2),
@@ -530,7 +559,11 @@ fun DrugMarketImpunityClockCard(
             },
             title = {
                 Text(
-                    if (isMissingPerson) "Certificar Persona Localizada" else "Certificar Intervención de Autoridades",
+                    when {
+                        isHomicide -> "Certificar Captura o Esclarecimiento en Homicidio"
+                        isMissingPerson -> "Certificar Persona Localizada"
+                        else -> "Certificar Intervención de Autoridades"
+                    },
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = MeetColors.textPrimary,
@@ -545,10 +578,10 @@ fun DrugMarketImpunityClockCard(
                         color = MeetColors.cyberCyan,
                     )
                     Text(
-                        if (isMissingPerson) {
-                            "Al confirmar, el cronómetro de búsqueda se detendrá con la fecha actual y se publicará tu titular confirmando que la persona fue localizada."
-                        } else {
-                            "Al confirmar, el cronómetro de inacción se detendrá con la fecha actual y se publicará tu titular en este punto."
+                        when {
+                            isHomicide -> "Al confirmar, el cronómetro de impunidad se detendrá con la fecha actual y se publicará tu titular confirmando la captura o resolución judicial de este homicidio."
+                            isMissingPerson -> "Al confirmar, el cronómetro de búsqueda se detendrá con la fecha actual y se publicará tu titular confirmando que la persona fue localizada."
+                            else -> "Al confirmar, el cronómetro de inacción se detendrá con la fecha actual y se publicará tu titular en este punto."
                         },
                         fontSize = 12.sp,
                         color = MeetColors.textSecondary,
@@ -559,13 +592,21 @@ fun DrugMarketImpunityClockCard(
                         onValueChange = { headlineInput = it },
                         label = {
                             Text(
-                                if (isMissingPerson) "Titular de la Localización" else "Titular o Resumen del Operativo",
+                                when {
+                                    isHomicide -> "Titular de la Captura / Esclarecimiento Judicial"
+                                    isMissingPerson -> "Titular de la Localización"
+                                    else -> "Titular o Resumen del Operativo"
+                                },
                                 fontSize = 12.sp,
                             )
                         },
                         placeholder = {
                             Text(
-                                if (isMissingPerson) "Ej. OIJ y familiares confirman localización en buen estado" else "Ej. OIJ y Fuerza Pública allanan búnker y decomisan droga",
+                                when {
+                                    isHomicide -> "Ej. OIJ y Fiscalía capturan a sospechosos de homicidio en allanamiento"
+                                    isMissingPerson -> "Ej. OIJ y familiares confirman localización en buen estado"
+                                    else -> "Ej. OIJ y Fuerza Pública allanan búnker y decomisan droga"
+                                },
                                 fontSize = 12.sp,
                             )
                         },
@@ -601,7 +642,14 @@ fun DrugMarketImpunityClockCard(
                     enabled = headlineInput.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black),
                 ) {
-                    Text(if (isMissingPerson) "CERTIFICAR HALLAZGO" else "DETENER CRONÓMETRO", fontWeight = FontWeight.Bold)
+                    Text(
+                        when {
+                            isHomicide -> "CERTIFICAR CAPTURA / JUSTICIA"
+                            isMissingPerson -> "CERTIFICAR HALLAZGO"
+                            else -> "DETENER CRONÓMETRO"
+                        },
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             },
             dismissButton = {
