@@ -170,7 +170,12 @@ fun SafetyMyReportsScreen(
                     items(state.reports, key = { it.reportId }) { report ->
                         val evidence = state.evidenceByReport[report.reportId] ?: emptyList()
                         val privatePoint = state.privatePointsByReport[report.reportId]
-                        val videoUrls = privatePoint?.videoUrls ?: emptyList()
+                        val narrativeUrls = remember(privatePoint?.narrative) {
+                            privatePoint?.narrative?.let { nar ->
+                                Regex("""(https?://[^\s]+)""").findAll(nar).map { it.value.trimEnd('.', ',', ';', ')', ']', '>') }.toList()
+                            } ?: emptyList()
+                        }
+                        val videoUrls = ((privatePoint?.videoUrls ?: emptyList()) + narrativeUrls).filter { it.isNotBlank() }.distinct()
                         AnimatedVisibility(
                             visible = true,
                             enter = fadeIn() + slideInVertically { it / 4 },
@@ -189,9 +194,20 @@ fun SafetyMyReportsScreen(
                                         val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                         }
-                                        context.startActivity(Intent.createChooser(intent, "Ver video"))
-                                    } catch (e: Exception) {
-                                        android.util.Log.e("SafetyMyReports", "Error opening video $url", e)
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                        try {
+                                            val uri = Uri.parse(url)
+                                            val chooser = Intent.createChooser(
+                                                Intent(Intent.ACTION_VIEW, uri).apply {
+                                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                },
+                                                "Ver video"
+                                            )
+                                            context.startActivity(chooser)
+                                        } catch (e: Exception) {
+                                            android.util.Log.e("SafetyMyReports", "Error opening video $url", e)
+                                        }
                                     }
                                 },
                             )

@@ -962,15 +962,14 @@ private fun StepEvidence(
                 }
             }
 
-            var videoInputText by remember { mutableStateOf("") }
             Row(
                 Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 OutlinedTextField(
-                    value = videoInputText,
-                    onValueChange = { videoInputText = it },
+                    value = state.videoInputText,
+                    onValueChange = { viewModel.updateVideoInputText(it) },
                     placeholder = { Text("Pega el link del video...", fontSize = 11.sp, color = MeetColors.textMuted) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
@@ -985,13 +984,8 @@ private fun StepEvidence(
                     textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
                 )
                 Button(
-                    onClick = {
-                        if (videoInputText.isNotBlank()) {
-                            viewModel.addVideoUrl(videoInputText)
-                            videoInputText = ""
-                        }
-                    },
-                    enabled = videoInputText.isNotBlank(),
+                    onClick = { viewModel.commitVideoInput() },
+                    enabled = state.videoInputText.isNotBlank(),
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MeetColors.neonGreen,

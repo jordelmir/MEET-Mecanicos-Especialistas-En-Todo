@@ -357,6 +357,7 @@ fun SafetyMapScreen(
     matchedPublic?.let { point ->
         val regionPoints = state.points.filter { it.regionKey() == point.regionKey() }
         val evidenceList = state.evidenceByReport[point.publicPointId] ?: emptyList()
+        val matchingPrivate = state.privatePoints.firstOrNull { it.reportId.equals(point.publicPointId, ignoreCase = true) }
         ModalBottomSheet(
             onDismissRequest = { selectedId = null },
             containerColor = MeetColors.cardBackground,
@@ -368,6 +369,7 @@ fun SafetyMapScreen(
                 totalCount = regionPoints.size,
                 store = impunityStore,
                 evidenceList = evidenceList,
+                matchingPrivate = matchingPrivate,
                 onClose = { selectedId = null },
                 onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId) },
                 onLoadThumbnail = { evidenceId -> viewModel.loadEvidenceThumbnail(evidenceId) },
@@ -400,6 +402,7 @@ private fun PublicPointDetail(
     totalCount: Int,
     store: DrugMarketImpunityStore,
     evidenceList: List<SafetyEvidenceEntity> = emptyList(),
+    matchingPrivate: SafetyPrivateMapPoint? = null,
     onClose: () -> Unit = {},
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit = {},
     onLoadThumbnail: suspend (String) -> ByteArray? = { null },
@@ -411,15 +414,27 @@ private fun PublicPointDetail(
     }.getOrDefault(point.category.replace("_", " "))
 
     val context = LocalContext.current
-    // Extract video URLs if any in label
+    // Extract video URLs if any in label or matching private report
     val urlRegex = remember { Regex("""(https?://[^\s]+)""") }
-    val videoUrls = remember(point.label) {
-        urlRegex.findAll(point.label).map { it.value }.toList()
+    val labelUrls = remember(point.label) {
+        urlRegex.findAll(point.label).map { it.value.trimEnd('.', ',', ';', ')', ']', '>') }.toList()
+    }
+    val privateUrls = matchingPrivate?.videoUrls ?: emptyList()
+    val privateNarrativeUrls = remember(matchingPrivate?.narrative) {
+        matchingPrivate?.narrative?.let { nar ->
+            urlRegex.findAll(nar).map { it.value.trimEnd('.', ',', ';', ')', ']', '>') }.toList()
+        } ?: emptyList()
+    }
+    val videoUrls = remember(labelUrls, privateUrls, privateNarrativeUrls) {
+        (labelUrls + privateUrls + privateNarrativeUrls).filter { it.isNotBlank() }.distinct()
     }
     val cleanNarrative = remember(point.label, videoUrls) {
         var text = point.label
         videoUrls.forEach { u -> text = text.replace(u, "").trim() }
-        text.ifBlank { point.label }
+        text.replace("[VIDEOS ADJUNTOS]", "")
+            .replace("[VIDEOS]", "")
+            .trim()
+            .ifBlank { point.label }
     }
 
     LazyColumn(
@@ -730,28 +745,43 @@ private fun PublicPointDetail(
         }
 
         // === 8. Videos adjuntos por enlace (One-click launch!) ===
-        if (videoUrls.isNotEmpty()) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Videocam, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "VIDEOS ADJUNTOS (${videoUrls.size})",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            color = MeetColors.neonGreen,
-                            letterSpacing = 1.sp,
-                        )
-                    }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Videocam, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "VIDEOS ADJUNTOS (${videoUrls.size})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MeetColors.neonGreen,
+                        letterSpacing = 1.sp,
+                    )
+                }
+                if (videoUrls.isNotEmpty()) {
                     Text(
                         "Toca el enlace para reproducir el video directamente en YouTube, TikTok, Drive o navegador:",
                         fontSize = 11.sp,
                         color = MeetColors.textSecondary,
                     )
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                    ) {
+                        Text(
+                            "No se adjuntaron enlaces de video a este reporte.",
+                            fontSize = 12.sp,
+                            color = MeetColors.textMuted,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
                 }
             }
+        }
 
+        if (videoUrls.isNotEmpty()) {
             items(videoUrls) { url ->
                 VideoLinkCard(
                     url = url,
@@ -837,6 +867,23 @@ private fun PrivateReportDetailSheet(
     val sourceRelationEnum = runCatching { SourceRelation.valueOf(point.sourceRelation) }.getOrNull()
     val sourceBadge = sourceRelationEnum?.toObservatoryBadge()
     val context = LocalContext.current
+
+    // Extract video URLs if any in narrative or point.videoUrls
+    val urlRegex = remember { Regex("""(https?://[^\s]+)""") }
+    val narrativeUrls = remember(point.narrative) {
+        urlRegex.findAll(point.narrative).map { it.value.trimEnd('.', ',', ';', ')', ']', '>') }.toList()
+    }
+    val allVideoUrls = remember(point.videoUrls, narrativeUrls) {
+        (point.videoUrls + narrativeUrls).filter { it.isNotBlank() }.distinct()
+    }
+    val cleanNarrative = remember(point.narrative, allVideoUrls) {
+        var text = point.narrative
+        allVideoUrls.forEach { u -> text = text.replace(u, "").trim() }
+        text.replace("[VIDEOS ADJUNTOS]", "")
+            .replace("[VIDEOS]", "")
+            .trim()
+            .ifBlank { point.narrative }
+    }
 
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
@@ -1056,9 +1103,9 @@ private fun PrivateReportDetailSheet(
                             letterSpacing = 1.sp,
                         )
                     }
-                    if (point.narrative.isNotBlank()) {
+                    if (cleanNarrative.isNotBlank()) {
                         Text(
-                            "${point.narrative.length} caracteres",
+                            "${cleanNarrative.length} caracteres",
                             fontSize = 10.sp,
                             color = MeetColors.textMuted,
                         )
@@ -1072,7 +1119,7 @@ private fun PrivateReportDetailSheet(
                     border = BorderStroke(1.dp, MeetColors.borderSubtle),
                 ) {
                     Text(
-                        text = if (point.narrative.isNotBlank()) point.narrative else "Sin descripción narrativa proporcionada.",
+                        text = if (cleanNarrative.isNotBlank()) cleanNarrative else "Sin descripción narrativa proporcionada.",
                         color = MeetColors.textPrimary,
                         fontSize = 14.sp,
                         lineHeight = 22.sp,
@@ -1124,29 +1171,44 @@ private fun PrivateReportDetailSheet(
         }
 
         // === 8. VIDEOS ADJUNTOS POR ENLACE ===
-        if (point.videoUrls.isNotEmpty()) {
-            item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Videocam, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            "VIDEOS ADJUNTOS (${point.videoUrls.size})",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            color = MeetColors.neonGreen,
-                            letterSpacing = 1.sp,
-                        )
-                    }
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Videocam, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "VIDEOS ADJUNTOS (${allVideoUrls.size})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MeetColors.neonGreen,
+                        letterSpacing = 1.sp,
+                    )
+                }
+                if (allVideoUrls.isNotEmpty()) {
                     Text(
                         "Toca el enlace para reproducir el video directamente en YouTube, TikTok, Drive o navegador:",
                         fontSize = 11.sp,
                         color = MeetColors.textSecondary,
                     )
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                    ) {
+                        Text(
+                            "No se adjuntaron enlaces de video a este reporte.",
+                            fontSize = 12.sp,
+                            color = MeetColors.textMuted,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
                 }
             }
+        }
 
-            items(point.videoUrls) { url ->
+        if (allVideoUrls.isNotEmpty()) {
+            items(allVideoUrls) { url ->
                 VideoLinkCard(
                     url = url,
                     onOpen = {

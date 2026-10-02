@@ -65,6 +65,7 @@ data class SafetyReportUiState(
     val victimMale: Int? = null,
     // V3 — External video links
     val videoUrls: List<String> = emptyList(),
+    val videoInputText: String = "",
     // V4 — Detailed participant registration
     val participantDetails: String = "",
 ) {
@@ -183,6 +184,18 @@ class SafetyReportViewModel @Inject constructor(
         }
     }
 
+    fun updateVideoInputText(text: String) {
+        _state.update { it.copy(videoInputText = text, error = null) }
+    }
+
+    fun commitVideoInput() {
+        val text = _state.value.videoInputText.trim()
+        if (text.isNotBlank()) {
+            addVideoUrl(text)
+            _state.update { it.copy(videoInputText = "") }
+        }
+    }
+
     fun updateVictimCount(count: Int?) {
         _state.update { it.copy(victimCount = count, error = null) }
     }
@@ -224,6 +237,7 @@ class SafetyReportViewModel @Inject constructor(
     }
 
     fun nextStep() {
+        commitVideoInput()
         val s = _state.value
         when {
             s.step == 0 && s.sourceRelation == null -> return
@@ -261,15 +275,36 @@ class SafetyReportViewModel @Inject constructor(
     }
 
     fun submit() {
+        commitVideoInput()
         val snapshot = _state.value
         if (snapshot.submitting || snapshot.staging || snapshot.locating) return
         if (snapshot.category == null || snapshot.sourceRelation == null) return
         if (snapshot.narrative.trim().length < 10) return
 
-        val finalNarrative = if (snapshot.participantDetails.isNotBlank()) {
+        // Extract any URLs typed or pasted directly into the narrative
+        val narrativeUrls = Regex("""(https?://[^\s]+)""").findAll(snapshot.narrative)
+            .map { it.value.trimEnd('.', ',', ';', ')', ']', '>') }
+            .toList()
+        val allVideoUrls = (snapshot.videoUrls + narrativeUrls)
+            .filter { it.isNotBlank() }
+            .distinct()
+
+        val baseNarrative = if (snapshot.participantDetails.isNotBlank()) {
             "[Registro de Fuente: ${snapshot.sourceRelation?.label() ?: "Reporte"} - ${snapshot.participantDetails.trim()}]\n\n" + snapshot.narrative.trim()
         } else {
             snapshot.narrative.trim()
+        }
+
+        // Ensure video URLs are permanently preserved in narrative for worldwide read
+        val finalNarrative = if (allVideoUrls.isNotEmpty()) {
+            val missingInNarrative = allVideoUrls.filterNot { baseNarrative.contains(it) }
+            if (missingInNarrative.isNotEmpty()) {
+                baseNarrative + "\n\n[VIDEOS ADJUNTOS]\n" + missingInNarrative.joinToString("\n")
+            } else {
+                baseNarrative
+            }
+        } else {
+            baseNarrative
         }
 
         viewModelScope.launch {
@@ -291,7 +326,7 @@ class SafetyReportViewModel @Inject constructor(
                         reportedVictimCount = snapshot.victimCount,
                         reportedVictimFemale = snapshot.victimFemale,
                         reportedVictimMale = snapshot.victimMale,
-                        videoUrls = snapshot.videoUrls,
+                        videoUrls = allVideoUrls,
                     ),
                 )
 

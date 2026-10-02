@@ -1,51 +1,6 @@
--- Migration: 20261001080000_safety_auto_project_reports_v3.sql
--- Enables automatic online projection of citizen safety reports into all public sections:
--- Map (safety_public_points), Public Cases (safety_public_case_projection),
--- Timelines (safety_public_case_timeline_projection), and Accountability (safety_public_accountability_projection).
+-- 20261002083000_safety_full_narrative_and_videos.sql
+-- Ensure public map points preserve full narrative (up to 30k chars) and embedded video links worldwide.
 
-begin;
-
--- 1. Relax restrictive constraints and drop blocking triggers on public projection tables
-
--- Drop blocking triggers so citizen reports can auto-project
-drop trigger if exists safety_guard_public_point_v3 on public.safety_public_points;
-drop trigger if exists safety_public_point_verified_bytes on public.safety_public_points;
-
-drop trigger if exists safety_guard_public_case_v3 on public.safety_public_case_projection;
-drop trigger if exists safety_public_case_verified_bytes on public.safety_public_case_projection;
-
-drop trigger if exists safety_guard_accountability_v3 on public.safety_public_accountability_projection;
-
--- safety_public_points
-alter table public.safety_public_points alter column claim_id drop not null;
-alter table public.safety_public_points alter column publication_decision_id drop not null;
-alter table public.safety_public_points drop constraint if exists safety_public_points_v3_claim_fk;
-alter table public.safety_public_points drop constraint if exists safety_public_points_claim_id_fkey;
-alter table public.safety_public_points drop constraint if exists safety_public_points_publication_decision_fk;
-alter table public.safety_public_points drop constraint if exists safety_public_points_publication_decision_id_fkey;
-
--- safety_public_case_projection
-alter table public.safety_public_case_projection alter column publication_decision_id drop not null;
-alter table public.safety_public_case_projection alter column case_state_version drop not null;
-alter table public.safety_public_case_projection alter column confidence_score drop not null;
-alter table public.safety_public_case_projection drop constraint if exists safety_public_case_projection_case_fk;
-alter table public.safety_public_case_projection drop constraint if exists safety_public_case_projection_case_id_fkey;
-alter table public.safety_public_case_projection drop constraint if exists safety_public_case_projection_publication_decision_id_fkey;
-
--- safety_public_accountability_projection
-alter table public.safety_public_accountability_projection alter column publication_decision_id drop not null;
-alter table public.safety_public_accountability_projection drop constraint if exists safety_public_accountability_projection_publication_decision_id_fkey;
-alter table public.safety_public_accountability_projection drop constraint if exists safety_public_accountability_projection_publication_decision_id;
-alter table public.safety_public_accountability_projection drop constraint if exists safety_public_accountability_projection_case_id_fkey;
-
--- 2. Open read grants and RLS for anon and authenticated
-grant select on public.safety_public_points to anon, authenticated;
-grant select on public.safety_public_case_projection to anon, authenticated;
-grant select on public.safety_public_case_timeline_projection to anon, authenticated;
-grant select on public.safety_public_case_claim_projection to anon, authenticated;
-grant select on public.safety_public_accountability_projection to anon, authenticated;
-
--- 3. Replace safety_create_report_v3 with auto-projection into public tables
 create or replace function public.safety_create_report_v3(
     p_report_id uuid,
     p_idempotency_key uuid,
@@ -248,6 +203,7 @@ begin
     end;
 
     -- 6.1 Project to public map points (worldwide read)
+    -- Crucial: label is the full clean narrative so video links & descriptions are never truncated!
     insert into public.safety_public_points (
         id, category, display_latitude, display_longitude,
         geo_disclosure, location_accuracy_meters, label, claim_state,
@@ -328,76 +284,11 @@ $$;
 revoke all on function public.safety_create_report_v3(uuid,uuid,text,text,timestamptz,double precision,double precision,real,text,text,text,integer,integer,integer) from public, anon;
 grant execute on function public.safety_create_report_v3(uuid,uuid,text,text,timestamptz,double precision,double precision,real,text,text,text,integer,integer,integer) to authenticated;
 
--- 4. Backfill existing reports into projections
-do $$
-declare
-    r record;
-    c record;
-    v_title text;
-    v_lat double precision;
-    v_lng double precision;
-begin
-    for r in select * from public.safety_reports loop
-        select * into c from safety_private.report_content where report_id = r.id;
-        v_title := case
-            when c.narrative is not null and length(trim(c.narrative)) > 60 then substring(trim(c.narrative) from 1 for 57) || '...'
-            when c.narrative is not null then trim(c.narrative)
-            else 'Incidente documentado'
-        end;
-        v_lat := coalesce(c.latitude, 9.93603);
-        v_lng := coalesce(c.longitude, -84.09858);
-
-        -- Map point
-        insert into public.safety_public_points (
-            id, category, display_latitude, display_longitude,
-            geo_disclosure, location_accuracy_meters, label, claim_state,
-            independent_source_count, civil_source_count, journalistic_source_count,
-            public_record_source_count, documentary_source_count, institutional_source_count,
-            first_documented_at, last_reviewed_at, published_at, server_version,
-            victim_count_documented, victim_female_count, victim_male_count
-        ) values (
-            r.id, r.category, v_lat, v_lng,
-            case when c.latitude is not null then 'EXACT_GEOLOCATED' else 'COARSE_GRID_25KM_PLUS' end,
-            coalesce(ceil(c.accuracy_meters)::integer, 10),
-            v_title, 'DOCUMENTED',
-            1, 1, 0, 0, 0, 0,
-            coalesce(r.occurred_at, r.created_at, now()), now(), now(), 1,
-            coalesce(r.reported_victim_count, 0),
-            coalesce(r.reported_victim_female, 0),
-            coalesce(r.reported_victim_male, 0)
-        ) on conflict (id) do nothing;
-
-        -- Case projection
-        insert into public.safety_public_case_projection (
-            case_id, case_type, title, public_summary, lifecycle,
-            confidence_score, event_count, claim_count, source_count, evidence_count,
-            published_at, last_updated_at, server_version
-        ) values (
-            r.id, r.category, v_title, coalesce(c.narrative, v_title), 'DOCUMENTED',
-            0.95, 1, 1, 1, 1,
-            coalesce(r.occurred_at, r.created_at, now()), now(), 1
-        ) on conflict (case_id) do nothing;
-
-        -- Timeline projection
-        insert into public.safety_public_case_timeline_projection (
-            case_id, milestone_id, event_type, public_summary,
-            occurred_at, recorded_at, source_count, evidence_count, server_version
-        ) values (
-            r.id, gen_random_uuid(), 'REPORT_FILED',
-            'Reporte ciudadano documentado y verificado en la red mundial.',
-            coalesce(r.occurred_at, r.created_at, now()), now(), 1, 1, 1
-        ) on conflict (case_id, milestone_id) do nothing;
-
-        -- Accountability projection
-        insert into public.safety_public_accountability_projection (
-            event_id, case_id, case_title, institution_ref, event_type,
-            occurred_at, published_at, server_version
-        ) values (
-            gen_random_uuid(), r.id, v_title, 'INGESTA_CIUDADANA', 'REPORT_SENT',
-            coalesce(r.occurred_at, r.created_at, now()), now(), 1
-        ) on conflict (event_id) do nothing;
-    end loop;
-end;
-$$;
-
-commit;
+-- Backfill public map points with complete narrative from private content
+update public.safety_public_points p
+set label = c.narrative,
+    server_version = p.server_version + 1,
+    last_reviewed_at = now()
+from safety_private.report_content c
+where p.id = c.report_id
+  and length(c.narrative) > length(p.label);
