@@ -16,6 +16,8 @@ data class CreateSafetyReportPayload(
     val reportedVictimCount: Int? = null,
     val reportedVictimFemale: Int? = null,
     val reportedVictimMale: Int? = null,
+    // V3 — External video links (to avoid filling up server storage)
+    val videoUrls: List<String> = emptyList(),
 )
 
 @Serializable

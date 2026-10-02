@@ -58,6 +58,8 @@ data class SafetyReportUiState(
     val victimCount: Int? = null,
     val victimFemale: Int? = null,
     val victimMale: Int? = null,
+    // V3 — External video links
+    val videoUrls: List<String> = emptyList(),
 ) {
     /** Whether victim demographics step should be shown (only for homicide). */
     val showVictimStep: Boolean get() = category == SafetyReportCategory.HOMICIDE
@@ -148,6 +150,22 @@ class SafetyReportViewModel @Inject constructor(
     fun updateOccurredAt(iso: String?) {
         savedState["occurredAt"] = iso
         _state.update { it.copy(occurredAtIso = iso, error = null) }
+    }
+
+    fun addVideoUrl(url: String) {
+        val clean = url.trim()
+        if (clean.isBlank()) return
+        val formatted = if (!clean.startsWith("http://") && !clean.startsWith("https://")) "https://$clean" else clean
+        _state.update { current ->
+            if (current.videoUrls.contains(formatted)) current
+            else current.copy(videoUrls = current.videoUrls + formatted, error = null)
+        }
+    }
+
+    fun removeVideoUrl(url: String) {
+        _state.update { current ->
+            current.copy(videoUrls = current.videoUrls.filter { it != url }, error = null)
+        }
     }
 
     fun updateVictimCount(count: Int?) {
@@ -248,6 +266,7 @@ class SafetyReportViewModel @Inject constructor(
                         reportedVictimCount = snapshot.victimCount,
                         reportedVictimFemale = snapshot.victimFemale,
                         reportedVictimMale = snapshot.victimMale,
+                        videoUrls = snapshot.videoUrls,
                     ),
                 )
 

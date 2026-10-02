@@ -29,6 +29,8 @@ data class SafetyMyReportsUiState(
     val actionMessage: String? = null,
     /** Evidence grouped by reportId */
     val evidenceByReport: Map<String, List<SafetyEvidenceEntity>> = emptyMap(),
+    /** Private map points with decrypted videoUrls and narrative */
+    val privatePointsByReport: Map<String, com.elysium369.meet.safety.data.SafetyPrivateMapPoint> = emptyMap(),
 )
 
 @HiltViewModel
@@ -43,10 +45,12 @@ class SafetyMyReportsViewModel @Inject constructor(
     val state: StateFlow<SafetyMyReportsUiState> = combine(
         repository.observeMyReports(),
         evidenceRepository.observeOwner(),
+        repository.observeMyPrivateMapPoints(),
         withdrawal,
-    ) { reports, allEvidence, action ->
+    ) { reports, allEvidence, privatePoints, action ->
         val pending = reports.count { it.syncState != "SYNCED" }
         val evidenceByReport = allEvidence.groupBy { it.reportId }
+        val pointsByReport = privatePoints.associateBy { it.reportId }
         SafetyMyReportsUiState(
             reports = reports,
             totalReports = reports.size,
@@ -56,6 +60,7 @@ class SafetyMyReportsViewModel @Inject constructor(
             withdrawingReportId = action.first,
             actionMessage = action.second,
             evidenceByReport = evidenceByReport,
+            privatePointsByReport = pointsByReport,
         )
     }
         .stateIn(

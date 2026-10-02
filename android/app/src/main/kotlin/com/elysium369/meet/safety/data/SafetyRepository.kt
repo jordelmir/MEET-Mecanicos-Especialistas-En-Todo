@@ -243,6 +243,7 @@ class SafetyRepository @Inject constructor(
                             victimFemale = payload.reportedVictimFemale,
                             victimMale = payload.reportedVictimMale,
                             createdAt = row.createdAt,
+                            videoUrls = payload.videoUrls,
                         )
                     }.getOrNull()
                 }
@@ -345,6 +346,7 @@ data class SafetyPrivateMapPoint(
     val victimFemale: Int? = null,
     val victimMale: Int? = null,
     val createdAt: Long = occurredAt,
+    val videoUrls: List<String> = emptyList(),
 ) {
     val markerId: String get() = "private:$reportId"
 }

@@ -456,6 +456,7 @@ private fun PrivateReportDetailSheet(
 
     val sourceRelationEnum = runCatching { SourceRelation.valueOf(point.sourceRelation) }.getOrNull()
     val sourceBadge = sourceRelationEnum?.toObservatoryBadge()
+    val context = LocalContext.current
 
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
@@ -725,7 +726,48 @@ private fun PrivateReportDetailSheet(
             )
         }
 
-        // === 8. Security & Cryptographic Transparency Notice ===
+        // === 8. VIDEOS ADJUNTOS POR ENLACE ===
+        if (point.videoUrls.isNotEmpty()) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Videocam, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "VIDEOS ADJUNTOS (${point.videoUrls.size})",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MeetColors.neonGreen,
+                            letterSpacing = 1.sp,
+                        )
+                    }
+                    Text(
+                        "Toca el enlace para reproducir el video directamente en YouTube, TikTok, Drive o navegador:",
+                        fontSize = 11.sp,
+                        color = MeetColors.textSecondary,
+                    )
+                }
+            }
+
+            items(point.videoUrls) { url ->
+                VideoLinkCard(
+                    url = url,
+                    onOpen = {
+                        try {
+                            val uri = android.net.Uri.parse(url)
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(android.content.Intent.createChooser(intent, "Ver video"))
+                        } catch (e: Exception) {
+                            android.util.Log.e("SafetyMap", "Error opening video link $url", e)
+                        }
+                    }
+                )
+            }
+        }
+
+        // === 9. Security & Cryptographic Transparency Notice ===
         item {
             HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
         }
@@ -744,6 +786,83 @@ private fun PrivateReportDetailSheet(
     }
 }
 
+private data class VideoPlatformInfo(val name: String, val emoji: String)
+
+private fun resolveVideoPlatform(url: String): VideoPlatformInfo {
+    val lower = url.lowercase()
+    return when {
+        lower.contains("youtube.com") || lower.contains("youtu.be") -> VideoPlatformInfo("YouTube", "▶️")
+        lower.contains("tiktok.com") -> VideoPlatformInfo("TikTok", "🎵")
+        lower.contains("drive.google.com") -> VideoPlatformInfo("Google Drive", "📁")
+        lower.contains("vimeo.com") -> VideoPlatformInfo("Vimeo", "🎬")
+        lower.contains("twitter.com") || lower.contains("x.com") -> VideoPlatformInfo("X / Twitter", "🐦")
+        lower.contains("instagram.com") -> VideoPlatformInfo("Instagram", "📸")
+        lower.contains("facebook.com") || lower.contains("fb.watch") -> VideoPlatformInfo("Facebook", "👤")
+        else -> VideoPlatformInfo("Enlace de Video", "🎥")
+    }
+}
+
+@Composable
+private fun VideoLinkCard(url: String, onOpen: () -> Unit) {
+    val platform = resolveVideoPlatform(url)
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onOpen),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(MeetColors.neonGreen.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(platform.emoji, fontSize = 16.sp)
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        platform.name,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        color = MeetColors.neonGreen,
+                    )
+                    Text(
+                        url,
+                        fontSize = 10.sp,
+                        color = MeetColors.textSecondary,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            Button(
+                onClick = onOpen,
+                shape = RoundedCornerShape(8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MeetColors.neonGreen.copy(alpha = 0.15f),
+                    contentColor = MeetColors.backgroundDeep,
+                ),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Ver video", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
 @Composable
 private fun EvidenceFileCard(
     item: SafetyEvidenceEntity,
@@ -753,7 +872,6 @@ private fun EvidenceFileCard(
     val isImage = item.mimeType.startsWith("image/")
     val (icon, typeLabel) = when {
         isImage -> Icons.Filled.Image to "Imagen"
-        item.mimeType.startsWith("video/") -> Icons.Filled.Videocam to "Video"
         item.mimeType.startsWith("audio/") -> Icons.Filled.AudioFile to "Audio"
         item.mimeType == "application/pdf" -> Icons.Filled.PictureAsPdf to "PDF"
         else -> Icons.Filled.AttachFile to "Documento"

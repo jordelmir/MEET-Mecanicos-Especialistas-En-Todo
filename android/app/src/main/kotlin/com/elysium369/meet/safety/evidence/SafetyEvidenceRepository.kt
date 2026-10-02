@@ -36,7 +36,7 @@ class SafetyEvidenceRepository @Inject constructor(
         check(runCatching { UUID.fromString(owner.id) }.isSuccess) { "Inicia sesión para adjuntar evidencia." }
         UUID.fromString(reportId)
         val mime = context.contentResolver.getType(uri)?.lowercase()
-        require(mime in SafetyEvidencePolicy.allowedMimeTypes) { "Formato no admitido. Usa imagen, video, audio o PDF." }
+        require(mime in SafetyEvidencePolicy.allowedMimeTypes) { "Formato no admitido. Usa imágenes, audios o documentos/PDFs. Para videos, adjunta el link." }
         val bytes = requireNotNull(context.contentResolver.openInputStream(uri)) { "No se pudo abrir el archivo." }.use(SafetyEvidencePolicy::readBounded)
         val id = UUID.randomUUID().toString()
         val directory = File(context.noBackupFilesDir, "safety_evidence/${owner.id}").apply { mkdirs() }

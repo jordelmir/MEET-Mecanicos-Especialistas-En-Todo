@@ -1,5 +1,7 @@
 package com.elysium369.meet.safety.ui.report
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -167,6 +169,8 @@ fun SafetyMyReportsScreen(
 
                     items(state.reports, key = { it.reportId }) { report ->
                         val evidence = state.evidenceByReport[report.reportId] ?: emptyList()
+                        val privatePoint = state.privatePointsByReport[report.reportId]
+                        val videoUrls = privatePoint?.videoUrls ?: emptyList()
                         AnimatedVisibility(
                             visible = true,
                             enter = fadeIn() + slideInVertically { it / 4 },
@@ -174,10 +178,22 @@ fun SafetyMyReportsScreen(
                             MyReportCard(
                                 report = report,
                                 evidence = evidence,
+                                videoUrls = videoUrls,
                                 withdrawing = state.withdrawingReportId == report.reportId,
                                 onWithdraw = { reportToWithdraw = report.reportId },
                                 onRetrySync = { viewModel.retrySyncAll() },
                                 onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId) },
+                                onOpenVideo = { url ->
+                                    try {
+                                        val uri = Uri.parse(url)
+                                        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        }
+                                        context.startActivity(Intent.createChooser(intent, "Ver video"))
+                                    } catch (e: Exception) {
+                                        android.util.Log.e("SafetyMyReports", "Error opening video $url", e)
+                                    }
+                                },
                             )
                         }
                     }
@@ -233,10 +249,12 @@ fun SafetyMyReportsScreen(
 private fun MyReportCard(
     report: com.elysium369.meet.safety.data.local.SafetyReportEntity,
     evidence: List<SafetyEvidenceEntity>,
+    videoUrls: List<String> = emptyList(),
     withdrawing: Boolean,
     onWithdraw: () -> Unit,
     onRetrySync: () -> Unit,
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit = {},
+    onOpenVideo: (String) -> Unit = {},
 ) {
     val categoryColor = SafetyCategoryIcons.colorForString(report.category)
     val categoryIcon = SafetyCategoryIcons.iconForString(report.category)
@@ -356,6 +374,26 @@ private fun MyReportCard(
                 ) {
                     items(evidence, key = { it.evidenceId }) { item ->
                         EvidenceChip(item, onClick = { onOpenEvidence(item) })
+                    }
+                }
+            }
+
+            // === Video Links Section ===
+            if (videoUrls.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    "VIDEOS ADJUNTOS (${videoUrls.size})",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MeetColors.neonGreen,
+                    letterSpacing = 1.sp,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(videoUrls) { url ->
+                        VideoLinkChip(url = url, onClick = { onOpenVideo(url) })
                     }
                 }
             }
@@ -523,3 +561,47 @@ private fun resolveUploadLabel(state: String): String = when (state) {
 private fun formatTimestamp(epochMs: Long): String = try {
     SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es")).format(Date(epochMs))
 } catch (_: Exception) { "" }
+
+@Composable
+private fun VideoLinkChip(url: String, onClick: () -> Unit) {
+    val platformName = when {
+        url.contains("youtube", ignoreCase = true) || url.contains("youtu.be", ignoreCase = true) -> "YouTube ▶️"
+        url.contains("tiktok", ignoreCase = true) -> "TikTok 🎵"
+        url.contains("drive.google", ignoreCase = true) -> "Drive 📁"
+        url.contains("vimeo", ignoreCase = true) -> "Vimeo 🎬"
+        url.contains("x.com", ignoreCase = true) || url.contains("twitter", ignoreCase = true) -> "X / Twitter 🐦"
+        url.contains("instagram", ignoreCase = true) -> "Instagram 📸"
+        else -> "Video 🎥"
+    }
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(MeetColors.backgroundDeep)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Videocam,
+            contentDescription = null,
+            tint = MeetColors.neonGreen,
+            modifier = Modifier.size(16.dp),
+        )
+        Column {
+            Text(
+                platformName,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MeetColors.neonGreen,
+            )
+            Text(
+                "Toca para abrir",
+                fontSize = 8.sp,
+                color = MeetColors.textSecondary,
+            )
+        }
+    }
+}
+

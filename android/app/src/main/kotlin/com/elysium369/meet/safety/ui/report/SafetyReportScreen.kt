@@ -18,6 +18,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
@@ -37,7 +40,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -777,18 +782,20 @@ private fun StepEvidence(
     ) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.safety_report_step_evidence_title), fontWeight = FontWeight.Black, fontSize = 15.sp, color = MeetColors.textPrimary)
-            Text(stringResource(R.string.safety_report_step_evidence_desc), color = MeetColors.textSecondary, fontSize = 12.sp)
+            Text(
+                "Adjunta fotos, audios o documentos que respalden el hecho. Para videos, adjunta el link más abajo para no saturar el servidor.",
+                color = MeetColors.textSecondary,
+                fontSize = 12.sp,
+            )
 
             state.evidence.forEach { item ->
                 val evidenceIcon = when {
                     item.mimeType.startsWith("image/") -> Icons.Filled.AttachFile
-                    item.mimeType.startsWith("video/") -> Icons.Filled.AttachFile
                     item.mimeType.startsWith("audio/") -> Icons.Filled.AttachFile
                     else -> Icons.Filled.AttachFile
                 }
                 val evidenceLabel = when {
                     item.mimeType.startsWith("image/") -> "📷 Imagen"
-                    item.mimeType.startsWith("video/") -> "🎥 Video"
                     item.mimeType.startsWith("audio/") -> "🎙️ Audio"
                     item.mimeType == "application/pdf" -> "📄 PDF"
                     item.mimeType.contains("word") || item.mimeType.contains("document") -> "📝 Documento"
@@ -828,7 +835,20 @@ private fun StepEvidence(
             }
 
             Button(
-                onClick = { picker.launch(arrayOf("image/*", "video/*", "audio/*", "application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
+                onClick = {
+                    picker.launch(
+                        arrayOf(
+                            "image/*",
+                            "audio/*",
+                            "application/pdf",
+                            "text/*",
+                            "application/msword",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "application/vnd.ms-excel",
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        )
+                    )
+                },
                 enabled = !state.staging && state.evidence.size < 5,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -840,7 +860,7 @@ private fun StepEvidence(
                 Icon(Icons.Filled.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (state.staging) stringResource(R.string.safety_report_step_evidence_protecting) else "Adjuntar archivos",
+                    if (state.staging) stringResource(R.string.safety_report_step_evidence_protecting) else "Adjuntar fotos / audios / docs",
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -852,6 +872,96 @@ private fun StepEvidence(
                     color = MeetColors.textMuted,
                     modifier = Modifier.fillMaxWidth(),
                 )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
+            Spacer(Modifier.height(4.dp))
+
+            // === SECCIÓN DE VIDEOS POR ENLACE ===
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Videocam, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "VIDEOS (MEDIANTE ENLACE)",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 12.sp,
+                    color = MeetColors.neonGreen,
+                    letterSpacing = 1.sp,
+                )
+            }
+            Text(
+                "Para no saturar el servidor, si quieres poner un video adjunta el link (YouTube, TikTok, Drive, redes, etc.). Al tocarlo se abrirá el video directamente.",
+                color = MeetColors.textSecondary,
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+            )
+
+            // Added video URLs
+            state.videoUrls.forEach { url ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MeetColors.backgroundDeep)
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Videocam, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        url,
+                        color = MeetColors.textPrimary,
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    IconButton(onClick = { viewModel.removeVideoUrl(url) }) {
+                        Icon(Icons.Filled.Delete, contentDescription = "Eliminar", tint = MeetColors.error, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+
+            var videoInputText by remember { mutableStateOf("") }
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = videoInputText,
+                    onValueChange = { videoInputText = it },
+                    placeholder = { Text("Pega el link del video...", fontSize = 11.sp, color = MeetColors.textMuted) },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MeetColors.neonGreen,
+                        unfocusedBorderColor = MeetColors.borderSubtle,
+                        focusedTextColor = MeetColors.textPrimary,
+                        unfocusedTextColor = MeetColors.textPrimary,
+                        cursorColor = MeetColors.neonGreen,
+                    ),
+                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 12.sp),
+                )
+                Button(
+                    onClick = {
+                        if (videoInputText.isNotBlank()) {
+                            viewModel.addVideoUrl(videoInputText)
+                            videoInputText = ""
+                        }
+                    },
+                    enabled = videoInputText.isNotBlank(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MeetColors.neonGreen,
+                        contentColor = MeetColors.backgroundDeep,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+                ) {
+                    Text("Agregar", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
             }
         }
     }
@@ -904,6 +1014,13 @@ private fun StepReview(state: SafetyReportUiState) {
                 label = "EVIDENCIAS",
                 value = stringResource(R.string.safety_report_step_review_evidence, state.evidence.size),
             )
+
+            if (state.videoUrls.isNotEmpty()) {
+                ReviewRow(
+                    label = "VIDEOS (LINKS)",
+                    value = "${state.videoUrls.size} enlace(s) adjunto(s)",
+                )
+            }
 
             Spacer(Modifier.height(4.dp))
             Text(

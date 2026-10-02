@@ -9,7 +9,6 @@ object SafetyEvidencePolicy {
     const val MAX_ATTACHMENTS = 5
     val allowedMimeTypes = setOf(
         "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif",
-        "video/mp4", "video/webm", "video/3gpp", "video/quicktime",
         "audio/mpeg", "audio/mp4", "audio/aac", "audio/ogg", "audio/wav", "audio/x-wav",
         "application/pdf",
         "text/plain", "text/csv", "text/html",
