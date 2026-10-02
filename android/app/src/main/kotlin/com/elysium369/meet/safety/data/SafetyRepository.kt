@@ -393,7 +393,7 @@ class SafetyRepository @Inject constructor(
     }
 
     private fun validate(payload: CreateSafetyReportPayload) {
-        require(payload.narrative.trim().length in 10..10_000) {
+        require(payload.narrative.trim().length in 10..30_000) {
             "SAFETY_INVALID_NARRATIVE_LENGTH"
         }
         payload.occurredAtIso?.let { require(runCatching { Instant.parse(it) }.isSuccess) { "SAFETY_INVALID_OCCURRED_AT" } }

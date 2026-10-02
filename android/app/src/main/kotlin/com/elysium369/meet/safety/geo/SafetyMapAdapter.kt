@@ -64,8 +64,8 @@ object SafetyMapAdapter {
                 isHighlighted = point.syncState != "SYNCED",
             )
         }
-        val privateReportIds = privatePoints.map { it.reportId }.toSet()
-        val deduplicatedPublicMarkers = publicMarkers.filter { it.id !in privateReportIds }
+        val privateReportIds = privatePoints.map { it.reportId.lowercase() }.toSet()
+        val deduplicatedPublicMarkers = publicMarkers.filter { it.id.lowercase() !in privateReportIds }
         val markers = deduplicatedPublicMarkers + privateMarkers
 
         val bounds = GeoBounds.fromPoints(markers.map { it.point } + publicAreas.flatMap { it.boundary })

@@ -91,8 +91,28 @@ fun SafetyMapScreen(
     }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var showList by rememberSaveable { mutableStateOf(false) }
-    val selected = state.points.firstOrNull { it.publicPointId == selectedId }
-    val selectedPrivate = state.privatePoints.firstOrNull { it.markerId == selectedId }
+
+    val matchedPrivate = remember(selectedId, state.privatePoints) {
+        val target = selectedId ?: return@remember null
+        state.privatePoints.firstOrNull {
+            it.markerId == target ||
+            it.reportId == target ||
+            it.markerId.equals(target, ignoreCase = true) ||
+            it.reportId.equals(target.removePrefix("private:"), ignoreCase = true)
+        }
+    }
+
+    val matchedPublic = remember(selectedId, matchedPrivate, state.points) {
+        if (matchedPrivate != null) null
+        else {
+            val target = selectedId ?: return@remember null
+            state.points.firstOrNull {
+                it.publicPointId == target ||
+                it.publicPointId.equals(target, ignoreCase = true) ||
+                it.publicPointId.equals(target.removePrefix("private:"), ignoreCase = true)
+            }
+        }
+    }
 
     Scaffold(
         containerColor = MeetColors.backgroundDeep,
@@ -317,17 +337,7 @@ fun SafetyMapScreen(
         }
     }
 
-    selected?.let { point ->
-        val regionPoints = state.points.filter { it.regionKey() == point.regionKey() }
-        ModalBottomSheet(
-            onDismissRequest = { selectedId = null },
-            containerColor = MeetColors.cardBackground,
-        ) {
-            PublicPointDetail(point, point.regionLabel(), regionPoints.count { it.category == "HOMICIDE" }, regionPoints.size, impunityStore)
-        }
-    }
-
-    selectedPrivate?.let { point ->
+    matchedPrivate?.let { point ->
         val evidenceList = state.evidenceByReport[point.reportId] ?: emptyList()
         ModalBottomSheet(
             onDismissRequest = { selectedId = null },
@@ -340,6 +350,27 @@ fun SafetyMapScreen(
                 onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId) },
                 onLoadThumbnail = { evidenceId -> viewModel.loadEvidenceThumbnail(evidenceId) },
                 store = impunityStore,
+            )
+        }
+    }
+
+    matchedPublic?.let { point ->
+        val regionPoints = state.points.filter { it.regionKey() == point.regionKey() }
+        val evidenceList = state.evidenceByReport[point.publicPointId] ?: emptyList()
+        ModalBottomSheet(
+            onDismissRequest = { selectedId = null },
+            containerColor = MeetColors.cardBackground,
+        ) {
+            PublicPointDetail(
+                point = point,
+                region = point.regionLabel(),
+                homicideCount = regionPoints.count { it.category == "HOMICIDE" },
+                totalCount = regionPoints.size,
+                store = impunityStore,
+                evidenceList = evidenceList,
+                onClose = { selectedId = null },
+                onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId) },
+                onLoadThumbnail = { evidenceId -> viewModel.loadEvidenceThumbnail(evidenceId) },
             )
         }
     }
@@ -368,11 +399,33 @@ private fun PublicPointDetail(
     homicideCount: Int,
     totalCount: Int,
     store: DrugMarketImpunityStore,
+    evidenceList: List<SafetyEvidenceEntity> = emptyList(),
+    onClose: () -> Unit = {},
+    onOpenEvidence: (SafetyEvidenceEntity) -> Unit = {},
+    onLoadThumbnail: suspend (String) -> ByteArray? = { null },
 ) {
     val catColor = SafetyCategoryIcons.colorForString(point.category)
     val catIcon = SafetyCategoryIcons.iconForString(point.category)
+    val catLabel = runCatching {
+        SafetyReportCategory.valueOf(point.category).label()
+    }.getOrDefault(point.category.replace("_", " "))
 
-    LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val context = LocalContext.current
+    // Extract video URLs if any in label
+    val urlRegex = remember { Regex("""(https?://[^\s]+)""") }
+    val videoUrls = remember(point.label) {
+        urlRegex.findAll(point.label).map { it.value }.toList()
+    }
+    val cleanNarrative = remember(point.label, videoUrls) {
+        var text = point.label
+        videoUrls.forEach { u -> text = text.replace(u, "").trim() }
+        text.ifBlank { point.label }
+    }
+
+    LazyColumn(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
         val isDrug = point.category == "DRUG_SALE_ACTIVITY" || point.category.contains("DRUG", ignoreCase = true)
         val isMissing = point.category == "MISSING_PERSON" || point.category.contains("MISSING", ignoreCase = true)
         val isHomicide = point.category == "HOMICIDE" || point.category.contains("HOMICID", ignoreCase = true)
@@ -390,60 +443,358 @@ private fun PublicPointDetail(
                 )
             }
         }
+
+        // === 1. Header with Category, Icon, and Close button ===
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(catColor.copy(alpha = 0.2f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(catIcon, contentDescription = null, tint = catColor, modifier = Modifier.size(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(catColor.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = catIcon,
+                            contentDescription = null,
+                            tint = catColor,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            catLabel,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                            color = MeetColors.textPrimary,
+                        )
+                        val dateMs = point.firstDocumentedAt ?: point.publishedAt
+                        Text(
+                            "Ocurrió el ${safetyPublicDate(dateMs)}",
+                            fontSize = 11.sp,
+                            color = MeetColors.textMuted,
+                        )
+                    }
                 }
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(point.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary)
-                    Text(point.category.replace("_", " "), fontSize = 12.sp, color = catColor, fontWeight = FontWeight.SemiBold)
+                IconButton(onClick = onClose) {
+                    Icon(
+                        imageVector = Icons.Filled.Close,
+                        contentDescription = "Cerrar",
+                        tint = MeetColors.textSecondary,
+                    )
                 }
             }
         }
 
+        // === 2. Status & Authority Badges ===
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF10B981).copy(alpha = 0.15f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(Icons.Filled.CloudDone, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(14.dp))
+                        Text("Sincronizado mundialmente", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                    }
+                }
+
+                if (point.serverVersion > 0) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                    ) {
+                        Text("v${point.serverVersion} autorizada", fontSize = 11.sp, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+
+        // === 3. Provenance / Fuente de Información Badge ===
+        item {
+            val sourceTitle = when {
+                point.journalisticSourceCount > 0 -> "Fuente Periodística"
+                point.institutionalSourceCount > 0 -> "Fuente Institucional"
+                point.publicRecordSourceCount > 0 -> "Registro Público"
+                else -> "Fuente Civil Protegida"
+            }
+            val sourceSubtitle = when {
+                point.journalisticSourceCount > 0 -> "Investigación periodística / Medios"
+                point.institutionalSourceCount > 0 -> "Fuerza Pública / OIJ / Oficial"
+                point.publicRecordSourceCount > 0 -> "Expediente judicial o registral"
+                else -> "Testimonio ciudadano verificado"
+            }
+            val sourceEmoji = when {
+                point.journalisticSourceCount > 0 -> "📰"
+                point.institutionalSourceCount > 0 -> "🏛️"
+                point.publicRecordSourceCount > 0 -> "📄"
+                else -> "🛡️"
+            }
+            val sourceColor = when {
+                point.journalisticSourceCount > 0 -> Color(0xFF69F0AE)
+                point.institutionalSourceCount > 0 -> Color(0xFFB388FF)
+                point.publicRecordSourceCount > 0 -> Color(0xFFFFD700)
+                else -> MeetColors.cyberCyan
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                border = BorderStroke(1.dp, sourceColor.copy(alpha = 0.35f)),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(sourceEmoji, fontSize = 20.sp)
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            sourceTitle,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = sourceColor,
+                        )
+                        Text(
+                            sourceSubtitle,
+                            fontSize = 11.sp,
+                            color = MeetColors.textSecondary,
+                        )
+                    }
+                }
+            }
+        }
+
+        // === 4. Coordenadas Card ===
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
             ) {
-                Column(Modifier.padding(12.dp)) {
-                    Text(stringResource(R.string.safety_map_region_summary, region, homicideCount, totalCount), color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Spacer(Modifier.height(4.dp))
-                    Text(stringResource(R.string.safety_public_claim_state, point.claimState), fontSize = 12.sp, color = MeetColors.neonGreen)
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.LocationOn, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            "Coordenadas: ${String.format(java.util.Locale.US, "%.5f, %.5f", point.displayLatitude, point.displayLongitude)}",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MeetColors.textPrimary,
+                        )
+                        val accuracyText = point.locationAccuracyMeters?.let { "Precisión: ±${it}m" } ?: "Precisión no informada"
+                        Text("$accuracyText · Red pública global", fontSize = 11.sp, color = MeetColors.textMuted)
+                    }
                 }
             }
         }
 
-        item {
-            Text(stringResource(R.string.safety_public_geo_detail, stringResource(R.string.safety_public_coarse_area), point.locationAccuracyMeters?.toString() ?: stringResource(R.string.safety_public_unknown)), color = MeetColors.textSecondary, fontSize = 12.sp)
+        // === 5. Victims Demographics ===
+        if (point.victimCountDocumented > 0) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.Person, contentDescription = null, tint = MeetColors.error, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                "Víctimas documentadas: ${point.victimCountDocumented}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MeetColors.error,
+                            )
+                            val details = listOfNotNull(
+                                point.victimFemaleCount.takeIf { it > 0 }?.let { "$it mujeres" },
+                                point.victimMaleCount.takeIf { it > 0 }?.let { "$it hombres" },
+                            ).joinToString(" · ")
+                            if (details.isNotBlank()) {
+                                Text(details, fontSize = 11.sp, color = MeetColors.textSecondary)
+                            }
+                        }
+                    }
+                }
+            }
         }
+
+        // === 6. Testimonio / Reporte Completo ===
         item {
-            Text(stringResource(R.string.safety_public_sources_count, point.independentSourceCount), color = MeetColors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Description, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "TESTIMONIO / REPORTE COMPLETO",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MeetColors.cyberCyan,
+                            letterSpacing = 1.sp,
+                        )
+                    }
+                    if (cleanNarrative.isNotBlank()) {
+                        Text(
+                            "${cleanNarrative.length} caracteres",
+                            fontSize = 10.sp,
+                            color = MeetColors.textMuted,
+                        )
+                    }
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                    border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                ) {
+                    Text(
+                        text = cleanNarrative.ifBlank { "Sin descripción narrativa proporcionada." },
+                        color = MeetColors.textPrimary,
+                        fontSize = 14.sp,
+                        lineHeight = 22.sp,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
         }
+
+        // === 7. Archivos adjuntos / Evidencia multimedia ===
         item {
-            Text(
-                stringResource(point.sourceMixStringRes(), point.civilSourceCount, point.journalisticSourceCount, point.publicRecordSourceCount, point.documentarySourceCount, point.institutionalSourceCount),
-                color = MeetColors.cyberCyan,
-                fontSize = 12.sp,
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.AttachFile, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "ARCHIVOS ADJUNTOS (${evidenceList.size})",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MeetColors.cyberCyan,
+                        letterSpacing = 1.sp,
+                    )
+                }
+
+                if (evidenceList.isEmpty()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                    ) {
+                        Text(
+                            "No se adjuntaron archivos o imágenes a este reporte.",
+                            fontSize = 12.sp,
+                            color = MeetColors.textMuted,
+                            modifier = Modifier.padding(14.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        items(evidenceList, key = { it.evidenceId }) { item ->
+            EvidenceFileCard(
+                item = item,
+                onOpen = { onOpenEvidence(item) },
+                onLoadThumbnail = onLoadThumbnail,
             )
         }
-        item {
-            Text(stringResource(R.string.safety_public_reviewed, safetyPublicDate(point.lastReviewedAt)), color = MeetColors.textSecondary, fontSize = 11.sp)
+
+        // === 8. Videos adjuntos por enlace (One-click launch!) ===
+        if (videoUrls.isNotEmpty()) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Videocam, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            "VIDEOS ADJUNTOS (${videoUrls.size})",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MeetColors.neonGreen,
+                            letterSpacing = 1.sp,
+                        )
+                    }
+                    Text(
+                        "Toca el enlace para reproducir el video directamente en YouTube, TikTok, Drive o navegador:",
+                        fontSize = 11.sp,
+                        color = MeetColors.textSecondary,
+                    )
+                }
+            }
+
+            items(videoUrls) { url ->
+                VideoLinkCard(
+                    url = url,
+                    onOpen = {
+                        try {
+                            val uri = android.net.Uri.parse(url)
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            try {
+                                val uri = android.net.Uri.parse(url)
+                                val chooser = android.content.Intent.createChooser(
+                                    android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    },
+                                    "Ver video"
+                                )
+                                context.startActivity(chooser)
+                            } catch (e: Exception) {
+                                android.util.Log.e("SafetyMap", "Error opening video link $url", e)
+                            }
+                        }
+                    }
+                )
+            }
         }
+
+        // === 9. Epistemic & Security Notice ===
         item {
             HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
         }
         item {
             Row(verticalAlignment = Alignment.Top) {
-                Icon(Icons.Filled.Balance, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.safety_public_epistemic_notice), style = MaterialTheme.typography.bodySmall, color = MeetColors.textSecondary, lineHeight = 16.sp)
+                Icon(Icons.Filled.Shield, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Reporte público sincronizado en red descentralizada con atestación criptográfica. ${stringResource(R.string.safety_public_epistemic_notice)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MeetColors.textSecondary,
+                    lineHeight = 16.sp,
+                )
             }
         }
     }
@@ -804,9 +1155,20 @@ private fun PrivateReportDetailSheet(
                             val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
                                 addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
-                            context.startActivity(android.content.Intent.createChooser(intent, "Ver video"))
-                        } catch (e: Exception) {
-                            android.util.Log.e("SafetyMap", "Error opening video link $url", e)
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            try {
+                                val uri = android.net.Uri.parse(url)
+                                val chooser = android.content.Intent.createChooser(
+                                    android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    },
+                                    "Ver video"
+                                )
+                                context.startActivity(chooser)
+                            } catch (e: Exception) {
+                                android.util.Log.e("SafetyMap", "Error opening video link $url", e)
+                            }
                         }
                     }
                 )

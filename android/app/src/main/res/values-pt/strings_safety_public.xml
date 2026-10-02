@@ -107,7 +107,7 @@
     <string name="safety_report_source_public_desc">Obtive a informação em um registro ou documento oficial</string>
     <string name="safety_report_source_unknown_desc">Nenhuma das opções anteriores</string>
     <string name="safety_report_step_narrative_title">Descreva o que aconteceu</string>
-    <string name="safety_report_step_narrative_count">%1$d / 10.000 caracteres</string>
+    <string name="safety_report_step_narrative_count">%1$d / 30.000 caracteres</string>
     <string name="safety_report_step_narrative_placeholder">Mínimo de 10 caracteres...</string>
     <string name="safety_report_step_when_title">Quando aconteceu?</string>
     <string name="safety_report_step_when_optional">Opcional</string>

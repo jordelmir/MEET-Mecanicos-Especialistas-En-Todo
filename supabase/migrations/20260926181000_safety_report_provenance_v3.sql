@@ -56,7 +56,7 @@ begin
     if p_client_payload_sha256 is null or p_client_payload_sha256 !~ '^[a-f0-9]{64}$' then
         raise exception 'INVALID_CLIENT_DIGEST';
     end if;
-    if length(p_narrative) > 10000 then raise exception 'NARRATIVE_TOO_LONG'; end if;
+    if length(p_narrative) > 30000 then raise exception 'NARRATIVE_TOO_LONG'; end if;
     if (p_latitude is null) <> (p_longitude is null)
        or (p_latitude is not null and not (p_latitude between -90 and 90))
        or (p_longitude is not null and not (p_longitude between -180 and 180))
