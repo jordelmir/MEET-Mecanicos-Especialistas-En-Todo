@@ -12,6 +12,9 @@ import com.elysium369.meet.safety.geo.SafetyPublicPoint
 import com.elysium369.meet.core.geo.CommonMapState
 import com.elysium369.meet.core.geo.GeoPoint
 import com.elysium369.meet.safety.location.FusedSafetyLocationProvider
+import android.content.Context
+import com.elysium369.meet.safety.evidence.SafetyEvidenceEntity
+import com.elysium369.meet.safety.evidence.SafetyEvidenceRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
@@ -36,6 +39,13 @@ fun List<SafetyPublicPointEntity>.filterFor(layer: SafetyMapLayer, range: Safety
     }
 }
 
+data class SafetyMapSources(
+    val public: List<SafetyPublicPointEntity>,
+    val private: List<SafetyPrivateMapPoint>,
+    val query: String,
+    val evidenceByReport: Map<String, List<SafetyEvidenceEntity>>,
+)
+
 data class SafetyMapUiState(
     val mapState: CommonMapState = SafetyMapAdapter.build(emptyList()),
     val points: List<SafetyPublicPointEntity> = emptyList(),
@@ -46,6 +56,7 @@ data class SafetyMapUiState(
     val pointCount: Int = 0,
     val layer: SafetyMapLayer = SafetyMapLayer.ALL,
     val range: SafetyTimeRange = SafetyTimeRange.ALL,
+    val evidenceByReport: Map<String, List<SafetyEvidenceEntity>> = emptyMap(),
 )
 
 @HiltViewModel
@@ -53,6 +64,7 @@ class SafetyMapViewModel @Inject constructor(
     private val publicRepository: SafetyPublicRepository,
     private val safetyRepository: SafetyRepository,
     private val locationProvider: FusedSafetyLocationProvider,
+    private val evidenceRepository: SafetyEvidenceRepository,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val _currentLocation = MutableStateFlow<GeoPoint?>(null)
@@ -62,9 +74,16 @@ class SafetyMapViewModel @Inject constructor(
     private val loading = MutableStateFlow(true)
     private val error = MutableStateFlow<String?>(null)
     private val search = savedStateHandle.getStateFlow("safetySearch", "")
-    private val mapSources = combine(publicRepository.observePoints(), safetyRepository.observeMyPrivateMapPoints(), search) { public, private, query -> Triple(public, private, query) }
+    private val mapSources = combine(
+        publicRepository.observePoints(),
+        safetyRepository.observeMyPrivateMapPoints(),
+        search,
+        evidenceRepository.observeOwner(),
+    ) { public, private, query, evidenceList ->
+        SafetyMapSources(public, private, query, evidenceList.groupBy { it.reportId })
+    }
     val uiState = combine(mapSources, layer, range, loading, error) { sources, layerName, rangeName, busy, failure ->
-        val (all, allPrivate, query) = sources
+        val (all, allPrivate, query, evidenceGrouped) = sources
         val selectedLayer = SafetyMapLayer.valueOf(layerName)
         val selectedRange = SafetyTimeRange.valueOf(rangeName)
         val now = System.currentTimeMillis()
@@ -87,8 +106,17 @@ class SafetyMapViewModel @Inject constructor(
             searchQuery = query,
             pointCount = points.size + privatePoints.size,
             layer = selectedLayer, range = selectedRange,
+            evidenceByReport = evidenceGrouped,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SafetyMapUiState())
+
+    fun openEvidence(context: Context, evidenceId: String) {
+        evidenceRepository.openEvidence(context, evidenceId)
+    }
+
+    suspend fun loadEvidenceThumbnail(evidenceId: String): ByteArray? {
+        return evidenceRepository.getDecryptedBytes(evidenceId)
+    }
 
     init { viewModelScope.launch { publicRepository.realtimeWakeUps().collect { refreshNow() } } }
     fun selectLayer(value: SafetyMapLayer) { savedStateHandle["safetyLayer"] = value.name }

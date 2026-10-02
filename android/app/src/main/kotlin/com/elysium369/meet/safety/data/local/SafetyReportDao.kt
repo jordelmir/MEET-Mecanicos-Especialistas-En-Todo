@@ -14,6 +14,7 @@ data class SafetyPrivateMapRow(
     val occurredAt: Long?,
     val serverState: String?,
     val syncState: String,
+    val serverVersion: Long = 0,
     val createdAt: Long,
     val ciphertext: ByteArray,
     val payloadSha256: String,
@@ -49,7 +50,7 @@ interface SafetyReportDao {
     @Query(
         """
         SELECT r.reportId, r.ownerUserId, r.category, r.payloadId,
-               r.occurredAt, r.serverState, r.syncState, r.createdAt,
+               r.occurredAt, r.serverState, r.syncState, r.serverVersion, r.createdAt,
                p.ciphertext, p.sha256 AS payloadSha256
         FROM safety_reports r
         INNER JOIN safety_local_payloads p ON p.payloadId = r.payloadId

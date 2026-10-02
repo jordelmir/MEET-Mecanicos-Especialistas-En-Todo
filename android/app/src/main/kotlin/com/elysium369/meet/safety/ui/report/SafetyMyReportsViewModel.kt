@@ -75,6 +75,10 @@ class SafetyMyReportsViewModel @Inject constructor(
         }
     }
 
+    fun openEvidence(context: Context, evidenceId: String) {
+        evidenceRepository.openEvidence(context, evidenceId)
+    }
+
     fun withdraw(reportId: String) {
         if (withdrawal.value.first != null) return
         withdrawal.value = reportId to null

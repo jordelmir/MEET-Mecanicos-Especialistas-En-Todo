@@ -5,6 +5,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -60,6 +61,7 @@ fun SafetyMyReportsScreen(
     viewModel: SafetyMyReportsViewModel,
     onBack: () -> Unit = {},
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val state by viewModel.state.collectAsState()
     var reportToWithdraw by remember { mutableStateOf<String?>(null) }
 
@@ -175,6 +177,7 @@ fun SafetyMyReportsScreen(
                                 withdrawing = state.withdrawingReportId == report.reportId,
                                 onWithdraw = { reportToWithdraw = report.reportId },
                                 onRetrySync = { viewModel.retrySyncAll() },
+                                onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId) },
                             )
                         }
                     }
@@ -233,6 +236,7 @@ private fun MyReportCard(
     withdrawing: Boolean,
     onWithdraw: () -> Unit,
     onRetrySync: () -> Unit,
+    onOpenEvidence: (SafetyEvidenceEntity) -> Unit = {},
 ) {
     val categoryColor = SafetyCategoryIcons.colorForString(report.category)
     val categoryIcon = SafetyCategoryIcons.iconForString(report.category)
@@ -351,7 +355,7 @@ private fun MyReportCard(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(evidence, key = { it.evidenceId }) { item ->
-                        EvidenceChip(item)
+                        EvidenceChip(item, onClick = { onOpenEvidence(item) })
                     }
                 }
             }
@@ -438,7 +442,7 @@ private fun SyncStatusBadge(report: com.elysium369.meet.safety.data.local.Safety
 }
 
 @Composable
-private fun EvidenceChip(item: SafetyEvidenceEntity) {
+private fun EvidenceChip(item: SafetyEvidenceEntity, onClick: () -> Unit = {}) {
     val (icon, label) = resolveEvidenceType(item.mimeType)
     val uploadColor = when (item.uploadState) {
         "RECEIVED" -> MeetColors.neonGreen
@@ -452,6 +456,7 @@ private fun EvidenceChip(item: SafetyEvidenceEntity) {
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(MeetColors.backgroundDeep)
+            .clickable(onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),

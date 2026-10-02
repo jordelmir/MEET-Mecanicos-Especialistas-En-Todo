@@ -235,6 +235,14 @@ class SafetyRepository @Inject constructor(
                             occurredAt = row.occurredAt ?: row.createdAt,
                             serverState = row.serverState,
                             syncState = row.syncState,
+                            serverVersion = row.serverVersion,
+                            narrative = payload.narrative,
+                            sourceRelation = payload.sourceRelation.name,
+                            locationSource = payload.locationSource.name,
+                            victimCount = payload.reportedVictimCount,
+                            victimFemale = payload.reportedVictimFemale,
+                            victimMale = payload.reportedVictimMale,
+                            createdAt = row.createdAt,
                         )
                     }.getOrNull()
                 }
@@ -329,6 +337,14 @@ data class SafetyPrivateMapPoint(
     val occurredAt: Long,
     val serverState: String?,
     val syncState: String,
+    val serverVersion: Long = 0,
+    val narrative: String = "",
+    val sourceRelation: String = "UNKNOWN",
+    val locationSource: String = "NONE",
+    val victimCount: Int? = null,
+    val victimFemale: Int? = null,
+    val victimMale: Int? = null,
+    val createdAt: Long = occurredAt,
 ) {
     val markerId: String get() = "private:$reportId"
 }
