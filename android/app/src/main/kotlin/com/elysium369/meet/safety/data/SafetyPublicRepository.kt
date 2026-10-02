@@ -250,6 +250,32 @@ class SafetyPublicRepository @Inject constructor(
         }
     }
 
+    suspend fun evictReport(reportId: String) {
+        _publicEvidence.update { current ->
+            current.filterKeys { !it.equals(reportId, ignoreCase = true) }
+        }
+        database.withTransaction {
+            dao.deletePoint(reportId)
+            dao.deleteCase(reportId)
+            dao.clearTimeline(reportId)
+            dao.clearClaims(reportId)
+        }
+        try {
+            refreshPoints()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            android.util.Log.w("SafetyPublicRepo", "evictReport refreshPoints error: ${e.message}")
+        }
+        try {
+            refreshCases()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            android.util.Log.w("SafetyPublicRepo", "evictReport refreshCases error: ${e.message}")
+        }
+    }
+
     fun observePoints(): Flow<List<SafetyPublicPointEntity>> =
         dao.observePoints()
 

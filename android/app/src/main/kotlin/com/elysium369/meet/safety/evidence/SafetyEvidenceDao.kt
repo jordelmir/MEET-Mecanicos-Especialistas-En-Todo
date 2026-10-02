@@ -24,4 +24,6 @@ interface SafetyEvidenceDao {
     suspend fun get(id: String, owner: String): SafetyEvidenceEntity?
     @Query("DELETE FROM safety_evidence_local WHERE evidenceId = :id AND ownerUserId = :owner AND uploadState = 'STAGED'")
     suspend fun removeDraft(id: String, owner: String): Int
+    @Query("DELETE FROM safety_evidence_local WHERE reportId = :reportId AND ownerUserId = :owner")
+    suspend fun deleteByReportId(reportId: String, owner: String): Int
 }

@@ -69,6 +69,18 @@ class SafetyEvidenceRepository @Inject constructor(
         if (dao.removeDraft(id, owner) == 1) File(item.encryptedPath).delete()
     }
 
+    suspend fun clearReportLocalEvidence(reportId: String, owner: String) = withContext(Dispatchers.IO) {
+        dao.deleteByReportId(reportId, owner)
+        runCatching {
+            val cacheDir = File(context.cacheDir, "safety_evidence")
+            if (cacheDir.exists()) {
+                cacheDir.listFiles()?.forEach { file ->
+                    if (file.name.contains(reportId.take(8))) file.delete()
+                }
+            }
+        }
+    }
+
     suspend fun getDecryptedBytes(evidenceId: String): ByteArray? = withContext(Dispatchers.IO) {
         val owner = principal.current().id
         val item = dao.get(evidenceId, owner) ?: return@withContext null

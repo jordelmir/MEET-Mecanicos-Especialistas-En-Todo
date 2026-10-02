@@ -39,6 +39,7 @@ interface SafetyReportDao {
         """
         SELECT * FROM safety_reports
         WHERE ownerUserId = :userId
+          AND (serverState IS NULL OR serverState != 'WITHDRAWN')
         ORDER BY createdAt DESC
         """
     )
@@ -48,6 +49,7 @@ interface SafetyReportDao {
         """
         SELECT * FROM safety_reports
         WHERE ownerUserId = :userId
+          AND (serverState IS NULL OR serverState != 'WITHDRAWN')
         ORDER BY createdAt DESC
         """
     )

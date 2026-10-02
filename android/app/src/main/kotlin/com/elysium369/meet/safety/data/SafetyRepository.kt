@@ -60,6 +60,7 @@ class SafetyRepository @Inject constructor(
     private val evidenceDao: SafetyEvidenceDao,
     private val gateway: SafetyCommandGateway,
     private val publicRepository: Provider<SafetyPublicRepository>,
+    private val evidenceRepository: Provider<com.elysium369.meet.safety.evidence.SafetyEvidenceRepository>,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -260,6 +261,7 @@ class SafetyRepository @Inject constructor(
             .select {
                 filter {
                     eq("reporter_user_id", principal.id)
+                    neq("state", "WITHDRAWN")
                 }
             }
             .decodeList<RemoteSafetyReportRow>()
@@ -282,8 +284,25 @@ class SafetyRepository @Inject constructor(
                 updatedAt = updatedMs,
             )
         }
-        if (entities.isNotEmpty()) {
-            reportDao.upsertAll(entities)
+        val activeRemoteIds = rows.map { it.id }.toSet()
+        val publicDao = database.safetyPublicDao()
+        database.withTransaction {
+            val now = System.currentTimeMillis()
+            val localReports = reportDao.listByUser(principal.id)
+            for (local in localReports) {
+                if (local.syncState == "SYNCED" && !activeRemoteIds.contains(local.reportId)) {
+                    payloadDao.redact(local.payloadId, now)
+                    reportDao.deleteOwned(local.reportId, principal.id)
+                    publicDao.deletePoint(local.reportId)
+                    publicDao.deleteCase(local.reportId)
+                    publicDao.clearTimeline(local.reportId)
+                    publicDao.clearClaims(local.reportId)
+                    evidenceDao.deleteByReportId(local.reportId, principal.id)
+                }
+            }
+            if (entities.isNotEmpty()) {
+                reportDao.upsertAll(entities)
+            }
         }
     }
 
@@ -351,7 +370,7 @@ class SafetyRepository @Inject constructor(
         return reportDao.countByUser(principal.id)
     }
 
-    /** Owner-authorized withdrawal. Server redacts private content before local removal. */
+    /** Owner-authorized withdrawal. Server redacts private content and cascades removal from all public projections. */
     suspend fun withdrawReport(reportId: String) {
         UUID.fromString(reportId)
         val principal = principalKernel.current()
@@ -367,12 +386,20 @@ class SafetyRepository @Inject constructor(
             ).decodeAs<JsonObject>()
             check(response["state"]?.jsonPrimitive?.contentOrNull == "WITHDRAWN") { "SAFETY_WITHDRAWAL_NOT_ACKNOWLEDGED" }
         }
+        val publicDao = database.safetyPublicDao()
         database.withTransaction {
             val now = System.currentTimeMillis()
             if (report.syncState != "SYNCED") outboxDao.cancelPendingReport(reportId, principal.id, now)
             payloadDao.redact(report.payloadId, now)
             check(reportDao.deleteOwned(reportId, principal.id) == 1)
+            publicDao.deletePoint(reportId)
+            publicDao.deleteCase(reportId)
+            publicDao.clearTimeline(reportId)
+            publicDao.clearClaims(reportId)
+            evidenceDao.deleteByReportId(reportId, principal.id)
         }
+        evidenceRepository.get().clearReportLocalEvidence(reportId, principal.id)
+        publicRepository.get().evictReport(reportId)
     }
 
     suspend fun reconcileMyReports() {
@@ -381,12 +408,18 @@ class SafetyRepository @Inject constructor(
             filter { eq("reporter_user_id", principal.id) }
         }.decodeList<SafetyRemoteReportState>()
         val remoteById = remote.associateBy { it.id }
+        val publicDao = database.safetyPublicDao()
         database.withTransaction {
             reportDao.listByUser(principal.id).forEach { local ->
                 val authoritative = remoteById[local.reportId]
                 if (authoritative?.state == "WITHDRAWN") {
                     payloadDao.redact(local.payloadId, System.currentTimeMillis())
                     reportDao.deleteOwned(local.reportId, principal.id)
+                    publicDao.deletePoint(local.reportId)
+                    publicDao.deleteCase(local.reportId)
+                    publicDao.clearTimeline(local.reportId)
+                    publicDao.clearClaims(local.reportId)
+                    evidenceDao.deleteByReportId(local.reportId, principal.id)
                 }
             }
         }
