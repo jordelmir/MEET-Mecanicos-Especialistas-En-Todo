@@ -200,6 +200,22 @@ class DrugMarketImpunityStore @Inject constructor(
         }
     }
 
+    fun registerCivilianProfile(
+        aliasOrPseudonym: String = "Ciudadano Anónimo",
+        isAnonymousProtected: Boolean = true,
+    ) {
+        val cleanAlias = aliasOrPseudonym.trim().ifEmpty { "Ciudadano Anónimo" }
+        val profile = SafetyParticipantProfile(
+            role = "CIVILIAN",
+            fullName = cleanAlias,
+            organizationOrMedia = "",
+            phoneOrContact = "",
+            isAnonymousProtected = isAnonymousProtected,
+            registeredAt = System.currentTimeMillis(),
+        )
+        saveParticipantProfile(profile)
+    }
+
     private fun loadParticipantProfile(): SafetyParticipantProfile {
         val raw = prefs.getString("safety_participant_profile", null) ?: return SafetyParticipantProfile()
         return runCatching { json.decodeFromString<SafetyParticipantProfile>(raw) }.getOrDefault(SafetyParticipantProfile())

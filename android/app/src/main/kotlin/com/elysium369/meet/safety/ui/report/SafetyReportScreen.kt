@@ -513,21 +513,55 @@ private fun StepSourceRelation(
                                         )
                                     }
                                 }
-                                SourceRelation.DIRECT_WITNESS -> {
-                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                SourceRelation.DIRECT_WITNESS, SourceRelation.SECOND_HAND -> {
+                                    var civilAliasInput by remember(state.participantDetails) {
+                                        mutableStateOf(
+                                            state.participantDetails.removePrefix("Civil: ").removeSuffix(" (Anónimo Protegido)").ifEmpty { "" }
+                                        )
+                                    }
+
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text(
-                                            "🔒 PROTECCIÓN SOBERANA DE FUENTE",
+                                            "REGISTRO CIUDADANO · MÁXIMO ANONIMATO SOBERANO",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Black,
                                             color = MeetColors.neonGreen,
                                             letterSpacing = 1.sp,
                                         )
-                                        Text(
-                                            "Tu reporte está protegido con cifrado criptográfico AEAD. Tu anonimato permanece blindado. Los civiles pueden reportar incidencias y reactivar cronómetros con total seguridad.",
-                                            fontSize = 11.sp,
-                                            color = MeetColors.textSecondary,
-                                            lineHeight = 16.sp,
+                                        OutlinedTextField(
+                                            value = civilAliasInput,
+                                            onValueChange = {
+                                                civilAliasInput = it
+                                                val detail = if (it.isBlank()) "Civil: Anónimo Protegido" else "Civil: ${it.trim()} (Anónimo Protegido)"
+                                                viewModel.updateParticipantDetails(detail)
+                                            },
+                                            label = { Text("Seudónimo o Alias Opcional", fontSize = 11.sp) },
+                                            placeholder = { Text("Opcional (Ej. Civil Vigilante, Anónimo)", fontSize = 11.sp) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
                                         )
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = CardDefaults.cardColors(containerColor = MeetColors.neonGreen.copy(alpha = 0.08f)),
+                                            border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.35f)),
+                                        ) {
+                                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                                Text(
+                                                    "🛡️ BLINDAJE DE PRIVACIDAD Y ZERO-KNOWLEDGE",
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Black,
+                                                    color = MeetColors.neonGreen,
+                                                    letterSpacing = 0.8.sp,
+                                                )
+                                                Text(
+                                                    "Cero recolección de barrios, lugares de residencia, domicilios o identidades personales. Tu dispositivo cifra el reporte con clave soberana AEAD. Como ciudadano tienes potestad plena de emitir reportes y reactivar cronómetros de reincidencia con 100% de protección de tu vida e integridad.",
+                                                    fontSize = 10.sp,
+                                                    color = MeetColors.textSecondary,
+                                                    lineHeight = 15.sp,
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                                 else -> {
