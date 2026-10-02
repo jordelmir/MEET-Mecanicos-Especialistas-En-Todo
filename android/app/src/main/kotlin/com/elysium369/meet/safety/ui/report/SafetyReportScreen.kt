@@ -368,9 +368,47 @@ private fun StepSourceRelation(
             Text(stringResource(R.string.safety_report_identify), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MeetColors.cyberCyan, letterSpacing = 1.2.sp)
             Spacer(modifier = Modifier.height(4.dp))
             Text(stringResource(R.string.safety_report_identify_body), fontSize = 12.sp, color = MeetColors.textSecondary)
-            Spacer(modifier = Modifier.height(12.dp))
-            SourceRelation.entries.forEach { relation ->
-                val isSelected = state.sourceRelation == relation
+            val primarySourceCategories = listOf(
+                SourceRelation.DIRECT_WITNESS,
+                SourceRelation.JOURNALISTIC,
+                SourceRelation.INSTITUTIONAL,
+            )
+
+            primarySourceCategories.forEach { relation ->
+                val isSelected = when (relation) {
+                    SourceRelation.DIRECT_WITNESS -> state.sourceRelation == null ||
+                        state.sourceRelation == SourceRelation.DIRECT_WITNESS ||
+                        state.sourceRelation == SourceRelation.FAMILY_OR_NEIGHBOR ||
+                        state.sourceRelation == SourceRelation.SECOND_HAND ||
+                        state.sourceRelation == SourceRelation.DOCUMENTARY ||
+                        state.sourceRelation == SourceRelation.PUBLIC_RECORD ||
+                        state.sourceRelation == SourceRelation.UNKNOWN
+                    SourceRelation.JOURNALISTIC -> state.sourceRelation == SourceRelation.JOURNALISTIC
+                    SourceRelation.INSTITUTIONAL -> state.sourceRelation == SourceRelation.INSTITUTIONAL
+                    else -> false
+                }
+
+                val title = when (relation) {
+                    SourceRelation.DIRECT_WITNESS -> "Civil"
+                    SourceRelation.JOURNALISTIC -> "Periodista / Medio"
+                    SourceRelation.INSTITUTIONAL -> "Institución"
+                    else -> "Civil"
+                }
+
+                val subtitle = when (relation) {
+                    SourceRelation.DIRECT_WITNESS -> "Civiles, familias, testigos y ciudadanía con máximo anonimato"
+                    SourceRelation.JOURNALISTIC -> "Prensa, reporteros, agencias y medios de comunicación"
+                    SourceRelation.INSTITUTIONAL -> "Fuerza Pública, OIJ, Cruz Roja, Bomberos u organismos oficiales"
+                    else -> "Civiles, familias, testigos y ciudadanía con máximo anonimato"
+                }
+
+                val emoji = when (relation) {
+                    SourceRelation.DIRECT_WITNESS -> "🛡️"
+                    SourceRelation.JOURNALISTIC -> "📰"
+                    SourceRelation.INSTITUTIONAL -> "🏢"
+                    else -> "🛡️"
+                }
+
                 Card(
                     onClick = {
                         SafetyHaptics.selectionTick(view)
@@ -378,7 +416,7 @@ private fun StepSourceRelation(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
+                        .padding(vertical = 5.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = if (isSelected) MeetColors.cyberCyan.copy(alpha = 0.12f) else MeetColors.backgroundDeep,
@@ -394,9 +432,9 @@ private fun StepSourceRelation(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("${relation.emoji()} ${relation.label()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (isSelected) Color.White else MeetColors.textPrimary)
+                                Text("$emoji $title", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (isSelected) Color.White else MeetColors.textPrimary)
                                 Spacer(Modifier.height(2.dp))
-                                Text(relation.description(), fontSize = 11.sp, color = MeetColors.textSecondary)
+                                Text(subtitle, fontSize = 11.sp, color = MeetColors.textSecondary)
                             }
                             if (isSelected) {
                                 Icon(
