@@ -763,10 +763,10 @@ private fun StepEvidence(
     viewModel: SafetyReportViewModel,
     view: View,
 ) {
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let {
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        uris.forEach { uri ->
             SafetyHaptics.evidenceAttached(view)
-            viewModel.attachEvidence(it)
+            viewModel.attachEvidence(uri)
         }
     }
     Card(
@@ -780,6 +780,21 @@ private fun StepEvidence(
             Text(stringResource(R.string.safety_report_step_evidence_desc), color = MeetColors.textSecondary, fontSize = 12.sp)
 
             state.evidence.forEach { item ->
+                val evidenceIcon = when {
+                    item.mimeType.startsWith("image/") -> Icons.Filled.AttachFile
+                    item.mimeType.startsWith("video/") -> Icons.Filled.AttachFile
+                    item.mimeType.startsWith("audio/") -> Icons.Filled.AttachFile
+                    else -> Icons.Filled.AttachFile
+                }
+                val evidenceLabel = when {
+                    item.mimeType.startsWith("image/") -> "📷 Imagen"
+                    item.mimeType.startsWith("video/") -> "🎥 Video"
+                    item.mimeType.startsWith("audio/") -> "🎙️ Audio"
+                    item.mimeType == "application/pdf" -> "📄 PDF"
+                    item.mimeType.contains("word") || item.mimeType.contains("document") -> "📝 Documento"
+                    item.mimeType.contains("text") -> "📝 Texto"
+                    else -> "📎 ${item.mimeType.substringAfter("/")}"
+                }
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -788,14 +803,21 @@ private fun StepEvidence(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Filled.AttachFile, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
+                    Icon(evidenceIcon, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(
-                        stringResource(R.string.safety_report_step_evidence_item, item.mimeType, item.byteCount / 1024),
-                        Modifier.weight(1f),
-                        color = MeetColors.textPrimary,
-                        fontSize = 12.sp,
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            evidenceLabel,
+                            color = MeetColors.textPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            "${item.byteCount / 1024} KB · ${item.mimeType}",
+                            color = MeetColors.textMuted,
+                            fontSize = 10.sp,
+                        )
+                    }
                     IconButton(
                         onClick = { viewModel.removeEvidence(item.evidenceId) },
                         enabled = !state.staging,
@@ -806,7 +828,7 @@ private fun StepEvidence(
             }
 
             Button(
-                onClick = { picker.launch(arrayOf("image/*", "video/*", "audio/*", "application/pdf")) },
+                onClick = { picker.launch(arrayOf("image/*", "video/*", "audio/*", "application/pdf", "text/*", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
                 enabled = !state.staging && state.evidence.size < 5,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -818,8 +840,17 @@ private fun StepEvidence(
                 Icon(Icons.Filled.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (state.staging) stringResource(R.string.safety_report_step_evidence_protecting) else stringResource(R.string.safety_report_step_evidence_attach),
+                    if (state.staging) stringResource(R.string.safety_report_step_evidence_protecting) else "Adjuntar archivos",
                     fontWeight = FontWeight.Bold,
+                )
+            }
+
+            if (state.evidence.isNotEmpty()) {
+                Text(
+                    "${state.evidence.size}/5 archivos adjuntos",
+                    fontSize = 10.sp,
+                    color = MeetColors.textMuted,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }

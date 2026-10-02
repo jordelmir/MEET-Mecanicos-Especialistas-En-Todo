@@ -7,14 +7,26 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -26,15 +38,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.elysium369.meet.R
+import com.elysium369.meet.safety.evidence.SafetyEvidenceEntity
 import com.elysium369.meet.safety.ui.common.SafetyCategoryIcons
 import com.elysium369.meet.safety.ui.common.SafetyEmptyState
 import com.elysium369.meet.safety.ui.common.SafetyShimmer
 import com.elysium369.meet.ui.theme.MeetColors
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,6 +89,17 @@ fun SafetyMyReportsScreen(
                             contentDescription = stringResource(R.string.safety_back),
                             tint = MeetColors.textPrimary,
                         )
+                    }
+                },
+                actions = {
+                    if (state.pendingCount > 0) {
+                        IconButton(onClick = { viewModel.retrySyncAll() }) {
+                            Icon(
+                                Icons.Filled.Refresh,
+                                contentDescription = "Reintentar sincronización",
+                                tint = MeetColors.cyberCyan,
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MeetColors.backgroundDeep),
@@ -115,15 +144,37 @@ fun SafetyMyReportsScreen(
                 ) {
                     item { Spacer(modifier = Modifier.height(4.dp)) }
 
+                    // Action message banner
+                    state.actionMessage?.let { message ->
+                        item {
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(containerColor = MeetColors.neonGreen.copy(alpha = 0.15f)),
+                            ) {
+                                Text(
+                                    message,
+                                    modifier = Modifier.padding(12.dp),
+                                    color = MeetColors.neonGreen,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                    }
+
                     items(state.reports, key = { it.reportId }) { report ->
+                        val evidence = state.evidenceByReport[report.reportId] ?: emptyList()
                         AnimatedVisibility(
                             visible = true,
                             enter = fadeIn() + slideInVertically { it / 4 },
                         ) {
                             MyReportCard(
                                 report = report,
+                                evidence = evidence,
                                 withdrawing = state.withdrawingReportId == report.reportId,
                                 onWithdraw = { reportToWithdraw = report.reportId },
+                                onRetrySync = { viewModel.retrySyncAll() },
                             )
                         }
                     }
@@ -178,8 +229,10 @@ fun SafetyMyReportsScreen(
 @Composable
 private fun MyReportCard(
     report: com.elysium369.meet.safety.data.local.SafetyReportEntity,
+    evidence: List<SafetyEvidenceEntity>,
     withdrawing: Boolean,
     onWithdraw: () -> Unit,
+    onRetrySync: () -> Unit,
 ) {
     val categoryColor = SafetyCategoryIcons.colorForString(report.category)
     val categoryIcon = SafetyCategoryIcons.iconForString(report.category)
@@ -191,15 +244,16 @@ private fun MyReportCard(
         border = BorderStroke(1.dp, MeetColors.borderSubtle),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+            // === Header: Category + Sync Badge ===
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(categoryColor.copy(alpha = 0.15f)),
                         contentAlignment = Alignment.Center,
@@ -208,53 +262,66 @@ private fun MyReportCard(
                             imageVector = categoryIcon,
                             contentDescription = null,
                             tint = categoryColor,
-                            modifier = Modifier.size(16.dp),
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                     Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        report.category.replace("_", " "),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
-                        color = MeetColors.textPrimary,
-                    )
+                    Column {
+                        Text(
+                            report.category.replace("_", " "),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = MeetColors.textPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            formatTimestamp(report.createdAt),
+                            fontSize = 10.sp,
+                            color = MeetColors.textMuted,
+                        )
+                    }
                 }
 
-                val syncColor = when (report.syncState) {
-                    "SYNCED" -> MeetColors.neonGreen
-                    "FAILED" -> MeetColors.error
-                    else -> MeetColors.cyberCyan
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(syncColor.copy(alpha = 0.15f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp),
-                ) {
-                    Text(
-                        report.syncState,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        color = syncColor,
-                    )
-                }
+                SyncStatusBadge(report)
             }
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            // === Status Row: Local state + Server version ===
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(10.dp))
                     .background(MeetColors.backgroundDeep)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
-                    Text("ESTADO LOCAL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary)
-                    Text(report.localState, fontSize = 12.sp, color = MeetColors.textPrimary)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val (statusIcon, statusColor, statusLabel) = resolveLocalState(report)
+                    Icon(
+                        imageVector = statusIcon,
+                        contentDescription = null,
+                        tint = statusColor,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(
+                            "ESTADO",
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MeetColors.textMuted,
+                            letterSpacing = 1.sp,
+                        )
+                        Text(
+                            statusLabel,
+                            fontSize = 12.sp,
+                            color = statusColor,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
                 }
 
                 if (report.serverVersion > 0) {
@@ -269,8 +336,47 @@ private fun MyReportCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            // === Evidence/Attachments Section ===
+            if (evidence.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    "ARCHIVOS ADJUNTOS (${evidence.size})",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MeetColors.textMuted,
+                    letterSpacing = 1.sp,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(evidence, key = { it.evidenceId }) { item ->
+                        EvidenceChip(item)
+                    }
+                }
+            }
 
+            // === Retry button for failed sync ===
+            if (report.syncState == "FAILED") {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = onRetrySync,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MeetColors.cyberCyan.copy(alpha = 0.15f),
+                        contentColor = MeetColors.cyberCyan,
+                    ),
+                ) {
+                    Icon(Icons.Filled.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Reintentar sincronización", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // === Remove button ===
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -297,3 +403,118 @@ private fun MyReportCard(
         }
     }
 }
+
+@Composable
+private fun SyncStatusBadge(report: com.elysium369.meet.safety.data.local.SafetyReportEntity) {
+    val (syncColor, syncLabel, syncIcon) = when (report.syncState) {
+        "SYNCED" -> Triple(MeetColors.neonGreen, "ONLINE", Icons.Filled.CloudDone)
+        "SYNCING" -> Triple(MeetColors.cyberCyan, "SYNCING", Icons.Filled.CloudSync)
+        "FAILED" -> Triple(MeetColors.error, "FAILED", Icons.Filled.CloudOff)
+        "QUEUED" -> Triple(Color(0xFFFFB020), "QUEUED", Icons.Filled.CloudUpload)
+        else -> Triple(MeetColors.textMuted, report.syncState, Icons.Filled.CloudUpload)
+    }
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(syncColor.copy(alpha = 0.15f))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector = syncIcon,
+            contentDescription = null,
+            tint = syncColor,
+            modifier = Modifier.size(12.dp),
+        )
+        Text(
+            syncLabel,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Black,
+            color = syncColor,
+        )
+    }
+}
+
+@Composable
+private fun EvidenceChip(item: SafetyEvidenceEntity) {
+    val (icon, label) = resolveEvidenceType(item.mimeType)
+    val uploadColor = when (item.uploadState) {
+        "RECEIVED" -> MeetColors.neonGreen
+        "UPLOADED" -> MeetColors.cyberCyan
+        "UPLOADING" -> Color(0xFFFFB020)
+        "FAILED" -> MeetColors.error
+        else -> MeetColors.textMuted
+    }
+
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(MeetColors.backgroundDeep)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MeetColors.cyberCyan,
+            modifier = Modifier.size(16.dp),
+        )
+        Column {
+            Text(
+                label,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MeetColors.textPrimary,
+            )
+            Text(
+                "${item.byteCount / 1024} KB · ${resolveUploadLabel(item.uploadState)}",
+                fontSize = 8.sp,
+                color = uploadColor,
+            )
+        }
+    }
+}
+
+/** Map localState to a human-friendly triple: (icon, color, label) */
+private fun resolveLocalState(report: com.elysium369.meet.safety.data.local.SafetyReportEntity): Triple<ImageVector, Color, String> {
+    // Priority: if synced online, show that. Otherwise show raw state.
+    return when {
+        report.localState == "SYNCED_ONLINE" || report.syncState == "SYNCED" ->
+            Triple(Icons.Filled.CloudDone, Color(0xFF10B981), "Sincronizado mundialmente")
+        report.syncState == "SYNCING" ->
+            Triple(Icons.Filled.CloudSync, Color(0xFF06B6D4), "Sincronizando...")
+        report.syncState == "QUEUED" ->
+            Triple(Icons.Filled.CloudUpload, Color(0xFFFFB020), "En cola de sincronización")
+        report.syncState == "FAILED" ->
+            Triple(Icons.Filled.CloudOff, Color(0xFFEF4444), "Error de sincronización")
+        report.localState == "LOCAL_ONLY" ->
+            Triple(Icons.Filled.CloudUpload, Color(0xFFFFB020), "Pendiente de sincronización")
+        else ->
+            Triple(Icons.Filled.CloudUpload, Color(0xFF94A3B8), report.localState)
+    }
+}
+
+private fun resolveEvidenceType(mimeType: String): Pair<ImageVector, String> = when {
+    mimeType.startsWith("image/") -> Icons.Filled.Image to "Imagen"
+    mimeType.startsWith("video/") -> Icons.Filled.Videocam to "Video"
+    mimeType.startsWith("audio/") -> Icons.Filled.AudioFile to "Audio"
+    mimeType == "application/pdf" -> Icons.Filled.PictureAsPdf to "PDF"
+    else -> Icons.Filled.AttachFile to "Archivo"
+}
+
+private fun resolveUploadLabel(state: String): String = when (state) {
+    "STAGED" -> "Pendiente"
+    "UPLOADING" -> "Subiendo..."
+    "UPLOADED" -> "Subido"
+    "RECEIVED" -> "Verificado ✓"
+    "RETRY" -> "Reintentando..."
+    "FAILED" -> "Error"
+    else -> state
+}
+
+private fun formatTimestamp(epochMs: Long): String = try {
+    SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es")).format(Date(epochMs))
+} catch (_: Exception) { "" }

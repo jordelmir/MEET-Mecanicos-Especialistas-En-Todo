@@ -7,7 +7,17 @@ import java.security.MessageDigest
 object SafetyEvidencePolicy {
     const val MAX_BYTES = 20 * 1024 * 1024
     const val MAX_ATTACHMENTS = 5
-    val allowedMimeTypes = setOf("image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "audio/mpeg", "audio/mp4", "audio/aac", "audio/ogg", "application/pdf")
+    val allowedMimeTypes = setOf(
+        "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif",
+        "video/mp4", "video/webm", "video/3gpp", "video/quicktime",
+        "audio/mpeg", "audio/mp4", "audio/aac", "audio/ogg", "audio/wav", "audio/x-wav",
+        "application/pdf",
+        "text/plain", "text/csv", "text/html",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
     fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it.toInt() and 0xff) }
     fun readBounded(input: InputStream): ByteArray {
         val output = ByteArrayOutputStream()

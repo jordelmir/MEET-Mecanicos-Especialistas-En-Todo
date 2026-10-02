@@ -66,6 +66,7 @@ interface SafetyReportDao {
         SET serverState = :serverState,
             serverVersion = :serverVersion,
             syncState = 'SYNCED',
+            localState = 'SYNCED_ONLINE',
             updatedAt = :now
         WHERE reportId = :reportId
         """
