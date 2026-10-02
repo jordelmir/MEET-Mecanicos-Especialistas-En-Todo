@@ -467,29 +467,6 @@ private fun StepSourceRelation(
                                         )
                                     }
                                 }
-                                SourceRelation.FAMILY_OR_NEIGHBOR -> {
-                                    var relationInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.removePrefix("Vínculo: ")) }
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(
-                                            "VÍNCULO O PARENTESCO CON EL AFECTADO",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = MeetColors.cyberCyan,
-                                            letterSpacing = 1.sp,
-                                        )
-                                        OutlinedTextField(
-                                            value = relationInput,
-                                            onValueChange = {
-                                                relationInput = it
-                                                viewModel.updateParticipantDetails("Vínculo: $it")
-                                            },
-                                            label = { Text("Especifica tu parentesco o cercanía", fontSize = 11.sp) },
-                                            placeholder = { Text("Ej. Madre, Hermano, Cónyuge, Vecino directo", fontSize = 11.sp) },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true,
-                                        )
-                                    }
-                                }
                                 SourceRelation.INSTITUTIONAL -> {
                                     var instInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.removePrefix("Institución: ")) }
                                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -506,14 +483,15 @@ private fun StepSourceRelation(
                                                 instInput = it
                                                 viewModel.updateParticipantDetails("Institución: $it")
                                             },
-                                            label = { Text("Nombre del cuerpo o institución", fontSize = 11.sp) },
+                                            label = { Text("Nombre del cuerpo o institución oficial", fontSize = 11.sp) },
                                             placeholder = { Text("Ej. OIJ, Fuerza Pública, Cruz Roja, Bomberos", fontSize = 11.sp) },
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true,
                                         )
                                     }
                                 }
-                                SourceRelation.DIRECT_WITNESS, SourceRelation.SECOND_HAND -> {
+                                else -> {
+                                    // Civiles, Testigos, Familiares y Ciudadanía General: MÁXIMO ANONIMATO
                                     var civilAliasInput by remember(state.participantDetails) {
                                         mutableStateOf(
                                             state.participantDetails.removePrefix("Civil: ").removeSuffix(" (Anónimo Protegido)").ifEmpty { "" }
@@ -522,7 +500,7 @@ private fun StepSourceRelation(
 
                                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                         Text(
-                                            "REGISTRO CIUDADANO · MÁXIMO ANONIMATO SOBERANO",
+                                            "CIUDADANÍA Y CIVILES · MÁXIMO ANONIMATO SOBERANO",
                                             fontSize = 10.sp,
                                             fontWeight = FontWeight.Black,
                                             color = MeetColors.neonGreen,
@@ -535,7 +513,7 @@ private fun StepSourceRelation(
                                                 val detail = if (it.isBlank()) "Civil: Anónimo Protegido" else "Civil: ${it.trim()} (Anónimo Protegido)"
                                                 viewModel.updateParticipantDetails(detail)
                                             },
-                                            label = { Text("Seudónimo o Alias Opcional", fontSize = 11.sp) },
+                                            label = { Text("Seudónimo o Alias (100% Opcional)", fontSize = 11.sp) },
                                             placeholder = { Text("Opcional (Ej. Civil Vigilante, Anónimo)", fontSize = 11.sp) },
                                             modifier = Modifier.fillMaxWidth(),
                                             singleLine = true,
@@ -548,36 +526,20 @@ private fun StepSourceRelation(
                                         ) {
                                             Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                                 Text(
-                                                    "🛡️ BLINDAJE DE PRIVACIDAD Y ZERO-KNOWLEDGE",
+                                                    "🛡️ BLINDAJE DE VIDA Y PROTOCOLO ZERO-KNOWLEDGE",
                                                     fontSize = 10.sp,
                                                     fontWeight = FontWeight.Black,
                                                     color = MeetColors.neonGreen,
                                                     letterSpacing = 0.8.sp,
                                                 )
                                                 Text(
-                                                    "Cero recolección de barrios, lugares de residencia, domicilios o identidades personales. Tu dispositivo cifra el reporte con clave soberana AEAD. Como ciudadano tienes potestad plena de emitir reportes y reactivar cronómetros de reincidencia con 100% de protección de tu vida e integridad.",
+                                                    "Para proteger la vida de los seres humanos y prevenir riesgos ante cualquier filtración o hackeo, NO se recopilan parentescos, familias, domicilios, barrios ni identidades personales. Tu reporte está blindado criptográficamente con clave soberana AEAD. Como ciudadano tienes potestad total de reportar y reactivar cronómetros con absoluta seguridad.",
                                                     fontSize = 10.sp,
                                                     color = MeetColors.textSecondary,
                                                     lineHeight = 15.sp,
                                                 )
                                             }
                                         }
-                                    }
-                                }
-                                else -> {
-                                    var noteInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.removePrefix("Detalle: ")) }
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        OutlinedTextField(
-                                            value = noteInput,
-                                            onValueChange = {
-                                                noteInput = it
-                                                viewModel.updateParticipantDetails("Detalle: $it")
-                                            },
-                                            label = { Text("Detalle adicional sobre tu rol o fuente (Opcional)", fontSize = 11.sp) },
-                                            placeholder = { Text("Información sobre el origen de los datos", fontSize = 11.sp) },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true,
-                                        )
                                     }
                                 }
                             }
