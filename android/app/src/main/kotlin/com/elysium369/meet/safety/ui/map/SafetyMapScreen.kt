@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
@@ -805,6 +806,17 @@ private fun resolveVideoPlatform(url: String): VideoPlatformInfo {
 @Composable
 private fun VideoLinkCard(url: String, onOpen: () -> Unit) {
     val platform = resolveVideoPlatform(url)
+    // Platform-aware vivid colors
+    val platformColor = when {
+        url.contains("youtube", true) || url.contains("youtu.be", true) -> Color(0xFFFF0000)
+        url.contains("tiktok", true) -> Color(0xFFEE1D52)
+        url.contains("instagram", true) -> Color(0xFFE4405F)
+        url.contains("facebook", true) || url.contains("fb.watch", true) -> Color(0xFF1877F2)
+        url.contains("drive.google", true) -> Color(0xFF34A853)
+        url.contains("vimeo", true) -> Color(0xFF1AB7EA)
+        url.contains("twitter", true) || url.contains("x.com", true) -> Color(0xFF1DA1F2)
+        else -> MeetColors.neonGreen
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -812,7 +824,7 @@ private fun VideoLinkCard(url: String, onOpen: () -> Unit) {
             .clickable(onClick = onOpen),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
-        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
+        border = BorderStroke(1.5.dp, platformColor.copy(alpha = 0.8f)),
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -824,7 +836,7 @@ private fun VideoLinkCard(url: String, onOpen: () -> Unit) {
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(MeetColors.neonGreen.copy(alpha = 0.15f)),
+                        .background(platformColor.copy(alpha = 0.25f)),
                     contentAlignment = Alignment.Center,
                 ) {
                     Text(platform.emoji, fontSize = 16.sp)
@@ -835,7 +847,7 @@ private fun VideoLinkCard(url: String, onOpen: () -> Unit) {
                         platform.name,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
-                        color = MeetColors.neonGreen,
+                        color = platformColor,
                     )
                     Text(
                         url,
@@ -850,12 +862,12 @@ private fun VideoLinkCard(url: String, onOpen: () -> Unit) {
                 onClick = onOpen,
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MeetColors.neonGreen.copy(alpha = 0.15f),
-                    contentColor = MeetColors.backgroundDeep,
+                    containerColor = platformColor,
+                    contentColor = Color.White,
                 ),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
             ) {
-                Icon(Icons.Filled.OpenInNew, contentDescription = null, modifier = Modifier.size(14.dp))
+                Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Ver video", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }

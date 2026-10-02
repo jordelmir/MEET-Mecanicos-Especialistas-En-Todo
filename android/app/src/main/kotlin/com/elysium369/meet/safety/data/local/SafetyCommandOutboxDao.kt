@@ -90,6 +90,20 @@ interface SafetyCommandOutboxDao {
     @Query(
         """
         UPDATE safety_command_outbox
+        SET status='ACKNOWLEDGED',
+            leaseStartedAt=NULL,
+            correlationId=:correlationId,
+            lastErrorCode=NULL,
+            lastErrorMessage=NULL,
+            updatedAt=:now
+        WHERE idempotencyKey=:key
+        """
+    )
+    suspend fun markAcknowledgedDirect(key: String, correlationId: String?, now: Long): Int
+
+    @Query(
+        """
+        UPDATE safety_command_outbox
         SET status='RETRYABLE',
             leaseStartedAt=NULL,
             nextAttemptAt=:nextAttemptAt,

@@ -2,14 +2,17 @@ package com.elysium369.meet.safety.ui.hub
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.elysium369.meet.safety.data.SafetyPublicRepository
 import com.elysium369.meet.safety.data.SafetyRuntimeFeatureGates
 import com.elysium369.meet.safety.data.SafetyRepository
 import com.elysium369.meet.safety.domain.RemoteAvailability
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -39,44 +42,56 @@ data class SafetyHomeUiState(
 @HiltViewModel
 class SafetyHomeViewModel @Inject constructor(
     private val safetyRepository: SafetyRepository,
+    private val publicRepository: SafetyPublicRepository,
     private val gates: SafetyRuntimeFeatureGates,
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(SafetyHomeUiState())
-    val uiState: StateFlow<SafetyHomeUiState> = _uiState.asStateFlow()
+    private val _base = MutableStateFlow(SafetyHomeUiState())
+
+    // Reactively combine Room Flows so counts auto-update when any report/point/case changes
+    val uiState: StateFlow<SafetyHomeUiState> = combine(
+        _base,
+        safetyRepository.observeMyReports(),
+        publicRepository.observePoints(),
+        publicRepository.observeCases(),
+    ) { base, myReports, publicPoints, publicCases ->
+        base.copy(
+            totalReportCount = myReports.size,
+            pendingLocalReports = myReports.count { it.syncState != "SYNCED" },
+            publicPointCount = publicPoints.size,
+            publishedCaseCount = publicCases.size,
+            remoteAvailability = if (publicPoints.isNotEmpty() || publicCases.isNotEmpty())
+                RemoteAvailability.ONLINE else base.remoteAvailability,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SafetyHomeUiState())
 
     init {
         safetyRepository.resumePendingUploads()
         viewModelScope.launch {
-            gates.state.collect { features -> _uiState.update { it.copy(featureGates = features) } }
+            gates.state.collect { features -> _base.update { it.copy(featureGates = features) } }
         }
         loadHomeState()
     }
 
     private fun loadHomeState() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-
+            _base.update { it.copy(isLoading = true, error = null) }
             try {
                 val features = gates.refresh()
-                val pending = safetyRepository.pendingCount()
-                val total = safetyRepository.totalReportCount()
-                val remote = RemoteAvailability.UNKNOWN
-
-                _uiState.update {
+                // Refresh public data from Supabase into Room cache
+                try { publicRepository.refreshPoints() } catch (_: Exception) {}
+                try { publicRepository.refreshCases() } catch (_: Exception) {}
+                _base.update {
                     it.copy(
                         isLoading = false,
                         featureGates = features,
-                        pendingLocalReports = pending,
-                        totalReportCount = total,
-                        remoteAvailability = remote,
-                        lastConfirmedRemoteAt = null,
+                        lastConfirmedRemoteAt = System.currentTimeMillis(),
                     )
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                _uiState.update {
+                _base.update {
                     it.copy(
                         isLoading = false,
                         error = error.message ?: "Error al cargar datos de seguridad",

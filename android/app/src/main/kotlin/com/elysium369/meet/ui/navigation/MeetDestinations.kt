@@ -85,6 +85,7 @@ object MeetDestinations {
     const val SAFETY_REPORT_LOCATION = "safety/report/location/{mode}"
     const val SAFETY_MY_REPORTS = "safety/my-reports"
     const val SAFETY_CASES = "safety/cases"
+    const val SAFETY_TIMELINES = "safety/timelines"
     const val SAFETY_CASE_DETAIL = "safety/case/{caseId}"
     const val SAFETY_ACCOUNTABILITY = "safety/accountability"
     const val SAFETY_OBSERVATORY = "safety/observatory"

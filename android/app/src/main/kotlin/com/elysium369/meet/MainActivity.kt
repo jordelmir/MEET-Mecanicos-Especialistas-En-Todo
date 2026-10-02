@@ -1801,7 +1801,7 @@ fun MeetApp(
                     onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
                     onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
                     onNavigateToCases = { navController.navigate(MeetDestinations.SAFETY_CASES) },
-                    onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_CASES) },
+                    onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_TIMELINES) },
                     onNavigateToAccountability = { navController.navigate(MeetDestinations.SAFETY_ACCOUNTABILITY) },
                     onNavigateToObservatory = { navController.navigate(MeetDestinations.SAFETY_OBSERVATORY) },
                 )
@@ -1847,6 +1847,11 @@ fun MeetApp(
                 com.elysium369.meet.safety.ui.cases.SafetyCasesScreen(
                     onBack = { navController.popBackStack() },
                     onCaseClick = { caseId -> navController.navigate("safety/case/" + android.net.Uri.encode(caseId)) },
+                )
+            }
+            composable(MeetDestinations.SAFETY_TIMELINES) {
+                com.elysium369.meet.safety.ui.timelines.SafetyTimelinesScreen(
+                    onBack = { navController.popBackStack() },
                 )
             }
             composable(

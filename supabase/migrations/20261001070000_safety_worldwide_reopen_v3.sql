@@ -18,8 +18,12 @@ on conflict (key) do update set
   reason = excluded.reason,
   updated_at = now();
 
--- 2. Open RLS read policy on safety_public_points
+-- 2. Open permissions and RLS read policy on safety_public_points
+grant select on public.safety_public_points to anon, authenticated;
+alter table public.safety_public_points enable row level security;
 drop policy if exists safety_public_points_v3_closed on public.safety_public_points;
+drop policy if exists safety_public_points_anyone_read on public.safety_public_points;
+drop policy if exists safety_public_points_v3_published_read on public.safety_public_points;
 drop policy if exists safety_public_points_worldwide_read on public.safety_public_points;
 
 create policy safety_public_points_worldwide_read
@@ -28,30 +32,57 @@ create policy safety_public_points_worldwide_read
   to anon, authenticated
   using (true);
 
--- 3. Open RLS read policy on safety_public_cases
-drop policy if exists safety_public_cases_v3_closed on public.safety_public_cases;
-drop policy if exists safety_public_cases_worldwide_read on public.safety_public_cases;
+-- 3. Open permissions and RLS read policy on safety_public_case_projection
+grant select on public.safety_public_case_projection to anon, authenticated;
+alter table public.safety_public_case_projection enable row level security;
+drop policy if exists safety_public_case_projection_read on public.safety_public_case_projection;
+drop policy if exists safety_public_case_projection_v3_closed on public.safety_public_case_projection;
+drop policy if exists safety_public_case_projection_v3_published_read on public.safety_public_case_projection;
+drop policy if exists safety_public_case_projection_worldwide_read on public.safety_public_case_projection;
 
-create policy safety_public_cases_worldwide_read
-  on public.safety_public_cases
+create policy safety_public_case_projection_worldwide_read
+  on public.safety_public_case_projection
   for select
   to anon, authenticated
   using (true);
 
--- 4. Open RLS read policy on safety_public_timelines
-drop policy if exists safety_public_timelines_worldwide_read on public.safety_public_timelines;
+-- 4. Open permissions and RLS read policy on safety_public_case_timeline_projection
+grant select on public.safety_public_case_timeline_projection to anon, authenticated;
+alter table public.safety_public_case_timeline_projection enable row level security;
+drop policy if exists safety_public_case_timeline_projection_read on public.safety_public_case_timeline_projection;
+drop policy if exists safety_public_case_timeline_projection_v3_closed on public.safety_public_case_timeline_projection;
+drop policy if exists safety_public_timelines_worldwide_read on public.safety_public_case_timeline_projection;
+drop policy if exists safety_public_case_timeline_worldwide_read on public.safety_public_case_timeline_projection;
 
-create policy safety_public_timelines_worldwide_read
-  on public.safety_public_timelines
+create policy safety_public_case_timeline_worldwide_read
+  on public.safety_public_case_timeline_projection
   for select
   to anon, authenticated
   using (true);
 
--- 5. Open RLS read policy on safety_public_claims
-drop policy if exists safety_public_claims_worldwide_read on public.safety_public_claims;
+-- 5. Open permissions and RLS read policy on safety_public_case_claim_projection
+grant select on public.safety_public_case_claim_projection to anon, authenticated;
+alter table public.safety_public_case_claim_projection enable row level security;
+drop policy if exists safety_public_case_claim_projection_read on public.safety_public_case_claim_projection;
+drop policy if exists safety_public_case_claim_projection_v3_closed on public.safety_public_case_claim_projection;
+drop policy if exists safety_public_claims_worldwide_read on public.safety_public_case_claim_projection;
+drop policy if exists safety_public_case_claim_worldwide_read on public.safety_public_case_claim_projection;
 
-create policy safety_public_claims_worldwide_read
-  on public.safety_public_claims
+create policy safety_public_case_claim_worldwide_read
+  on public.safety_public_case_claim_projection
+  for select
+  to anon, authenticated
+  using (true);
+
+-- 6. Open permissions and RLS read policy on safety_public_accountability_projection
+grant select on public.safety_public_accountability_projection to anon, authenticated;
+alter table public.safety_public_accountability_projection enable row level security;
+drop policy if exists safety_public_accountability_projection_v3_closed on public.safety_public_accountability_projection;
+drop policy if exists safety_accountability_v3_published_read on public.safety_public_accountability_projection;
+drop policy if exists safety_public_accountability_worldwide_read on public.safety_public_accountability_projection;
+
+create policy safety_public_accountability_worldwide_read
+  on public.safety_public_accountability_projection
   for select
   to anon, authenticated
   using (true);

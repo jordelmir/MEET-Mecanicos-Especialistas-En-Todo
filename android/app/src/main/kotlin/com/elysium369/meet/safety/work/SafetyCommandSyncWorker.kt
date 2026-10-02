@@ -23,6 +23,7 @@ import com.elysium369.meet.data.remote.SupabaseModule
 import com.elysium369.meet.observability.MeetTelemetry
 import io.github.jan.supabase.gotrue.auth
 import kotlinx.coroutines.CancellationException
+import com.elysium369.meet.safety.data.SafetyPublicRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 
@@ -35,6 +36,7 @@ class SafetyCommandSyncWorker @AssistedInject constructor(
     private val reportDao: SafetyReportDao,
     private val gateway: SafetyCommandGateway,
     private val cipher: SafetyPayloadCipher,
+    private val publicRepository: SafetyPublicRepository,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result {
@@ -130,6 +132,10 @@ class SafetyCommandSyncWorker @AssistedInject constructor(
                     )
                     check(ackResult == 1) {
                         "ACK failed for ${entity.idempotencyKey}: expected 1 row, got $ackResult"
+                    }
+                    if (isReportCommand) {
+                        runCatching { publicRepository.refreshPoints() }
+                        runCatching { publicRepository.refreshCases() }
                     }
                     // Privacy-safe telemetry: no report IDs, GPS, or narrative content.
                     MeetTelemetry.event("safety.command.synced", mapOf(

@@ -42,6 +42,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import io.github.jan.supabase.postgrest.from
 import kotlinx.serialization.Serializable
+import com.elysium369.meet.safety.data.remote.SafetyCommandGateway
+import com.elysium369.meet.safety.domain.SafetyGatewayResult
+import javax.inject.Provider
 import kotlinx.serialization.SerialName
 
 @Singleton
@@ -55,6 +58,8 @@ class SafetyRepository @Inject constructor(
     private val principalKernel: ActivePrincipalKernel,
     private val cipher: SafetyPayloadCipher,
     private val evidenceDao: SafetyEvidenceDao,
+    private val gateway: SafetyCommandGateway,
+    private val publicRepository: Provider<SafetyPublicRepository>,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -155,6 +160,34 @@ class SafetyRepository @Inject constructor(
 
         SafetyCommandScheduler.enqueueNow(context)
         SafetyEvidenceScheduler.enqueue(context)
+
+        // Immediate online synchronization & public projections auto-refresh
+        try {
+            val command = outboxDao.get(idempotencyKey)
+            if (command != null) {
+                val payloadString = canonical.decodeToString()
+                val result = gateway.execute(command, payloadString)
+                if (result is SafetyGatewayResult.Accepted) {
+                    val completedAt = System.currentTimeMillis()
+                    reportDao.applyServerAcknowledgement(
+                        reportId = reportId,
+                        serverState = result.state,
+                        serverVersion = result.serverVersion,
+                        now = completedAt,
+                    )
+                    outboxDao.markAcknowledgedDirect(
+                        key = idempotencyKey,
+                        correlationId = result.correlationId,
+                        now = completedAt,
+                    )
+                    // Auto-refresh public projections so all Safety sections update immediately
+                    runCatching { publicRepository.get().refreshPoints() }
+                    runCatching { publicRepository.get().refreshCases() }
+                }
+            }
+        } catch (_: Exception) {
+            // Offline or intermittent network: WorkManager retry queue handles it safely
+        }
 
         return reportId
     }

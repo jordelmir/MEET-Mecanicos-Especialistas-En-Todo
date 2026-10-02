@@ -4,7 +4,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Android-4.28.0%20%7C%20code%2062-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
-  <img src="https://img.shields.io/badge/Room-schema%2086-39FF14?style=flat-square" alt="Room schema" />
+  <img src="https://img.shields.io/badge/Room-schema%2088-39FF14?style=flat-square" alt="Room schema" />
   <img src="https://img.shields.io/badge/Architecture-offline--first-7F52FF?style=flat-square" alt="Offline first" />
 </p>
 
@@ -19,10 +19,24 @@ La regla del producto es simple: no se presenta una intención local, una
 estimación o un dato de demostración como un hecho físico o una confirmación
 del servidor.
 
-## Estado del código en este checkpoint (Genesis Convergence)
+## Estado del código en este checkpoint (Safety V3 & Convergence)
 
 - **Android:** `versionName 4.28.0`, `versionCode 62`.
 - **Contrato de versión del paquete:** `4.28.0` (sin cambios funcionales web en esta ronda).
+- **Seguridad Ciudadana (Safety V3 - Red Abierta & Sincronización Mundial):**
+  - **Sincronización en Línea Inmediata:** Subida directa y auto-proyectada vía RPC `safety_create_report_v3`, actualizando en tiempo real todas las secciones (Mapa, Casos Públicos, Líneas de Tiempo y Rendición de Cuentas).
+  - **Doble Capa de Resiliencia:** Persistencia transaccional local en Room previa al envío, ejecución inmediata online en `SafetyRepository` con refresco automático de proyecciones, y respaldo background vía `SafetyCommandSyncWorker` (WorkManager) para operación 100% offline-first.
+  - **Hub de Seguridad Reactivo:** `SafetyHomeViewModel` observa flujos de Room en tiempo real, reflejando conteos precisos de `MY REPORTS`, reportes pendientes y estado de red activo.
+  - **Visualización Cartográfica en Vivo:** Eliminación de filtros que restringían coordenadas reales, permitiendo visualizar todos los incidentes geolocalizados en el mapa MapLibre con selección de marcadores y hoja inferior de narrativa completa.
+  - **Módulo Independiente TIMELINES:** Pantalla dedicada (`MeetDestinations.SAFETY_TIMELINES`, `SafetyTimelinesScreen`) con navegación propia, espina cronológica vertical, nodos de color según la categoría del incidente y desglose forense de fuentes/evidencia.
+  - **Enlaces Multimedia Optimizados:** Enlaces directos a videos (YouTube, TikTok, Instagram, Facebook, Drive) con botones de acción rápida, colores temáticos de alto contraste y lanzamiento nativo 1-click para preservar espacio en servidor.
+- **Persistencia Local (Room Schema 88):**
+  - Tablas locales dedicadas para proyecciones públicas: `safety_public_points_local`, `safety_public_cases_local`, `safety_public_timeline_local`, `safety_public_claims_local`.
+  - Cola outbox `safety_command_outbox` con ACK directo y transiciones idempotentes.
+  - Migración Room `88` verificada e integrada en `MeetDatabase.kt`.
+- **Backend & Migraciones Supabase:**
+  - `20261001070000_safety_worldwide_reopen_v3.sql`: Apertura mundial de políticas de lectura pública en proyecciones de seguridad.
+  - `20261001080000_safety_auto_project_reports_v3.sql`: Eliminación de bloqueos de moderación previa y auto-proyección atómica de reportes ciudadanos a proyecciones públicas con backfill histórico.
 - **Elysium Vanguard Master Order Genesis:**
   - **Infraestructura de Outbox en Producción:** `PostgresOutboxRepository` conectado en `Application.kt` con bloqueo a nivel de fila `FOR UPDATE SKIP LOCKED`, leases criptográficos atómicos y DLQ. Prohibición estricta de stubs en memoria fuera de tests.
   - **EVAIR Living Companion & Instant Shift:** Acompañante vivo persistente con canal único de audio (`VoiceInteractionBus.default`), eliminando fugas `ERROR_RECOGNIZER_BUSY`. Teletransportación instantánea 3D al botón objetivo mediante comandos `"SECCIÓN <nombre>"` y `"SELECCIONA <nombre>"`, compresión cuántica (`0.18f`), pulso de iluminación y ejecución determinista.
@@ -30,7 +44,6 @@ del servidor.
   - **Resolución de lugares:** el flujo nuevo de servicios no fabrica precios ni ubicaciones; las herramientas históricas todavía requieren auditoría independiente. Lugares no resolubles devuelven estrictamente `PlaceResolutionResult.NotFound`. Cotizaciones versionadas con TTL (`CR_METRO_V3_2026`).
   - **Suite de Verdad & Release Gate:** `GoldenJourneyTruthSuite` (5 tests de verdad obligatorios) y `AgentUiCoverageReleaseGate` integrados; distinguir sus pruebas automatizadas de recorridos físicos y verificación de producción.
   - **Paridad Cross-Runtime Parity:** Paridad byte-a-byte exacta de firmas SHA-256 entre TypeScript, Kotlin y PostgreSQL en `ci-verify.sh`.
-- **Persistencia local:** Room schema `86`, con cadena de migraciones incluida `MIGRATION_85_86` y esquemas exportados. Mensajes se aíslan por cuenta y conservan proyección y cola local.
 - **Servicios Elysium unificados:** ambas entradas históricas abren la misma experiencia cliente/proveedor con estados autorizados, métricas/calificaciones reales y comisión del 5% idempotente mediante saldo.
 - **Navegación 1-Click con Waze (`WazeNavigationButton`):**
   - Protocolo nativo `waze://?ll=lat,lng&navigate=yes` integrado en todas las tarjetas de servicios (viajes, misiones courier, rescate técnico y radar en vivo).
@@ -53,12 +66,6 @@ del servidor.
 - **Laboratorio de Emisiones & Pre-ITV Costa Rica:** Subsistema completo de evaluación
   regulatoria COSEVI / CITA con contrato de verdad inquebrantable (`MEASURED` vs `PHYSICS_DERIVED`
   vs `MODEL_ESTIMATED` vs `UNKNOWN`).
-- **Seguridad (Safety V2):** Suite completa de 9 pantallas elevadas al estándar
-  visual y de movimiento con 8 componentes dedicados (`SafetyCategoryIcons`,
-  `SafetyEmptyState`, `SafetyHaptics`, `SafetyShimmer`, `SafetyPulse`,
-  `AccountabilityGauge`, `SafetyTimeline`, `SafetyOfflineBanner`).
-- **Backend / Supabase:** Migración `20260925120000_commerce_and_delivery_ecosystem.sql`
-  con RLS, RPCs autoritativas de despacho/custodia y trazabilidad de eventos.
 - **Nombre comercial:** Elysium Vanguard AI OS. No se deben renombrar los
   contratos técnicos heredados `MEET` durante una actualización normal.
 
