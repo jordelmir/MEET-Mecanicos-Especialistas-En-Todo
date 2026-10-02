@@ -1,8 +1,9 @@
 package com.elysium.vanguard.recordshield
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecordShieldIdentityTest {
@@ -16,8 +17,14 @@ class RecordShieldIdentityTest {
         assertFalse(b.contains("account"))
     }
 
-    @Test fun anonymousStorageIsRejected() {
+    @Test fun anonymousStorageProjected() {
         RecordShieldIdentity.install { null }
-        assertThrows(IllegalStateException::class.java) { RecordShieldIdentity.storageScope() }
+        val scope = RecordShieldIdentity.storageScope()
+        assertTrue("scope must be non-empty hex", scope.isNotEmpty())
+        assertFalse("scope must not leak fallback string", scope.contains("local"))
+        assertFalse("scope must not leak fallback string", scope.contains("sovereign"))
+        // Deterministic: same fallback yields same scope
+        val again = RecordShieldIdentity.storageScope()
+        assertEquals(scope, again)
     }
 }
