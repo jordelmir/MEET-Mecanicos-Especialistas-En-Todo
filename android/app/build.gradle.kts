@@ -229,6 +229,9 @@ android {
             buildConfigField("String", "CAR2DB_API_KEY", "\"${localProps.getProperty("CAR2DB_API_KEY", "")}\"")
             buildConfigField("boolean", "CAR2DB_ENABLED", localProps.getProperty("CAR2DB_API_KEY", "").isNotBlank().toString())
             buildConfigField("String", "MINIMAX_API_KEY_DEBUG", "\"${localProps.getProperty("MINIMAX_API_KEY_DEBUG", "")}\"")
+            if (releaseSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
         release {
             isMinifyEnabled = true

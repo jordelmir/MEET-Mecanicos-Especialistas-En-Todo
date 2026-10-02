@@ -197,6 +197,32 @@ data class SafetyPublicCaseWire(
         )
 }
 
+@Serializable
+data class SafetyPublicEvidenceWire(
+    @SerialName("evidence_id") val evidenceId: String,
+    @SerialName("report_id") val reportId: String,
+    @SerialName("storage_path") val storagePath: String,
+    @SerialName("mime_type") val mimeType: String,
+    @SerialName("byte_count") val byteCount: Long,
+    @SerialName("content_sha256") val contentSha256: String = "",
+    @SerialName("created_at") val createdAt: String? = null,
+) {
+    fun toEntity(): com.elysium369.meet.safety.evidence.SafetyEvidenceEntity =
+        com.elysium369.meet.safety.evidence.SafetyEvidenceEntity(
+            evidenceId = evidenceId,
+            reportId = reportId,
+            ownerUserId = "public_reporter",
+            encryptedPath = storagePath,
+            contentSha256 = contentSha256,
+            mimeType = mimeType,
+            byteCount = byteCount,
+            stagedAt = createdAt?.let {
+                runCatching { Instant.parse(it).toEpochMilli() }.getOrNull()
+            } ?: System.currentTimeMillis(),
+            uploadState = "RECEIVED",
+        )
+}
+
 @Singleton
 class SafetyPublicRepository @Inject constructor(
     private val dao: SafetyPublicDao,
@@ -206,6 +232,23 @@ class SafetyPublicRepository @Inject constructor(
     private val refreshMutex = Mutex()
 
     private val client get() = SupabaseModule.client
+
+    private val _publicEvidence = MutableStateFlow<Map<String, List<com.elysium369.meet.safety.evidence.SafetyEvidenceEntity>>>(emptyMap())
+    val publicEvidence: StateFlow<Map<String, List<com.elysium369.meet.safety.evidence.SafetyEvidenceEntity>>> = _publicEvidence.asStateFlow()
+
+    suspend fun refreshEvidence() {
+        try {
+            val remote = client.postgrest["safety_public_evidence"]
+                .select()
+                .decodeList<SafetyPublicEvidenceWire>()
+            _publicEvidence.value = remote.map { it.toEntity() }.groupBy { it.reportId }
+            recordRefresh("public_evidence", remote.size)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            android.util.Log.e("SafetyPublicRepo", "Error refreshing public evidence", e)
+        }
+    }
 
     fun observePoints(): Flow<List<SafetyPublicPointEntity>> =
         dao.observePoints()
@@ -262,6 +305,7 @@ class SafetyPublicRepository @Inject constructor(
             ))
         }
         recordRefresh("public_points", remote.size)
+        refreshEvidence()
     }
 
     suspend fun refreshCases() = refreshMutex.withLock {
@@ -348,7 +392,8 @@ class SafetyPublicRepository @Inject constructor(
         val owner = requireSession()
         val channel = client.channel("safety-public-$owner-${UUID.randomUUID()}")
         val changes = listOf("safety_public_points", "safety_public_case_projection",
-            "safety_public_case_timeline_projection", "safety_public_case_claim_projection")
+            "safety_public_case_timeline_projection", "safety_public_case_claim_projection",
+            "safety_evidence_objects")
             .map { name -> channel.postgresChangeFlow<PostgresAction>(schema = "public") {
                 table = name
             }.map { Unit } }

@@ -84,8 +84,30 @@ class SafetyMapViewModel @Inject constructor(
         safetyRepository.observeMyPrivateMapPoints(),
         search,
         evidenceRepository.observeOwner(),
-    ) { public, private, query, evidenceList ->
-        SafetyMapSources(public, private, query, evidenceList.groupBy { it.reportId })
+        publicRepository.publicEvidence,
+    ) { public, private, query, localEvidenceList, publicEvidenceMap ->
+        val mergedEvidence = mutableMapOf<String, MutableList<SafetyEvidenceEntity>>()
+
+        publicEvidenceMap.forEach { (reportId, list) ->
+            mergedEvidence.getOrPut(reportId) { mutableListOf() }.addAll(list)
+            mergedEvidence.getOrPut(reportId.lowercase()) { mutableListOf() }.apply {
+                val existingIds = map { it.evidenceId }.toSet()
+                addAll(list.filter { it.evidenceId !in existingIds })
+            }
+        }
+
+        localEvidenceList.groupBy { it.reportId }.forEach { (reportId, list) ->
+            val existing = mergedEvidence.getOrPut(reportId) { mutableListOf() }
+            val localIds = list.map { it.evidenceId }.toSet()
+            existing.removeAll { it.evidenceId in localIds }
+            existing.addAll(list)
+
+            val existingLower = mergedEvidence.getOrPut(reportId.lowercase()) { mutableListOf() }
+            existingLower.removeAll { it.evidenceId in localIds }
+            existingLower.addAll(list)
+        }
+
+        SafetyMapSources(public, private, query, mergedEvidence)
     }
     val uiState = combine(mapSources, layer, range, loading, error) { sources, layerName, rangeName, busy, failure ->
         val (all, allPrivate, query, evidenceGrouped) = sources
@@ -115,12 +137,23 @@ class SafetyMapViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SafetyMapUiState())
 
-    fun openEvidence(context: Context, evidenceId: String) {
-        evidenceRepository.openEvidence(context, evidenceId)
+    fun openEvidence(context: Context, evidenceId: String, remoteStoragePath: String? = null, remoteMimeType: String? = null) {
+        val path = remoteStoragePath ?: uiState.value.evidenceByReport.values.flatten()
+            .find { it.evidenceId.equals(evidenceId, ignoreCase = true) }?.encryptedPath
+        val mime = remoteMimeType ?: uiState.value.evidenceByReport.values.flatten()
+            .find { it.evidenceId.equals(evidenceId, ignoreCase = true) }?.mimeType
+        evidenceRepository.openEvidence(context, evidenceId, path, mime)
     }
 
-    suspend fun loadEvidenceThumbnail(evidenceId: String): ByteArray? {
-        return evidenceRepository.getDecryptedBytes(evidenceId)
+    suspend fun loadEvidenceThumbnail(evidenceId: String, storagePath: String? = null): ByteArray? {
+        val local = evidenceRepository.getDecryptedBytes(evidenceId)
+        if (local != null) return local
+        val effectivePath = storagePath ?: uiState.value.evidenceByReport.values.flatten()
+            .find { it.evidenceId.equals(evidenceId, ignoreCase = true) }?.encryptedPath
+        if (!effectivePath.isNullOrBlank() && !effectivePath.endsWith(".aead")) {
+            return evidenceRepository.getRemotePublicBytes(evidenceId, effectivePath)
+        }
+        return null
     }
 
     init { viewModelScope.launch { publicRepository.realtimeWakeUps().collect { refreshNow() } } }
@@ -141,7 +174,12 @@ class SafetyMapViewModel @Inject constructor(
     fun locationPermissionDenied() { error.value = "Permiso de ubicación no concedido." }
     private suspend fun refreshNow() {
         loading.value = true
-        try { safetyRepository.reconcileMyReports(); publicRepository.refreshPoints(); error.value = null }
+        try {
+            safetyRepository.reconcileMyReports()
+            publicRepository.refreshPoints()
+            publicRepository.refreshEvidence()
+            error.value = null
+        }
         catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) { error.value = "No se pudo actualizar. Se muestra la última información pública guardada." }
         finally { loading.value = false }

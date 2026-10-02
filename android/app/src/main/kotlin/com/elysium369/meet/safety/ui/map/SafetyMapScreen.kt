@@ -338,7 +338,9 @@ fun SafetyMapScreen(
     }
 
     matchedPrivate?.let { point ->
-        val evidenceList = state.evidenceByReport[point.reportId] ?: emptyList()
+        val evidenceList = state.evidenceByReport[point.reportId]
+            ?: state.evidenceByReport[point.reportId.lowercase()]
+            ?: emptyList()
         ModalBottomSheet(
             onDismissRequest = { selectedId = null },
             containerColor = MeetColors.cardBackground,
@@ -347,8 +349,8 @@ fun SafetyMapScreen(
                 point = point,
                 evidenceList = evidenceList,
                 onClose = { selectedId = null },
-                onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId) },
-                onLoadThumbnail = { evidenceId -> viewModel.loadEvidenceThumbnail(evidenceId) },
+                onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId, item.encryptedPath, item.mimeType) },
+                onLoadThumbnail = { evidenceId, storagePath -> viewModel.loadEvidenceThumbnail(evidenceId, storagePath) },
                 store = impunityStore,
             )
         }
@@ -356,7 +358,9 @@ fun SafetyMapScreen(
 
     matchedPublic?.let { point ->
         val regionPoints = state.points.filter { it.regionKey() == point.regionKey() }
-        val evidenceList = state.evidenceByReport[point.publicPointId] ?: emptyList()
+        val evidenceList = state.evidenceByReport[point.publicPointId]
+            ?: state.evidenceByReport[point.publicPointId.lowercase()]
+            ?: emptyList()
         val matchingPrivate = state.privatePoints.firstOrNull { it.reportId.equals(point.publicPointId, ignoreCase = true) }
         ModalBottomSheet(
             onDismissRequest = { selectedId = null },
@@ -371,8 +375,8 @@ fun SafetyMapScreen(
                 evidenceList = evidenceList,
                 matchingPrivate = matchingPrivate,
                 onClose = { selectedId = null },
-                onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId) },
-                onLoadThumbnail = { evidenceId -> viewModel.loadEvidenceThumbnail(evidenceId) },
+                onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId, item.encryptedPath, item.mimeType) },
+                onLoadThumbnail = { evidenceId, storagePath -> viewModel.loadEvidenceThumbnail(evidenceId, storagePath) },
             )
         }
     }
@@ -405,7 +409,7 @@ private fun PublicPointDetail(
     matchingPrivate: SafetyPrivateMapPoint? = null,
     onClose: () -> Unit = {},
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit = {},
-    onLoadThumbnail: suspend (String) -> ByteArray? = { null },
+    onLoadThumbnail: suspend (String, String?) -> ByteArray? = { _, _ -> null },
 ) {
     val catColor = SafetyCategoryIcons.colorForString(point.category)
     val catIcon = SafetyCategoryIcons.iconForString(point.category)
@@ -855,7 +859,7 @@ private fun PrivateReportDetailSheet(
     evidenceList: List<SafetyEvidenceEntity>,
     onClose: () -> Unit,
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit,
-    onLoadThumbnail: suspend (String) -> ByteArray?,
+    onLoadThumbnail: suspend (String, String?) -> ByteArray? = { _, _ -> null },
     store: DrugMarketImpunityStore,
 ) {
     val categoryColor = SafetyCategoryIcons.colorForString(point.category)
@@ -1344,11 +1348,29 @@ private fun VideoLinkCard(url: String, onOpen: () -> Unit) {
     }
 }
 
+private fun decodeSampledBitmap(bytes: ByteArray, maxDim: Int = 1080): android.graphics.Bitmap? {
+    return runCatching {
+        val options = BitmapFactory.Options().apply {
+            inJustDecodeBounds = true
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        var sampleSize = 1
+        val origMax = maxOf(options.outWidth, options.outHeight)
+        while (origMax / (sampleSize * 2) >= maxDim) {
+            sampleSize *= 2
+        }
+        val decodeOptions = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize
+        }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOptions)
+    }.getOrNull()
+}
+
 @Composable
 private fun EvidenceFileCard(
     item: SafetyEvidenceEntity,
     onOpen: () -> Unit,
-    onLoadThumbnail: suspend (String) -> ByteArray?,
+    onLoadThumbnail: suspend (String, String?) -> ByteArray?,
 ) {
     val isImage = item.mimeType.startsWith("image/")
     val (icon, typeLabel) = when {
@@ -1359,15 +1381,18 @@ private fun EvidenceFileCard(
     }
 
     var imageBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var isLoadingThumbnail by remember { mutableStateOf(isImage) }
 
     if (isImage) {
-        LaunchedEffect(item.evidenceId) {
-            val bytes = onLoadThumbnail(item.evidenceId)
+        LaunchedEffect(item.evidenceId, item.encryptedPath) {
+            isLoadingThumbnail = true
+            val bytes = onLoadThumbnail(item.evidenceId, item.encryptedPath)
             if (bytes != null && bytes.isNotEmpty()) {
                 imageBitmap = runCatching {
-                    android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                    decodeSampledBitmap(bytes, 1080)?.asImageBitmap()
                 }.getOrNull()
             }
+            isLoadingThumbnail = false
         }
     }
 
@@ -1381,16 +1406,43 @@ private fun EvidenceFileCard(
         border = BorderStroke(1.dp, MeetColors.borderSubtle),
     ) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (imageBitmap != null) {
-                Image(
-                    bitmap = imageBitmap!!,
-                    contentDescription = "Vista previa de imagen",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 120.dp, max = 220.dp)
-                        .clip(RoundedCornerShape(10.dp)),
-                    contentScale = ContentScale.Crop,
-                )
+            if (isImage) {
+                if (imageBitmap != null) {
+                    Image(
+                        bitmap = imageBitmap!!,
+                        contentDescription = "Vista previa de imagen",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 120.dp, max = 240.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                        contentScale = ContentScale.Crop,
+                    )
+                } else if (isLoadingThumbnail) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MeetColors.cardBackgroundLighter),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MeetColors.cyberCyan,
+                                strokeWidth = 2.dp,
+                            )
+                            Text(
+                                "Cargando imagen...",
+                                color = MeetColors.textMuted,
+                                fontSize = 11.sp,
+                            )
+                        }
+                    }
+                }
             }
 
             Row(
