@@ -217,6 +217,53 @@ class DrugMarketImpunityStore @Inject constructor(
         saveParticipantProfile(profile)
     }
 
+    fun isInitialRegistered(): Boolean {
+        if (prefs.getBoolean("safety_initial_registered", false)) return true
+        val prof = _participantProfile.value
+        return prof.registeredAt > 0L && prof.role.isNotBlank()
+    }
+
+    fun saveInitialRegistration(
+        role: String,
+        aliasOrName: String = "",
+        organizationOrMedia: String = "",
+        credentialOrBadge: String = "",
+    ) {
+        val cleanRole = when (role.uppercase()) {
+            "JOURNALIST", "PERIODISTA" -> "JOURNALIST"
+            "INSTITUTION", "INSTITUCIÓN", "INSTITUCION" -> "INSTITUTION"
+            else -> "CIVILIAN"
+        }
+        val profile = when (cleanRole) {
+            "JOURNALIST" -> SafetyParticipantProfile(
+                role = "JOURNALIST",
+                fullName = aliasOrName.trim(),
+                organizationOrMedia = organizationOrMedia.trim(),
+                credentialNumber = credentialOrBadge.trim(),
+                isAnonymousProtected = false,
+                registeredAt = System.currentTimeMillis(),
+            )
+            "INSTITUTION" -> SafetyParticipantProfile(
+                role = "INSTITUTION",
+                fullName = aliasOrName.trim(),
+                organizationOrMedia = organizationOrMedia.trim().ifEmpty { aliasOrName.trim() },
+                credentialNumber = credentialOrBadge.trim(),
+                isAnonymousProtected = false,
+                registeredAt = System.currentTimeMillis(),
+            )
+            else -> SafetyParticipantProfile(
+                role = "CIVILIAN",
+                fullName = aliasOrName.trim().ifEmpty { "Ciudadano Anónimo" },
+                organizationOrMedia = "",
+                credentialNumber = "",
+                isAnonymousProtected = true,
+                registeredAt = System.currentTimeMillis(),
+            )
+        }
+        saveParticipantProfile(profile)
+        prefs.edit().putBoolean("safety_initial_registered", true).apply()
+    }
+
     private fun loadParticipantProfile(): SafetyParticipantProfile {
         val raw = prefs.getString("safety_participant_profile", null) ?: return SafetyParticipantProfile()
         return runCatching { json.decodeFromString<SafetyParticipantProfile>(raw) }.getOrDefault(SafetyParticipantProfile())

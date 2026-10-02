@@ -109,6 +109,26 @@ fun SafetyReportScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val view = LocalView.current
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val impunityStore = remember(context) { com.elysium369.meet.safety.drugimpunity.DrugMarketImpunityStore(context.applicationContext) }
+    var showInitialRegistration by remember { mutableStateOf(!impunityStore.isInitialRegistered()) }
+
+    if (showInitialRegistration) {
+        SafetyInitialRegistrationScreen(
+            onBack = onBack,
+            onSaved = { role, name, org, cred ->
+                impunityStore.saveInitialRegistration(role, name, org, cred)
+                val detail = when (role) {
+                    "JOURNALIST" -> "Medio: $org | Periodista: $name | Carné: $cred"
+                    "INSTITUTION" -> "Institución: $org | Identificador: $cred"
+                    else -> if (name.isBlank()) "Civil: Anónimo Protegido" else "Civil: $name (Anónimo Protegido)"
+                }
+                viewModel.updateParticipantDetails(detail)
+                showInitialRegistration = false
+            }
+        )
+        return
+    }
 
     androidx.compose.runtime.LaunchedEffect(locationEntryMode) {
         if (locationEntryMode == "search" || locationEntryMode == "map") viewModel.goToStep(0)
@@ -368,46 +388,16 @@ private fun StepSourceRelation(
             Text(stringResource(R.string.safety_report_identify), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Black, color = MeetColors.cyberCyan, letterSpacing = 1.2.sp)
             Spacer(modifier = Modifier.height(4.dp))
             Text(stringResource(R.string.safety_report_identify_body), fontSize = 12.sp, color = MeetColors.textSecondary)
-            val primarySourceCategories = listOf(
-                SourceRelation.DIRECT_WITNESS,
-                SourceRelation.JOURNALISTIC,
-                SourceRelation.INSTITUTIONAL,
-            )
+            Spacer(modifier = Modifier.height(12.dp))
 
-            primarySourceCategories.forEach { relation ->
-                val isSelected = when (relation) {
-                    SourceRelation.DIRECT_WITNESS -> state.sourceRelation == null ||
-                        state.sourceRelation == SourceRelation.DIRECT_WITNESS ||
-                        state.sourceRelation == SourceRelation.FAMILY_OR_NEIGHBOR ||
-                        state.sourceRelation == SourceRelation.SECOND_HAND ||
-                        state.sourceRelation == SourceRelation.DOCUMENTARY ||
-                        state.sourceRelation == SourceRelation.PUBLIC_RECORD ||
-                        state.sourceRelation == SourceRelation.UNKNOWN
-                    SourceRelation.JOURNALISTIC -> state.sourceRelation == SourceRelation.JOURNALISTIC
-                    SourceRelation.INSTITUTIONAL -> state.sourceRelation == SourceRelation.INSTITUTIONAL
-                    else -> false
-                }
-
-                val title = when (relation) {
-                    SourceRelation.DIRECT_WITNESS -> "Civil"
-                    SourceRelation.JOURNALISTIC -> "Periodista / Medio"
-                    SourceRelation.INSTITUTIONAL -> "Institución"
-                    else -> "Civil"
-                }
-
-                val subtitle = when (relation) {
-                    SourceRelation.DIRECT_WITNESS -> "Civiles, familias, testigos y ciudadanía con máximo anonimato"
-                    SourceRelation.JOURNALISTIC -> "Prensa, reporteros, agencias y medios de comunicación"
-                    SourceRelation.INSTITUTIONAL -> "Fuerza Pública, OIJ, Cruz Roja, Bomberos u organismos oficiales"
-                    else -> "Civiles, familias, testigos y ciudadanía con máximo anonimato"
-                }
-
-                val emoji = when (relation) {
-                    SourceRelation.DIRECT_WITNESS -> "🛡️"
-                    SourceRelation.JOURNALISTIC -> "📰"
-                    SourceRelation.INSTITUTIONAL -> "🏢"
-                    else -> "🛡️"
-                }
+            SourceRelation.entries.forEach { relation ->
+                val isSelected = state.sourceRelation == relation
+                val borderColor = if (isSelected) {
+                    if (relation == SourceRelation.INSTITUTIONAL) Color(0xFF7C4DFF) else MeetColors.cyberCyan
+                } else MeetColors.borderSubtle
+                val bgColor = if (isSelected) {
+                    if (relation == SourceRelation.INSTITUTIONAL) Color(0xFF7C4DFF).copy(alpha = 0.12f) else MeetColors.cyberCyan.copy(alpha = 0.12f)
+                } else MeetColors.backgroundDeep
 
                 Card(
                     onClick = {
@@ -416,171 +406,43 @@ private fun StepSourceRelation(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 5.dp),
+                        .padding(vertical = 4.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) MeetColors.cyberCyan.copy(alpha = 0.12f) else MeetColors.backgroundDeep,
+                        containerColor = bgColor,
                     ),
                     border = BorderStroke(
                         width = if (isSelected) 1.5.dp else 1.dp,
-                        color = if (isSelected) MeetColors.cyberCyan else MeetColors.borderSubtle,
+                        color = borderColor,
                     ),
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("$emoji $title", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (isSelected) Color.White else MeetColors.textPrimary)
-                                Spacer(Modifier.height(2.dp))
-                                Text(subtitle, fontSize = 11.sp, color = MeetColors.textSecondary)
-                            }
-                            if (isSelected) {
-                                Icon(
-                                    Icons.Filled.Check,
-                                    contentDescription = null,
-                                    tint = MeetColors.cyberCyan,
-                                    modifier = Modifier.size(18.dp),
-                                )
-                            }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "${relation.emoji()} ${relation.label()}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) Color.White else MeetColors.textPrimary
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                relation.description(),
+                                fontSize = 11.sp,
+                                color = MeetColors.textSecondary
+                            )
                         }
-
-                        // Detailed Professional Participant Registration Form
                         if (isSelected) {
-                            Spacer(Modifier.height(10.dp))
-                            HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
-                            Spacer(Modifier.height(10.dp))
-
-                            when (relation) {
-                                SourceRelation.JOURNALISTIC -> {
-                                    var mediaInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.substringBefore(" | ").removePrefix("Medio: ").ifEmpty { "" }) }
-                                    var journalistInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.substringAfter(" | Periodista: ", "").substringBefore(" | ").ifEmpty { "" }) }
-                                    var cardInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.substringAfter(" | Carné: ", "").ifEmpty { "" }) }
-
-                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text(
-                                            "REGISTRO PROFESIONAL DE PRENSA Y MEDIOS",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = MeetColors.cyberCyan,
-                                            letterSpacing = 1.sp,
-                                        )
-                                        OutlinedTextField(
-                                            value = mediaInput,
-                                            onValueChange = {
-                                                mediaInput = it
-                                                viewModel.updateParticipantDetails("Medio: $it | Periodista: $journalistInput | Carné: $cardInput")
-                                            },
-                                            label = { Text("Medio de Comunicación / Agencia", fontSize = 11.sp) },
-                                            placeholder = { Text("Ej. Teletica, CRHoy, Diario Extra, Medio Digital", fontSize = 11.sp) },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true,
-                                        )
-                                        OutlinedTextField(
-                                            value = journalistInput,
-                                            onValueChange = {
-                                                journalistInput = it
-                                                viewModel.updateParticipantDetails("Medio: $mediaInput | Periodista: $it | Carné: $cardInput")
-                                            },
-                                            label = { Text("Nombre del Periodista / Reportero", fontSize = 11.sp) },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true,
-                                        )
-                                        OutlinedTextField(
-                                            value = cardInput,
-                                            onValueChange = {
-                                                cardInput = it
-                                                viewModel.updateParticipantDetails("Medio: $mediaInput | Periodista: $journalistInput | Carné: $it")
-                                            },
-                                            label = { Text("Carné / Acreditación de Prensa (Opcional)", fontSize = 11.sp) },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true,
-                                        )
-                                        Text(
-                                            "✓ Como periodista registrado, tendrás autoridad para certificar operativos oficiales y hallazgos de personas desaparecidas.",
-                                            fontSize = 10.sp,
-                                            color = MeetColors.neonGreen,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                    }
-                                }
-                                SourceRelation.INSTITUTIONAL -> {
-                                    var instInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.removePrefix("Institución: ")) }
-                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                        Text(
-                                            "ORGANISMO INSTITUCIONAL DE RESPUESTA",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = MeetColors.cyberCyan,
-                                            letterSpacing = 1.sp,
-                                        )
-                                        OutlinedTextField(
-                                            value = instInput,
-                                            onValueChange = {
-                                                instInput = it
-                                                viewModel.updateParticipantDetails("Institución: $it")
-                                            },
-                                            label = { Text("Nombre del cuerpo o institución oficial", fontSize = 11.sp) },
-                                            placeholder = { Text("Ej. OIJ, Fuerza Pública, Cruz Roja, Bomberos", fontSize = 11.sp) },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true,
-                                        )
-                                    }
-                                }
-                                else -> {
-                                    // Civiles, Testigos, Familiares y Ciudadanía General: MÁXIMO ANONIMATO
-                                    var civilAliasInput by remember(state.participantDetails) {
-                                        mutableStateOf(
-                                            state.participantDetails.removePrefix("Civil: ").removeSuffix(" (Anónimo Protegido)").ifEmpty { "" }
-                                        )
-                                    }
-
-                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        Text(
-                                            "CIUDADANÍA Y CIVILES · MÁXIMO ANONIMATO SOBERANO",
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.Black,
-                                            color = MeetColors.neonGreen,
-                                            letterSpacing = 1.sp,
-                                        )
-                                        OutlinedTextField(
-                                            value = civilAliasInput,
-                                            onValueChange = {
-                                                civilAliasInput = it
-                                                val detail = if (it.isBlank()) "Civil: Anónimo Protegido" else "Civil: ${it.trim()} (Anónimo Protegido)"
-                                                viewModel.updateParticipantDetails(detail)
-                                            },
-                                            label = { Text("Seudónimo o Alias (100% Opcional)", fontSize = 11.sp) },
-                                            placeholder = { Text("Opcional (Ej. Civil Vigilante, Anónimo)", fontSize = 11.sp) },
-                                            modifier = Modifier.fillMaxWidth(),
-                                            singleLine = true,
-                                        )
-                                        Card(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = CardDefaults.cardColors(containerColor = MeetColors.neonGreen.copy(alpha = 0.08f)),
-                                            border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.35f)),
-                                        ) {
-                                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                                Text(
-                                                    "🛡️ BLINDAJE DE VIDA Y PROTOCOLO ZERO-KNOWLEDGE",
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Black,
-                                                    color = MeetColors.neonGreen,
-                                                    letterSpacing = 0.8.sp,
-                                                )
-                                                Text(
-                                                    "Para proteger la vida de los seres humanos y prevenir riesgos ante cualquier filtración o hackeo, NO se recopilan parentescos, familias, domicilios, barrios ni identidades personales. Tu reporte está blindado criptográficamente con clave soberana AEAD. Como ciudadano tienes potestad total de reportar y reactivar cronómetros con absoluta seguridad.",
-                                                    fontSize = 10.sp,
-                                                    color = MeetColors.textSecondary,
-                                                    lineHeight = 15.sp,
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = if (relation == SourceRelation.INSTITUTIONAL) Color(0xFFB388FF) else MeetColors.cyberCyan,
+                                modifier = Modifier.size(18.dp),
+                            )
                         }
                     }
                 }
@@ -1381,6 +1243,296 @@ private fun SafetyReportReceiptScreen(
             ) {
                 Text(stringResource(R.string.safety_report_receipt_done), fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SafetyInitialRegistrationScreen(
+    onBack: () -> Unit,
+    onSaved: (role: String, name: String, organization: String, credential: String) -> Unit,
+) {
+    val view = LocalView.current
+    var selectedRole by remember { mutableStateOf("CIVILIAN") }
+    var civilAlias by remember { mutableStateOf("") }
+    var mediaOutlet by remember { mutableStateOf("") }
+    var journalistName by remember { mutableStateOf("") }
+    var pressCard by remember { mutableStateOf("") }
+    var institutionName by remember { mutableStateOf("") }
+    var institutionUnit by remember { mutableStateOf("") }
+
+    Scaffold(
+        containerColor = MeetColors.backgroundDeep,
+        topBar = {
+            TopAppBar(
+                title = {
+                    Column {
+                        Text(
+                            "REGISTRO INICIAL",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 17.sp,
+                            color = MeetColors.textPrimary
+                        )
+                        Text(
+                            "Configura tu perfil de reporte (se realiza una única vez)",
+                            fontSize = 11.sp,
+                            color = MeetColors.cyberCyan
+                        )
+                    }
+                },
+                navigationIcon = {
+                    IconButton(onClick = {
+                        SafetyHaptics.selectionTick(view)
+                        onBack()
+                    }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.safety_back), tint = MeetColors.textPrimary)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = MeetColors.backgroundDeep),
+            )
+        },
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "SELECCIONA QUIÉN REPORTA",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Black,
+                color = MeetColors.cyberCyan,
+                letterSpacing = 1.2.sp
+            )
+            Text(
+                "Define tu categoría de participación para el sistema de seguridad y corroboración forense:",
+                fontSize = 12.sp,
+                color = MeetColors.textSecondary
+            )
+
+            // 1. Civil
+            val isCivil = selectedRole == "CIVILIAN"
+            Card(
+                onClick = {
+                    SafetyHaptics.selectionTick(view)
+                    selectedRole = "CIVILIAN"
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isCivil) MeetColors.cyberCyan.copy(alpha = 0.12f) else MeetColors.cardBackground,
+                ),
+                border = BorderStroke(
+                    width = if (isCivil) 1.5.dp else 1.dp,
+                    color = if (isCivil) MeetColors.cyberCyan else MeetColors.borderSubtle,
+                ),
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("🛡️ Civil", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isCivil) Color.White else MeetColors.textPrimary)
+                            Spacer(Modifier.height(2.dp))
+                            Text("Civiles, familias y testigos · Máximo anonimato soberano", fontSize = 11.sp, color = MeetColors.textSecondary)
+                        }
+                        if (isCivil) {
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    if (isCivil) {
+                        Spacer(Modifier.height(10.dp))
+                        HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
+                        Spacer(Modifier.height(10.dp))
+                        OutlinedTextField(
+                            value = civilAlias,
+                            onValueChange = { civilAlias = it },
+                            label = { Text("Seudónimo o Alias (100% Opcional)", fontSize = 11.sp) },
+                            placeholder = { Text("Ej. Civil Vigilante, Anónimo", fontSize = 11.sp) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(containerColor = MeetColors.neonGreen.copy(alpha = 0.08f)),
+                            border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.35f)),
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Text(
+                                    "🛡️ BLINDAJE DE VIDA Y PROTOCOLO ZERO-KNOWLEDGE",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = MeetColors.neonGreen,
+                                    letterSpacing = 0.8.sp,
+                                )
+                                Text(
+                                    "Para proteger la vida de los seres humanos y prevenir riesgos ante cualquier filtración o hackeo, NO se recopilan parentescos, familias, domicilios, barrios ni identidades personales. Tu reporte está blindado criptográficamente con clave soberana AEAD.",
+                                    fontSize = 10.sp,
+                                    color = MeetColors.textSecondary,
+                                    lineHeight = 14.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2. Periodista / Medio
+            val isJournalist = selectedRole == "JOURNALIST"
+            Card(
+                onClick = {
+                    SafetyHaptics.selectionTick(view)
+                    selectedRole = "JOURNALIST"
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isJournalist) MeetColors.cyberCyan.copy(alpha = 0.12f) else MeetColors.cardBackground,
+                ),
+                border = BorderStroke(
+                    width = if (isJournalist) 1.5.dp else 1.dp,
+                    color = if (isJournalist) MeetColors.cyberCyan else MeetColors.borderSubtle,
+                ),
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("📰 Periodista / Medio", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isJournalist) Color.White else MeetColors.textPrimary)
+                            Spacer(Modifier.height(2.dp))
+                            Text("Prensa, reporteros, agencias y medios de comunicación", fontSize = 11.sp, color = MeetColors.textSecondary)
+                        }
+                        if (isJournalist) {
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    if (isJournalist) {
+                        Spacer(Modifier.height(10.dp))
+                        HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
+                        Spacer(Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = mediaOutlet,
+                                onValueChange = { mediaOutlet = it },
+                                label = { Text("Medio de Comunicación / Agencia", fontSize = 11.sp) },
+                                placeholder = { Text("Ej. Teletica, CRHoy, Diario Extra, Medio Digital", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                            OutlinedTextField(
+                                value = journalistName,
+                                onValueChange = { journalistName = it },
+                                label = { Text("Nombre del Periodista / Reportero", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                            OutlinedTextField(
+                                value = pressCard,
+                                onValueChange = { pressCard = it },
+                                label = { Text("Carné / Acreditación de Prensa (Opcional)", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                            Text(
+                                "✓ Como periodista registrado, tendrás autoridad para certificar operativos oficiales y hallazgos.",
+                                fontSize = 10.sp,
+                                color = MeetColors.neonGreen,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 3. Institución
+            val isInstitution = selectedRole == "INSTITUTION"
+            Card(
+                onClick = {
+                    SafetyHaptics.selectionTick(view)
+                    selectedRole = "INSTITUTION"
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isInstitution) MeetColors.cyberCyan.copy(alpha = 0.12f) else MeetColors.cardBackground,
+                ),
+                border = BorderStroke(
+                    width = if (isInstitution) 1.5.dp else 1.dp,
+                    color = if (isInstitution) MeetColors.cyberCyan else MeetColors.borderSubtle,
+                ),
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("🏢 Institución", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isInstitution) Color.White else MeetColors.textPrimary)
+                            Spacer(Modifier.height(2.dp))
+                            Text("Fuerza Pública, OIJ, Cruz Roja, Bomberos u organismos oficiales", fontSize = 11.sp, color = MeetColors.textSecondary)
+                        }
+                        if (isInstitution) {
+                            Icon(Icons.Filled.Check, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
+                        }
+                    }
+                    if (isInstitution) {
+                        Spacer(Modifier.height(10.dp))
+                        HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
+                        Spacer(Modifier.height(10.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedTextField(
+                                value = institutionName,
+                                onValueChange = { institutionName = it },
+                                label = { Text("Nombre del cuerpo o institución oficial", fontSize = 11.sp) },
+                                placeholder = { Text("Ej. OIJ, Fuerza Pública, Bomberos", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                            OutlinedTextField(
+                                value = institutionUnit,
+                                onValueChange = { institutionUnit = it },
+                                label = { Text("Unidad / Identificador (Opcional)", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            Button(
+                onClick = {
+                    SafetyHaptics.selectionTick(view)
+                    when (selectedRole) {
+                        "JOURNALIST" -> onSaved("JOURNALIST", journalistName, mediaOutlet, pressCard)
+                        "INSTITUTION" -> onSaved("INSTITUTION", institutionName, institutionName, institutionUnit)
+                        else -> onSaved("CIVILIAN", civilAlias, "", "")
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MeetColors.cyberCyan,
+                    contentColor = Color.Black,
+                ),
+            ) {
+                Text("GUARDAR Y CONTINUAR", fontWeight = FontWeight.Black, fontSize = 14.sp)
+            }
+            Spacer(Modifier.height(16.dp))
         }
     }
 }

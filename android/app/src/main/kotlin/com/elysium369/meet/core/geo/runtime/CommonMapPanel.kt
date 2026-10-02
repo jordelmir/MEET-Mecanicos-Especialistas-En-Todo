@@ -83,7 +83,7 @@ fun CommonMapPanel(
     val interaction = remember { MapInteractionPolicy() }
     var gestureRevision by remember { mutableIntStateOf(0) }
     var lastCameraKey: Any? by remember { mutableStateOf(null) }
-    val iconCache = remember { mutableMapOf<Pair<GeoMarkerRole, Boolean>, Icon>() }
+    val iconCache = remember { mutableMapOf<Triple<GeoMarkerRole, String, Boolean>, Icon>() }
     var loadPolicy by remember(styleUrl, fallbackStyleUrl) {
         mutableStateOf(MapStyleLoadPolicy.candidates(styleUrl, fallbackStyleUrl))
     }
@@ -326,7 +326,7 @@ private fun renderCommonMap(
     map: MapLibreMap,
     state: CommonMapState,
     markerIds: MutableMap<Long, String>,
-    iconCache: MutableMap<Pair<GeoMarkerRole, Boolean>, Icon>,
+    iconCache: MutableMap<Triple<GeoMarkerRole, String, Boolean>, Icon>,
     moveCamera: Boolean,
 ) {
     markerIds.clear()
@@ -370,7 +370,10 @@ private fun renderCommonMap(
 
     // Render Markers
     state.markers.forEach { marker ->
-        val icon = iconCache.getOrPut(marker.role to marker.isHighlighted) { createCommonMarkerIcon(context, iconFactory, marker.role, marker.isHighlighted) }
+        val iconKey = Triple(marker.role, marker.iconResName ?: "", marker.isHighlighted)
+        val icon = iconCache.getOrPut(iconKey) {
+            createCommonMarkerIcon(context, iconFactory, marker.role, marker.iconResName, marker.isHighlighted)
+        }
         val accuracyText = marker.point.accuracyMeters?.let { "±${it.toInt()}m" } ?: ""
         val renderedMarker = map.addMarker(
             MarkerOptions()
@@ -451,24 +454,33 @@ private fun createCommonMarkerIcon(
     context: Context,
     iconFactory: IconFactory,
     role: GeoMarkerRole,
+    categoryOrIcon: String?,
     isHighlighted: Boolean
 ): Icon {
-    val sizePx = if (isHighlighted) 64 else 52
+    val sizePx = if (isHighlighted) 72 else 58
     val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
-    val baseColor = when (role) {
-        GeoMarkerRole.USER_LOCATION -> Color.rgb(0, 229, 255) // Cyber Cyan
-        GeoMarkerRole.VEHICLE_ORIGIN -> Color.rgb(255, 171, 0) // Amber Warning
-        GeoMarkerRole.DESTINATION -> Color.rgb(0, 230, 118) // Neon Green
-        GeoMarkerRole.PROVIDER_LIVE -> Color.rgb(179, 136, 255) // Purple Accent
-        GeoMarkerRole.PROVIDER_WORKSHOP -> Color.rgb(33, 150, 243) // Workshop Blue
-        GeoMarkerRole.TOW_TRUCK -> Color.rgb(255, 109, 0) // Tow Orange
-        GeoMarkerRole.STORE_LOCATION -> Color.rgb(255, 64, 129) // Pink Accent
-        GeoMarkerRole.INCIDENT_PIN -> Color.rgb(255, 23, 68) // Danger Red
-        GeoMarkerRole.HOMICIDE_PIN -> Color.rgb(210, 18, 48) // Verified public homicide category
-        GeoMarkerRole.PRIVATE_INCIDENT_PIN -> Color.rgb(255, 171, 0) // Owner-only pending report
-        GeoMarkerRole.GENERIC_SERVICE -> Color.rgb(0, 229, 255)
+    val cleanCategory = (categoryOrIcon ?: "").trim().uppercase()
+
+    val baseColor = when {
+        cleanCategory == "HOMICIDE" || role == GeoMarkerRole.HOMICIDE_PIN -> Color.rgb(210, 18, 48) // Crimson Red
+        cleanCategory == "DRUG_SALE_ACTIVITY" -> Color.rgb(171, 71, 188) // Purple
+        cleanCategory == "VIOLENT_INCIDENT" -> Color.rgb(255, 87, 34) // Fire Orange
+        cleanCategory == "THREAT" -> Color.rgb(255, 152, 0) // Amber Warning
+        cleanCategory == "MISSING_PERSON" -> Color.rgb(0, 200, 235) // Cyan
+        cleanCategory == "INSTITUTIONAL_CONDUCT" -> Color.rgb(33, 150, 243) // Blue
+        cleanCategory == "THEFT" -> Color.rgb(255, 193, 7) // Yellow
+        role == GeoMarkerRole.USER_LOCATION -> Color.rgb(0, 229, 255) // Cyber Cyan
+        role == GeoMarkerRole.VEHICLE_ORIGIN -> Color.rgb(255, 171, 0) // Amber Warning
+        role == GeoMarkerRole.DESTINATION -> Color.rgb(0, 230, 118) // Neon Green
+        role == GeoMarkerRole.PROVIDER_LIVE -> Color.rgb(179, 136, 255) // Purple Accent
+        role == GeoMarkerRole.PROVIDER_WORKSHOP -> Color.rgb(33, 150, 243) // Workshop Blue
+        role == GeoMarkerRole.TOW_TRUCK -> Color.rgb(255, 109, 0) // Tow Orange
+        role == GeoMarkerRole.STORE_LOCATION -> Color.rgb(255, 64, 129) // Pink Accent
+        role == GeoMarkerRole.INCIDENT_PIN -> Color.rgb(255, 23, 68) // Danger Red
+        role == GeoMarkerRole.PRIVATE_INCIDENT_PIN -> Color.rgb(255, 171, 0) // Owner-only pending report
+        else -> Color.rgb(0, 229, 255)
     }
 
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -476,7 +488,7 @@ private fun createCommonMarkerIcon(
         style = Paint.Style.FILL
     }
     val center = sizePx / 2f
-    val radius = sizePx / 2.5f
+    val radius = sizePx / 2.4f
 
     // Outer Glow / Ring
     paint.color = Color.argb(90, Color.red(baseColor), Color.green(baseColor), Color.blue(baseColor))
@@ -486,25 +498,46 @@ private fun createCommonMarkerIcon(
     paint.color = baseColor
     canvas.drawCircle(center, center, radius, paint)
 
-    if (role == GeoMarkerRole.HOMICIDE_PIN) {
-        // Original generic skull glyph: clear mortality symbol without third-party branding.
-        paint.color = Color.WHITE
-        canvas.drawCircle(center, center - 3f, radius * .48f, paint)
-        paint.color = Color.BLACK
-        canvas.drawCircle(center - radius * .18f, center - 5f, radius * .11f, paint)
-        canvas.drawCircle(center + radius * .18f, center - 5f, radius * .11f, paint)
-        canvas.drawRect(center - 2f, center + 1f, center + 2f, center + 7f, paint)
-        paint.color = Color.WHITE
-        canvas.drawRect(center - radius * .34f, center + radius * .28f, center + radius * .34f, center + radius * .56f, paint)
-        paint.color = Color.BLACK
-        paint.strokeWidth = 2f
-        for (offset in listOf(-5f, 0f, 5f)) canvas.drawLine(center + offset, center + radius * .28f, center + offset, center + radius * .56f, paint)
-        return iconFactory.fromBitmap(bitmap)
+    // Inner White Backdrop for Icon/Emoji Contrast
+    val innerBgRadius = radius * 0.72f
+    paint.color = Color.WHITE
+    canvas.drawCircle(center, center, innerBgRadius, paint)
+
+    // Determine Icon/Emoji to draw
+    val symbol = when {
+        cleanCategory == "HOMICIDE" || role == GeoMarkerRole.HOMICIDE_PIN -> "☠️"
+        cleanCategory == "DRUG_SALE_ACTIVITY" -> "💊"
+        cleanCategory == "VIOLENT_INCIDENT" -> "⚡"
+        cleanCategory == "THREAT" -> "⚠️"
+        cleanCategory == "MISSING_PERSON" -> "🔍"
+        cleanCategory == "INSTITUTIONAL_CONDUCT" -> "🏛️"
+        cleanCategory == "THEFT" -> "🚨"
+        role == GeoMarkerRole.PRIVATE_INCIDENT_PIN -> "🛡️"
+        role == GeoMarkerRole.INCIDENT_PIN -> "⚠️"
+        else -> null
     }
 
-    // White Center Dot
-    paint.color = Color.WHITE
-    canvas.drawCircle(center, center, radius * 0.45f, paint)
+    if (symbol != null) {
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = radius * 0.92f
+            textAlign = Paint.Align.CENTER
+        }
+        val textY = center - ((textPaint.descent() + textPaint.ascent()) / 2f)
+        canvas.drawText(symbol, center, textY, textPaint)
+    } else {
+        // Fallback dot
+        paint.color = baseColor
+        canvas.drawCircle(center, center, radius * 0.35f, paint)
+    }
+
+    if (isHighlighted) {
+        val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(0, 229, 255)
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+        }
+        canvas.drawCircle(center, center, radius + 2f, highlightPaint)
+    }
 
     return iconFactory.fromBitmap(bitmap)
 }

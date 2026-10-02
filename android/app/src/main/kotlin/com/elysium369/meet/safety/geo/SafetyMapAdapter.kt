@@ -38,17 +38,35 @@ object SafetyMapAdapter {
                 radius,
             )
         }
+        val publicMarkers = points.mapNotNull { point ->
+            if (!point.displayLatitude.isFinite() || !point.displayLongitude.isFinite()) return@mapNotNull null
+            if (point.geoDisclosure != "EXACT_GEOLOCATED") return@mapNotNull null
+            val role = if (point.category == "HOMICIDE") GeoMarkerRole.HOMICIDE_PIN else GeoMarkerRole.INCIDENT_PIN
+            GeoMarker(
+                id = point.publicPointId,
+                role = role,
+                point = GeoPoint(point.displayLatitude, point.displayLongitude, point.uncertaintyMeters?.toFloat()),
+                label = point.label.ifBlank { point.category },
+                subtitle = "${point.independentSourceCount}$independentSourcesSuffix",
+                iconResName = point.category,
+                isHighlighted = false,
+            )
+        }
         val privateMarkers = privatePoints.map { point ->
+            val role = if (point.category == "HOMICIDE") GeoMarkerRole.HOMICIDE_PIN else GeoMarkerRole.PRIVATE_INCIDENT_PIN
             GeoMarker(
                 id = point.markerId,
-                role = GeoMarkerRole.PRIVATE_INCIDENT_PIN,
+                role = role,
                 point = GeoPoint(point.latitude, point.longitude, point.accuracyMeters, point.occurredAt),
                 label = privateLabel,
                 subtitle = point.serverState ?: point.syncState,
+                iconResName = point.category,
                 isHighlighted = point.syncState != "SYNCED",
             )
         }
-        val markers = privateMarkers
+        val privateReportIds = privatePoints.map { it.reportId }.toSet()
+        val deduplicatedPublicMarkers = publicMarkers.filter { it.id !in privateReportIds }
+        val markers = deduplicatedPublicMarkers + privateMarkers
 
         val bounds = GeoBounds.fromPoints(markers.map { it.point } + publicAreas.flatMap { it.boundary })
 
