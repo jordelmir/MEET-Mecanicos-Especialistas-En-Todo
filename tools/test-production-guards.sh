@@ -14,7 +14,7 @@ fail() {
 make_fixture() {
   local target="$1"
   mkdir -p "$target"
-  git -C "$ROOT_DIR" archive --format=tar HEAD | tar -xf - -C "$target"
+  git -C "$ROOT_DIR" archive --format=tar HEAD android/app/build.gradle.kts android/app/src/main/kotlin tools supabase_schema.sql | tar -xf - -C "$target"
 }
 
 expect_failure() {
@@ -26,6 +26,7 @@ expect_failure() {
   if MEET_GUARD_ROOT="$fixture" bash "$fixture/tools/verify-production-guards.sh" >/dev/null 2>&1; then
     fail "$name did not make the guard fail"
   fi
+  rm -rf "$fixture"
 }
 
 inject_vanguard_stub() {
@@ -63,6 +64,7 @@ clean="$TMP_DIR/clean"
 make_fixture "$clean"
 MEET_GUARD_ROOT="$clean" bash "$clean/tools/verify-production-guards.sh" >/dev/null || \
   fail "clean tree was rejected"
+rm -rf "$clean"
 
 expect_failure vanguard-stub inject_vanguard_stub
 expect_failure stub-marker inject_stub_marker

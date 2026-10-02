@@ -1,3 +1,4 @@
+begin;
 -- 20261002090000_safety_public_evidence_access.sql
 -- Allow public map points to display attached images and evidence worldwide
 
@@ -43,3 +44,5 @@ from public.safety_evidence_objects eo
 join public.safety_public_points pp on pp.id = eo.report_id;
 
 grant select on public.safety_public_evidence to anon, authenticated;
+
+commit;

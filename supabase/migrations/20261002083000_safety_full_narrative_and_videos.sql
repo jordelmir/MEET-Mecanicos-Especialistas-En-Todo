@@ -1,3 +1,4 @@
+begin;
 -- 20261002083000_safety_full_narrative_and_videos.sql
 -- Ensure public map points preserve full narrative (up to 30k chars) and embedded video links worldwide.
 
@@ -292,3 +293,5 @@ set label = c.narrative,
 from safety_private.report_content c
 where p.id = c.report_id
   and length(c.narrative) > length(p.label);
+
+commit;
