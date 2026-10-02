@@ -378,34 +378,175 @@ private fun StepSourceRelation(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 3.dp),
-                    shape = RoundedCornerShape(12.dp),
+                        .padding(vertical = 4.dp),
+                    shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = if (isSelected) MeetColors.cyberCyan.copy(alpha = 0.15f) else MeetColors.backgroundDeep,
+                        containerColor = if (isSelected) MeetColors.cyberCyan.copy(alpha = 0.12f) else MeetColors.backgroundDeep,
                     ),
                     border = BorderStroke(
                         width = if (isSelected) 1.5.dp else 1.dp,
                         color = if (isSelected) MeetColors.cyberCyan else MeetColors.borderSubtle,
                     ),
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("${relation.emoji()} ${relation.label()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (isSelected) Color.White else MeetColors.textPrimary)
-                            Spacer(Modifier.height(2.dp))
-                            Text(relation.description(), fontSize = 11.sp, color = MeetColors.textSecondary)
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("${relation.emoji()} ${relation.label()}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (isSelected) Color.White else MeetColors.textPrimary)
+                                Spacer(Modifier.height(2.dp))
+                                Text(relation.description(), fontSize = 11.sp, color = MeetColors.textSecondary)
+                            }
+                            if (isSelected) {
+                                Icon(
+                                    Icons.Filled.Check,
+                                    contentDescription = null,
+                                    tint = MeetColors.cyberCyan,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                            }
                         }
+
+                        // Detailed Professional Participant Registration Form
                         if (isSelected) {
-                            Icon(
-                                Icons.Filled.Check,
-                                contentDescription = null,
-                                tint = MeetColors.cyberCyan,
-                                modifier = Modifier.size(18.dp),
-                            )
+                            Spacer(Modifier.height(10.dp))
+                            HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
+                            Spacer(Modifier.height(10.dp))
+
+                            when (relation) {
+                                SourceRelation.JOURNALISTIC -> {
+                                    var mediaInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.substringBefore(" | ").removePrefix("Medio: ").ifEmpty { "" }) }
+                                    var journalistInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.substringAfter(" | Periodista: ", "").substringBefore(" | ").ifEmpty { "" }) }
+                                    var cardInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.substringAfter(" | Carné: ", "").ifEmpty { "" }) }
+
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text(
+                                            "REGISTRO PROFESIONAL DE PRENSA Y MEDIOS",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MeetColors.cyberCyan,
+                                            letterSpacing = 1.sp,
+                                        )
+                                        OutlinedTextField(
+                                            value = mediaInput,
+                                            onValueChange = {
+                                                mediaInput = it
+                                                viewModel.updateParticipantDetails("Medio: $it | Periodista: $journalistInput | Carné: $cardInput")
+                                            },
+                                            label = { Text("Medio de Comunicación / Agencia", fontSize = 11.sp) },
+                                            placeholder = { Text("Ej. Teletica, CRHoy, Diario Extra, Medio Digital", fontSize = 11.sp) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                        )
+                                        OutlinedTextField(
+                                            value = journalistInput,
+                                            onValueChange = {
+                                                journalistInput = it
+                                                viewModel.updateParticipantDetails("Medio: $mediaInput | Periodista: $it | Carné: $cardInput")
+                                            },
+                                            label = { Text("Nombre del Periodista / Reportero", fontSize = 11.sp) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                        )
+                                        OutlinedTextField(
+                                            value = cardInput,
+                                            onValueChange = {
+                                                cardInput = it
+                                                viewModel.updateParticipantDetails("Medio: $mediaInput | Periodista: $journalistInput | Carné: $it")
+                                            },
+                                            label = { Text("Carné / Acreditación de Prensa (Opcional)", fontSize = 11.sp) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                        )
+                                        Text(
+                                            "✓ Como periodista registrado, tendrás autoridad para certificar operativos oficiales y hallazgos de personas desaparecidas.",
+                                            fontSize = 10.sp,
+                                            color = MeetColors.neonGreen,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
+                                }
+                                SourceRelation.FAMILY_OR_NEIGHBOR -> {
+                                    var relationInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.removePrefix("Vínculo: ")) }
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            "VÍNCULO O PARENTESCO CON EL AFECTADO",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MeetColors.cyberCyan,
+                                            letterSpacing = 1.sp,
+                                        )
+                                        OutlinedTextField(
+                                            value = relationInput,
+                                            onValueChange = {
+                                                relationInput = it
+                                                viewModel.updateParticipantDetails("Vínculo: $it")
+                                            },
+                                            label = { Text("Especifica tu parentesco o cercanía", fontSize = 11.sp) },
+                                            placeholder = { Text("Ej. Madre, Hermano, Cónyuge, Vecino directo", fontSize = 11.sp) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                        )
+                                    }
+                                }
+                                SourceRelation.INSTITUTIONAL -> {
+                                    var instInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.removePrefix("Institución: ")) }
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        Text(
+                                            "ORGANISMO INSTITUCIONAL DE RESPUESTA",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MeetColors.cyberCyan,
+                                            letterSpacing = 1.sp,
+                                        )
+                                        OutlinedTextField(
+                                            value = instInput,
+                                            onValueChange = {
+                                                instInput = it
+                                                viewModel.updateParticipantDetails("Institución: $it")
+                                            },
+                                            label = { Text("Nombre del cuerpo o institución", fontSize = 11.sp) },
+                                            placeholder = { Text("Ej. OIJ, Fuerza Pública, Cruz Roja, Bomberos", fontSize = 11.sp) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                        )
+                                    }
+                                }
+                                SourceRelation.DIRECT_WITNESS -> {
+                                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(
+                                            "🔒 PROTECCIÓN SOBERANA DE FUENTE",
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = MeetColors.neonGreen,
+                                            letterSpacing = 1.sp,
+                                        )
+                                        Text(
+                                            "Tu reporte está protegido con cifrado criptográfico AEAD. Tu anonimato permanece blindado. Los civiles pueden reportar incidencias y reactivar cronómetros con total seguridad.",
+                                            fontSize = 11.sp,
+                                            color = MeetColors.textSecondary,
+                                            lineHeight = 16.sp,
+                                        )
+                                    }
+                                }
+                                else -> {
+                                    var noteInput by remember(state.participantDetails) { mutableStateOf(state.participantDetails.removePrefix("Detalle: ")) }
+                                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        OutlinedTextField(
+                                            value = noteInput,
+                                            onValueChange = {
+                                                noteInput = it
+                                                viewModel.updateParticipantDetails("Detalle: $it")
+                                            },
+                                            label = { Text("Detalle adicional sobre tu rol o fuente (Opcional)", fontSize = 11.sp) },
+                                            placeholder = { Text("Información sobre el origen de los datos", fontSize = 11.sp) },
+                                            modifier = Modifier.fillMaxWidth(),
+                                            singleLine = true,
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -19,6 +19,7 @@ import com.elysium369.meet.safety.domain.CreateSafetyReportPayload
 import com.elysium369.meet.safety.domain.LocationSource
 import com.elysium369.meet.safety.domain.SafetyReportCategory
 import com.elysium369.meet.safety.domain.SourceRelation
+import com.elysium369.meet.safety.domain.label
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,6 +65,8 @@ data class SafetyReportUiState(
     val victimMale: Int? = null,
     // V3 — External video links
     val videoUrls: List<String> = emptyList(),
+    // V4 — Detailed participant registration
+    val participantDetails: String = "",
 ) {
     /** Whether victim demographics step should be shown (only for homicide). */
     val showVictimStep: Boolean get() = category == SafetyReportCategory.HOMICIDE
@@ -253,11 +256,21 @@ class SafetyReportViewModel @Inject constructor(
         }
     }
 
+    fun updateParticipantDetails(details: String) {
+        _state.update { it.copy(participantDetails = details) }
+    }
+
     fun submit() {
         val snapshot = _state.value
         if (snapshot.submitting || snapshot.staging || snapshot.locating) return
         if (snapshot.category == null || snapshot.sourceRelation == null) return
         if (snapshot.narrative.trim().length < 10) return
+
+        val finalNarrative = if (snapshot.participantDetails.isNotBlank()) {
+            "[Registro de Fuente: ${snapshot.sourceRelation?.label() ?: "Reporte"} - ${snapshot.participantDetails.trim()}]\n\n" + snapshot.narrative.trim()
+        } else {
+            snapshot.narrative.trim()
+        }
 
         viewModelScope.launch {
             _state.update { it.copy(submitting = true, error = null) }
@@ -268,7 +281,7 @@ class SafetyReportViewModel @Inject constructor(
                     evidenceIds = snapshot.evidence.map { it.evidenceId },
                     payload = CreateSafetyReportPayload(
                         category = snapshot.category,
-                        narrative = snapshot.narrative.trim(),
+                        narrative = finalNarrative,
                         sourceRelation = snapshot.sourceRelation,
                         occurredAtIso = snapshot.occurredAtIso,
                         latitude = snapshot.location?.latitude,

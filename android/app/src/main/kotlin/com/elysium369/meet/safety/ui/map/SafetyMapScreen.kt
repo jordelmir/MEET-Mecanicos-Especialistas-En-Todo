@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import com.elysium369.meet.safety.drugimpunity.DrugMarketImpunityStore
+import com.elysium369.meet.safety.drugimpunity.DrugMarketImpunityClockCard
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -81,6 +83,7 @@ fun SafetyMapScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val currentLocation by viewModel.currentLocation.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val impunityStore = remember(context) { DrugMarketImpunityStore(context.applicationContext) }
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { result ->
@@ -320,7 +323,7 @@ fun SafetyMapScreen(
             onDismissRequest = { selectedId = null },
             containerColor = MeetColors.cardBackground,
         ) {
-            PublicPointDetail(point, point.regionLabel(), regionPoints.count { it.category == "HOMICIDE" }, regionPoints.size)
+            PublicPointDetail(point, point.regionLabel(), regionPoints.count { it.category == "HOMICIDE" }, regionPoints.size, impunityStore)
         }
     }
 
@@ -336,6 +339,7 @@ fun SafetyMapScreen(
                 onClose = { selectedId = null },
                 onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId) },
                 onLoadThumbnail = { evidenceId -> viewModel.loadEvidenceThumbnail(evidenceId) },
+                store = impunityStore,
             )
         }
     }
@@ -358,11 +362,29 @@ private fun SafetyMetricCard(label: String, value: String, valueColor: Color, mo
 }
 
 @Composable
-private fun PublicPointDetail(point: SafetyPublicPointEntity, region: String, homicideCount: Int, totalCount: Int) {
+private fun PublicPointDetail(
+    point: SafetyPublicPointEntity,
+    region: String,
+    homicideCount: Int,
+    totalCount: Int,
+    store: DrugMarketImpunityStore,
+) {
     val catColor = SafetyCategoryIcons.colorForString(point.category)
     val catIcon = SafetyCategoryIcons.iconForString(point.category)
 
     LazyColumn(contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        val isDrug = point.category == "DRUG_SALE_ACTIVITY" || point.category.contains("DRUG", ignoreCase = true)
+        val isMissing = point.category == "MISSING_PERSON" || point.category.contains("MISSING", ignoreCase = true)
+        if (isDrug || isMissing) {
+            item {
+                DrugMarketImpunityClockCard(
+                    pointId = point.publicPointId,
+                    initialReportedAt = point.firstDocumentedAt ?: point.publishedAt,
+                    store = store,
+                    clockType = if (isMissing) com.elysium369.meet.safety.drugimpunity.ImpunityClockType.MISSING_PERSON else com.elysium369.meet.safety.drugimpunity.ImpunityClockType.DRUG_SALE,
+                )
+            }
+        }
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
@@ -448,6 +470,7 @@ private fun PrivateReportDetailSheet(
     onClose: () -> Unit,
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit,
     onLoadThumbnail: suspend (String) -> ByteArray?,
+    store: DrugMarketImpunityStore,
 ) {
     val categoryColor = SafetyCategoryIcons.colorForString(point.category)
     val categoryIcon = SafetyCategoryIcons.iconForString(point.category)
@@ -463,6 +486,18 @@ private fun PrivateReportDetailSheet(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        val isDrug = point.category == "DRUG_SALE_ACTIVITY" || point.category.contains("DRUG", ignoreCase = true)
+        val isMissing = point.category == "MISSING_PERSON" || point.category.contains("MISSING", ignoreCase = true)
+        if (isDrug || isMissing) {
+            item {
+                DrugMarketImpunityClockCard(
+                    pointId = point.reportId,
+                    initialReportedAt = point.occurredAt.takeIf { it > 0 } ?: point.createdAt,
+                    store = store,
+                    clockType = if (isMissing) com.elysium369.meet.safety.drugimpunity.ImpunityClockType.MISSING_PERSON else com.elysium369.meet.safety.drugimpunity.ImpunityClockType.DRUG_SALE,
+                )
+            }
+        }
         // === 1. Header with Category, Icon, and Close button ===
         item {
             Row(
