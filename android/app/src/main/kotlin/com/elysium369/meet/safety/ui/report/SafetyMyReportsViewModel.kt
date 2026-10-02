@@ -70,13 +70,17 @@ class SafetyMyReportsViewModel @Inject constructor(
         )
 
     init {
-        // Trigger pending uploads on screen open
-        viewModelScope.launch { repository.resumePendingUploads() }
+        // Trigger pending uploads and pull remote reports on screen open
+        viewModelScope.launch {
+            repository.resumePendingUploads()
+            repository.refreshMyReports()
+        }
     }
 
     fun retrySyncAll() {
         viewModelScope.launch {
             repository.resumePendingUploads()
+            repository.refreshMyReports()
         }
     }
 

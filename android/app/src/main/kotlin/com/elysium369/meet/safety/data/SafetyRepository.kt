@@ -167,26 +167,38 @@ class SafetyRepository @Inject constructor(
             if (command != null) {
                 val payloadString = canonical.decodeToString()
                 val result = gateway.execute(command, payloadString)
-                if (result is SafetyGatewayResult.Accepted) {
-                    val completedAt = System.currentTimeMillis()
-                    reportDao.applyServerAcknowledgement(
-                        reportId = reportId,
-                        serverState = result.state,
-                        serverVersion = result.serverVersion,
-                        now = completedAt,
-                    )
-                    outboxDao.markAcknowledgedDirect(
-                        key = idempotencyKey,
-                        correlationId = result.correlationId,
-                        now = completedAt,
-                    )
-                    // Auto-refresh public projections so all Safety sections update immediately
-                    runCatching { publicRepository.get().refreshPoints() }
-                    runCatching { publicRepository.get().refreshCases() }
+                android.util.Log.i("ElysiumSafetySync", "Gateway result for $reportId: $result")
+                when (result) {
+                    is SafetyGatewayResult.Accepted -> {
+                        val completedAt = System.currentTimeMillis()
+                        reportDao.applyServerAcknowledgement(
+                            reportId = reportId,
+                            serverState = result.state,
+                            serverVersion = result.serverVersion,
+                            now = completedAt,
+                        )
+                        outboxDao.markAcknowledgedDirect(
+                            key = idempotencyKey,
+                            correlationId = result.correlationId,
+                            now = completedAt,
+                        )
+                        // Auto-refresh public projections so all Safety sections update immediately
+                        runCatching { publicRepository.get().refreshPoints() }
+                        runCatching { publicRepository.get().refreshCases() }
+                        android.util.Log.i("ElysiumSafetySync", "Report $reportId SYNCED ONLINE successfully, serverVersion=${result.serverVersion}")
+                    }
+                    is SafetyGatewayResult.Rejected -> {
+                        android.util.Log.e("ElysiumSafetySync", "Report $reportId REJECTED by server: code=${result.code} message=${result.message} retryable=${result.retryable}")
+                    }
+                    is SafetyGatewayResult.TransportFailure -> {
+                        android.util.Log.e("ElysiumSafetySync", "Report $reportId TRANSPORT FAILURE: code=${result.code} message=${result.message}")
+                    }
                 }
+            } else {
+                android.util.Log.w("ElysiumSafetySync", "Outbox command not found for key=$idempotencyKey")
             }
-        } catch (_: Exception) {
-            // Offline or intermittent network: WorkManager retry queue handles it safely
+        } catch (e: Exception) {
+            android.util.Log.e("ElysiumSafetySync", "Immediate sync failed for report $reportId, WorkManager will retry", e)
         }
 
         return reportId
@@ -237,6 +249,42 @@ class SafetyRepository @Inject constructor(
         }
         SafetyCommandScheduler.enqueueNow(context)
         return commandId
+    }
+
+    fun observeReport(reportId: String): Flow<SafetyReportEntity?> = reportDao.observeById(reportId)
+
+    suspend fun refreshMyReports(): Result<Unit> = runCatching {
+        val principal = principalKernel.current()
+        if (runCatching { UUID.fromString(principal.id) }.isFailure) return@runCatching
+        val rows = SupabaseModule.client.postgrest["safety_reports"]
+            .select {
+                filter {
+                    eq("reporter_user_id", principal.id)
+                }
+            }
+            .decodeList<RemoteSafetyReportRow>()
+
+        val entities = rows.map { row ->
+            val occurredMs = row.occurredAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
+            val createdMs = row.createdAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: System.currentTimeMillis()
+            val updatedMs = row.updatedAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: createdMs
+            SafetyReportEntity(
+                reportId = row.id,
+                ownerUserId = row.reporterUserId,
+                category = row.category,
+                payloadId = row.id,
+                occurredAt = occurredMs,
+                localState = "SYNCED_ONLINE",
+                serverState = row.state,
+                serverVersion = row.stateVersion,
+                syncState = "SYNCED",
+                createdAt = createdMs,
+                updatedAt = updatedMs,
+            )
+        }
+        if (entities.isNotEmpty()) {
+            reportDao.upsertAll(entities)
+        }
     }
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -389,4 +437,16 @@ private data class SafetyRemoteReportState(
     val id: String,
     val state: String,
     @SerialName("state_version") val stateVersion: Long,
+)
+
+@Serializable
+private data class RemoteSafetyReportRow(
+    val id: String,
+    @SerialName("reporter_user_id") val reporterUserId: String,
+    val category: String,
+    val state: String = "RECEIVED",
+    @SerialName("state_version") val stateVersion: Long = 1,
+    @SerialName("occurred_at") val occurredAt: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
 )

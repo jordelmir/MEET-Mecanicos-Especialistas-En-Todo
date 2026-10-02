@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
     private var signalingServer: SignalingServer? = null
     private var foldMonitorJob: Job? = null
 
+    @android.annotation.SuppressLint("InvalidFragmentVersionForActivityResult")
     private val mediaProjectionLauncher = registerForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
     ) { result ->

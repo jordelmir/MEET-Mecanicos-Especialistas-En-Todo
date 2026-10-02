@@ -26,8 +26,14 @@ interface SafetyReportDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertOrThrow(entity: SafetyReportEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(entities: List<SafetyReportEntity>)
+
     @Query("SELECT * FROM safety_reports WHERE reportId = :reportId")
     suspend fun get(reportId: String): SafetyReportEntity?
+
+    @Query("SELECT * FROM safety_reports WHERE reportId = :reportId")
+    fun observeById(reportId: String): Flow<SafetyReportEntity?>
 
     @Query(
         """

@@ -115,8 +115,10 @@ fun SafetyReportScreen(
     }
 
     if (state.createdReportId != null) {
+        val createdReport by viewModel.createdReport.collectAsStateWithLifecycle()
         SafetyReportReceiptScreen(
             reportId = state.createdReportId!!,
+            report = createdReport,
             onBack = onBack,
             onDone = { onReportSubmitted(state.createdReportId!!) },
         )
@@ -1053,11 +1055,45 @@ private fun ReviewRow(label: String, value: String) {
 @Composable
 private fun SafetyReportReceiptScreen(
     reportId: String,
+    report: com.elysium369.meet.safety.data.local.SafetyReportEntity? = null,
     onBack: () -> Unit,
     onDone: () -> Unit,
 ) {
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
+
+    val isOnline = report?.syncState == "SYNCED" || report?.serverState != null
+    val isSyncing = report?.syncState == "SYNCING"
+
+    val statusText = when {
+        isOnline -> "EN LÍNEA (SYNCED)"
+        isSyncing -> "SINCRONIZANDO..."
+        else -> "PENDIENTE DE RED"
+    }
+
+    val statusColor = when {
+        isOnline -> MeetColors.neonGreen
+        isSyncing -> MeetColors.cyberCyan
+        else -> MeetColors.warning
+    }
+
+    val titleText = when {
+        isOnline -> "Reporte publicado en línea"
+        isSyncing -> "Transmitiendo reporte..."
+        else -> stringResource(R.string.safety_report_receipt_saved_title)
+    }
+
+    val descText = when {
+        isOnline -> "Transmitido exitosamente al servidor. Proyectado en tiempo real en Mapa, Casos Públicos, Líneas de Tiempo y Rendición de Cuentas."
+        isSyncing -> "Conectando con el servidor seguro y proyectando datos en tiempo real..."
+        else -> stringResource(R.string.safety_report_receipt_saved_desc)
+    }
+
+    val networkDescText = when {
+        isOnline -> "Confirmado por el servidor · visible para toda la comunidad"
+        isSyncing -> "Enviando paquete cifrado al servidor..."
+        else -> stringResource(R.string.safety_report_receipt_network_desc)
+    }
 
     Scaffold(
         containerColor = MeetColors.backgroundDeep,
@@ -1083,21 +1119,22 @@ private fun SafetyReportReceiptScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            SafetyPulse(state = PulseState.NOMINAL, size = 88.dp)
+            SafetyPulse(state = if (isOnline) PulseState.NOMINAL else PulseState.PENDING, size = 88.dp)
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                stringResource(R.string.safety_report_receipt_saved_title),
+                titleText,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Black,
                 color = MeetColors.textPrimary,
+                textAlign = TextAlign.Center,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                stringResource(R.string.safety_report_receipt_saved_desc),
+                descText,
                 fontSize = 13.sp,
                 color = MeetColors.textSecondary,
                 textAlign = TextAlign.Center,
@@ -1110,7 +1147,7 @@ private fun SafetyReportReceiptScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, if (isOnline) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.cyberCyan.copy(alpha = 0.5f)),
             ) {
                 Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
@@ -1140,13 +1177,13 @@ private fun SafetyReportReceiptScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                     ) {
                         Text(stringResource(R.string.safety_report_receipt_status), fontSize = 12.sp, color = MeetColors.textSecondary)
-                        Text(stringResource(R.string.safety_report_receipt_status_local), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MeetColors.warning)
+                        Text(statusText, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = statusColor)
                     }
 
                     HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
 
                     Text(
-                        stringResource(R.string.safety_report_receipt_network_desc),
+                        networkDescText,
                         fontSize = 11.sp,
                         color = MeetColors.textSecondary,
                         lineHeight = 16.sp,

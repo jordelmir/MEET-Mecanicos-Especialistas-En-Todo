@@ -25,6 +25,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -82,6 +86,14 @@ class SafetyReportViewModel @Inject constructor(
         occurredAtIso = savedState["occurredAt"],
     ))
     val state: StateFlow<SafetyReportUiState> = _state.asStateFlow()
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val createdReport: StateFlow<com.elysium369.meet.safety.data.local.SafetyReportEntity?> = _state
+        .flatMapLatest { s ->
+            val id = s.createdReportId
+            if (id != null) repository.observeReport(id) else kotlinx.coroutines.flow.flowOf(null)
+        }
+        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.WhileSubscribed(5_000), null)
 
     init {
         viewModelScope.launch { evidenceRepository.observe(draftId).collect { evidence -> _state.update { it.copy(evidence = evidence) } } }
