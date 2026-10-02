@@ -1,6 +1,8 @@
 -- Reopen Safety V3 for Worldwide Production Access
 -- Enables online feature gates and read access for public maps, cases, timelines, accountability, and observatory.
 
+begin;
+
 -- 1. Reopen runtime feature gates
 insert into public.runtime_feature_gates (key, enabled, reason, updated_at)
 values
@@ -86,3 +88,5 @@ create policy safety_public_accountability_worldwide_read
   for select
   to anon, authenticated
   using (true);
+
+commit;

@@ -3,6 +3,8 @@
 -- Map (safety_public_points), Public Cases (safety_public_case_projection),
 -- Timelines (safety_public_case_timeline_projection), and Accountability (safety_public_accountability_projection).
 
+begin;
+
 -- 1. Relax restrictive constraints and drop blocking triggers on public projection tables
 
 -- Drop blocking triggers so citizen reports can auto-project
@@ -397,3 +399,5 @@ begin
     end loop;
 end;
 $$;
+
+commit;
