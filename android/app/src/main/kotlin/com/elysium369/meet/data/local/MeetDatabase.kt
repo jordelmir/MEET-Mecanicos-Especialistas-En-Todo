@@ -29,6 +29,7 @@ import com.elysium369.meet.core.operations.data.OperationCaseEntity
 import com.elysium369.meet.core.operations.data.CorrelatedIncidentEntity
 import com.elysium369.meet.core.operations.data.OperationCaseDao
 import com.elysium369.meet.core.operations.data.CorrelatedIncidentDao
+import com.elysium369.meet.safety.science.data.*
 
 @Database(
     entities = [
@@ -232,8 +233,29 @@ import com.elysium369.meet.core.operations.data.CorrelatedIncidentDao
         // EAOS — AUTONOMOUS OPERATIONS ENGINE PERSISTENCE (ASCENSION §23-25)
         OperationCaseEntity::class,
         CorrelatedIncidentEntity::class,
+
+        // ELYSIUM SAFETY SCIENTIFIC CORE v1 (P0-P3)
+        SciEntityEntity::class,
+        SciEntityRelationEntity::class,
+        SciClaimEntity::class,
+        SciClaimEvidenceEntity::class,
+        SciClaimRelationEntity::class,
+        SciEventEntity::class,
+        SciKnowledgeEventEntity::class,
+        SciAuthorityAssertionEntity::class,
+        SciDutyAssertionEntity::class,
+        SciAccountabilityActionEntity::class,
+        SciHypothesisEntity::class,
+        SciProvenanceNodeEntity::class,
+        SciProvenanceEdgeEntity::class,
+        SciResearchDatasetEntity::class,
+        SciResearchRunEntity::class,
+        SciReplicationEntity::class,
+        SciPublicationEntity::class,
+        SciStateTransitionEntity::class,
+        SciCheckpointEntity::class,
     ],
-    version = 88,
+    version = 89,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -344,4 +366,7 @@ abstract class MeetDatabase : RoomDatabase() {
         // EAOS — AUTONOMOUS OPERATIONS ENGINE DAOs (ASCENSION §23-25)
         abstract fun operationCaseDao(): OperationCaseDao
         abstract fun correlatedIncidentDao(): CorrelatedIncidentDao
+
+        // ELYSIUM SAFETY SCIENTIFIC CORE v1 DAO
+        abstract fun safetyScienceDao(): SafetyScienceDao
 }
