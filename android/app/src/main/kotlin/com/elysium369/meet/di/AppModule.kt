@@ -6038,6 +6038,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideScientificAuthorityDao(db: MeetDatabase): com.elysium369.meet.safety.science.data.ScientificAuthorityDao = db.scientificAuthorityDao()
+
+    @Provides
+    @Singleton
+    fun provideScientificGateway(impl: com.elysium369.meet.safety.science.data.SupabaseScientificGateway): com.elysium369.meet.safety.science.data.SafetyScientificGateway = impl
 }
 
 @kotlinx.serialization.Serializable

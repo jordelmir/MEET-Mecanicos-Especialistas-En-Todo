@@ -7,16 +7,22 @@ on:
       - 'android/app/src/main/kotlin/com/elysium369/meet/safety/science/**'
       - 'android/app/src/test/kotlin/com/elysium369/meet/safety/science/**'
       - 'supabase/migrations/*scientific*'
+      - 'supabase/migrations/*custody*'
+      - 'packages/elysium-safety-core/src/custody-protocol-v2.ts'
+      - 'tests/safety/custody-protocol-v2.test.ts'
   pull_request:
     branches: [main]
     paths:
       - 'android/app/src/main/kotlin/com/elysium369/meet/safety/science/**'
       - 'android/app/src/test/kotlin/com/elysium369/meet/safety/science/**'
       - 'supabase/migrations/*scientific*'
+      - 'supabase/migrations/*custody*'
+      - 'packages/elysium-safety-core/src/custody-protocol-v2.ts'
+      - 'tests/safety/custody-protocol-v2.test.ts'
 
 jobs:
-  scientific-integrity:
-    name: Scientific Evidence Platform Tests
+  kotlin-tests:
+    name: Kotlin Scientific Tests (105 tests)
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -40,6 +46,10 @@ jobs:
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.provenance.MerkleTreeTest'
 
+      - name: Verify SAFETY-CUSTODY-V2 protocol parity
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.provenance.CustodyProtocolV2Test'
+
       - name: Verify no AI truth elevation
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.domain.AssertionStateMachineTest'
@@ -52,11 +62,15 @@ jobs:
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.domain.InstitutionalClaimValidatorTest'
 
+      - name: Verify temporal + source lineage + publication authority
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.domain.AuthorityInfrastructureTest'
+
       - name: Verify source independence and causal analysis
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.analysis.ScientificAnalysisTest'
 
-      - name: Verify research package integrity
+      - name: Verify research package integrity (adversarial)
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.publication.ResearchPackageVerifierTest'
 
@@ -64,10 +78,32 @@ jobs:
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.*'
 
-      - name: Upload test results
+      - name: Upload Kotlin test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: safety-science-test-results
+          name: safety-science-kotlin-results
           path: android/app/build/reports/tests/testDebugUnitTest/
           retention-days: 30
+
+  typescript-parity:
+    name: TypeScript Parity Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify SAFETY-CUSTODY-V2 TypeScript parity
+        run: npx vitest run tests/safety/custody-protocol-v2.test.ts
+
+      - name: Run all Safety TypeScript tests
+        run: npx vitest run tests/safety
