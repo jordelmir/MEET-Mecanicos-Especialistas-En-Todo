@@ -6042,6 +6042,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideScientificGateway(impl: com.elysium369.meet.safety.science.data.SupabaseScientificGateway): com.elysium369.meet.safety.science.data.SafetyScientificGateway = impl
+
+    @Provides
+    @Singleton
+    fun provideFeatureGateRepository(impl: com.elysium369.meet.safety.science.domain.SupabaseFeatureGateRepository): com.elysium369.meet.safety.science.domain.SafetyScienceFeatureGateRepository = impl
 }
 
 @kotlinx.serialization.Serializable
