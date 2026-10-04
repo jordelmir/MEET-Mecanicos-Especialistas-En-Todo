@@ -314,6 +314,7 @@ private fun CategoryFilterBar(
         AgentCategory.MOBILITY to "Movilidad",
         AgentCategory.EMISSIONS to "Emisiones",
         AgentCategory.CORE to "Core",
+        AgentCategory.XENOLOGY to "👽 Xenología",
     )
 
     LazyRow(

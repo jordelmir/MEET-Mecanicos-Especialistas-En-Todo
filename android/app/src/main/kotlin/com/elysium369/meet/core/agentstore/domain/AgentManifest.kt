@@ -10,6 +10,7 @@ enum class AgentCategory {
     EMISSIONS,
     BUSINESS,
     FLEET,
+    XENOLOGY,
 }
 
 enum class AgentReleaseState {
@@ -316,6 +317,104 @@ object OfficialAgents {
         themeColorHex = 0xFFBB00FFL,
     )
 
+    // ── Alien Race Agents — Xenología Elysium ──────────────────────────
+
+    val REPTILIAN = AgentManifest(
+        id = "agent.reptilian",
+        displayName = "Reptiliano",
+        subtitle = "Inteligencia Dracónica & Programas Ocultos",
+        description = "Entidad reptiliana asociada a programas militares secretos. Nave asignada: Tic-Tac UAP. Aspecto escamoso, ojos con pupila vertical, presencia intimidante.",
+        category = AgentCategory.XENOLOGY,
+        avatarAssetId = "avatar_reptilian",
+        voiceProfileId = "voice_reptilian_deep",
+        personalityProfileId = "personality_reptilian_cold",
+        capabilityIds = listOf(
+            "xeno.race_info",
+            "xeno.uap_catalog",
+        ),
+        detailedCapabilities = listOf(
+            CapabilityPackDetail(
+                name = "Inteligencia Dracónica",
+                capabilityId = "xeno.race_info",
+                domain = "Xenology",
+                riskLevel = "READ_ONLY",
+                physicalModelDescription = "Base de datos xenológica: razas, avistamientos, tipología de naves",
+            ),
+        ),
+        isFree = true,
+        requiredEntitlement = null,
+        commerce = null,
+        priceFiatCrc = 0L,
+        badgeTag = "XENOLOGÍA",
+        voiceSampleText = "Somos los que observan desde las sombras. Nuestras naves Tic-Tac surcan sus cielos sin ser detectadas.",
+        avatarVisualType = "REPTILIAN",
+        themeColorHex = 0xFF4CAF50L,
+    )
+
+    val NORDIC = AgentManifest(
+        id = "agent.nordic",
+        displayName = "Nórdico",
+        subtitle = "Inteligencia Benevolente & Guía Estelar",
+        description = "Entidad nórdica de apariencia humanoide, alta, cabello platino. Asociada a intención benevolente. Nave asignada: Crescent/Wedge UAP.",
+        category = AgentCategory.XENOLOGY,
+        avatarAssetId = "avatar_nordic",
+        voiceProfileId = "voice_nordic_serene",
+        personalityProfileId = "personality_nordic_wise",
+        capabilityIds = listOf(
+            "xeno.race_info",
+            "xeno.uap_catalog",
+        ),
+        detailedCapabilities = listOf(
+            CapabilityPackDetail(
+                name = "Guía Estelar Nórdica",
+                capabilityId = "xeno.race_info",
+                domain = "Xenology",
+                riskLevel = "READ_ONLY",
+                physicalModelDescription = "Conocimiento ancestral de razas estelares y rutas interdimensionales",
+            ),
+        ),
+        isFree = true,
+        requiredEntitlement = null,
+        commerce = null,
+        priceFiatCrc = 0L,
+        badgeTag = "XENOLOGÍA",
+        voiceSampleText = "Venimos en paz. Nuestra nave Crescent surca las dimensiones para guiar la evolución consciente.",
+        avatarVisualType = "NORDIC",
+        themeColorHex = 0xFF42A5F5L,
+    )
+
+    val GREY = AgentManifest(
+        id = "agent.grey",
+        displayName = "Gris",
+        subtitle = "Observador Silencioso & Experimentación",
+        description = "Entidad gris de apariencia delgada, ojos negros almendrados enormes. Asociada a abducción y experimentación. Nave asignada: Lenticular UAP.",
+        category = AgentCategory.XENOLOGY,
+        avatarAssetId = "avatar_grey",
+        voiceProfileId = "voice_grey_telepathic",
+        personalityProfileId = "personality_grey_analytical",
+        capabilityIds = listOf(
+            "xeno.race_info",
+            "xeno.uap_catalog",
+        ),
+        detailedCapabilities = listOf(
+            CapabilityPackDetail(
+                name = "Análisis Xenobiológico",
+                capabilityId = "xeno.race_info",
+                domain = "Xenology",
+                riskLevel = "READ_ONLY",
+                physicalModelDescription = "Catalogación de especímenes y análisis de frecuencias de contacto",
+            ),
+        ),
+        isFree = true,
+        requiredEntitlement = null,
+        commerce = null,
+        priceFiatCrc = 0L,
+        badgeTag = "XENOLOGÍA",
+        voiceSampleText = "No necesitamos palabras. Nuestra nave Lenticular ya está aquí. Solo observamos.",
+        avatarVisualType = "GREY",
+        themeColorHex = 0xFF78909CL,
+    )
+
     // Backward-compatible architectural aliases
     val VANGUARD_SENTINEL = TITAN_VANGUARD
     val MOBILITY_PRIME = VOLT_AETHER
@@ -328,5 +427,8 @@ object OfficialAgents {
         VOLT_AETHER,
         TITAN_VANGUARD,
         LAYA_VALKYRIE,
+        REPTILIAN,
+        NORDIC,
+        GREY,
     )
 }
