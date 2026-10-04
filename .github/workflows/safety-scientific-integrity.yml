@@ -1,0 +1,73 @@
+name: Safety Scientific Integrity
+
+on:
+  push:
+    branches: [main, "feat/**", "codex/**"]
+    paths:
+      - 'android/app/src/main/kotlin/com/elysium369/meet/safety/science/**'
+      - 'android/app/src/test/kotlin/com/elysium369/meet/safety/science/**'
+      - 'supabase/migrations/*scientific*'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'android/app/src/main/kotlin/com/elysium369/meet/safety/science/**'
+      - 'android/app/src/test/kotlin/com/elysium369/meet/safety/science/**'
+      - 'supabase/migrations/*scientific*'
+
+jobs:
+  scientific-integrity:
+    name: Scientific Evidence Platform Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify custody chain integrity
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.provenance.CustodyVerifierTest'
+
+      - name: Verify Merkle tree integrity
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.provenance.MerkleTreeTest'
+
+      - name: Verify no AI truth elevation
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.domain.AssertionStateMachineTest'
+
+      - name: Verify epistemological mapping
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.domain.TruthStateMappingTest'
+
+      - name: Verify institutional claim restrictions
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.domain.InstitutionalClaimValidatorTest'
+
+      - name: Verify source independence and causal analysis
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.analysis.ScientificAnalysisTest'
+
+      - name: Verify research package integrity
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.publication.ResearchPackageVerifierTest'
+
+      - name: Full safety-science test suite
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests 'com.elysium369.meet.safety.science.*'
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safety-science-test-results
+          path: android/app/build/reports/tests/testDebugUnitTest/
+          retention-days: 30
