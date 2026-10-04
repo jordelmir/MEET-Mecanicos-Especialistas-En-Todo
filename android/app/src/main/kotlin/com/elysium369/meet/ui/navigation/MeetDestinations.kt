@@ -64,6 +64,7 @@ object MeetDestinations {
     const val SERVICES_COMPLETED = "services_completed"
     const val PROVIDER_SERVICES_CONFIG = "provider_services_config"
     const val AGENT_STORE = "agent_store"
+    const val UAP_XENOLOGY = "uap_xenology"
     const val DRAGON_CALC = "dragon_calc"
     const val NEXUS_CONTROL = "elysium_nexxus_control"
     const val SCREEN_MIRROR = "elysium_screen_mirror"

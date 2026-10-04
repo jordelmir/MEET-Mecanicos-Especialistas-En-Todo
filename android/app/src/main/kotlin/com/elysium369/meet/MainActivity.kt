@@ -1048,6 +1048,11 @@ fun MeetApp(
                     viewModel = agentStoreViewModel
                 )
             }
+            composable("uap_xenology") {
+                com.elysium369.meet.core.agentstore.ui.UapXenologyScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
             composable("vehicle_access") {
                 com.elysium369.meet.ui.screens.vehicleaccess.VehicleAccessDashboardScreen(
                     navController = navController,

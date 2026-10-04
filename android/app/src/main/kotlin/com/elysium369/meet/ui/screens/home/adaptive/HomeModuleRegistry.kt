@@ -54,7 +54,8 @@ object HomeModuleRegistry {
                 HomeModuleItem("elysium_properties", "Elysium Properties", "Property Passport, venta y alquiler", MeetDestinations.PROPERTIES, HomeSectionCategory.SERVICES, "elysium_properties", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("fuel_rewards", "Fuel Rewards", "Wallet, campañas y Station OS", MeetDestinations.FUEL_REWARDS, HomeSectionCategory.SERVICES, "fuel_rewards", isHighlight = true, badgeText = "NUEVO"),
                 HomeModuleItem("elysium_services", "Servicios Elysium", "Subasta dual, radar técnico y contra-ofertas", MeetDestinations.ELYSIUM_SERVICES, HomeSectionCategory.SERVICES, "elysium_services", isHighlight = true, badgeText = "NUEVO"),
-                HomeModuleItem("agent_store", "Agent Store", "IA especializada, agentes 3D y DigiSouls", MeetDestinations.AGENT_STORE, HomeSectionCategory.SERVICES, "agent_store", isHighlight = true, badgeText = "NUEVO")
+                HomeModuleItem("agent_store", "Agent Store", "IA especializada, agentes 3D y DigiSouls", MeetDestinations.AGENT_STORE, HomeSectionCategory.SERVICES, "agent_store", isHighlight = true, badgeText = "NUEVO"),
+                HomeModuleItem("uap_xenology", "🛸 OVNIs y Razas", "Razas extraterrestres, naves UAP y plasmoides", MeetDestinations.UAP_XENOLOGY, HomeSectionCategory.SERVICES, "uap_xenology", isHighlight = true, badgeText = "NUEVO")
             )
         )
 
