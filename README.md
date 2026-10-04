@@ -3,9 +3,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Android-4.28.0%20%7C%20code%2062-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
+  <img src="https://img.shields.io/badge/Android-4.29.0%20%7C%20code%2063-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
   <img src="https://img.shields.io/badge/Room-schema%2088-39FF14?style=flat-square" alt="Room schema" />
   <img src="https://img.shields.io/badge/Architecture-offline--first-7F52FF?style=flat-square" alt="Offline first" />
+  <img src="https://img.shields.io/badge/Kotlin-2.4.0-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
+  <img src="https://img.shields.io/badge/AGP-9.2.1-3DDC84?style=flat-square&logo=gradle&logoColor=white" alt="AGP" />
+  <img src="https://img.shields.io/badge/Gradle-9.4.1-02303A?style=flat-square&logo=gradle&logoColor=white" alt="Gradle" />
+  <img src="https://img.shields.io/badge/Compose%20BOM-2026.05.01-4285F4?style=flat-square" alt="Compose BOM" />
+  <img src="https://img.shields.io/badge/Agents-9%20(6%20Canvas%20%2B%203%20Bitmap)-E040FB?style=flat-square" alt="Agents" />
 </p>
 
 # Elysium Vanguard AI OS
@@ -19,53 +24,67 @@ La regla del producto es simple: no se presenta una intención local, una
 estimación o un dato de demostración como un hecho físico o una confirmación
 del servidor.
 
-## Estado del código en este checkpoint (Safety V3 & Convergence)
+## Estado del código en este checkpoint (Xenology, Agent Avatars Redesign & Convergence)
 
-- **Android:** `versionName 4.28.0`, `versionCode 62`.
-- **Contrato de versión del paquete:** `4.28.0` (sin cambios funcionales web en esta ronda).
-- **Seguridad Ciudadana (Safety V3 - Red Abierta & Sincronización Mundial):**
-  - **Sincronización en Línea Inmediata:** Subida directa y auto-proyectada vía RPC `safety_create_report_v3`, actualizando en tiempo real todas las secciones (Mapa, Casos Públicos, Líneas de Tiempo y Rendición de Cuentas).
-  - **Doble Capa de Resiliencia:** Persistencia transaccional local en Room previa al envío, ejecución inmediata online en `SafetyRepository` con refresco automático de proyecciones, y respaldo background vía `SafetyCommandSyncWorker` (WorkManager) para operación 100% offline-first.
-  - **Hub de Seguridad Reactivo:** `SafetyHomeViewModel` observa flujos de Room en tiempo real, reflejando conteos precisos de `MY REPORTS`, reportes pendientes y estado de red activo.
-  - **Visualización Cartográfica en Vivo:** Eliminación de filtros que restringían coordenadas reales, permitiendo visualizar todos los incidentes geolocalizados en el mapa MapLibre con selección de marcadores y hoja inferior de narrativa completa.
-  - **Módulo Independiente TIMELINES:** Pantalla dedicada (`MeetDestinations.SAFETY_TIMELINES`, `SafetyTimelinesScreen`) con navegación propia, espina cronológica vertical, nodos de color según la categoría del incidente y desglose forense de fuentes/evidencia.
-  - **Enlaces Multimedia Optimizados:** Enlaces directos a videos (YouTube, TikTok, Instagram, Facebook, Drive) con botones de acción rápida, colores temáticos de alto contraste y lanzamiento nativo 1-click para preservar espacio en servidor.
-- **Persistencia Local (Room Schema 88):**
-  - Tablas locales dedicadas para proyecciones públicas: `safety_public_points_local`, `safety_public_cases_local`, `safety_public_timeline_local`, `safety_public_claims_local`.
-  - Cola outbox `safety_command_outbox` con ACK directo y transiciones idempotentes.
-  - Migración Room `88` verificada e integrada en `MeetDatabase.kt`.
-- **Backend & Migraciones Supabase:**
-  - `20261001070000_safety_worldwide_reopen_v3.sql`: Apertura mundial de políticas de lectura pública en proyecciones de seguridad.
-  - `20261001080000_safety_auto_project_reports_v3.sql`: Eliminación de bloqueos de moderación previa y auto-proyección atómica de reportes ciudadanos a proyecciones públicas con backfill histórico.
-- **Elysium Vanguard Master Order Genesis:**
-  - **Infraestructura de Outbox en Producción:** `PostgresOutboxRepository` conectado en `Application.kt` con bloqueo a nivel de fila `FOR UPDATE SKIP LOCKED`, leases criptográficos atómicos y DLQ. Prohibición estricta de stubs en memoria fuera de tests.
-  - **EVAIR Living Companion & Instant Shift:** Acompañante vivo persistente con canal único de audio (`VoiceInteractionBus.default`), eliminando fugas `ERROR_RECOGNIZER_BUSY`. Teletransportación instantánea 3D al botón objetivo mediante comandos `"SECCIÓN <nombre>"` y `"SELECCIONA <nombre>"`, compresión cuántica (`0.18f`), pulso de iluminación y ejecución determinista.
-  - **Control Plane Semántico de UI:** Cobertura de controles interactivos instrumentados con `Modifier.agentAction` y `Modifier.agentTextInput`. Blindaje de campos confidenciales (`AgentUiSensitivity.SECRET` para PINs/claves) que deniegan inspección o inyección por voz.
-  - **Resolución de lugares:** el flujo nuevo de servicios no fabrica precios ni ubicaciones; las herramientas históricas todavía requieren auditoría independiente. Lugares no resolubles devuelven estrictamente `PlaceResolutionResult.NotFound`. Cotizaciones versionadas con TTL (`CR_METRO_V3_2026`).
-  - **Suite de Verdad & Release Gate:** `GoldenJourneyTruthSuite` (5 tests de verdad obligatorios) y `AgentUiCoverageReleaseGate` integrados; distinguir sus pruebas automatizadas de recorridos físicos y verificación de producción.
-  - **Paridad Cross-Runtime Parity:** Paridad byte-a-byte exacta de firmas SHA-256 entre TypeScript, Kotlin y PostgreSQL en `ci-verify.sh`.
-- **Servicios Elysium unificados:** ambas entradas históricas abren la misma experiencia cliente/proveedor con estados autorizados, métricas/calificaciones reales y comisión del 5% idempotente mediante saldo.
-- **Navegación 1-Click con Waze (`WazeNavigationButton`):**
-  - Protocolo nativo `waze://?ll=lat,lng&navigate=yes` integrado en todas las tarjetas de servicios (viajes, misiones courier, rescate técnico y radar en vivo).
-  - Fallback automático en cascada: Geo Intent (Google Maps / navegador vehicular) y Waze Live Map Web.
-- **Hub Universal de Servicios Activos, Historial y Oferta:**
-  - `⚡ SERVICIOS ACTIVOS`: Seguimiento simultáneo de Viajes, Misiones de Entrega y Servicios Técnicos para Clientes y Prestadores.
-  - `📜 HISTORIAL FORENSE`: Balance financiero acumulado en ₡ CRC, métricas de actividad y verificación de integridad SHA-256.
-  - `🛠️ CONFIGURACIÓN DE OFERTA & MATERIALES`:
-    - Definición formal de especialidad (Mecánica, Grúas, Pulpería, Soda, Plomería, Electricidad, Cerrajería, Hogar).
-    - Fórmulas de cobro matemáticas en colones costarricenses (mano de obra ₡/hora, tarifa base, costo ₡/km y recargos).
-    - Políticas de suministro de materiales (`MATERIALS_INCLUDED`, `CLIENT_SUPPLIED`, `AT_COST_WITH_MARGIN`).
-    - Sub-servicios con horas estimadas, materiales requeridos y equipamiento certificado.
-- **Cancelación Autoritativa de Viajes:**
-  - Cancelación local inmediata garantizada (`LOCAL_CANCELLED`) y sincronización outbox resiliente con Supabase.
-  - Limpieza atómica de selecciones activas para evitar estados residuales o bloqueos.
-- **Comercio Local & Delivery Triangular:**
-  - Pulperías & Minisúper: Abarrotes, recargas y canasta básica con despacho local.
-  - Sodas & Restaurantes: Comida típica y bebidas preparadas en tiempo real.
-  - Mensajería & Courier: Asignación de repartidor, seguimiento de trayecto y custodia de entrega por PIN.
-- **Laboratorio de Emisiones & Pre-ITV Costa Rica:** Subsistema completo de evaluación
-  regulatoria COSEVI / CITA con contrato de verdad inquebrantable (`MEASURED` vs `PHYSICS_DERIVED`
-  vs `MODEL_ESTIMATED` vs `UNKNOWN`).
+- **Android:** `versionName 4.29.0`, `versionCode 63`.
+- **Contrato de versión del paquete:** `4.29.0`.
+
+### Stack Tecnológico
+
+| Componente | Versión |
+|---|---|
+| Kotlin | 2.4.0 |
+| AGP (Android Gradle Plugin) | 9.2.1 |
+| Gradle | 9.4.1 |
+| Compose BOM | 2026.05.01 |
+| Room | 2.8.4 (schema 88) |
+| Hilt / Dagger | 2.60.1 |
+| Ktor | 2.3.13 |
+| Coroutines | 1.9.0 |
+| compileSdk | 37 |
+| targetSdk | 36 |
+| minSdk | 26 |
+
+### Agentes Coleccionables (9 agentes — Agent3dAvatarCanvas)
+
+| # | Agente | Diseño | Tipo Avatar | Color |
+|---|---|---|---|---|
+| 1 | 🐉 Draco Ignis | Serpiente de Magma Volcánica | Canvas | Carmesí |
+| 2 | ⚡ Volt Aether | Sprite de Plasma Teal | Canvas | Teal |
+| 3 | 🛡️ Titan Vanguard | Robot Acorazado (radar, cañones, visor) | Canvas | Rojo |
+| 4 | ⚛️ Cyber Mecha | Sentinel Cuántico (constelación hexagonal) | Canvas | Cyan |
+| 5 | 🌌 Laya Celestial | Tejedora de Nebulosa (gas interestelar) | Canvas | Violeta |
+| 6 | ✨ EVAIR Core | Simbionte Bioluminiscente (medusa abisal) | Canvas | Azul |
+| 7 | 🦎 Reptiliano | Entidad Dracónica — Nave: Tic-Tac UAP | Bitmap + Glow | Verde |
+| 8 | 👤 Nórdico | Guía Estelar Benevolente — Nave: Crescent UAP | Bitmap + Glow | Azul |
+| 9 | 👽 Gris | Observador Silencioso — Nave: Lenticular UAP | Bitmap + Glow | Gris |
+
+- **Avatar Hybrid System:** Los 6 agentes originales usan Canvas API con DrawScope animado (pseudo-3D con azimuth/elevation/wavePhase). Los 3 agentes alien usan imágenes bitmap reales con glow pulsante animado y borde sweep-gradient sobre CircleShape.
+- **Categoría XENOLOGY:** Nueva categoría de agente para las razas extraterrestres con filtro dedicado en el Agent Store.
+
+### 🛸 OVNIs y Razas (Xenología Elysium)
+
+Nueva sección accesible desde Home con galería completa:
+- **3 Razas Extraterrestres** con su nave asignada (Reptiliano→Tic-Tac, Nórdico→Crescent/Wedge, Gris→Lenticular).
+- **4 Plasmoides** (avistamientos: rojo, blanco, rosa, verde).
+- **Infografía completa** de referencia de razas y tipología UAP.
+- 11 imágenes en `res/drawable/` como recursos nativos.
+- Navegación: `MeetDestinations.UAP_XENOLOGY` → `UapXenologyScreen`.
+
+### Rediseño Completo de Avatares (IP-Safe, Propietarios Elysium)
+
+Todos los avatares fueron rediseñados desde cero como diseños propietarios:
+- **Draco Ignis:** Serpiente de obsidiana volcánica enrollada, venas de lava incandescente, corona de cristales volcánicos, corazón de magma pulsante.
+- **Volt Aether:** Sprite de plasma teal con antenas de pararrayos, reactor arc, anillos orbitales de electrones, escudo hexagonal rotatorio.
+- **Titan Vanguard:** Robot acorazado con campo de radar sweep, cañones de hombro, casco angular con visor LED panorámico, reactor triangular, brazos mecánicos con garras, propulsores.
+- **Cyber Mecha (Sentinel Cuántico):** Entidad geométrica no-humanoide de placas hexagonales flotantes orbitando un core de consciencia cuántica.
+- **Laya (Tejedora de Nebulosa):** Entidad cósmica de gas interestelar con patrones de constelación, alas de refracción prismática, ojos de estrella binaria.
+- **EVAIR (Simbionte Bioluminiscente):** Criatura abisal tipo medusa con campana translúcida, venas de red neural, cromatóforos, tentáculos bioluminiscentes.
+
+- **Navegación Waze 1-Click en Safety:**
+  - Ícono Waze integrado dentro de la tarjeta de coordenadas en `PublicPointDetail` y `PrivateReportDetailSheet`.
+  - Deep-link nativo `waze://?ll=lat,lng&navigate=yes` con cascada de fallback: Google Maps geo → Play Store Waze.
+  - Helper `openWazeNavigation()` con seguridad de excepciones completa.
 - **Nombre comercial:** Elysium Vanguard AI OS. No se deben renombrar los
   contratos técnicos heredados `MEET` durante una actualización normal.
 
