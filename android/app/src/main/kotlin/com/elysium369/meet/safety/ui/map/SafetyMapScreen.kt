@@ -615,7 +615,7 @@ private fun PublicPointDetail(
                 ) {
                     Icon(Icons.Filled.LocationOn, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             "Coordenadas: ${String.format(java.util.Locale.US, "%.5f, %.5f", point.displayLatitude, point.displayLongitude)}",
                             fontSize = 12.sp,
@@ -624,6 +624,20 @@ private fun PublicPointDetail(
                         )
                         val accuracyText = point.locationAccuracyMeters?.let { "Precisión: ±${it}m" } ?: "Precisión no informada"
                         Text("$accuracyText · Red pública global", fontSize = 11.sp, color = MeetColors.textMuted)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            openWazeNavigation(context, point.displayLatitude, point.displayLongitude)
+                        },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource(R.drawable.ic_waze_logo),
+                            contentDescription = "Navegar con Waze",
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(28.dp),
+                        )
                     }
                 }
             }
@@ -1039,7 +1053,7 @@ private fun PrivateReportDetailSheet(
                 ) {
                     Icon(Icons.Filled.LocationOn, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             "Coordenadas: ${String.format(java.util.Locale.US, "%.5f, %.5f", point.latitude, point.longitude)}",
                             fontSize = 12.sp,
@@ -1049,6 +1063,20 @@ private fun PrivateReportDetailSheet(
                         val accuracyText = point.accuracyMeters?.let { "Precisión: ±${it.toInt()}m" } ?: "Precisión no informada"
                         val sourceText = formatLocationSource(point.locationSource)
                         Text("$accuracyText · $sourceText", fontSize = 11.sp, color = MeetColors.textMuted)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            openWazeNavigation(context, point.latitude, point.longitude)
+                        },
+                        modifier = Modifier.size(40.dp),
+                    ) {
+                        Icon(
+                            painter = androidx.compose.ui.res.painterResource(R.drawable.ic_waze_logo),
+                            contentDescription = "Navegar con Waze",
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(28.dp),
+                        )
                     }
                 }
             }
@@ -1514,4 +1542,46 @@ private fun formatLocationSource(source: String): String = when (source) {
     "MAP_SELECTION" -> "Selección manual en mapa"
     "USER_DESCRIPTION" -> "Búsqueda / descripción"
     else -> "Ubicación reportada"
+}
+
+/**
+ * Opens Waze navigation to the given coordinates.
+ * Deep-links via `waze://?ll=LAT,LON&navigate=yes` so Waze starts
+ * turn-by-turn navigation immediately.
+ * Falls back to Google Maps geo: intent if Waze is not installed.
+ */
+private fun openWazeNavigation(context: android.content.Context, lat: Double, lon: Double) {
+    try {
+        val wazeUri = android.net.Uri.parse(
+            "waze://?ll=${String.format(java.util.Locale.US, "%.6f,%.6f", lat, lon)}&navigate=yes"
+        )
+        val wazeIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, wazeUri).apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        // Check if Waze is installed before launching
+        if (wazeIntent.resolveActivity(context.packageManager) != null) {
+            context.startActivity(wazeIntent)
+        } else {
+            // Fallback: open Google Maps navigation
+            val mapsUri = android.net.Uri.parse(
+                "geo:0,0?q=${String.format(java.util.Locale.US, "%.6f,%.6f", lat, lon)}(Reporte)"
+            )
+            val mapsIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, mapsUri).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(mapsIntent)
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("SafetyMap", "Error opening Waze navigation for ($lat, $lon)", e)
+        // Last-resort fallback: open Waze via Play Store
+        try {
+            val playUri = android.net.Uri.parse("market://details?id=com.waze")
+            val playIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, playUri).apply {
+                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(playIntent)
+        } catch (_: Exception) {
+            // Silently fail if even Play Store is not available
+        }
+    }
 }

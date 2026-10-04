@@ -256,7 +256,11 @@ private fun DrawScope.drawDragonCharacter(
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// 2. ESPÍRITU VOLTAICO (VOLT AETHER)
+// 2. ESPÍRITU VOLTAICO (VOLT AETHER) — Diseño Propietario Elysium
+//    Criatura eléctrica viva: sprite de plasma con antenas de pararrayos,
+//    cuerpo teal redondeado, ojos expresivos, y brazos diminutos.
+//    Rodeado por su PODER: anillos orbitales de electrones, tentáculos
+//    de plasma, escudo hexagonal y descargas de rayos.
 // ══════════════════════════════════════════════════════════════════════
 private fun DrawScope.drawVoltAetherCharacter(
     center: Offset,
@@ -266,112 +270,275 @@ private fun DrawScope.drawVoltAetherCharacter(
     elevationRad: Float,
     wavePhase: Float,
 ) {
-    val headOffset = Offset(
-        center.x + sin(azimuthRad) * radius * 0.2f,
-        center.y - sin(elevationRad) * radius * 0.15f
+    val bodyCenter = Offset(
+        center.x + sin(azimuthRad) * radius * 0.15f,
+        center.y - sin(elevationRad) * radius * 0.12f
     )
 
-    // A. Zigzag Lightning Tail (Wagging behind)
-    val tailWag = sin(wavePhase * 3f) * radius * 0.25f
-    val tailPath = Path().apply {
-        moveTo(headOffset.x + radius * 0.35f, headOffset.y + radius * 0.4f)
-        lineTo(headOffset.x + radius * 0.75f + tailWag, headOffset.y + radius * 0.2f)
-        lineTo(headOffset.x + radius * 0.65f + tailWag, headOffset.y - radius * 0.05f)
-        lineTo(headOffset.x + radius * 1.05f + tailWag, headOffset.y - radius * 0.35f)
-        lineTo(headOffset.x + radius * 0.95f + tailWag, headOffset.y - radius * 0.15f)
-        lineTo(headOffset.x + radius * 0.55f + tailWag, headOffset.y + radius * 0.15f)
+    // ═══════════════════════════════════════════════════════
+    // CAPA 1: PODER ENVOLVENTE (aura, anillos, plasma)
+    // ═══════════════════════════════════════════════════════
+
+    // A. Plasma Tendrils radiating from the creature (organic energy veins)
+    for (i in 0 until 6) {
+        val baseAngle = (i.toFloat() / 6f) * 2f * PI.toFloat() + wavePhase * 0.3f
+        val tendrilWave = sin(wavePhase * 2.5f + i * 1.1f) * radius * 0.10f
+        val tendrilPath = Path().apply {
+            val startX = bodyCenter.x + cos(baseAngle) * radius * 0.40f
+            val startY = bodyCenter.y + sin(baseAngle) * radius * 0.35f
+            val endX = bodyCenter.x + cos(baseAngle) * radius * (0.92f + sin(wavePhase + i) * 0.12f)
+            val endY = bodyCenter.y + sin(baseAngle) * radius * (0.78f + sin(wavePhase + i) * 0.10f)
+            val ctrlX = bodyCenter.x + cos(baseAngle + 0.25f) * radius * 0.62f + tendrilWave
+            val ctrlY = bodyCenter.y + sin(baseAngle + 0.25f) * radius * 0.52f + tendrilWave
+            moveTo(startX, startY)
+            quadraticTo(ctrlX, ctrlY, endX, endY)
+        }
+        val tendrilAlpha = 0.35f + 0.25f * sin(wavePhase * 3f + i * 0.8f)
+        drawPath(tendrilPath, Color(0xFF00E5FF).copy(alpha = tendrilAlpha), style = Stroke(width = 2f + sin(wavePhase + i) * 0.6f))
+        // Energy nodes at tips
+        val tipDist = radius * (0.92f + sin(wavePhase + i) * 0.12f)
+        val tipX = bodyCenter.x + cos(baseAngle) * tipDist
+        val tipY = bodyCenter.y + sin(baseAngle) * tipDist * 0.85f
+        drawCircle(Color(0xFFFFD700), 3f + sin(wavePhase * 4f + i) * 1.2f, Offset(tipX, tipY))
+    }
+
+    // B. Hexagonal Energy Shield (slowly rotating around creature)
+    val hexRotation = wavePhase * 0.4f
+    val hexPath = Path().apply {
+        for (i in 0..5) {
+            val angle = hexRotation + (i.toFloat() / 6f) * 2f * PI.toFloat()
+            val hx = bodyCenter.x + cos(angle) * radius * 0.80f
+            val hy = bodyCenter.y + sin(angle) * radius * 0.68f
+            if (i == 0) moveTo(hx, hy) else lineTo(hx, hy)
+        }
         close()
     }
-    drawPath(tailPath, Brush.linearGradient(listOf(Color(0xFF8B4513), Color(0xFFFFD700))))
-    drawPath(tailPath, Color(0xFFFFA500), style = Stroke(2f))
+    drawPath(hexPath, Color(0xFF00E5FF).copy(alpha = 0.12f + 0.08f * sin(wavePhase * 2f)))
+    drawPath(hexPath, Color(0xFF00E5FF).copy(alpha = 0.40f), style = Stroke(
+        width = 1.5f,
+        pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 5f), phase = wavePhase * 18f)
+    ))
 
-    // B. Pointy Long Ears with Black Tips (Springy physics)
-    val earWiggle = sin(wavePhase * 2f) * 0.1f
-    val leftEar = Path().apply {
-        moveTo(headOffset.x - radius * 0.4f, headOffset.y - radius * 0.3f)
-        cubicTo(
-            headOffset.x - radius * 0.7f, headOffset.y - radius * (0.8f + earWiggle),
-            headOffset.x - radius * 0.85f, headOffset.y - radius * (1.1f + earWiggle),
-            headOffset.x - radius * 0.55f, headOffset.y - radius * (1.15f + earWiggle)
-        )
-        cubicTo(
-            headOffset.x - radius * 0.45f, headOffset.y - radius * 0.8f,
-            headOffset.x - radius * 0.25f, headOffset.y - radius * 0.5f,
-            headOffset.x - radius * 0.2f, headOffset.y - radius * 0.4f
-        )
-        close()
+    // C. Orbiting Electron Rings (3 tilted ellipses orbiting the body)
+    for (ringIdx in 0..2) {
+        val ringTilt = ringIdx * 60f
+        val ringPhase = wavePhase * (1.5f + ringIdx * 0.4f)
+        val electronCount = 6
+        for (e in 0 until electronCount) {
+            val eAngle = ringPhase + (e.toFloat() / electronCount) * 2f * PI.toFloat()
+            val orbitRx = radius * 0.55f
+            val orbitRy = radius * 0.16f
+            val tiltRad = Math.toRadians(ringTilt.toDouble()).toFloat()
+            val rawX = cos(eAngle) * orbitRx
+            val rawY = sin(eAngle) * orbitRy
+            val ex = bodyCenter.x + rawX * cos(tiltRad) - rawY * sin(tiltRad)
+            val ey = bodyCenter.y + rawX * sin(tiltRad) + rawY * cos(tiltRad)
+            val dotSize = 1.8f + 1.2f * (0.5f + 0.5f * sin(eAngle))
+            val ringColor = when (ringIdx) {
+                0 -> Color(0xFF00E5FF)
+                1 -> Color(0xFFFFD700)
+                else -> Color(0xFF76FF03)
+            }
+            drawCircle(ringColor.copy(alpha = 0.5f + 0.3f * sin(eAngle)), dotSize, Offset(ex, ey))
+        }
     }
-    val rightEar = Path().apply {
-        moveTo(headOffset.x + radius * 0.4f, headOffset.y - radius * 0.3f)
-        cubicTo(
-            headOffset.x + radius * 0.7f, headOffset.y - radius * (0.8f - earWiggle),
-            headOffset.x + radius * 0.85f, headOffset.y - radius * (1.1f - earWiggle),
-            headOffset.x + radius * 0.55f, headOffset.y - radius * (1.15f - earWiggle)
-        )
-        cubicTo(
-            headOffset.x + radius * 0.45f, headOffset.y - radius * 0.8f,
-            headOffset.x + radius * 0.25f, headOffset.y - radius * 0.5f,
-            headOffset.x + radius * 0.2f, headOffset.y - radius * 0.4f
-        )
-        close()
+
+    // D. Lightning Arc Discharges crackling outward from body
+    if (sin(wavePhase * 5f) > 0.2f) {
+        val arcAngle = wavePhase * 2f
+        val arcPath = Path().apply {
+            val sx = bodyCenter.x + cos(arcAngle) * radius * 0.40f
+            val sy = bodyCenter.y + sin(arcAngle) * radius * 0.35f
+            moveTo(sx, sy)
+            lineTo(sx + 14f, sy - 10f)
+            lineTo(sx + 7f, sy - 20f)
+            lineTo(sx + 20f, sy - 32f)
+        }
+        drawPath(arcPath, Color(0xFF00E5FF), style = Stroke(2f))
     }
-    drawPath(leftEar, Color(0xFFFFEB3B))
-    drawPath(rightEar, Color(0xFFFFEB3B))
-    drawPath(leftEar, Color(0xFFF57F17), style = Stroke(2f))
-    drawPath(rightEar, Color(0xFFF57F17), style = Stroke(2f))
+    if (sin(wavePhase * 4f + 1.5f) > 0.3f) {
+        val arcAngle2 = wavePhase * 1.7f + PI.toFloat()
+        val arcPath2 = Path().apply {
+            val sx = bodyCenter.x + cos(arcAngle2) * radius * 0.40f
+            val sy = bodyCenter.y + sin(arcAngle2) * radius * 0.35f
+            moveTo(sx, sy)
+            lineTo(sx - 12f, sy + 8f)
+            lineTo(sx - 6f, sy + 20f)
+            lineTo(sx - 18f, sy + 30f)
+        }
+        drawPath(arcPath2, Color(0xFFFFD700), style = Stroke(1.6f))
+    }
 
-    // Black tips of ears
-    drawCircle(Color(0xFF212121), radius * 0.18f, Offset(headOffset.x - radius * 0.65f, headOffset.y - radius * 1.05f))
-    drawCircle(Color(0xFF212121), radius * 0.18f, Offset(headOffset.x + radius * 0.65f, headOffset.y - radius * 1.05f))
+    // ═══════════════════════════════════════════════════════
+    // CAPA 2: EL SER VIVO (criatura eléctrica Volt)
+    // ═══════════════════════════════════════════════════════
 
-    // C. Chubby Round Yellow Face
-    drawOval(
+    // E. Body Glow (inner aura, soft halo around creature)
+    drawCircle(
         brush = Brush.radialGradient(
-            colors = listOf(Color(0xFFFFF176), Color(0xFFFFD600)),
-            center = headOffset,
-            radius = radius * 0.6f
+            colors = listOf(
+                Color(0xFF00E5FF).copy(alpha = 0.22f),
+                Color(0xFF0091EA).copy(alpha = 0.06f),
+                Color.Transparent
+            ),
+            center = bodyCenter,
+            radius = radius * 0.52f
         ),
-        topLeft = Offset(headOffset.x - radius * 0.55f, headOffset.y - radius * 0.45f),
-        size = Size(radius * 1.1f, radius * 0.95f)
+        radius = radius * 0.52f,
+        center = bodyCenter
+    )
+
+    // F. Lightning-Rod Antennae (two asymmetric conductors on top)
+    val antennaWiggle = sin(wavePhase * 3f) * 0.05f
+    // Left antenna — taller, bends left
+    val leftAntenna = Path().apply {
+        moveTo(bodyCenter.x - radius * 0.12f, bodyCenter.y - radius * 0.30f)
+        cubicTo(
+            bodyCenter.x - radius * 0.18f, bodyCenter.y - radius * (0.55f + antennaWiggle),
+            bodyCenter.x - radius * 0.28f, bodyCenter.y - radius * (0.72f + antennaWiggle),
+            bodyCenter.x - radius * 0.22f, bodyCenter.y - radius * (0.82f + antennaWiggle)
+        )
+    }
+    drawPath(leftAntenna, Color(0xFF00BCD4), style = Stroke(width = 3.5f))
+    // Antenna tip spark ball
+    drawCircle(
+        brush = Brush.radialGradient(listOf(Color.White, Color(0xFF00E5FF), Color.Transparent)),
+        radius = radius * 0.06f + sin(wavePhase * 6f) * radius * 0.02f,
+        center = Offset(bodyCenter.x - radius * 0.22f, bodyCenter.y - radius * (0.82f + antennaWiggle))
+    )
+    // Right antenna — shorter, bends right
+    val rightAntenna = Path().apply {
+        moveTo(bodyCenter.x + radius * 0.10f, bodyCenter.y - radius * 0.30f)
+        cubicTo(
+            bodyCenter.x + radius * 0.16f, bodyCenter.y - radius * (0.48f - antennaWiggle),
+            bodyCenter.x + radius * 0.25f, bodyCenter.y - radius * (0.58f - antennaWiggle),
+            bodyCenter.x + radius * 0.20f, bodyCenter.y - radius * (0.65f - antennaWiggle)
+        )
+    }
+    drawPath(rightAntenna, Color(0xFF00BCD4), style = Stroke(width = 3f))
+    drawCircle(
+        brush = Brush.radialGradient(listOf(Color.White, Color(0xFFFFD700), Color.Transparent)),
+        radius = radius * 0.05f + sin(wavePhase * 5f + 1f) * radius * 0.015f,
+        center = Offset(bodyCenter.x + radius * 0.20f, bodyCenter.y - radius * (0.65f - antennaWiggle))
+    )
+
+    // G. Main Body — rounded teal sprite (NOT yellow, NOT round face like Pikachu)
+    //    Slightly pear-shaped: wider bottom, narrower top = unique silhouette
+    val bodyPath = Path().apply {
+        // Top of head
+        moveTo(bodyCenter.x, bodyCenter.y - radius * 0.33f)
+        // Right side of head curving into wider body
+        cubicTo(
+            bodyCenter.x + radius * 0.28f, bodyCenter.y - radius * 0.33f,
+            bodyCenter.x + radius * 0.35f, bodyCenter.y - radius * 0.15f,
+            bodyCenter.x + radius * 0.38f, bodyCenter.y + radius * 0.05f
+        )
+        // Right side belly (wider)
+        cubicTo(
+            bodyCenter.x + radius * 0.40f, bodyCenter.y + radius * 0.22f,
+            bodyCenter.x + radius * 0.32f, bodyCenter.y + radius * 0.38f,
+            bodyCenter.x, bodyCenter.y + radius * 0.42f
+        )
+        // Left side belly
+        cubicTo(
+            bodyCenter.x - radius * 0.32f, bodyCenter.y + radius * 0.38f,
+            bodyCenter.x - radius * 0.40f, bodyCenter.y + radius * 0.22f,
+            bodyCenter.x - radius * 0.38f, bodyCenter.y + radius * 0.05f
+        )
+        // Left side of head
+        cubicTo(
+            bodyCenter.x - radius * 0.35f, bodyCenter.y - radius * 0.15f,
+            bodyCenter.x - radius * 0.28f, bodyCenter.y - radius * 0.33f,
+            bodyCenter.x, bodyCenter.y - radius * 0.33f
+        )
+        close()
+    }
+    // Body fill: teal gradient (Elysium brand, NOT yellow)
+    drawPath(bodyPath, Brush.radialGradient(
+        colors = listOf(Color(0xFF4DD0E1), Color(0xFF00ACC1), Color(0xFF00838F)),
+        center = Offset(bodyCenter.x - radius * 0.05f, bodyCenter.y - radius * 0.08f),
+        radius = radius * 0.45f
+    ))
+    // Body outline
+    drawPath(bodyPath, Color(0xFF006064), style = Stroke(2.2f))
+
+    // H. Chest Energy Core — small glowing circle in the chest (like an arc reactor)
+    val coreY = bodyCenter.y + radius * 0.08f
+    drawCircle(
+        brush = Brush.radialGradient(
+            colors = listOf(Color.White, Color(0xFF00E5FF), Color(0xFF0091EA).copy(alpha = 0.3f)),
+            center = Offset(bodyCenter.x, coreY),
+            radius = radius * 0.10f
+        ),
+        radius = radius * 0.10f,
+        center = Offset(bodyCenter.x, coreY)
+    )
+    drawCircle(Color(0xFF00E5FF), radius * 0.10f, Offset(bodyCenter.x, coreY), style = Stroke(1.2f))
+
+    // I. Eyes — big expressive round eyes with electric-blue irises (NOT anime Pikachu style)
+    val eyeY = bodyCenter.y - radius * 0.10f
+    val eyeSpread = radius * 0.17f
+    val eyeRadius = radius * 0.11f
+    // Left eye — white sclera
+    drawCircle(Color.White, eyeRadius, Offset(bodyCenter.x - eyeSpread, eyeY))
+    // Left iris — electric blue
+    drawCircle(Color(0xFF0091EA), eyeRadius * 0.65f, Offset(bodyCenter.x - eyeSpread + sin(azimuthRad) * 2f, eyeY))
+    // Left pupil
+    drawCircle(Color(0xFF0D1B2A), eyeRadius * 0.32f, Offset(bodyCenter.x - eyeSpread + sin(azimuthRad) * 2f, eyeY))
+    // Left specular
+    drawCircle(Color.White.copy(alpha = 0.9f), eyeRadius * 0.18f, Offset(bodyCenter.x - eyeSpread - 1.5f, eyeY - 2f))
+
+    // Right eye
+    drawCircle(Color.White, eyeRadius, Offset(bodyCenter.x + eyeSpread, eyeY))
+    drawCircle(Color(0xFF0091EA), eyeRadius * 0.65f, Offset(bodyCenter.x + eyeSpread + sin(azimuthRad) * 2f, eyeY))
+    drawCircle(Color(0xFF0D1B2A), eyeRadius * 0.32f, Offset(bodyCenter.x + eyeSpread + sin(azimuthRad) * 2f, eyeY))
+    drawCircle(Color.White.copy(alpha = 0.9f), eyeRadius * 0.18f, Offset(bodyCenter.x + eyeSpread - 1.5f, eyeY - 2f))
+
+    // J. Happy Mouth — simple arc smile
+    val smilePath = Path().apply {
+        moveTo(bodyCenter.x - radius * 0.08f, bodyCenter.y + radius * 0.08f)
+        quadraticTo(bodyCenter.x, bodyCenter.y + radius * 0.16f, bodyCenter.x + radius * 0.08f, bodyCenter.y + radius * 0.08f)
+    }
+    drawPath(smilePath, Color(0xFF004D40), style = Stroke(2f))
+
+    // K. Tiny Arms/Hands — stubby little appendages waving
+    val armWave = sin(wavePhase * 2.5f) * 0.08f
+    // Left arm
+    val leftArm = Path().apply {
+        moveTo(bodyCenter.x - radius * 0.34f, bodyCenter.y + radius * 0.05f)
+        cubicTo(
+            bodyCenter.x - radius * 0.48f, bodyCenter.y + radius * (0.0f - armWave),
+            bodyCenter.x - radius * 0.52f, bodyCenter.y + radius * (-0.08f - armWave),
+            bodyCenter.x - radius * 0.48f, bodyCenter.y + radius * (-0.14f - armWave)
+        )
+    }
+    drawPath(leftArm, Color(0xFF00ACC1), style = Stroke(width = radius * 0.08f))
+    // Left hand — tiny circle
+    drawCircle(Color(0xFF4DD0E1), radius * 0.05f, Offset(bodyCenter.x - radius * 0.48f, bodyCenter.y + radius * (-0.14f - armWave)))
+
+    // Right arm
+    val rightArm = Path().apply {
+        moveTo(bodyCenter.x + radius * 0.34f, bodyCenter.y + radius * 0.05f)
+        cubicTo(
+            bodyCenter.x + radius * 0.48f, bodyCenter.y + radius * (0.0f + armWave),
+            bodyCenter.x + radius * 0.52f, bodyCenter.y + radius * (-0.05f + armWave),
+            bodyCenter.x + radius * 0.50f, bodyCenter.y + radius * (-0.10f + armWave)
+        )
+    }
+    drawPath(rightArm, Color(0xFF00ACC1), style = Stroke(width = radius * 0.08f))
+    drawCircle(Color(0xFF4DD0E1), radius * 0.05f, Offset(bodyCenter.x + radius * 0.50f, bodyCenter.y + radius * (-0.10f + armWave)))
+
+    // L. Tiny Feet — two small bumps at bottom
+    drawOval(
+        color = Color(0xFF00838F),
+        topLeft = Offset(bodyCenter.x - radius * 0.20f, bodyCenter.y + radius * 0.36f),
+        size = Size(radius * 0.16f, radius * 0.10f)
     )
     drawOval(
-        color = Color(0xFFF57F17),
-        topLeft = Offset(headOffset.x - radius * 0.55f, headOffset.y - radius * 0.45f),
-        size = Size(radius * 1.1f, radius * 0.95f),
-        style = Stroke(2.2f)
+        color = Color(0xFF00838F),
+        topLeft = Offset(bodyCenter.x + radius * 0.04f, bodyCenter.y + radius * 0.36f),
+        size = Size(radius * 0.16f, radius * 0.10f)
     )
-
-    // D. Big Anime Eyes with Double Highlight
-    val eyeY = headOffset.y - radius * 0.1f
-    val eyeDist = radius * 0.24f
-    // Left eye
-    drawCircle(Color(0xFF212121), radius * 0.13f, Offset(headOffset.x - eyeDist, eyeY))
-    drawCircle(Color.White, radius * 0.05f, Offset(headOffset.x - eyeDist - 2f, eyeY - 3f))
-    drawCircle(Color.White, radius * 0.025f, Offset(headOffset.x - eyeDist + 3f, eyeY + 2f))
-    // Right eye
-    drawCircle(Color(0xFF212121), radius * 0.13f, Offset(headOffset.x + eyeDist, eyeY))
-    drawCircle(Color.White, radius * 0.05f, Offset(headOffset.x + eyeDist - 2f, eyeY - 3f))
-    drawCircle(Color.White, radius * 0.025f, Offset(headOffset.x + eyeDist + 3f, eyeY + 2f))
-
-    // E. Red Electric Cheeks (Glowing with Sparks)
-    val cheekY = headOffset.y + radius * 0.12f
-    val cheekDist = radius * 0.38f
-    drawCircle(Color(0xFFFF1744), radius * 0.15f, Offset(headOffset.x - cheekDist, cheekY))
-    drawCircle(Color(0xFFFF1744), radius * 0.15f, Offset(headOffset.x + cheekDist, cheekY))
-    // Electric sparks from cheeks
-    if (sin(wavePhase * 5f) > 0.3f) {
-        drawLine(Color.White, Offset(headOffset.x - cheekDist, cheekY), Offset(headOffset.x - cheekDist - 15f, cheekY - 10f), 2f)
-        drawLine(Color.White, Offset(headOffset.x + cheekDist, cheekY), Offset(headOffset.x + cheekDist + 15f, cheekY - 10f), 2f)
-    }
-
-    // F. Cute Nose & Smile
-    drawCircle(Color(0xFF424242), 2.5f, Offset(headOffset.x, headOffset.y + radius * 0.02f))
-    val mouthPath = Path().apply {
-        moveTo(headOffset.x - 10f, headOffset.y + radius * 0.18f)
-        quadraticTo(headOffset.x - 5f, headOffset.y + radius * 0.25f, headOffset.x, headOffset.y + radius * 0.20f)
-        quadraticTo(headOffset.x + 5f, headOffset.y + radius * 0.25f, headOffset.x + 10f, headOffset.y + radius * 0.18f)
-    }
-    drawPath(mouthPath, Color(0xFFB71C1C), style = Stroke(2f))
 }
 
 // ══════════════════════════════════════════════════════════════════════
