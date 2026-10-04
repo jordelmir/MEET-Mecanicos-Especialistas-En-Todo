@@ -2,6 +2,7 @@ package com.elysium369.meet.safety.science.domain
 
 import java.time.Instant
 import java.util.UUID
+import javax.inject.Inject
 
 /**
  * Formal state machine governing epistemic transitions.
@@ -13,7 +14,7 @@ import java.util.UUID
  *    is never sufficient.
  * 4. AI actors may NEVER trigger an upward transition.
  */
-class AssertionStateMachine {
+class AssertionStateMachine @Inject constructor() {
 
     companion object {
         /** Upward epistemic ladder — each step requires explicit evidence. */

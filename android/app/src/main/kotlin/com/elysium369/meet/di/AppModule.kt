@@ -5164,6 +5164,329 @@ object AppModule {
         }
     }
 
+    // ── ELYSIUM SAFETY SCIENTIFIC CORE v1 ──────────────────────────
+    // Creates 19 local tables mirroring Supabase safety_scientific_* schema.
+    // All new tables, no existing tables touched.
+    val MIGRATION_88_89 = object : Migration(88, 89) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // 1. Scientific Entities
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_entities` (
+                    `id` TEXT NOT NULL,
+                    `entityType` TEXT NOT NULL,
+                    `canonicalName` TEXT NOT NULL,
+                    `aliasesJson` TEXT NOT NULL DEFAULT '[]',
+                    `externalIdentifiersJson` TEXT NOT NULL DEFAULT '[]',
+                    `assertionState` TEXT NOT NULL DEFAULT 'UNKNOWN',
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_entities_entityType` ON `safety_scientific_entities` (`entityType`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_entities_canonicalName` ON `safety_scientific_entities` (`canonicalName`)")
+
+            // 2. Entity Relations
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_entity_relations` (
+                    `id` TEXT NOT NULL,
+                    `subjectId` TEXT NOT NULL,
+                    `relationType` TEXT NOT NULL,
+                    `objectId` TEXT NOT NULL,
+                    `validFrom` INTEGER,
+                    `validUntil` INTEGER,
+                    `supportingEvidenceIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `assertionState` TEXT NOT NULL DEFAULT 'UNKNOWN',
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_entity_relations_subjectId` ON `safety_scientific_entity_relations` (`subjectId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_entity_relations_objectId` ON `safety_scientific_entity_relations` (`objectId`)")
+
+            // 3. Claims
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_claims` (
+                    `id` TEXT NOT NULL,
+                    `proposition` TEXT NOT NULL,
+                    `subjectEntityId` TEXT,
+                    `predicate` TEXT NOT NULL,
+                    `objectEntityId` TEXT,
+                    `occurredAt` INTEGER,
+                    `knownAt` INTEGER,
+                    `validFrom` INTEGER,
+                    `validUntil` INTEGER,
+                    `assertionState` TEXT NOT NULL DEFAULT 'UNKNOWN',
+                    `causalStatus` TEXT NOT NULL DEFAULT 'NOT_ASSESSED',
+                    `methodologyVersion` TEXT NOT NULL DEFAULT 'safety-science-v1',
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_claims_subjectEntityId` ON `safety_scientific_claims` (`subjectEntityId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_claims_objectEntityId` ON `safety_scientific_claims` (`objectEntityId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_claims_assertionState` ON `safety_scientific_claims` (`assertionState`)")
+
+            // 4. Claim ↔ Evidence
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_claim_evidence` (
+                    `claimId` TEXT NOT NULL,
+                    `evidenceId` TEXT NOT NULL,
+                    `relationType` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`claimId`, `evidenceId`)
+                )
+            """.trimIndent())
+
+            // 5. Claim Relations
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_claim_relations` (
+                    `id` TEXT NOT NULL,
+                    `sourceClaimId` TEXT NOT NULL,
+                    `targetClaimId` TEXT NOT NULL,
+                    `relationType` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_claim_relations_sourceClaimId` ON `safety_scientific_claim_relations` (`sourceClaimId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_claim_relations_targetClaimId` ON `safety_scientific_claim_relations` (`targetClaimId`)")
+
+            // 6. Events
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_events` (
+                    `id` TEXT NOT NULL,
+                    `eventType` TEXT NOT NULL,
+                    `occurredAt` INTEGER,
+                    `knownAt` INTEGER,
+                    `recordedAt` INTEGER NOT NULL,
+                    `publishedAt` INTEGER,
+                    `verifiedAt` INTEGER,
+                    `actorEntityIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `locationEntityId` TEXT,
+                    `evidenceIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `claimIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `assertionState` TEXT NOT NULL DEFAULT 'UNKNOWN',
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_events_occurredAt` ON `safety_scientific_events` (`occurredAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_events_eventType` ON `safety_scientific_events` (`eventType`)")
+
+            // 7. Knowledge Events
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_knowledge_events` (
+                    `id` TEXT NOT NULL,
+                    `actorEntityId` TEXT NOT NULL,
+                    `informationClaimId` TEXT NOT NULL,
+                    `receivedAt` INTEGER NOT NULL,
+                    `channel` TEXT NOT NULL,
+                    `sourceEntityId` TEXT,
+                    `authorityContextId` TEXT,
+                    `assertionState` TEXT NOT NULL DEFAULT 'UNKNOWN',
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_knowledge_events_actorEntityId` ON `safety_scientific_knowledge_events` (`actorEntityId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_knowledge_events_receivedAt` ON `safety_scientific_knowledge_events` (`receivedAt`)")
+
+            // 8. Authority Assertions
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_authority_assertions` (
+                    `id` TEXT NOT NULL,
+                    `actorEntityId` TEXT NOT NULL,
+                    `authorityType` TEXT NOT NULL,
+                    `jurisdictionEntityId` TEXT,
+                    `validFrom` INTEGER,
+                    `validUntil` INTEGER,
+                    `sourceEvidenceIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `assertionState` TEXT NOT NULL DEFAULT 'UNKNOWN',
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+
+            // 9. Duty Assertions
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_duty_assertions` (
+                    `id` TEXT NOT NULL,
+                    `actorEntityId` TEXT NOT NULL,
+                    `dutyType` TEXT NOT NULL,
+                    `jurisdictionEntityId` TEXT,
+                    `validFrom` INTEGER,
+                    `validUntil` INTEGER,
+                    `legalSourceEvidenceIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `assertionState` TEXT NOT NULL DEFAULT 'UNKNOWN',
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+
+            // 10. Accountability Actions
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_accountability_actions` (
+                    `id` TEXT NOT NULL,
+                    `actorEntityId` TEXT NOT NULL,
+                    `actionKind` TEXT NOT NULL,
+                    `actionType` TEXT NOT NULL,
+                    `expectedAction` TEXT,
+                    `occurredAt` INTEGER NOT NULL,
+                    `evidenceIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `assertionState` TEXT NOT NULL DEFAULT 'UNKNOWN',
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+
+            // 11. Hypotheses
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_hypotheses` (
+                    `id` TEXT NOT NULL,
+                    `proposition` TEXT NOT NULL,
+                    `nullHypothesis` TEXT,
+                    `supportingEvidenceIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `contradictingEvidenceIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `alternativeHypothesisIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `falsificationCriteriaJson` TEXT NOT NULL DEFAULT '[]',
+                    `status` TEXT NOT NULL DEFAULT 'PROPOSED',
+                    `methodologyVersion` TEXT NOT NULL DEFAULT 'safety-science-v1',
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_hypotheses_status` ON `safety_scientific_hypotheses` (`status`)")
+
+            // 12. Provenance Nodes
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_provenance_nodes` (
+                    `id` TEXT NOT NULL,
+                    `nodeType` TEXT NOT NULL,
+                    `contentHash` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_provenance_nodes_nodeType` ON `safety_scientific_provenance_nodes` (`nodeType`)")
+
+            // 13. Provenance Edges
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_provenance_edges` (
+                    `fromId` TEXT NOT NULL,
+                    `toId` TEXT NOT NULL,
+                    `relation` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`fromId`, `toId`, `relation`)
+                )
+            """.trimIndent())
+
+            // 14. Research Datasets
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_research_datasets` (
+                    `id` TEXT NOT NULL,
+                    `name` TEXT NOT NULL,
+                    `version` TEXT NOT NULL,
+                    `evidenceIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `claimIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `eventIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `datasetHash` TEXT NOT NULL,
+                    `methodologyVersion` TEXT NOT NULL DEFAULT 'safety-science-v1',
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+
+            // 15. Research Runs
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_research_runs` (
+                    `id` TEXT NOT NULL,
+                    `datasetId` TEXT NOT NULL,
+                    `datasetHash` TEXT NOT NULL,
+                    `methodologyVersion` TEXT NOT NULL,
+                    `codeCommit` TEXT NOT NULL,
+                    `parametersJson` TEXT NOT NULL DEFAULT '{}',
+                    `resultArtifactHash` TEXT NOT NULL,
+                    `biasAssessmentJson` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+
+            // 16. Replications
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_replications` (
+                    `id` TEXT NOT NULL,
+                    `originalRunId` TEXT NOT NULL,
+                    `replicatorEntityId` TEXT NOT NULL,
+                    `institutionEntityId` TEXT,
+                    `datasetVersion` TEXT NOT NULL,
+                    `methodologyVersion` TEXT NOT NULL,
+                    `independentDatasetHash` TEXT,
+                    `result` TEXT NOT NULL,
+                    `deviationsJson` TEXT NOT NULL DEFAULT '[]',
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+
+            // 17. Publications
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_publications` (
+                    `id` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `abstractText` TEXT NOT NULL,
+                    `researchRunId` TEXT NOT NULL,
+                    `datasetHash` TEXT NOT NULL,
+                    `methodologyHash` TEXT NOT NULL,
+                    `codeCommit` TEXT NOT NULL,
+                    `evidenceManifestHash` TEXT NOT NULL,
+                    `limitationsJson` TEXT NOT NULL DEFAULT '[]',
+                    `sensitivity` TEXT NOT NULL DEFAULT 'NORMAL',
+                    `supersedesPublicationId` TEXT,
+                    `status` TEXT NOT NULL DEFAULT 'DRAFT',
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+
+            // 18. State Transitions (audit log)
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_state_transitions` (
+                    `id` TEXT NOT NULL,
+                    `subjectId` TEXT NOT NULL,
+                    `fromState` TEXT NOT NULL,
+                    `toState` TEXT NOT NULL,
+                    `reason` TEXT NOT NULL,
+                    `evidenceIdsJson` TEXT NOT NULL DEFAULT '[]',
+                    `actorId` TEXT NOT NULL,
+                    `actorIsAi` INTEGER NOT NULL DEFAULT 0,
+                    `methodologyVersion` TEXT NOT NULL,
+                    `occurredAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+
+            // 19. Checkpoints
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_checkpoints` (
+                    `checkpointId` TEXT NOT NULL,
+                    `rootHash` TEXT NOT NULL,
+                    `eventCount` INTEGER NOT NULL,
+                    `firstEventHash` TEXT,
+                    `lastEventHash` TEXT,
+                    `signatureAlgorithm` TEXT NOT NULL,
+                    `signatureBase64` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`checkpointId`)
+                )
+            """.trimIndent())
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -5239,6 +5562,7 @@ object AppModule {
             MIGRATION_85_86,
             MIGRATION_86_87,
             MIGRATION_87_88,
+            MIGRATION_88_89,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -5592,6 +5916,10 @@ object AppModule {
     fun provideMarketOsRemoteGateway(
         gateway: com.elysium369.meet.platform.marketos.data.SupabaseMarketOsRemoteGateway,
     ): com.elysium369.meet.platform.marketos.data.MarketOsRemoteGateway = gateway
+
+    @Provides
+    @Singleton
+    fun provideSafetyScienceDao(db: MeetDatabase): com.elysium369.meet.safety.science.data.SafetyScienceDao = db.safetyScienceDao()
 }
 
 @kotlinx.serialization.Serializable
