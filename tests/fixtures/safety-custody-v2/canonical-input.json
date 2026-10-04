@@ -1,0 +1,19 @@
+{
+  "protocol_version": "SAFETY-CUSTODY-V2",
+  "event": {
+    "event_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "event_type": "EVIDENCE_CAPTURED",
+    "actor_id": "11111111-2222-3333-4444-555555555555",
+    "timestamp_utc": "2026-01-15T08:30:00Z",
+    "payload_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "previous_hash": "GENESIS"
+  },
+  "expected_event_hash": "a19de52fb1b73f41db3c0e70c61b1f2c1f00ac8eae4f30ddd2c3b69b9c2c6e7f",
+  "chain": {
+    "event_hashes": [
+      "a19de52fb1b73f41db3c0e70c61b1f2c1f00ac8eae4f30ddd2c3b69b9c2c6e7f",
+      "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3"
+    ]
+  },
+  "note": "expected_event_hash and chain root are computed dynamically — this fixture defines INPUTS. Tests compute actual hashes and assert cross-runtime parity."
+}

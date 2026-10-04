@@ -5487,6 +5487,119 @@ object AppModule {
         }
     }
 
+    // ── ELYSIUM SAFETY SCIENTIFIC AUTHORITY v1 ─────────────────
+    // Outbox, evidence bridge, temporal integrity, source lineage, cases.
+    val MIGRATION_89_90 = object : Migration(89, 90) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            // 1. Command Outbox
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_command_outbox` (
+                    `id` TEXT NOT NULL,
+                    `commandId` TEXT NOT NULL,
+                    `actorId` TEXT NOT NULL,
+                    `commandType` TEXT NOT NULL,
+                    `payload` TEXT NOT NULL,
+                    `payloadHash` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    `attemptCount` INTEGER NOT NULL DEFAULT 0,
+                    `nextAttemptAt` INTEGER NOT NULL DEFAULT 0,
+                    `lastError` TEXT,
+                    `status` TEXT NOT NULL DEFAULT 'PENDING',
+                    `serverVersion` INTEGER,
+                    `completedAt` INTEGER,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_command_outbox_status` ON `safety_scientific_command_outbox` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_command_outbox_nextAttemptAt` ON `safety_scientific_command_outbox` (`nextAttemptAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_command_outbox_commandType` ON `safety_scientific_command_outbox` (`commandType`)")
+
+            // 2. Evidence References
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_evidence_references` (
+                    `id` TEXT NOT NULL,
+                    `scientificObjectId` TEXT NOT NULL,
+                    `scientificObjectType` TEXT NOT NULL,
+                    `evidenceId` TEXT NOT NULL,
+                    `relation` TEXT NOT NULL,
+                    `verificationState` TEXT NOT NULL,
+                    `evidenceHash` TEXT,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_evidence_references_evidenceId` ON `safety_scientific_evidence_references` (`evidenceId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_evidence_references_scientificObjectId` ON `safety_scientific_evidence_references` (`scientificObjectId`)")
+
+            // 3. Temporal Integrity
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_temporal_integrity` (
+                    `id` TEXT NOT NULL,
+                    `subjectId` TEXT NOT NULL,
+                    `subjectType` TEXT NOT NULL,
+                    `deviceCapturedAt` INTEGER,
+                    `serverReceivedAt` INTEGER NOT NULL,
+                    `serverVerifiedAt` INTEGER,
+                    `clockSkewMs` INTEGER,
+                    `temporalState` TEXT NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_temporal_integrity_subjectId` ON `safety_scientific_temporal_integrity` (`subjectId`)")
+
+            // 4. Source Lineage
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_source_lineage` (
+                    `id` TEXT NOT NULL,
+                    `sourceId` TEXT NOT NULL,
+                    `sourceLineageId` TEXT NOT NULL,
+                    `sourceInstanceId` TEXT NOT NULL,
+                    `derivationParentId` TEXT,
+                    `derivationType` TEXT NOT NULL,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_source_lineage_sourceLineageId` ON `safety_scientific_source_lineage` (`sourceLineageId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_source_lineage_derivationParentId` ON `safety_scientific_source_lineage` (`derivationParentId`)")
+
+            // 5. Cases
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_cases` (
+                    `id` TEXT NOT NULL,
+                    `title` TEXT NOT NULL,
+                    `jurisdiction` TEXT,
+                    `status` TEXT NOT NULL,
+                    `sensitivity` TEXT NOT NULL,
+                    `evidenceCount` INTEGER NOT NULL DEFAULT 0,
+                    `claimCount` INTEGER NOT NULL DEFAULT 0,
+                    `hypothesisCount` INTEGER NOT NULL DEFAULT 0,
+                    `researchRunCount` INTEGER NOT NULL DEFAULT 0,
+                    `replicationCount` INTEGER NOT NULL DEFAULT 0,
+                    `publicationStatus` TEXT,
+                    `legalReferralStatus` TEXT NOT NULL DEFAULT 'NOT_REFERRED',
+                    `serverVersion` INTEGER NOT NULL DEFAULT 0,
+                    `createdAt` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`id`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_cases_status` ON `safety_scientific_cases` (`status`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_scientific_cases_sensitivity` ON `safety_scientific_cases` (`sensitivity`)")
+
+            // 6. Case Items
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_scientific_case_items` (
+                    `caseId` TEXT NOT NULL,
+                    `itemId` TEXT NOT NULL,
+                    `itemType` TEXT NOT NULL,
+                    `addedAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`caseId`, `itemId`, `itemType`)
+                )
+            """.trimIndent())
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -5563,6 +5676,7 @@ object AppModule {
             MIGRATION_86_87,
             MIGRATION_87_88,
             MIGRATION_88_89,
+            MIGRATION_89_90,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
@@ -5920,6 +6034,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideSafetyScienceDao(db: MeetDatabase): com.elysium369.meet.safety.science.data.SafetyScienceDao = db.safetyScienceDao()
+
+    @Provides
+    @Singleton
+    fun provideScientificAuthorityDao(db: MeetDatabase): com.elysium369.meet.safety.science.data.ScientificAuthorityDao = db.scientificAuthorityDao()
 }
 
 @kotlinx.serialization.Serializable

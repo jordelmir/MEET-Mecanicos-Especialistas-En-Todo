@@ -254,8 +254,15 @@ import com.elysium369.meet.safety.science.data.*
         SciPublicationEntity::class,
         SciStateTransitionEntity::class,
         SciCheckpointEntity::class,
+        // v90 — Authority infrastructure
+        ScientificCommandEntity::class,
+        SciEvidenceReferenceEntity::class,
+        SciTemporalIntegrityEntity::class,
+        SciSourceLineageEntity::class,
+        SciCaseEntity::class,
+        SciCaseItemEntity::class,
     ],
-    version = 89,
+    version = 90,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -369,4 +376,7 @@ abstract class MeetDatabase : RoomDatabase() {
 
         // ELYSIUM SAFETY SCIENTIFIC CORE v1 DAO
         abstract fun safetyScienceDao(): SafetyScienceDao
+
+        // ELYSIUM SAFETY SCIENTIFIC AUTHORITY v1 DAO
+        abstract fun scientificAuthorityDao(): ScientificAuthorityDao
 }
