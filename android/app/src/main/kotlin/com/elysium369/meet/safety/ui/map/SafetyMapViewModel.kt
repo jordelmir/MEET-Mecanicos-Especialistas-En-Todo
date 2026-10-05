@@ -15,6 +15,9 @@ import com.elysium369.meet.safety.location.FusedSafetyLocationProvider
 import android.content.Context
 import com.elysium369.meet.safety.evidence.SafetyEvidenceEntity
 import com.elysium369.meet.safety.evidence.SafetyEvidenceRepository
+import com.elysium369.meet.safety.science.data.SafetyScienceDao
+import com.elysium369.meet.safety.science.data.SciClaimEntity
+import com.elysium369.meet.safety.science.data.SciHypothesisEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
@@ -62,6 +65,15 @@ data class SafetyMapUiState(
     val layer: SafetyMapLayer = SafetyMapLayer.ALL,
     val range: SafetyTimeRange = SafetyTimeRange.ALL,
     val evidenceByReport: Map<String, List<SafetyEvidenceEntity>> = emptyMap(),
+    val hypotheses: List<SciHypothesisEntity> = emptyList(),
+    val claims: List<SciClaimEntity> = emptyList(),
+)
+
+private data class MapStatusAndScience(
+    val busy: Boolean,
+    val failure: String?,
+    val hypotheses: List<SciHypothesisEntity>,
+    val claims: List<SciClaimEntity>,
 )
 
 @HiltViewModel
@@ -70,6 +82,7 @@ class SafetyMapViewModel @Inject constructor(
     private val safetyRepository: SafetyRepository,
     private val locationProvider: FusedSafetyLocationProvider,
     private val evidenceRepository: SafetyEvidenceRepository,
+    private val safetyScienceDao: SafetyScienceDao,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
     private val _currentLocation = MutableStateFlow<GeoPoint?>(null)
@@ -109,7 +122,16 @@ class SafetyMapViewModel @Inject constructor(
 
         SafetyMapSources(public, private, query, mergedEvidence)
     }
-    val uiState = combine(mapSources, layer, range, loading, error) { sources, layerName, rangeName, busy, failure ->
+    private val scienceStatus = combine(
+        loading,
+        error,
+        safetyScienceDao.observeHypotheses(),
+        safetyScienceDao.observeRecentClaims(200),
+    ) { busy, failure, hyps, clms ->
+        MapStatusAndScience(busy, failure, hyps, clms)
+    }
+
+    val uiState = combine(mapSources, layer, range, scienceStatus) { sources, layerName, rangeName, sci ->
         val (all, allPrivate, query, evidenceGrouped) = sources
         val selectedLayer = SafetyMapLayer.valueOf(layerName)
         val selectedRange = SafetyTimeRange.valueOf(rangeName)
@@ -129,11 +151,13 @@ class SafetyMapViewModel @Inject constructor(
                 points.map { SafetyPublicPoint(it.publicPointId, it.displayLatitude, it.displayLongitude, it.label, it.claimState, it.independentSourceCount, it.category, it.geoDisclosure, it.locationAccuracyMeters) },
                 privatePoints,
             ),
-            points = points, privatePoints = privatePoints, isLoading = busy, error = failure,
+            points = points, privatePoints = privatePoints, isLoading = sci.busy, error = sci.failure,
             searchQuery = query,
             pointCount = points.size + privatePoints.size,
             layer = selectedLayer, range = selectedRange,
             evidenceByReport = evidenceGrouped,
+            hypotheses = sci.hypotheses,
+            claims = sci.claims,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SafetyMapUiState())
 

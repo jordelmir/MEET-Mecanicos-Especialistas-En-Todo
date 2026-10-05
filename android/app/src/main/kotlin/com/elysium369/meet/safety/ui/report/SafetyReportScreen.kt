@@ -104,6 +104,7 @@ import com.elysium369.meet.core.geo.runtime.CommonMapPanel
 fun SafetyReportScreen(
     onBack: () -> Unit = {},
     onReportSubmitted: (String) -> Unit = {},
+    onNavigateToResearch: () -> Unit = {},
     locationEntryMode: String? = null,
     viewModel: SafetyReportViewModel = hiltViewModel(),
 ) {
@@ -141,6 +142,7 @@ fun SafetyReportScreen(
             report = createdReport,
             onBack = onBack,
             onDone = { onReportSubmitted(state.createdReportId!!) },
+            onNavigateToResearch = onNavigateToResearch,
         )
         return
     }
@@ -551,36 +553,193 @@ private fun VictimNumberField(
 
 @Composable
 private fun StepNarrative(state: SafetyReportUiState, viewModel: SafetyReportViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+            border = BorderStroke(1.dp, MeetColors.borderSubtle),
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(stringResource(R.string.safety_report_step_narrative_title), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.safety_report_step_narrative_count, state.narrative.trim().length),
+                    fontSize = 11.sp,
+                    color = if (state.narrative.trim().length >= 10) MeetColors.neonGreen else MeetColors.textSecondary,
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = state.narrative,
+                    onValueChange = { viewModel.updateNarrative(it) },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text(stringResource(R.string.safety_report_step_narrative_placeholder), color = MeetColors.textSecondary) },
+                    minLines = 4,
+                    maxLines = 10,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MeetColors.neonGreen,
+                        unfocusedBorderColor = MeetColors.borderSubtle,
+                        focusedTextColor = MeetColors.textPrimary,
+                        unfocusedTextColor = MeetColors.textPrimary,
+                        cursorColor = MeetColors.neonGreen,
+                    ),
+                )
+            }
+        }
+
+        ScientificAnalysisSection(state = state, viewModel = viewModel)
+    }
+}
+
+@Composable
+private fun ScientificAnalysisSection(
+    state: SafetyReportUiState,
+    viewModel: SafetyReportViewModel,
+) {
+    var expanded by remember { mutableStateOf(state.enableScientificAnalysis || state.scientificHypothesis.isNotBlank() || state.factualClaim.isNotBlank()) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-        border = BorderStroke(1.dp, MeetColors.borderSubtle),
+        border = BorderStroke(1.dp, if (expanded) MeetColors.cyberCyan.copy(alpha = 0.8f) else MeetColors.borderSubtle),
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.safety_report_step_narrative_title), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                stringResource(R.string.safety_report_step_narrative_count, state.narrative.trim().length),
-                fontSize = 11.sp,
-                color = if (state.narrative.trim().length >= 10) MeetColors.neonGreen else MeetColors.textSecondary,
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = state.narrative,
-                onValueChange = { viewModel.updateNarrative(it) },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(stringResource(R.string.safety_report_step_narrative_placeholder), color = MeetColors.textSecondary) },
-                minLines = 4,
-                maxLines = 10,
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = MeetColors.neonGreen,
-                    unfocusedBorderColor = MeetColors.borderSubtle,
-                    focusedTextColor = MeetColors.textPrimary,
-                    unfocusedTextColor = MeetColors.textPrimary,
-                    cursorColor = MeetColors.neonGreen,
-                ),
-            )
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        expanded = !expanded
+                        viewModel.toggleScientificAnalysis(expanded)
+                    },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Text("🔬", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "DIMENSIÓN CIENTÍFICA & HIPÓTESIS FORENSE",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            color = MeetColors.cyberCyan,
+                            letterSpacing = 0.8.sp,
+                        )
+                        Text(
+                            if (expanded) "Criterios Popperianos de falsación y hechos fácticos" else "Toca para agregar hipótesis y proyectar al Hub Científico",
+                            fontSize = 11.sp,
+                            color = MeetColors.textSecondary,
+                        )
+                    }
+                }
+                Text(
+                    if (expanded) "▲" else "▼",
+                    color = MeetColors.cyberCyan,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                )
+            }
+
+            if (expanded) {
+                HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
+
+                // 1. Factual Claim (Observación fáctica)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "1. AFIRMACIÓN FÁCTICA OBSERVACIONAL (CLAIM)",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.neonGreen,
+                        letterSpacing = 0.8.sp,
+                    )
+                    OutlinedTextField(
+                        value = state.factualClaim,
+                        onValueChange = { viewModel.updateFactualClaim(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Ej: Vehículo sospechoso sin placas descargando bultos a las 02:15...", fontSize = 12.sp, color = MeetColors.textMuted) },
+                        maxLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MeetColors.neonGreen,
+                            unfocusedBorderColor = MeetColors.borderSubtle,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
+                        ),
+                    )
+                }
+
+                // 2. Scientific Hypothesis (H1)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "2. HIPÓTESIS CAUSAL / EXPLICATIVA (H₁)",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.cyberCyan,
+                        letterSpacing = 0.8.sp,
+                    )
+                    OutlinedTextField(
+                        value = state.scientificHypothesis,
+                        onValueChange = { viewModel.updateScientificHypothesis(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Ej: Operación logística de almacenamiento vinculada a banda territorial...", fontSize = 12.sp, color = MeetColors.textMuted) },
+                        maxLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MeetColors.cyberCyan,
+                            unfocusedBorderColor = MeetColors.borderSubtle,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
+                        ),
+                    )
+                }
+
+                // 3. Null Hypothesis (H0)
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "3. HIPÓTESIS NULA (H₀)",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.textSecondary,
+                        letterSpacing = 0.8.sp,
+                    )
+                    OutlinedTextField(
+                        value = state.nullHypothesis,
+                        onValueChange = { viewModel.updateNullHypothesis(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Ej: Descarga comercial ordinaria sin vinculación criminal...", fontSize = 12.sp, color = MeetColors.textMuted) },
+                        maxLines = 2,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MeetColors.textSecondary,
+                            unfocusedBorderColor = MeetColors.borderSubtle,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
+                        ),
+                    )
+                }
+
+                // 4. Popperian Falsification Criteria
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "4. CRITERIO POPPERIANO DE FALSABILIDAD",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.warning,
+                        letterSpacing = 0.8.sp,
+                    )
+                    OutlinedTextField(
+                        value = state.falsificationCriteria,
+                        onValueChange = { viewModel.updateFalsificationCriteria(it) },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("¿Qué prueba documental o peritaje oficial refutaría tajantemente tu hipótesis?", fontSize = 12.sp, color = MeetColors.textMuted) },
+                        maxLines = 3,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MeetColors.warning,
+                            unfocusedBorderColor = MeetColors.borderSubtle,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
+                        ),
+                    )
+                }
+            }
         }
     }
 }
@@ -1055,6 +1214,13 @@ private fun StepReview(state: SafetyReportUiState) {
                 )
             }
 
+            if (state.scientificHypothesis.isNotBlank() || state.factualClaim.isNotBlank()) {
+                ReviewRow(
+                    label = "HIPÓTESIS / CIENCIA",
+                    value = if (state.scientificHypothesis.isNotBlank()) state.scientificHypothesis.take(30) + "..." else "Falsable (Popper)",
+                )
+            }
+
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.safety_report_step_review_notice),
@@ -1089,6 +1255,7 @@ private fun SafetyReportReceiptScreen(
     report: com.elysium369.meet.safety.data.local.SafetyReportEntity? = null,
     onBack: () -> Unit,
     onDone: () -> Unit,
+    onNavigateToResearch: () -> Unit = {},
 ) {
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
@@ -1222,7 +1389,48 @@ private fun SafetyReportReceiptScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
+            ) {
+                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("🔬", fontSize = 18.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "PLATAFORMA CIENTÍFICA & RESEARCH",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 11.sp,
+                            color = MeetColors.cyberCyan,
+                            letterSpacing = 0.8.sp,
+                        )
+                    }
+                    Text(
+                        "Tu reporte y su hipótesis forense fueron proyectados con rigor Popperiano (falsabilidad) en la red científica descentralizada.",
+                        fontSize = 11.sp,
+                        color = MeetColors.textSecondary,
+                        lineHeight = 16.sp,
+                    )
+                    Button(
+                        onClick = onNavigateToResearch,
+                        modifier = Modifier.fillMaxWidth().height(40.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MeetColors.cyberCyan.copy(alpha = 0.18f),
+                            contentColor = MeetColors.cyberCyan,
+                        ),
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                    ) {
+                        Text("🔬 Abrir en Plataforma Científica & Research", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             Button(
                 onClick = onDone,

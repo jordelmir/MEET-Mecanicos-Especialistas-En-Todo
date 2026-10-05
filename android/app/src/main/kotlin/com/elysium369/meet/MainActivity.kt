@@ -1823,6 +1823,7 @@ fun MeetApp(
                     onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
                     onSearchLocation = { navController.navigate("safety/report/location/search") },
                     onSelectLocationOnMap = { navController.navigate("safety/report/location/map") },
+                    onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
                 )
             }
             composable(MeetDestinations.SAFETY_REPORT) {
@@ -1832,6 +1833,7 @@ fun MeetApp(
                         navController.popBackStack()
                         navController.navigate(MeetDestinations.SAFETY_MY_REPORTS)
                     },
+                    onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
                 )
             }
             composable(
@@ -1844,6 +1846,7 @@ fun MeetApp(
                         navController.popBackStack()
                         navController.navigate(MeetDestinations.SAFETY_MY_REPORTS)
                     },
+                    onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
                     locationEntryMode = entry.arguments?.getString("mode"),
                 )
             }

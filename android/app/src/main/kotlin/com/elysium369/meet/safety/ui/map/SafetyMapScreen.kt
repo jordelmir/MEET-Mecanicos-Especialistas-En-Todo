@@ -67,6 +67,8 @@ import com.elysium369.meet.safety.domain.SourceRelation
 import com.elysium369.meet.safety.domain.label
 import com.elysium369.meet.safety.domain.toObservatoryBadge
 import com.elysium369.meet.safety.evidence.SafetyEvidenceEntity
+import com.elysium369.meet.safety.science.data.SciClaimEntity
+import com.elysium369.meet.safety.science.data.SciHypothesisEntity
 import com.elysium369.meet.safety.ui.cases.safetyPublicDate
 import com.elysium369.meet.safety.ui.common.SafetyCategoryIcons
 import com.elysium369.meet.ui.theme.MeetColors
@@ -78,6 +80,7 @@ fun SafetyMapScreen(
     onNavigateToReport: () -> Unit = {},
     onSearchLocation: () -> Unit = onNavigateToReport,
     onSelectLocationOnMap: () -> Unit = onNavigateToReport,
+    onNavigateToResearch: () -> Unit = {},
     viewModel: SafetyMapViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -341,6 +344,21 @@ fun SafetyMapScreen(
         val evidenceList = state.evidenceByReport[point.reportId]
             ?: state.evidenceByReport[point.reportId.lowercase()]
             ?: emptyList()
+        val reportId = point.reportId
+        val shortId = if (reportId.length >= 8) reportId.substring(0, 8) else reportId
+        val pointHypotheses = remember(state.hypotheses, point.reportId) {
+            state.hypotheses.filter { hyp ->
+                hyp.proposition.contains(shortId, ignoreCase = true) ||
+                hyp.supportingEvidenceIdsJson.contains(point.reportId, ignoreCase = true) ||
+                hyp.nullHypothesis?.contains(shortId, ignoreCase = true) == true
+            }
+        }
+        val pointClaims = remember(state.claims, point.reportId) {
+            state.claims.filter { clm ->
+                clm.proposition.contains(shortId, ignoreCase = true) ||
+                clm.predicate.contains(shortId, ignoreCase = true)
+            }
+        }
         ModalBottomSheet(
             onDismissRequest = { selectedId = null },
             containerColor = MeetColors.cardBackground,
@@ -352,6 +370,9 @@ fun SafetyMapScreen(
                 onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId, item.encryptedPath, item.mimeType) },
                 onLoadThumbnail = { evidenceId, storagePath -> viewModel.loadEvidenceThumbnail(evidenceId, storagePath) },
                 store = impunityStore,
+                onNavigateToResearch = onNavigateToResearch,
+                hypotheses = pointHypotheses,
+                claims = pointClaims,
             )
         }
     }
@@ -362,6 +383,21 @@ fun SafetyMapScreen(
             ?: state.evidenceByReport[point.publicPointId.lowercase()]
             ?: emptyList()
         val matchingPrivate = state.privatePoints.firstOrNull { it.reportId.equals(point.publicPointId, ignoreCase = true) }
+        val pointId = point.publicPointId
+        val shortId = if (pointId.length >= 8) pointId.substring(0, 8) else pointId
+        val pointHypotheses = remember(state.hypotheses, point.publicPointId) {
+            state.hypotheses.filter { hyp ->
+                hyp.proposition.contains(shortId, ignoreCase = true) ||
+                hyp.supportingEvidenceIdsJson.contains(point.publicPointId, ignoreCase = true) ||
+                hyp.nullHypothesis?.contains(shortId, ignoreCase = true) == true
+            }
+        }
+        val pointClaims = remember(state.claims, point.publicPointId) {
+            state.claims.filter { clm ->
+                clm.proposition.contains(shortId, ignoreCase = true) ||
+                clm.predicate.contains(shortId, ignoreCase = true)
+            }
+        }
         ModalBottomSheet(
             onDismissRequest = { selectedId = null },
             containerColor = MeetColors.cardBackground,
@@ -377,6 +413,9 @@ fun SafetyMapScreen(
                 onClose = { selectedId = null },
                 onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId, item.encryptedPath, item.mimeType) },
                 onLoadThumbnail = { evidenceId, storagePath -> viewModel.loadEvidenceThumbnail(evidenceId, storagePath) },
+                onNavigateToResearch = onNavigateToResearch,
+                hypotheses = pointHypotheses,
+                claims = pointClaims,
             )
         }
     }
@@ -410,6 +449,9 @@ private fun PublicPointDetail(
     onClose: () -> Unit = {},
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit = {},
     onLoadThumbnail: suspend (String, String?) -> ByteArray? = { _, _ -> null },
+    onNavigateToResearch: () -> Unit = {},
+    hypotheses: List<SciHypothesisEntity> = emptyList(),
+    claims: List<SciClaimEntity> = emptyList(),
 ) {
     val catColor = SafetyCategoryIcons.colorForString(point.category)
     val catIcon = SafetyCategoryIcons.iconForString(point.category)
@@ -722,6 +764,16 @@ private fun PublicPointDetail(
             }
         }
 
+        // === DIMENSIÓN CIENTÍFICA & ANÁLISIS FORENSE ===
+        item {
+            ScientificDimensionMapSection(
+                hypotheses = hypotheses,
+                claims = claims,
+                onNavigateToResearch = onNavigateToResearch,
+                categoryName = point.category,
+            )
+        }
+
         // === 7. Archivos adjuntos / Evidencia multimedia ===
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -875,6 +927,9 @@ private fun PrivateReportDetailSheet(
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit,
     onLoadThumbnail: suspend (String, String?) -> ByteArray? = { _, _ -> null },
     store: DrugMarketImpunityStore,
+    onNavigateToResearch: () -> Unit = {},
+    hypotheses: List<SciHypothesisEntity> = emptyList(),
+    claims: List<SciClaimEntity> = emptyList(),
 ) {
     val categoryColor = SafetyCategoryIcons.colorForString(point.category)
     val categoryIcon = SafetyCategoryIcons.iconForString(point.category)
@@ -1161,6 +1216,16 @@ private fun PrivateReportDetailSheet(
             }
         }
 
+        // === DIMENSIÓN CIENTÍFICA & ANÁLISIS FORENSE ===
+        item {
+            ScientificDimensionMapSection(
+                hypotheses = hypotheses,
+                claims = claims,
+                onNavigateToResearch = onNavigateToResearch,
+                categoryName = point.category,
+            )
+        }
+
         // === 7. ARCHIVOS ADJUNTOS / EVIDENCIA MULTIMEDIA ===
         item {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1371,6 +1436,171 @@ private fun VideoLinkCard(url: String, onOpen: () -> Unit) {
                 Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Ver video", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScientificDimensionMapSection(
+    hypotheses: List<SciHypothesisEntity>,
+    claims: List<SciClaimEntity>,
+    onNavigateToResearch: () -> Unit,
+    categoryName: String,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Text("🔬", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        "DIMENSIÓN CIENTÍFICA & ANÁLISIS FORENSE",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MeetColors.cyberCyan,
+                        letterSpacing = 0.8.sp,
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            if (hypotheses.isNotEmpty()) MeetColors.neonGreen.copy(alpha = 0.15f)
+                            else MeetColors.cyberCyan.copy(alpha = 0.15f)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        if (hypotheses.isNotEmpty()) "HIPÓTESIS REGISTRADA" else "REGISTRO EMPÍRICO",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (hypotheses.isNotEmpty()) MeetColors.neonGreen else MeetColors.cyberCyan,
+                    )
+                }
+            }
+
+            if (hypotheses.isNotEmpty()) {
+                hypotheses.forEach { hyp ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MeetColors.cardBackground)
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            "HIPÓTESIS (H₁):",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MeetColors.cyberCyan,
+                        )
+                        Text(
+                            hyp.proposition,
+                            fontSize = 12.sp,
+                            color = MeetColors.textPrimary,
+                            lineHeight = 17.sp,
+                        )
+                        hyp.nullHypothesis?.let { nullHyp ->
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                "HIPÓTESIS NULA (H₀):",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MeetColors.textSecondary,
+                            )
+                            Text(
+                                nullHyp,
+                                fontSize = 11.sp,
+                                color = MeetColors.textSecondary,
+                                lineHeight = 15.sp,
+                            )
+                        }
+                        val falsification = hyp.falsificationCriteriaJson
+                            .replace("[\"", "")
+                            .replace("\"]", "")
+                            .replace("\\\"", "\"")
+                            .trim()
+                        if (falsification.isNotBlank() && falsification != "[]") {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                "⚡ CRITERIO POPPERIANO DE FALSACIÓN:",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MeetColors.warning,
+                            )
+                            Text(
+                                falsification,
+                                fontSize = 11.sp,
+                                color = MeetColors.textPrimary,
+                                lineHeight = 15.sp,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (claims.isNotEmpty()) {
+                claims.forEach { clm ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(MeetColors.cardBackground)
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text("📌", fontSize = 12.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Column {
+                            Text(
+                                "AFIRMACIÓN OBSERVADA (${clm.assertionState}):",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MeetColors.neonGreen,
+                            )
+                            Text(
+                                clm.proposition,
+                                fontSize = 11.sp,
+                                color = MeetColors.textPrimary,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (hypotheses.isEmpty() && claims.isEmpty()) {
+                Text(
+                    "Este punto territorial cuenta con atestación de custodia criptográfica. Puedes formular hipótesis explicativas y correlacionar evidencia en la plataforma de investigación.",
+                    fontSize = 11.sp,
+                    color = MeetColors.textSecondary,
+                    lineHeight = 16.sp,
+                )
+            }
+
+            Button(
+                onClick = onNavigateToResearch,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                shape = RoundedCornerShape(10.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MeetColors.cyberCyan.copy(alpha = 0.2f),
+                    contentColor = MeetColors.cyberCyan,
+                ),
+                border = BorderStroke(1.dp, MeetColors.cyberCyan),
+            ) {
+                Text("🔬 Abrir en Plataforma Científica & Research", fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -32,6 +32,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import com.elysium369.meet.safety.science.data.SafetyScienceDao
+import com.elysium369.meet.safety.science.data.SciClaimEntity
+import com.elysium369.meet.safety.science.data.SciEventEntity
+import com.elysium369.meet.safety.science.data.SciHypothesisEntity
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 
@@ -68,6 +72,12 @@ data class SafetyReportUiState(
     val videoInputText: String = "",
     // V4 — Detailed participant registration
     val participantDetails: String = "",
+    // V5 — Scientific Hypotheses & Popperian Analysis
+    val enableScientificAnalysis: Boolean = false,
+    val scientificHypothesis: String = "",
+    val nullHypothesis: String = "",
+    val falsificationCriteria: String = "",
+    val factualClaim: String = "",
 ) {
     /** Whether victim demographics step should be shown (only for homicide). */
     val showVictimStep: Boolean get() = category == SafetyReportCategory.HOMICIDE
@@ -78,6 +88,7 @@ class SafetyReportViewModel @Inject constructor(
     private val repository: SafetyRepository,
     private val locationProvider: FusedSafetyLocationProvider,
     private val evidenceRepository: SafetyEvidenceRepository,
+    private val safetyScienceDao: SafetyScienceDao,
     private val savedState: SavedStateHandle,
 ) : ViewModel() {
     private val placeSearch = resilientRidePlaceSearchProvider(BuildConfig.RIDE_GEOCODER_URL, BuildConfig.RIDE_GEOCODER_FALLBACK_URL)
@@ -274,6 +285,26 @@ class SafetyReportViewModel @Inject constructor(
         _state.update { it.copy(participantDetails = details) }
     }
 
+    fun toggleScientificAnalysis(enabled: Boolean) {
+        _state.update { it.copy(enableScientificAnalysis = enabled) }
+    }
+
+    fun updateScientificHypothesis(value: String) {
+        _state.update { it.copy(scientificHypothesis = value) }
+    }
+
+    fun updateNullHypothesis(value: String) {
+        _state.update { it.copy(nullHypothesis = value) }
+    }
+
+    fun updateFalsificationCriteria(value: String) {
+        _state.update { it.copy(falsificationCriteria = value) }
+    }
+
+    fun updateFactualClaim(value: String) {
+        _state.update { it.copy(factualClaim = value) }
+    }
+
     fun submit() {
         commitVideoInput()
         val snapshot = _state.value
@@ -328,6 +359,78 @@ class SafetyReportViewModel @Inject constructor(
                         reportedVictimMale = snapshot.victimMale,
                         videoUrls = allVideoUrls,
                     ),
+                )
+
+                // Project into Room Scientific Platform (Hypothesis, Popperian Falsification, Factual Claim, Event)
+                val now = System.currentTimeMillis()
+                val occurredMs = snapshot.occurredAtIso?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: now
+                val shortId = if (reportId.length >= 8) reportId.substring(0, 8) else reportId
+
+                // 1. SciClaimEntity: Factual Assertion
+                val claimProposition = if (snapshot.factualClaim.isNotBlank()) {
+                    snapshot.factualClaim.trim()
+                } else {
+                    "[Reporte #$shortId] Incidente observado: " + snapshot.narrative.take(160).trim()
+                }
+                val claimId = UUID.randomUUID().toString()
+                safetyScienceDao.upsertClaim(
+                    SciClaimEntity(
+                        id = claimId,
+                        proposition = claimProposition,
+                        predicate = "REPORTED_INCIDENT",
+                        assertionState = "OBSERVED",
+                        causalStatus = if (snapshot.scientificHypothesis.isNotBlank()) "HYPOTHESIS_FORMULATED" else "NOT_ASSESSED",
+                        occurredAt = occurredMs,
+                        knownAt = now,
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                )
+
+                // 2. SciHypothesisEntity: Popperian Falsifiable Hypothesis
+                val hypothesisProposition = if (snapshot.scientificHypothesis.isNotBlank()) {
+                    "[Reporte #$shortId] " + snapshot.scientificHypothesis.trim()
+                } else {
+                    "[Reporte #$shortId] Hechos observados en categoría ${snapshot.category.name} asociados a reporte territorial"
+                }
+                val nullHyp = if (snapshot.nullHypothesis.isNotBlank()) {
+                    snapshot.nullHypothesis.trim()
+                } else {
+                    "Los hechos reportados en #$shortId responden a eventos aislados sin correlación causal o sistemática."
+                }
+                val falsificationCriteriaJson = if (snapshot.falsificationCriteria.isNotBlank()) {
+                    "[\"${snapshot.falsificationCriteria.replace("\"", "\\\"").trim()}\"]"
+                } else {
+                    "[\"Atestación contradictoria irrefutable o prueba documental concluyente\"]"
+                }
+                val hypothesisId = UUID.randomUUID().toString()
+                safetyScienceDao.upsertHypothesis(
+                    SciHypothesisEntity(
+                        id = hypothesisId,
+                        proposition = hypothesisProposition,
+                        nullHypothesis = nullHyp,
+                        supportingEvidenceIdsJson = "[\"report:$reportId\"]",
+                        contradictingEvidenceIdsJson = "[]",
+                        alternativeHypothesisIdsJson = "[]",
+                        falsificationCriteriaJson = falsificationCriteriaJson,
+                        status = "PROPOSED",
+                        methodologyVersion = "safety-science-v1",
+                        createdAt = now,
+                        updatedAt = now,
+                    )
+                )
+
+                // 3. SciEventEntity: Timeline projection
+                safetyScienceDao.upsertEvent(
+                    SciEventEntity(
+                        id = UUID.randomUUID().toString(),
+                        eventType = snapshot.category.name,
+                        occurredAt = occurredMs,
+                        recordedAt = now,
+                        assertionState = "OBSERVED",
+                        claimIdsJson = "[\"$claimId\"]",
+                        createdAt = now,
+                    )
                 )
 
                 _state.update {
