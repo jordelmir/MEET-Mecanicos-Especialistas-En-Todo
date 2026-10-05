@@ -40,6 +40,8 @@ GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_feature_gates TO servic
 -- Phase 16 — WITNESS CHECKPOINT RPCs
 -- ═══════════════════════════════════════════════════════════════════
 
+ALTER TABLE public.safety_scientific_checkpoints ADD COLUMN IF NOT EXISTS created_by UUID;
+
 CREATE OR REPLACE FUNCTION public.safety_scientific_create_checkpoint_v1(
     p_idempotency_key UUID,
     p_root_hash TEXT,
@@ -63,14 +65,14 @@ BEGIN
     END IF;
 
     -- Idempotency
-    IF EXISTS (SELECT 1 FROM public.safety_scientific_checkpoints WHERE id = p_idempotency_key) THEN
+    IF EXISTS (SELECT 1 FROM public.safety_scientific_checkpoints WHERE checkpoint_id = p_idempotency_key) THEN
         RETURN jsonb_build_object('status', 'ALREADY_EXISTS', 'checkpointId', p_idempotency_key, 'serverVersion', 0);
     END IF;
 
     v_checkpoint_id := p_idempotency_key;
 
     INSERT INTO public.safety_scientific_checkpoints (
-        id, root_hash, event_count, first_event_hash, last_event_hash,
+        checkpoint_id, root_hash, event_count, first_event_hash, last_event_hash,
         signature_algorithm, signature_base64, created_by, created_at
     ) VALUES (
         v_checkpoint_id, p_root_hash, p_event_count,

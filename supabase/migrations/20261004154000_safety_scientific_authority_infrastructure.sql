@@ -144,7 +144,7 @@ GRANT SELECT, INSERT ON public.safety_scientific_case_items TO service_role;
 -- 6. Witness Checkpoints (Phase 16)
 CREATE TABLE IF NOT EXISTS public.safety_scientific_witness_records (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    checkpoint_id UUID NOT NULL REFERENCES public.safety_scientific_checkpoints(id),
+    checkpoint_id UUID NOT NULL REFERENCES public.safety_scientific_checkpoints(checkpoint_id),
     witness_name TEXT NOT NULL,
     witness_type TEXT NOT NULL CHECK (witness_type IN (
         'UNIVERSITY', 'SCIENTIFIC_ORGANIZATION', 'NGO',

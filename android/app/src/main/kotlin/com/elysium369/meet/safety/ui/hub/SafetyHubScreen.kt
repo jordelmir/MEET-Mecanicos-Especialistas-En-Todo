@@ -56,6 +56,7 @@ fun SafetyHubScreen(
     onNavigateToTimelines: () -> Unit = {},
     onNavigateToAccountability: () -> Unit = {},
     onNavigateToObservatory: () -> Unit = {},
+    onNavigateToResearch: () -> Unit = {},
     onBack: () -> Unit = {},
     viewModel: SafetyHomeViewModel = hiltViewModel(),
 ) {
@@ -207,6 +208,20 @@ fun SafetyHubScreen(
                     color = MeetColors.cyberCyan,
                     letterSpacing = 1.2.sp,
                     modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+
+            item {
+                SafetyHubCard(
+                    title = "🔬 Plataforma Científica & Research",
+                    subtitle = "Claims, Timeline, Hipótesis, Replicaciones, Paquetes Forenses",
+                    icon = Icons.Filled.Analytics,
+                    iconColor = MeetColors.electricBlue,
+                    onClick = {
+                        SafetyHaptics.selectionTick(view)
+                        onNavigateToResearch()
+                    },
+                    enabled = true,
                 )
             }
 

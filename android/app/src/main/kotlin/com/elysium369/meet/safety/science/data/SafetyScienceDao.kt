@@ -20,6 +20,9 @@ interface SafetyScienceDao {
     @Query("SELECT * FROM safety_scientific_entities WHERE entityType = :type ORDER BY canonicalName")
     fun observeEntitiesByType(type: String): Flow<List<SciEntityEntity>>
 
+    @Query("SELECT * FROM safety_scientific_entities ORDER BY canonicalName")
+    fun observeAllEntities(): Flow<List<SciEntityEntity>>
+
     @Query("SELECT * FROM safety_scientific_entities WHERE canonicalName LIKE '%' || :query || '%' ORDER BY canonicalName LIMIT 50")
     suspend fun searchEntities(query: String): List<SciEntityEntity>
 
@@ -130,6 +133,9 @@ interface SafetyScienceDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertReplication(replication: SciReplicationEntity)
+
+    @Query("SELECT * FROM safety_scientific_replications ORDER BY createdAt DESC")
+    fun observeReplications(): Flow<List<SciReplicationEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertPublication(publication: SciPublicationEntity)

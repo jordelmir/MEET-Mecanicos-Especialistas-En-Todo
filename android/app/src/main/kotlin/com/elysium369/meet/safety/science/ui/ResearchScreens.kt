@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.elysium369.meet.safety.science.data.*
 
 // ═══════════════════════════════════════════════════════════════════
@@ -653,3 +654,395 @@ private fun formatTimestamp(epochMillis: Long): String {
     val zdt = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
     return java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").format(zdt)
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// §63 — Claims List Screen
+// ═══════════════════════════════════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ClaimsListScreen(
+    claims: List<SciClaimEntity>,
+    onBack: () -> Unit,
+    onClaimClick: (SciClaimEntity) -> Unit = {},
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Claims & Proposiciones") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(claims, key = { it.id }) { claim ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onClaimClick(claim) },
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                claim.predicate,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            AssertionStateBadge(claim.assertionState)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            claim.proposition,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            CausalStatusBadge(claim.causalStatus)
+                            Text(
+                                claim.methodologyVersion,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (claims.isEmpty()) {
+                item { EmptyState("No hay claims registrados") }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// §64 — Hypotheses List Screen
+// ═══════════════════════════════════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HypothesesListScreen(
+    hypotheses: List<SciHypothesisEntity>,
+    onBack: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Hipótesis Científicas") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(hypotheses, key = { it.id }) { hyp ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                hyp.status,
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                            ) {
+                                Text(
+                                    hyp.methodologyVersion,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            hyp.proposition,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                        )
+                        if (hyp.falsificationCriteriaJson.isNotBlank() && hyp.falsificationCriteriaJson != "[]") {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                "Falsificación: ${hyp.falsificationCriteriaJson}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (hypotheses.isEmpty()) {
+                item { EmptyState("No hay hipótesis formuladas") }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// §65 — Replications Screen
+// ═══════════════════════════════════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReplicationsScreen(
+    replications: List<SciReplicationEntity>,
+    onBack: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Replicaciones Independientes") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(replications, key = { it.id }) { rep ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                rep.result,
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (rep.result == "CONFIRMED" || rep.result == "SUCCESS") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            )
+                            Text(
+                                formatTimestamp(rep.createdAt),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Run original: ${rep.originalRunId.take(12)}...",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            "Replicador: ${rep.replicatorEntityId.take(12)}...",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+
+            if (replications.isEmpty()) {
+                item { EmptyState("No hay replicaciones registradas") }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// §66 — Publications Screen
+// ═══════════════════════════════════════════════════════════════════
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PublicationsScreen(
+    publications: List<SciPublicationEntity>,
+    onBack: () -> Unit,
+) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Publicaciones Científicas") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
+                    }
+                },
+            )
+        },
+    ) { padding ->
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(publications, key = { it.id }) { pub ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text(
+                                pub.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                            ) {
+                                Text(
+                                    pub.status,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            pub.abstractText,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 3,
+                        )
+                    }
+                }
+            }
+
+            if (publications.isEmpty()) {
+                item { EmptyState("No hay publicaciones disponibles") }
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// §67 — Top-Level Container Screen
+// ═══════════════════════════════════════════════════════════════════
+
+@Composable
+fun ResearchContainerScreen(
+    onBack: () -> Unit,
+    viewModel: ResearchViewModel = hiltViewModel(),
+) {
+    var currentSection by remember { mutableStateOf<ResearchSection?>(null) }
+    var selectedClaim by remember { mutableStateOf<SciClaimEntity?>(null) }
+
+    val entities by viewModel.entities.collectAsState()
+    val claims by viewModel.claims.collectAsState()
+    val events by viewModel.events.collectAsState()
+    val hypotheses by viewModel.hypotheses.collectAsState()
+    val replications by viewModel.replications.collectAsState()
+    val publications by viewModel.publications.collectAsState()
+
+    androidx.activity.compose.BackHandler(enabled = currentSection != null || selectedClaim != null) {
+        if (selectedClaim != null) {
+            selectedClaim = null
+        } else {
+            currentSection = null
+        }
+    }
+
+    if (selectedClaim != null) {
+        val claim = selectedClaim!!
+        ClaimDetailScreen(
+            claim = claim,
+            supportingEvidence = emptyList(),
+            contradictingEvidence = emptyList(),
+            alternativeHypotheses = emptyList(),
+            onBack = { selectedClaim = null },
+        )
+        return
+    }
+
+    when (val section = currentSection) {
+        null -> {
+            ResearchHubScreen(
+                onBack = onBack,
+                onNavigate = { currentSection = it },
+            )
+        }
+        ResearchSection.ENTITIES -> {
+            EntityListScreen(
+                entities = entities,
+                onBack = { currentSection = null },
+                onEntityClick = { },
+            )
+        }
+        ResearchSection.CLAIMS -> {
+            ClaimsListScreen(
+                claims = claims,
+                onBack = { currentSection = null },
+                onClaimClick = { selectedClaim = it },
+            )
+        }
+        ResearchSection.EVENTS, ResearchSection.KNOWLEDGE -> {
+            TimelineScreen(
+                events = events,
+                onBack = { currentSection = null },
+            )
+        }
+        ResearchSection.HYPOTHESES, ResearchSection.CONTRADICTIONS -> {
+            HypothesesListScreen(
+                hypotheses = hypotheses,
+                onBack = { currentSection = null },
+            )
+        }
+        ResearchSection.REPLICATIONS -> {
+            ReplicationsScreen(
+                replications = replications,
+                onBack = { currentSection = null },
+            )
+        }
+        ResearchSection.PUBLICATIONS -> {
+            PublicationsScreen(
+                publications = publications,
+                onBack = { currentSection = null },
+            )
+        }
+    }
+}
+

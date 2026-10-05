@@ -113,6 +113,7 @@ object HomeModuleRegistry {
         map[HomeSectionCategory.SAFETY]?.addAll(
             listOf(
                 HomeModuleItem("safety_hub", "Elysium Seguridad", "Evidencia, casos y rendición de cuentas", MeetDestinations.SAFETY_HOME, HomeSectionCategory.SAFETY, "safety", isHighlight = true, badgeText = "NUEVO"),
+                HomeModuleItem("safety_research", "Plataforma Científica", "Evidencia forense, claims, replicación", MeetDestinations.SAFETY_RESEARCH, HomeSectionCategory.SAFETY, "research", isHighlight = true, badgeText = "CIENCIA"),
                 HomeModuleItem("safety_map", "Mapa de Seguridad", "Puntos públicos de seguridad", MeetDestinations.SAFETY_MAP, HomeSectionCategory.SAFETY, "safety_map"),
                 HomeModuleItem("safety_report", "Reportar", "Crear reporte de seguridad", MeetDestinations.SAFETY_REPORT, HomeSectionCategory.SAFETY, "safety_report"),
                 HomeModuleItem("safety_my_reports", "Mis Reportes", "Estado de tus reportes", MeetDestinations.SAFETY_MY_REPORTS, HomeSectionCategory.SAFETY, "safety_my_reports"),

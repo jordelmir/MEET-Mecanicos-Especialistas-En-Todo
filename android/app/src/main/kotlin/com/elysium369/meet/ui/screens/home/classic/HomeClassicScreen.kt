@@ -528,6 +528,7 @@ fun HomeClassicScreen(
 
             val actions = buildList {
                 add(Triple("🛡️", "Elysium Seguridad", MeetColors.warning) to MeetDestinations.SAFETY_HOME)
+                add(Triple("🔬", "Plataforma Científica", MeetColors.electricBlue) to MeetDestinations.SAFETY_RESEARCH)
                 add(Triple("🔊", "SupremeBass Neon", MeetColors.cyberCyan) to MeetDestinations.SUPREME_BASS)
                 add(Triple("🐉", "DragonCalc Elysium", MeetColors.neonGreen) to MeetDestinations.DRAGON_CALC)
                 add(Triple("🎮", "Elysium Nexus Control", MeetColors.cyberCyan) to MeetDestinations.NEXUS_CONTROL)

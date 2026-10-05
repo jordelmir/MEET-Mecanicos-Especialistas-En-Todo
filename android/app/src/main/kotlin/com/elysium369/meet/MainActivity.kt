@@ -1809,6 +1809,12 @@ fun MeetApp(
                     onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_TIMELINES) },
                     onNavigateToAccountability = { navController.navigate(MeetDestinations.SAFETY_ACCOUNTABILITY) },
                     onNavigateToObservatory = { navController.navigate(MeetDestinations.SAFETY_OBSERVATORY) },
+                    onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
+                )
+            }
+            composable(MeetDestinations.SAFETY_RESEARCH) {
+                com.elysium369.meet.safety.science.ui.ResearchContainerScreen(
+                    onBack = { navController.backOrHome() },
                 )
             }
             composable(MeetDestinations.SAFETY_MAP) {
