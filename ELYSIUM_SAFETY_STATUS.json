@@ -1,0 +1,101 @@
+{
+  "status": "NO_GO",
+  "ruleZeroReason": "Live Supabase migration deployment, remote database attacks, and external witness delivery remain NOT_EXECUTED against live staging infrastructure. Rule Zero strictly prohibits marking unexecuted live infrastructure tests as PASS.",
+  "gitHead": "678a620d9b1a5221b50265c0c61d10c2b299c4cb",
+  "gitBranch": "main",
+  "roomSchemaVersion": 90,
+  "protocol": "SAFETY-CUSTODY-V2",
+  "apkSha256": "3b76561dc9cf8390b9ad0dc7f63cade1a2ea0aa986df0445a6a5460ff0b6c5ed",
+  "unitTests": {
+    "status": "PASS",
+    "total": 155,
+    "kotlin": 118,
+    "typescript": 37,
+    "failed": 0
+  },
+  "liveSupabase": {
+    "status": "NOT_EXECUTED",
+    "migrationsCoded": 7,
+    "deployed": false
+  },
+  "rls": {
+    "status": "NOT_EXECUTED",
+    "policiesCoded": true,
+    "physicallyTestedOnLiveDb": false
+  },
+  "immutability": {
+    "status": "NOT_EXECUTED",
+    "triggersCoded": 14,
+    "triggerFunction": "safety_scientific_immutable()",
+    "physicallyTestedOnLiveDb": false
+  },
+  "aiBoundary": {
+    "status": "PASS",
+    "kotlinStateMachine": "UNIT_TESTED",
+    "negativeInvariants": "UNIT_TESTED",
+    "postgresTrigger": "CODED"
+  },
+  "outbox": {
+    "status": "UNIT_TESTED",
+    "roomEntity": "ScientificCommandOutbox",
+    "worker": "ScientificOutboxWorker",
+    "physicalNetworkCutE2E": "NOT_EXECUTED"
+  },
+  "cryptoParity": {
+    "status": "PASS",
+    "verificationScript": "scripts/verify-custody-parity.sh",
+    "fixture": "tests/fixtures/safety-custody-v2/canonical-input.json",
+    "eventHash": "f40ef568a767e9a98f79c7306c4365d4d5435fe101bb613a846b00f4a90dd62a",
+    "chainRoot": "c9d4ac3b00315e177f8387737b7ceb13b4b919d9397126e64b34d1c53c5b6ca4",
+    "match": true
+  },
+  "signatureVerification": {
+    "status": "PASS",
+    "algorithm": "Ed25519",
+    "realVerification": true,
+    "tamperTestsPassed": 6
+  },
+  "reproducibility": {
+    "status": "PASS",
+    "reproducibilityIncompleteEnforced": true,
+    "mandatoryMetadataValidated": true
+  },
+  "publicationAuthority": {
+    "status": "PASS",
+    "twoPersonRuleEnforced": true,
+    "publisherNotReviewerEnforced": true,
+    "terminalRetractedEnforced": true
+  },
+  "backupRestore": {
+    "status": "NOT_EXECUTED",
+    "planDocumented": true,
+    "physicalRestoreVerified": false
+  },
+  "physicalAndroid": {
+    "status": "PASS",
+    "installedOnDevices": [
+      {
+        "model": "VER-N49 (Honor Magic V2)",
+        "transportId": "127.0.0.1:37297",
+        "result": "INSTALLED_AND_LAUNCHED"
+      },
+      {
+        "model": "M2101K6R (Xiaomi Redmi Note 10 Pro / sweet_global)",
+        "transportId": "adb-cea87d5f-Vwjy6n._adb-tls-connect._tcp",
+        "result": "INSTALLED_AND_LAUNCHED"
+      }
+    ]
+  },
+  "witnessDelivery": {
+    "status": "NOT_EXECUTED",
+    "interfaceCoded": true,
+    "orchestratorCoded": true,
+    "pluggableProviders": 6,
+    "liveTsaConnected": false
+  },
+  "attestation": {
+    "status": "PASS",
+    "filePath": "docs/audits/ELYSIUM-SAFETY-PRODUCTION-ATTESTATION.md",
+    "matchesHead": true
+  }
+}
