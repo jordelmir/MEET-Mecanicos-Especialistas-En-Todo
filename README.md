@@ -4,7 +4,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Android-4.29.0%20%7C%20code%2063-00BCD4?style=flat-square&logo=android&logoColor=white" alt="Android version" />
-  <img src="https://img.shields.io/badge/Room-schema%2088-39FF14?style=flat-square" alt="Room schema" />
+  <img src="https://img.shields.io/badge/Room-schema%2090-39FF14?style=flat-square" alt="Room schema" />
   <img src="https://img.shields.io/badge/Architecture-offline--first-7F52FF?style=flat-square" alt="Offline first" />
   <img src="https://img.shields.io/badge/Kotlin-2.4.0-7F52FF?style=flat-square&logo=kotlin&logoColor=white" alt="Kotlin" />
   <img src="https://img.shields.io/badge/AGP-9.2.1-3DDC84?style=flat-square&logo=gradle&logoColor=white" alt="AGP" />
@@ -24,10 +24,11 @@ La regla del producto es simple: no se presenta una intención local, una
 estimación o un dato de demostración como un hecho físico o una confirmación
 del servidor.
 
-## Estado del código en este checkpoint (Xenology, Agent Avatars Redesign & Convergence)
+## Estado del código en este checkpoint (Safety Scientific Core, Forensic Research Hub & Territorial Map Integration)
 
 - **Android:** `versionName 4.29.0`, `versionCode 63`.
-- **Contrato de versión del paquete:** `4.29.0`.
+- **Contrato de versión del paquete:** `4.29.0` (sincronizado en `android/app/build.gradle.kts`, `package.json` y `package-lock.json`).
+- **Room Database:** `version 90` con 90 migraciones registradas (`MIGRATION_1_6` hasta `MIGRATION_89_90`).
 
 ### Stack Tecnológico
 
@@ -37,7 +38,7 @@ del servidor.
 | AGP (Android Gradle Plugin) | 9.2.1 |
 | Gradle | 9.4.1 |
 | Compose BOM | 2026.05.01 |
-| Room | 2.8.4 (schema 88) |
+| Room | 2.8.4 (schema 90, migraciones 1..90) |
 | Hilt / Dagger | 2.60.1 |
 | Ktor | 2.3.13 |
 | Coroutines | 1.9.0 |
@@ -138,6 +139,30 @@ evidencia remota de PostgreSQL.
   tras el recibo correspondiente de Supabase. No se fabrican saldos locales.
 - Los pagos externos requieren una capacidad de proveedor confirmada. Los
   asientos financieros usan importes enteros y un ledger inmutable.
+
+### Elysium Safety Scientific Core & Forensic Research Hub
+
+- **Epistemología Forense y Rigor Popperiano:**
+  - Formulación de Hipótesis de Trabajo ($H_1$) con contraparte explícita de Hipótesis Nula ($H_0$).
+  - Criterios Popperianos de Falsabilidad obligatorios: definición de qué evidencia física, documental o pericial refutaría categóricamente la proposición.
+  - Aislamiento riguroso entre proposición fáctica observacional (Claim) y juicio subjetivo.
+  - Cumplimiento de la Constitución de Seguridad: *Evidence ≠ Guilt*, *Claim ≠ Conviction*. Estados epistémicos iniciales estrictamente `PROPOSED` y `OBSERVED`.
+- **Proyección Automática e Inmediata en Creación de Reportes:**
+  - Persistencia atómica en Room al enviar el reporte:
+    - `SciClaimEntity` (proposición observada y estado causal).
+    - `SciHypothesisEntity` (hipótesis explicativa, nula y criterios de falsación JSON).
+    - `SciEventEntity` (evento en línea de tiempo con timestamps de ocurrencia y registro).
+  - Vinculación de evidencia multimedia (fotografías, videos, documentos) mediante el Evidence Bridge (`safety_scientific_evidence_bridge`).
+  - Botón de navegación directa `🔬 Abrir en Plataforma Científica & Research` en la pantalla de recibo del reporte.
+- **Integración Territorial en el Mapa (`SafetyMapScreen`):**
+  - Al pulsar cualquier marcador territorial (público o privado), se despliega la tarjeta **Dimensión Científica & Análisis Forense**.
+  - Principio estricto de adición sin pérdida: se conservan intactos la clasificación de fuente (testigo directo, familiar, periodístico, institucional), coordenadas exactas con navegación Waze 1-click, conteo de víctimas, desglose de impunidad, narrativa completa y archivos multimedia.
+  - Despliegue de hipótesis registradas, criterios de falsación en advertencia visual, claims observados y botón de enlace directo al Hub Científico.
+- **Cadena de Custodia Criptográfica Protocol V2:**
+  - Árboles de Merkle para agregación de lotes de evidencias.
+  - Firmas digitales Ed25519 con verificación en tiempo de ejecución.
+  - Paridad de hashing SHA-256 canónico byte-exacto entre TypeScript y Kotlin (`scripts/verify-custody-parity.sh`).
+  - Invariantes negativos probados: inmutabilidad de evidencias atestiguadas, rechazo de estados optimistas y preservación de linaje de fuentes.
 
 ## Arquitectura de verdad
 
