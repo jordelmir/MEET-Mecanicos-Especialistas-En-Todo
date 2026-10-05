@@ -146,4 +146,24 @@ class CustodyProtocolV2Test {
         )
         assertTrue(hash.isNotEmpty())
     }
+
+    @Test
+    fun `canonical fixture matches parity hash and chain root`() {
+        val eventHash = CustodyProtocolV2.computeEventHash(
+            eventId, eventType, actorId, timestampUtc, payloadHash, previousHash,
+        )
+        assertEquals(
+            "f40ef568a767e9a98f79c7306c4365d4d5435fe101bb613a846b00f4a90dd62a",
+            eventHash,
+        )
+
+        val chainRoot = CustodyProtocolV2.computeChainRoot(listOf(
+            eventHash,
+            "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3",
+        ))
+        assertEquals(
+            "c9d4ac3b00315e177f8387737b7ceb13b4b919d9397126e64b34d1c53c5b6ca4",
+            chainRoot,
+        )
+    }
 }

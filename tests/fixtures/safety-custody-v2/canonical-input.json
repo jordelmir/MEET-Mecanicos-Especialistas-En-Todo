@@ -8,12 +8,13 @@
     "payload_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "previous_hash": "GENESIS"
   },
-  "expected_event_hash": "a19de52fb1b73f41db3c0e70c61b1f2c1f00ac8eae4f30ddd2c3b69b9c2c6e7f",
+  "expected_event_hash": "f40ef568a767e9a98f79c7306c4365d4d5435fe101bb613a846b00f4a90dd62a",
   "chain": {
     "event_hashes": [
-      "a19de52fb1b73f41db3c0e70c61b1f2c1f00ac8eae4f30ddd2c3b69b9c2c6e7f",
+      "f40ef568a767e9a98f79c7306c4365d4d5435fe101bb613a846b00f4a90dd62a",
       "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3"
-    ]
+    ],
+    "expected_chain_root": "c9d4ac3b00315e177f8387737b7ceb13b4b919d9397126e64b34d1c53c5b6ca4"
   },
-  "note": "expected_event_hash and chain root are computed dynamically — this fixture defines INPUTS. Tests compute actual hashes and assert cross-runtime parity."
+  "note": "Canonical cross-runtime parity fixture for SAFETY-CUSTODY-V2. Both Kotlin, TypeScript and PostgreSQL compute byte-exact identical hashes."
 }

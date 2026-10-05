@@ -11,7 +11,7 @@ import {
   computeEventHash,
   computeChainRoot,
   computePayloadHash,
-} from '../src/custody-protocol-v2';
+} from '../../packages/elysium-safety-core/src/custody-protocol-v2';
 
 // Canonical fixture values (identical to Kotlin test)
 const EVENT_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
@@ -116,12 +116,14 @@ describe('CustodyProtocolV2 — TypeScript parity', () => {
     const hash = computeEventHash(
       EVENT_ID, EVENT_TYPE, ACTOR_ID, TIMESTAMP_UTC, PAYLOAD_HASH, PREVIOUS_HASH,
     );
-    // This exact hash must be recorded and compared with Kotlin output.
-    // The CI will run both and compare.
-    expect(hash).toHaveLength(64);
-    expect(hash).toMatch(/^[0-9a-f]{64}$/);
-
-    // Write hash to stdout for CI comparison
+    expect(hash).toBe('f40ef568a767e9a98f79c7306c4365d4d5435fe101bb613a846b00f4a90dd62a');
     console.log(`PARITY_EVENT_HASH=${hash}`);
+
+    const chainRoot = computeChainRoot([
+      hash,
+      'b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3',
+    ]);
+    expect(chainRoot).toBe('c9d4ac3b00315e177f8387737b7ceb13b4b919d9397126e64b34d1c53c5b6ca4');
+    console.log(`PARITY_CHAIN_ROOT=${chainRoot}`);
   });
 });

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Independent verifier launcher
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+npx tsx "$SCRIPT_DIR/verify.ts" "$@"

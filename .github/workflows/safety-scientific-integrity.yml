@@ -105,5 +105,8 @@ jobs:
       - name: Verify SAFETY-CUSTODY-V2 TypeScript parity
         run: npx vitest run tests/safety/custody-protocol-v2.test.ts
 
-      - name: Run all Safety TypeScript tests
+      - name: Run all Safety TypeScript tests (Ed25519, CLI verifier, Conformance)
         run: npx vitest run tests/safety
+
+      - name: Verify CLI Verifier Help & Execution
+        run: ./tools/safety-verifier/elysium-safety --help

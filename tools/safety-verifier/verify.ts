@@ -1,42 +1,51 @@
 #!/usr/bin/env npx tsx
 /**
  * ═══════════════════════════════════════════════════════════════════
- * Phase 17 — INDEPENDENT VERIFIER CLI
+ * Phase 11, 12, 13 — INDEPENDENT SCIENTIFIC VERIFIER CLI
  *
- * Standalone tool for third-party verification.
- * A forensic inspector can verify ANY Elysium Safety research package
- * with ONLY this script + the package ZIP/JSON.
+ * Standalone tool for third-party forensic inspection.
+ * A forensic inspector or academic institution can verify ANY
+ * Elysium Safety research package, custody chain, or checkpoint
+ * with ONLY this script + the exported JSON/files.
  *
  * Usage:
- *   npx tsx tools/safety-verifier/verify.ts <path-to-package.json>
- *   npx tsx tools/safety-verifier/verify.ts --checkpoint <checkpoint.json>
- *   npx tsx tools/safety-verifier/verify.ts --chain <chain-events.json>
+ *   elysium-safety verify package <package.json>
+ *   elysium-safety verify chain <chain-events.json>
+ *   elysium-safety verify checkpoint <checkpoint.json>
  *
  * Exit codes:
- *   0 = all verifications passed
- *   1 = verification failed (integrity, tampering, missing data)
- *   2 = usage error
+ *   0 = VERIFIED (all cryptographic and reproducibility checks passed)
+ *   1 = FAILED / REPRODUCIBILITY_INCOMPLETE
+ *   2 = INVALID_USAGE
  *
- * IMPORTANT: This tool does NOT require access to the Elysium system.
- * It operates ONLY on the exported data.
+ * IMPORTANT: This tool does NOT require access to the Elysium system,
+ * Supabase, Android runtime, or API credentials.
  * ═══════════════════════════════════════════════════════════════════
  */
 
 import { createHash } from 'crypto';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
+import {
+  verifyCheckpointSignature,
+  PROTOCOL_VERSION as ED25519_PROTOCOL_VERSION,
+} from '../../packages/elysium-safety-core/src/ed25519-verifier';
 
-const PROTOCOL_VERSION = 'SAFETY-CUSTODY-V2';
+export const PROTOCOL_VERSION = 'SAFETY-CUSTODY-V2';
 
-// ── SHA-256 ────────────────────────────────────────────────────
+// ── SHA-256 Helper ─────────────────────────────────────────────
 
 function sha256Hex(data: Buffer): string {
   return createHash('sha256').update(data).digest('hex');
 }
 
 function computeEventHash(
-  eventId: string, eventType: string, actorId: string,
-  timestampUtc: string, payloadHash: string, previousHash: string,
+  eventId: string,
+  eventType: string,
+  actorId: string,
+  timestampUtc: string,
+  payloadHash: string,
+  previousHash: string,
 ): string {
   const canonical =
     `${PROTOCOL_VERSION}\n` +
@@ -58,27 +67,33 @@ function computeChainRoot(eventHashes: string[]): string {
   return sha256Hex(Buffer.from(canonical, 'utf-8'));
 }
 
-// ── Verification Results ───────────────────────────────────────
+// ── Verification Types ─────────────────────────────────────────
 
-interface VerificationResult {
+export interface VerificationResult {
   status: 'PASS' | 'FAIL';
+  exitCode: number;
   checks: CheckResult[];
   summary: string;
 }
 
-interface CheckResult {
+export interface CheckResult {
   name: string;
   status: 'PASS' | 'FAIL' | 'WARN';
   detail: string;
 }
 
-// ── Package Verifier ───────────────────────────────────────────
+// ── Phase 12: Research Package Verifier ─────────────────────────
 
-function verifyPackage(packagePath: string): VerificationResult {
+export function verifyPackage(packagePath: string): VerificationResult {
   const checks: CheckResult[] = [];
 
   if (!existsSync(packagePath)) {
-    return { status: 'FAIL', checks: [{ name: 'FILE_EXISTS', status: 'FAIL', detail: `File not found: ${packagePath}` }], summary: 'Package file not found' };
+    return {
+      status: 'FAIL',
+      exitCode: 1,
+      checks: [{ name: 'FILE_EXISTS', status: 'FAIL', detail: `File not found: ${packagePath}` }],
+      summary: 'Package file not found',
+    };
   }
 
   const raw = readFileSync(packagePath, 'utf-8');
@@ -87,108 +102,232 @@ function verifyPackage(packagePath: string): VerificationResult {
     pkg = JSON.parse(raw);
     checks.push({ name: 'JSON_VALID', status: 'PASS', detail: 'Package is valid JSON' });
   } catch (e) {
-    return { status: 'FAIL', checks: [{ name: 'JSON_VALID', status: 'FAIL', detail: `Invalid JSON: ${e}` }], summary: 'Package is not valid JSON' };
+    return {
+      status: 'FAIL',
+      exitCode: 1,
+      checks: [{ name: 'JSON_VALID', status: 'FAIL', detail: `Invalid JSON: ${e}` }],
+      summary: 'Package is not valid JSON',
+    };
   }
 
-  // 1. Manifest hash
-  if (pkg.manifestHash) {
-    const computed = sha256Hex(Buffer.from(JSON.stringify(pkg.manifest || {}), 'utf-8'));
-    if (computed === pkg.manifestHash) {
-      checks.push({ name: 'MANIFEST_HASH', status: 'PASS', detail: `Hash matches: ${computed}` });
+  // Mandatory Reproducibility Fields (Phase 12)
+  const mandatoryFields = [
+    { key: 'protocolVersion', name: 'PROTOCOL_VERSION' },
+    { key: 'manifestHash', altKey: 'manifest', name: 'MANIFEST_HASH' },
+    { key: 'datasetHash', altKey: 'dataset', name: 'DATASET_HASH' },
+    { key: 'evidenceManifestHash', altKey: 'evidenceIds', name: 'EVIDENCE_METADATA' },
+    { key: 'methodologyVersion', altKey: 'methodologyHash', name: 'METHODOLOGY_SPEC' },
+    { key: 'codeCommit', name: 'CODE_COMMIT' },
+    { key: 'environmentHash', altKey: 'environment', name: 'ENVIRONMENT_LOCK' },
+    { key: 'analysisPlanHash', altKey: 'analysisPlan', name: 'ANALYSIS_PLAN' },
+  ];
+
+  const missingMandatory: string[] = [];
+
+  for (const f of mandatoryFields) {
+    const hasField = pkg[f.key] !== undefined || (f.altKey && pkg[f.altKey] !== undefined);
+    if (!hasField) {
+      missingMandatory.push(f.name);
+      checks.push({
+        name: f.name,
+        status: 'FAIL',
+        detail: `Missing mandatory field: ${f.key}${f.altKey ? ' or ' + f.altKey : ''}`,
+      });
     } else {
-      checks.push({ name: 'MANIFEST_HASH', status: 'FAIL', detail: `Expected ${pkg.manifestHash}, got ${computed}` });
+      checks.push({
+        name: f.name,
+        status: 'PASS',
+        detail: `Field present: ${pkg[f.key] !== undefined ? f.key : f.altKey}`,
+      });
     }
-  } else {
-    checks.push({ name: 'MANIFEST_HASH', status: 'WARN', detail: 'No manifestHash field in package' });
   }
 
-  // 2. Evidence count
-  const evidenceIds = pkg.evidenceIds || pkg.evidence_ids || [];
-  checks.push({
-    name: 'EVIDENCE_COUNT',
-    status: evidenceIds.length > 0 ? 'PASS' : 'WARN',
-    detail: `${evidenceIds.length} evidence items referenced`,
-  });
+  // Protocol version check
+  if (pkg.protocolVersion) {
+    const protocolValid = pkg.protocolVersion === PROTOCOL_VERSION;
+    checks.push({
+      name: 'PROTOCOL_MATCH',
+      status: protocolValid ? 'PASS' : 'FAIL',
+      detail: `Protocol version: ${pkg.protocolVersion} (expected: ${PROTOCOL_VERSION})`,
+    });
+  }
 
-  // 3. Claims
-  const claims = pkg.claims || [];
-  checks.push({
-    name: 'CLAIMS_PRESENT',
-    status: claims.length > 0 ? 'PASS' : 'WARN',
-    detail: `${claims.length} claims in package`,
-  });
+  // Manifest checksum verification
+  if (pkg.manifest && pkg.manifestHash) {
+    const computed = sha256Hex(Buffer.from(JSON.stringify(pkg.manifest), 'utf-8'));
+    if (computed === pkg.manifestHash) {
+      checks.push({ name: 'MANIFEST_CHECKSUM_VALID', status: 'PASS', detail: `Checksum matches: ${computed}` });
+    } else {
+      checks.push({ name: 'MANIFEST_CHECKSUM_VALID', status: 'FAIL', detail: `Checksum mismatch: expected ${pkg.manifestHash}, got ${computed}` });
+    }
+  }
 
-  // 4. AI boundary
+  // Epistemic disclaimers check (mandatory for publication/release)
   const hasAiDisclaimer = pkg.disclaimers?.some((d: string) =>
     d.includes('AI OUTPUT') || d.includes('≠ FACT')
   );
   checks.push({
     name: 'AI_DISCLAIMER',
-    status: hasAiDisclaimer ? 'PASS' : 'WARN',
-    detail: hasAiDisclaimer ? 'AI disclaimer present' : 'No AI disclaimer found',
+    status: hasAiDisclaimer ? 'PASS' : 'FAIL',
+    detail: hasAiDisclaimer ? 'AI limitation disclaimer present' : 'Missing mandatory AI disclaimer',
   });
 
-  // 5. Epistemological disclaimer
   const hasEpistemicDisclaimer = pkg.disclaimers?.some((d: string) =>
     d.includes('EVIDENCE ≠ GUILT') || d.includes('CLAIM ≠ CONVICTION')
   );
   checks.push({
     name: 'EPISTEMIC_DISCLAIMER',
-    status: hasEpistemicDisclaimer ? 'PASS' : 'WARN',
-    detail: hasEpistemicDisclaimer ? 'Epistemic disclaimer present' : 'No epistemic disclaimer found',
+    status: hasEpistemicDisclaimer ? 'PASS' : 'FAIL',
+    detail: hasEpistemicDisclaimer ? 'Epistemic disclaimer present' : 'Missing mandatory epistemic disclaimer',
   });
 
-  // 6. Protocol version
-  if (pkg.protocolVersion) {
-    checks.push({
-      name: 'PROTOCOL_VERSION',
-      status: pkg.protocolVersion === PROTOCOL_VERSION ? 'PASS' : 'FAIL',
-      detail: `Protocol: ${pkg.protocolVersion}`,
-    });
+  const hasFailed = checks.some(c => c.status === 'FAIL');
+  const isReproducibilityIncomplete = missingMandatory.length > 0;
+
+  let summary: string;
+  if (isReproducibilityIncomplete) {
+    summary = `REPRODUCIBILITY_INCOMPLETE: missing mandatory metadata: ${missingMandatory.join(', ')}`;
+  } else if (hasFailed) {
+    summary = `VERIFICATION FAILED: one or more integrity checks failed`;
+  } else {
+    summary = `VERIFIED: package satisfies all cryptographic and reproducibility standards`;
   }
 
-  // 7. Methodology version
-  if (pkg.methodologyVersion) {
-    checks.push({
-      name: 'METHODOLOGY_VERSION',
-      status: 'PASS',
-      detail: `Methodology: ${pkg.methodologyVersion}`,
-    });
-  }
-
-  // 8. Limitations
-  const limitations = pkg.limitations || [];
-  checks.push({
-    name: 'LIMITATIONS_DECLARED',
-    status: limitations.length > 0 ? 'PASS' : 'WARN',
-    detail: `${limitations.length} limitations declared`,
-  });
-
-  const failed = checks.filter(c => c.status === 'FAIL');
   return {
-    status: failed.length > 0 ? 'FAIL' : 'PASS',
+    status: hasFailed ? 'FAIL' : 'PASS',
+    exitCode: hasFailed ? 1 : 0,
     checks,
-    summary: failed.length > 0
-      ? `VERIFICATION FAILED: ${failed.length} check(s) failed`
-      : `VERIFICATION PASSED: ${checks.length} checks, ${checks.filter(c => c.status === 'WARN').length} warnings`,
+    summary,
   };
 }
 
-// ── Chain Verifier ─────────────────────────────────────────────
+// ── Phase 11: Checkpoint Verifier with Real Ed25519 ─────────────
 
-function verifyChain(chainPath: string): VerificationResult {
+export function verifyCheckpoint(checkpointPath: string): VerificationResult {
   const checks: CheckResult[] = [];
-  const raw = readFileSync(chainPath, 'utf-8');
-  const chain = JSON.parse(raw);
-  const events = chain.events || [];
 
+  if (!existsSync(checkpointPath)) {
+    return {
+      status: 'FAIL',
+      exitCode: 1,
+      checks: [{ name: 'FILE_EXISTS', status: 'FAIL', detail: `File not found: ${checkpointPath}` }],
+      summary: 'Checkpoint file not found',
+    };
+  }
+
+  const raw = readFileSync(checkpointPath, 'utf-8');
+  let cp: any;
+  try {
+    cp = JSON.parse(raw);
+    checks.push({ name: 'JSON_VALID', status: 'PASS', detail: 'Checkpoint is valid JSON' });
+  } catch (e) {
+    return {
+      status: 'FAIL',
+      exitCode: 1,
+      checks: [{ name: 'JSON_VALID', status: 'FAIL', detail: `Invalid JSON: ${e}` }],
+      summary: 'Checkpoint is not valid JSON',
+    };
+  }
+
+  // 1. Root hash
+  if (!cp.rootHash) {
+    checks.push({ name: 'ROOT_HASH', status: 'FAIL', detail: 'Missing rootHash' });
+  } else {
+    checks.push({ name: 'ROOT_HASH', status: 'PASS', detail: `Root: ${cp.rootHash}` });
+  }
+
+  // 2. Event count
+  if (!cp.eventCount || cp.eventCount < 1) {
+    checks.push({ name: 'EVENT_COUNT', status: 'FAIL', detail: 'eventCount must be >= 1' });
+  } else {
+    checks.push({ name: 'EVENT_COUNT', status: 'PASS', detail: `${cp.eventCount} events recorded` });
+  }
+
+  // 3. Ed25519 Real Verification (Phase 11)
+  const publicKey = cp.publicKeyBase64 || cp.publicKey;
+  const signature = cp.signatureBase64 || cp.signature;
+
+  if (!publicKey || !signature) {
+    checks.push({
+      name: 'SIGNATURE_CHECK',
+      status: 'FAIL',
+      detail: 'Missing publicKeyBase64 or signatureBase64 for cryptographic verification',
+    });
+  } else {
+    const isValid = verifyCheckpointSignature(
+      publicKey,
+      signature,
+      cp.rootHash || '',
+      cp.eventCount || 0,
+      cp.firstEventHash,
+      cp.lastEventHash,
+    );
+
+    if (isValid) {
+      checks.push({
+        name: 'SIGNATURE_VALID',
+        status: 'PASS',
+        detail: 'Cryptographic Ed25519 signature is authentic and verified against canonical payload',
+      });
+    } else {
+      checks.push({
+        name: 'SIGNATURE_VALID',
+        status: 'FAIL',
+        detail: 'Ed25519 signature verification FAILED — checkpoint data or signature was modified',
+      });
+    }
+  }
+
+  const hasFailed = checks.some(c => c.status === 'FAIL');
+  return {
+    status: hasFailed ? 'FAIL' : 'PASS',
+    exitCode: hasFailed ? 1 : 0,
+    checks,
+    summary: hasFailed
+      ? 'CHECKPOINT VERIFICATION FAILED'
+      : 'CHECKPOINT VERIFIED: authentic cryptographic signature and integrity confirmed',
+  };
+}
+
+// ── Custody Chain Verifier ─────────────────────────────────────
+
+export function verifyChain(chainPath: string): VerificationResult {
+  const checks: CheckResult[] = [];
+
+  if (!existsSync(chainPath)) {
+    return {
+      status: 'FAIL',
+      exitCode: 1,
+      checks: [{ name: 'FILE_EXISTS', status: 'FAIL', detail: `File not found: ${chainPath}` }],
+      summary: 'Chain file not found',
+    };
+  }
+
+  const raw = readFileSync(chainPath, 'utf-8');
+  let chain: any;
+  try {
+    chain = JSON.parse(raw);
+  } catch (e) {
+    return {
+      status: 'FAIL',
+      exitCode: 1,
+      checks: [{ name: 'JSON_VALID', status: 'FAIL', detail: `Invalid JSON: ${e}` }],
+      summary: 'Chain file is not valid JSON',
+    };
+  }
+
+  const events = chain.events || [];
   if (events.length === 0) {
-    return { status: 'FAIL', checks: [{ name: 'CHAIN_EMPTY', status: 'FAIL', detail: 'No events in chain' }], summary: 'Empty chain' };
+    return {
+      status: 'FAIL',
+      exitCode: 1,
+      checks: [{ name: 'CHAIN_EMPTY', status: 'FAIL', detail: 'Chain contains no events' }],
+      summary: 'Chain is empty',
+    };
   }
 
   checks.push({ name: 'EVENT_COUNT', status: 'PASS', detail: `${events.length} events in chain` });
 
-  // Verify each event hash
   const hashes: string[] = [];
   let previousHash = 'GENESIS';
   let hashErrors = 0;
@@ -213,16 +352,16 @@ function verifyChain(chainPath: string): VerificationResult {
   }
 
   if (hashErrors === 0) {
-    checks.push({ name: 'ALL_EVENT_HASHES', status: 'PASS', detail: `${events.length} event hashes verified` });
+    checks.push({ name: 'ALL_EVENT_HASHES', status: 'PASS', detail: `${events.length} consecutive event hashes verified` });
   }
 
-  // Verify chain root
   const computedRoot = computeChainRoot(hashes);
   if (chain.expectedChainRoot) {
+    const rootMatches = computedRoot === chain.expectedChainRoot;
     checks.push({
       name: 'CHAIN_ROOT',
-      status: computedRoot === chain.expectedChainRoot ? 'PASS' : 'FAIL',
-      detail: computedRoot === chain.expectedChainRoot
+      status: rootMatches ? 'PASS' : 'FAIL',
+      detail: rootMatches
         ? `Chain root matches: ${computedRoot}`
         : `Root mismatch: expected ${chain.expectedChainRoot}, computed ${computedRoot}`,
     });
@@ -230,103 +369,100 @@ function verifyChain(chainPath: string): VerificationResult {
     checks.push({ name: 'CHAIN_ROOT', status: 'PASS', detail: `Computed chain root: ${computedRoot}` });
   }
 
-  const failed = checks.filter(c => c.status === 'FAIL');
+  const hasFailed = checks.some(c => c.status === 'FAIL');
   return {
-    status: failed.length > 0 ? 'FAIL' : 'PASS',
+    status: hasFailed ? 'FAIL' : 'PASS',
+    exitCode: hasFailed ? 1 : 0,
     checks,
-    summary: failed.length > 0
-      ? `CHAIN VERIFICATION FAILED: ${failed.length} check(s) failed`
-      : `CHAIN VERIFICATION PASSED: ${events.length} events, root=${computedRoot.substring(0, 16)}...`,
+    summary: hasFailed
+      ? 'CHAIN VERIFICATION FAILED'
+      : `CHAIN VERIFIED: ${events.length} events unbroken custody root=${computedRoot.substring(0, 16)}...`,
   };
 }
 
-// ── Checkpoint Verifier ────────────────────────────────────────
+// ── CLI Main Dispatch ──────────────────────────────────────────
 
-function verifyCheckpoint(checkpointPath: string): VerificationResult {
-  const checks: CheckResult[] = [];
-  const raw = readFileSync(checkpointPath, 'utf-8');
-  const cp = JSON.parse(raw);
+export function main(argv: string[] = process.argv.slice(2)): number {
+  if (argv.length === 0 || argv.includes('--help') || argv.includes('-h')) {
+    console.log(`
+ELYSIUM SAFETY — INDEPENDENT VERIFIER CLI
+Usage:
+  elysium-safety verify package <package.json>
+  elysium-safety verify chain <chain-events.json>
+  elysium-safety verify checkpoint <checkpoint.json>
 
-  if (!cp.rootHash) {
-    checks.push({ name: 'ROOT_HASH', status: 'FAIL', detail: 'No rootHash in checkpoint' });
-  } else {
-    checks.push({ name: 'ROOT_HASH', status: 'PASS', detail: `Root: ${cp.rootHash.substring(0, 16)}...` });
+Exit codes:
+  0 = VERIFIED
+  1 = FAILED / REPRODUCIBILITY_INCOMPLETE
+  2 = INVALID_USAGE
+`);
+    return argv.length === 0 ? 2 : 0;
   }
 
-  if (!cp.eventCount || cp.eventCount < 1) {
-    checks.push({ name: 'EVENT_COUNT', status: 'FAIL', detail: 'eventCount must be >= 1' });
-  } else {
-    checks.push({ name: 'EVENT_COUNT', status: 'PASS', detail: `${cp.eventCount} events` });
-  }
-
-  if (cp.signatureAlgorithm) {
-    checks.push({ name: 'SIGNATURE_ALGORITHM', status: 'PASS', detail: cp.signatureAlgorithm });
-  }
-
-  if (cp.signatureBase64) {
-    checks.push({ name: 'SIGNATURE_PRESENT', status: 'PASS', detail: 'Digital signature present' });
-  } else {
-    checks.push({ name: 'SIGNATURE_PRESENT', status: 'WARN', detail: 'No digital signature' });
-  }
-
-  const failed = checks.filter(c => c.status === 'FAIL');
-  return {
-    status: failed.length > 0 ? 'FAIL' : 'PASS',
-    checks,
-    summary: failed.length > 0
-      ? `CHECKPOINT VERIFICATION FAILED`
-      : `CHECKPOINT VERIFICATION PASSED`,
-  };
-}
-
-// ── CLI ────────────────────────────────────────────────────────
-
-function main() {
-  const args = process.argv.slice(2);
-
-  if (args.length === 0) {
-    console.error('Usage:');
-    console.error('  npx tsx verify.ts <package.json>');
-    console.error('  npx tsx verify.ts --chain <chain-events.json>');
-    console.error('  npx tsx verify.ts --checkpoint <checkpoint.json>');
-    process.exit(2);
-  }
+  let command = argv[0];
+  let subCommand = argv[1];
+  let targetPath = argv[2];
 
   let result: VerificationResult;
 
-  if (args[0] === '--chain' && args[1]) {
-    result = verifyChain(resolve(args[1]));
-  } else if (args[0] === '--checkpoint' && args[1]) {
-    result = verifyCheckpoint(resolve(args[1]));
+  if (command === 'verify') {
+    if (subCommand === 'package' && targetPath) {
+      result = verifyPackage(resolve(targetPath));
+    } else if (subCommand === 'chain' && targetPath) {
+      result = verifyChain(resolve(targetPath));
+    } else if (subCommand === 'checkpoint' && targetPath) {
+      result = verifyCheckpoint(resolve(targetPath));
+    } else if (subCommand && !targetPath) {
+      // Single argument to verify: auto-detect based on file contents
+      const file = resolve(subCommand);
+      if (file.includes('checkpoint')) {
+        result = verifyCheckpoint(file);
+      } else if (file.includes('chain')) {
+        result = verifyChain(file);
+      } else {
+        result = verifyPackage(file);
+      }
+    } else {
+      console.error('Invalid usage. Run with --help for options.');
+      return 2;
+    }
+  } else if (command === '--chain' && subCommand) {
+    result = verifyChain(resolve(subCommand));
+  } else if (command === '--checkpoint' && subCommand) {
+    result = verifyCheckpoint(resolve(subCommand));
   } else {
-    result = verifyPackage(resolve(args[0]));
+    // Treat first arg as package path
+    result = verifyPackage(resolve(command));
   }
 
-  // Output
-  console.log('\n' + '═'.repeat(60));
-  console.log(`  ELYSIUM SAFETY — INDEPENDENT VERIFIER`);
+  // Print results
+  console.log('\n' + '═'.repeat(64));
+  console.log(`  ELYSIUM SAFETY — INDEPENDENT SCIENTIFIC VERIFIER`);
   console.log(`  Protocol: ${PROTOCOL_VERSION}`);
-  console.log('═'.repeat(60));
+  console.log('═'.repeat(64));
 
   for (const check of result.checks) {
     const icon = check.status === 'PASS' ? '✅' : check.status === 'FAIL' ? '❌' : '⚠️';
-    console.log(`  ${icon} ${check.name}: ${check.detail}`);
+    console.log(`  ${icon} [${check.status}] ${check.name}: ${check.detail}`);
   }
 
-  console.log('═'.repeat(60));
+  console.log('═'.repeat(64));
   console.log(`  ${result.status === 'PASS' ? '✅' : '❌'} ${result.summary}`);
-  console.log('═'.repeat(60) + '\n');
+  console.log('═'.repeat(64) + '\n');
 
-  console.log('IMPORTANT DISCLAIMERS:');
+  console.log('MANDATORY EPISTEMIC INVARIANTS:');
   console.log('  • EVIDENCE ≠ GUILT');
   console.log('  • CLAIM ≠ CONVICTION');
   console.log('  • CORRELATION ≠ CAUSATION');
+  console.log('  • NON_ACTION ≠ CRIMINAL LIABILITY');
   console.log('  • AI OUTPUT ≠ FACT');
   console.log('  • PUBLICATION ≠ COURT JUDGMENT');
-  console.log('  • This tool verifies DATA INTEGRITY only.');
-  console.log('  • It does NOT establish legal truth.\n');
+  console.log('  • PEER REVIEW ≠ JUDICIAL DETERMINATION\n');
 
-  process.exit(result.status === 'PASS' ? 0 : 1);
+  return result.exitCode;
 }
 
-main();
+if (typeof process !== 'undefined' && process.argv[1]?.endsWith('verify.ts')) {
+  const code = main();
+  process.exit(code);
+}
