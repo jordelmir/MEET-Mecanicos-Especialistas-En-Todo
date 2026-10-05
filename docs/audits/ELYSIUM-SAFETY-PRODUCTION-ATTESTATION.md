@@ -2,7 +2,8 @@
 
 > **Generated:** 2026-10-04T19:45:00-06:00
 > **Target Branch:** `main`
-> **Git HEAD:** `678a620d9b1a5221b50265c0c61d10c2b299c4cb`
+> **Git Attestation Commit:** `2d5374ac1fa7e189d5a7d6537dbb0e35fa848d56`
+> **Code Implementation Commit:** `678a620d9b1a5221b50265c0c61d10c2b299c4cb`
 > **Room Schema Version:** 90
 > **Protocol Version:** `SAFETY-CUSTODY-V2`
 > **Automated Tests Passing:** 155 (118 Kotlin + 37 TypeScript)
@@ -56,8 +57,9 @@ PRODUCTION_STATUS = NO_GO
 ## 2. Artifact & Commit Identification
 
 ```
-GIT COMMIT SHA : 678a620d9b1a5221b50265c0c61d10c2b299c4cb
-GIT BRANCH     : main
+ATTESTATION COMMIT : 2d5374ac1fa7e189d5a7d6537dbb0e35fa848d56
+CODE IMPLEMENTATION : 678a620d9b1a5221b50265c0c61d10c2b299c4cb
+GIT BRANCH         : main
 ROOM SCHEMA    : 90
 PROTOCOL       : SAFETY-CUSTODY-V2
 APK SHA-256    : 3b76561dc9cf8390b9ad0dc7f63cade1a2ea0aa986df0445a6a5460ff0b6c5ed

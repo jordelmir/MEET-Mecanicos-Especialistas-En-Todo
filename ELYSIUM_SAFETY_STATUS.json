@@ -1,7 +1,8 @@
 {
   "status": "NO_GO",
   "ruleZeroReason": "Live Supabase migration deployment, remote database attacks, and external witness delivery remain NOT_EXECUTED against live staging infrastructure. Rule Zero strictly prohibits marking unexecuted live infrastructure tests as PASS.",
-  "gitHead": "678a620d9b1a5221b50265c0c61d10c2b299c4cb",
+  "gitHead": "2d5374ac1fa7e189d5a7d6537dbb0e35fa848d56",
+  "codeHead": "678a620d9b1a5221b50265c0c61d10c2b299c4cb",
   "gitBranch": "main",
   "roomSchemaVersion": 90,
   "protocol": "SAFETY-CUSTODY-V2",
