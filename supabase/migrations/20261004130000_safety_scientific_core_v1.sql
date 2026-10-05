@@ -6,6 +6,8 @@
 -- All tables use RLS with service_role only — public access via projections.
 -- ============================================================================
 
+BEGIN;
+
 -- ── 001: Scientific Entities ─────────────────────────────────────────────────
 
 create table if not exists public.safety_scientific_entities (
@@ -457,38 +459,88 @@ create index if not exists idx_sst_actor on public.safety_scientific_state_trans
 -- Public access EXCLUSIVELY via projection views (created separately).
 -- ══════════════════════════════════════════════════════════════════════════════
 
-do $$
-declare
-    tbl text;
-begin
-    for tbl in
-        select unnest(array[
-            'safety_scientific_entities',
-            'safety_scientific_entity_relations',
-            'safety_scientific_claims',
-            'safety_scientific_claim_evidence',
-            'safety_scientific_claim_relations',
-            'safety_scientific_events',
-            'safety_scientific_knowledge_events',
-            'safety_scientific_authority_assertions',
-            'safety_scientific_duty_assertions',
-            'safety_scientific_accountability_actions',
-            'safety_scientific_hypotheses',
-            'safety_scientific_provenance_nodes',
-            'safety_scientific_provenance_edges',
-            'safety_scientific_research_datasets',
-            'safety_scientific_research_runs',
-            'safety_scientific_replications',
-            'safety_scientific_peer_reviews',
-            'safety_scientific_publications',
-            'safety_scientific_checkpoints',
-            'safety_scientific_checkpoint_witnesses',
-            'safety_scientific_state_transitions'
-        ])
-    loop
-        execute format('alter table public.%I enable row level security', tbl);
-        execute format('revoke all on public.%I from anon, authenticated', tbl);
-        execute format('grant select, insert, update on public.%I to service_role', tbl);
-    end loop;
-end
-$$;
+ALTER TABLE public.safety_scientific_entities ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_entities FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_entities TO service_role;
+
+ALTER TABLE public.safety_scientific_entity_relations ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_entity_relations FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_entity_relations TO service_role;
+
+ALTER TABLE public.safety_scientific_claims ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_claims FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_claims TO service_role;
+
+ALTER TABLE public.safety_scientific_claim_evidence ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_claim_evidence FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_claim_evidence TO service_role;
+
+ALTER TABLE public.safety_scientific_claim_relations ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_claim_relations FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_claim_relations TO service_role;
+
+ALTER TABLE public.safety_scientific_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_events FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_events TO service_role;
+
+ALTER TABLE public.safety_scientific_knowledge_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_knowledge_events FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_knowledge_events TO service_role;
+
+ALTER TABLE public.safety_scientific_authority_assertions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_authority_assertions FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_authority_assertions TO service_role;
+
+ALTER TABLE public.safety_scientific_duty_assertions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_duty_assertions FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_duty_assertions TO service_role;
+
+ALTER TABLE public.safety_scientific_accountability_actions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_accountability_actions FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_accountability_actions TO service_role;
+
+ALTER TABLE public.safety_scientific_hypotheses ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_hypotheses FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_hypotheses TO service_role;
+
+ALTER TABLE public.safety_scientific_provenance_nodes ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_provenance_nodes FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_provenance_nodes TO service_role;
+
+ALTER TABLE public.safety_scientific_provenance_edges ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_provenance_edges FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_provenance_edges TO service_role;
+
+ALTER TABLE public.safety_scientific_research_datasets ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_research_datasets FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_research_datasets TO service_role;
+
+ALTER TABLE public.safety_scientific_research_runs ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_research_runs FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_research_runs TO service_role;
+
+ALTER TABLE public.safety_scientific_replications ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_replications FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_replications TO service_role;
+
+ALTER TABLE public.safety_scientific_peer_reviews ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_peer_reviews FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_peer_reviews TO service_role;
+
+ALTER TABLE public.safety_scientific_publications ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_publications FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_publications TO service_role;
+
+ALTER TABLE public.safety_scientific_checkpoints ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_checkpoints FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_checkpoints TO service_role;
+
+ALTER TABLE public.safety_scientific_checkpoint_witnesses ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_checkpoint_witnesses FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_checkpoint_witnesses TO service_role;
+
+ALTER TABLE public.safety_scientific_state_transitions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.safety_scientific_state_transitions FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.safety_scientific_state_transitions TO service_role;
+
+COMMIT;

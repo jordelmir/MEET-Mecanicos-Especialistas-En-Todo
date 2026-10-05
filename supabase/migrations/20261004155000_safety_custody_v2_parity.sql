@@ -8,6 +8,8 @@
 -- Same canonical byte format → Same SHA-256 hex output.
 -- ═══════════════════════════════════════════════════════════════════
 
+BEGIN;
+
 CREATE OR REPLACE FUNCTION public.safety_custody_v2_event_hash(
     p_event_id TEXT,
     p_event_type TEXT,
@@ -19,6 +21,8 @@ CREATE OR REPLACE FUNCTION public.safety_custody_v2_event_hash(
 RETURNS TEXT
 LANGUAGE plpgsql
 IMMUTABLE
+SECURITY INVOKER
+SET search_path = ''
 AS $$
 DECLARE
     v_canonical TEXT;
@@ -33,7 +37,7 @@ BEGIN
         'previous_hash:' || lower(p_previous_hash) || E'\n';
 
     RETURN encode(
-        digest(convert_to(v_canonical, 'UTF8'), 'sha256'),
+        extensions.digest(convert_to(v_canonical, 'UTF8'), 'sha256'),
         'hex'
     );
 END;
@@ -45,6 +49,8 @@ CREATE OR REPLACE FUNCTION public.safety_custody_v2_chain_root(
 RETURNS TEXT
 LANGUAGE plpgsql
 IMMUTABLE
+SECURITY INVOKER
+SET search_path = ''
 AS $$
 DECLARE
     v_canonical TEXT;
@@ -59,7 +65,7 @@ BEGIN
     END LOOP;
 
     RETURN encode(
-        digest(convert_to(v_canonical, 'UTF8'), 'sha256'),
+        extensions.digest(convert_to(v_canonical, 'UTF8'), 'sha256'),
         'hex'
     );
 END;
@@ -77,6 +83,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE OR REPLACE FUNCTION public.safety_scientific_publication_guard()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 BEGIN
     -- Reject direct status changes to PUBLISHED without proper review
@@ -107,3 +114,5 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN
     NULL; -- trigger already exists
 END $$;
+
+COMMIT;

@@ -8,6 +8,8 @@
 -- unredacted documents, legal holds) is NEVER exposed.
 -- ═══════════════════════════════════════════════════════════════════
 
+BEGIN;
+
 -- §53: Public Research Projection
 CREATE OR REPLACE VIEW public.safety_public_research_projection AS
 SELECT
@@ -85,3 +87,5 @@ REVOKE ALL ON public.safety_scientific_publications FROM anon, authenticated;
 REVOKE ALL ON public.safety_scientific_replications FROM anon, authenticated;
 REVOKE ALL ON public.safety_scientific_research_runs FROM anon, authenticated;
 REVOKE ALL ON public.safety_scientific_research_datasets FROM anon, authenticated;
+
+COMMIT;

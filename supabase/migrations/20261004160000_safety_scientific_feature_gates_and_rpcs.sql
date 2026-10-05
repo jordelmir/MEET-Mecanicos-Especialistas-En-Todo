@@ -5,6 +5,8 @@
 -- A disabled server gate OVERRIDES local cache.
 -- ═══════════════════════════════════════════════════════════════════
 
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS public.safety_scientific_feature_gates (
     gate_name TEXT PRIMARY KEY,
     enabled BOOLEAN NOT NULL DEFAULT false,
@@ -54,6 +56,7 @@ CREATE OR REPLACE FUNCTION public.safety_scientific_create_checkpoint_v1(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     v_checkpoint_id UUID;
@@ -101,6 +104,7 @@ CREATE OR REPLACE FUNCTION public.safety_scientific_create_entity_v1(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     v_actor_id UUID;
@@ -144,6 +148,7 @@ CREATE OR REPLACE FUNCTION public.safety_scientific_create_claim_v1(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     v_actor_id UUID;
@@ -186,6 +191,7 @@ CREATE OR REPLACE FUNCTION public.safety_scientific_attach_evidence_v1(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     v_actor_id UUID;
@@ -236,6 +242,7 @@ CREATE OR REPLACE FUNCTION public.safety_scientific_create_hypothesis_v1(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     v_actor_id UUID;
@@ -266,3 +273,5 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.safety_scientific_create_hypothesis_v1 TO authenticated;
+
+COMMIT;

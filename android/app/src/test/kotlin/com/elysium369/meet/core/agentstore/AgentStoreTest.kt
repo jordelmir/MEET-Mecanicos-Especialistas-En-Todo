@@ -42,7 +42,7 @@ class AgentStoreTest {
     @Test
     fun `official agents roster contains Elysium original specialized archetypes`() {
         val all = OfficialAgents.ALL
-        assertEquals(6, all.size)
+        assertEquals(9, all.size)
 
         val ids = all.map { it.id }.toSet()
         assertTrue(ids.contains("agent.evair_core"))
@@ -51,6 +51,9 @@ class AgentStoreTest {
         assertTrue(ids.contains("agent.volt_aether"))
         assertTrue(ids.contains("agent.titan_vanguard"))
         assertTrue(ids.contains("agent.laya_valkyrie"))
+        assertTrue(ids.contains("agent.reptilian"))
+        assertTrue(ids.contains("agent.nordic"))
+        assertTrue(ids.contains("agent.grey"))
     }
 
     @Test
@@ -92,8 +95,14 @@ class AgentStoreTest {
         assertEquals(1, mobility.size)
         assertEquals("agent.laya_valkyrie", mobility.first().id)
 
+        val xenology = catalogRepo.listByCategory(AgentCategory.XENOLOGY)
+        assertEquals(3, xenology.size)
+        assertTrue(xenology.any { it.id == "agent.reptilian" })
+        assertTrue(xenology.any { it.id == "agent.nordic" })
+        assertTrue(xenology.any { it.id == "agent.grey" })
+
         val all = catalogRepo.listByCategory(null)
-        assertEquals(6, all.size)
+        assertEquals(9, all.size)
     }
 
     @Test

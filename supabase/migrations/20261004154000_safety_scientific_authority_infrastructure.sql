@@ -4,6 +4,8 @@
 -- source lineage, case aggregate
 -- ═══════════════════════════════════════════════════════════════════
 
+BEGIN;
+
 -- 1. Evidence Authority Bridge (Phase 6)
 CREATE TABLE IF NOT EXISTS public.safety_scientific_evidence_references (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -176,6 +178,7 @@ GRANT SELECT, INSERT ON public.safety_scientific_witness_records TO service_role
 CREATE OR REPLACE FUNCTION public.safety_scientific_ai_guard()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 DECLARE
     v_elevated TEXT[] := ARRAY[
@@ -194,3 +197,5 @@ $$;
 CREATE TRIGGER trg_ai_guard_state_transitions
     BEFORE INSERT ON public.safety_scientific_state_transitions
     FOR EACH ROW EXECUTE FUNCTION public.safety_scientific_ai_guard();
+
+COMMIT;

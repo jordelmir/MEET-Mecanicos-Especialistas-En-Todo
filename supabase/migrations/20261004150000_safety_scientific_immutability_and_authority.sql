@@ -6,10 +6,13 @@
 -- Corrections = new version. Withdrawal = new event.
 -- ═══════════════════════════════════════════════════════════════════
 
+BEGIN;
+
 -- Immutable guard function
 CREATE OR REPLACE FUNCTION public.safety_scientific_immutable()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 BEGIN
     RAISE EXCEPTION 'IMMUTABLE_SCIENTIFIC_RECORD: % on % is forbidden. '
@@ -87,6 +90,7 @@ CREATE OR REPLACE FUNCTION public.safety_scientific_transition_claim_v1(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
     v_actor_id UUID;
@@ -257,3 +261,5 @@ BEGIN
             ADD COLUMN evidence_ids UUID[] NOT NULL DEFAULT '{}';
     END IF;
 END $$;
+
+COMMIT;
