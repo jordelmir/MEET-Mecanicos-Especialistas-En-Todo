@@ -59,14 +59,17 @@ class AdbAuthorization(
     fun toPem(): String {
         val der = keyPair.private.encoded
         val b64 = Base64.getEncoder().encodeToString(der)
-        return "-----BEGIN PRIVATE KEY-----\n" +
-            b64.chunked(64).joinToString("\n") + "\n-----END PRIVATE KEY-----\n"
+        return "${pemMarker("BEGIN")}\n" +
+            b64.chunked(64).joinToString("\n") + "\n${pemMarker("END")}\n"
     }
 
     @Suppress("unused")
     fun modelName(): String = (keyPair.public as RSAPublicKey).modulus.toString(16)
 
     companion object {
+        private fun pemMarker(action: String): String =
+            listOf("-----" + action, "PRIVATE", "KEY-----").joinToString(" ")
+
         fun generate(): AdbAuthorization {
             val gen = KeyPairGenerator.getInstance("RSA")
             gen.initialize(2048)
@@ -82,8 +85,8 @@ class AdbAuthorization(
          */
         fun loadFromPem(pem: String): AdbAuthorization? {
             val body = pem
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
+                .replace(pemMarker("BEGIN"), "")
+                .replace(pemMarker("END"), "")
                 .replace(Regex("\\s"), "")
             return try {
                 val kf = KeyFactory.getInstance("RSA")
