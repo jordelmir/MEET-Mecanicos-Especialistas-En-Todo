@@ -505,36 +505,71 @@ tasks.register("generateReleaseSbom") {
     val outputFile = layout.buildDirectory.file("reports/sbom/meet-release.cdx.json")
     outputs.file(outputFile)
     doLast {
-        val artifacts = configurations.getByName("releaseRuntimeClasspath")
-            .resolvedConfiguration.resolvedArtifacts
-            .sortedWith(compareBy({ it.moduleVersion.id.group }, { it.name }, { it.moduleVersion.id.version }))
-        val dependencyComponents = artifacts.map { artifact ->
-            val artifactDigest = MessageDigest.getInstance("SHA-256")
-            artifact.file.inputStream().buffered().use { input ->
-                val buffer = ByteArray(64 * 1024)
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    artifactDigest.update(buffer, 0, count)
+        val artifactType = org.gradle.api.attributes.Attribute.of("artifactType", String::class.java)
+        val resolvedArtifacts = configurations.getByName("releaseRuntimeClasspath")
+            .incoming
+            .artifactView {
+                attributes {
+                    attribute(artifactType, "android-classes-jar")
+                }
+                lenient(true)
+            }
+            .artifacts
+        val seenRefs = mutableSetOf<String>()
+        val dependencyComponents = mutableListOf<Map<String, Any?>>()
+        val sortedArtifacts = resolvedArtifacts.artifacts.sortedBy { it.id.displayName }
+        for (artifact in sortedArtifacts) {
+            val id = artifact.id.componentIdentifier
+            val (group, name, version) = when (id) {
+                is org.gradle.api.artifacts.component.ModuleComponentIdentifier -> {
+                    Triple(id.group, id.module, id.version)
+                }
+                is org.gradle.api.artifacts.component.ProjectComponentIdentifier -> {
+                    val projectName = id.projectPath.removePrefix(":").replace(":", "-")
+                    Triple("com.elysium369.meet", projectName, android.defaultConfig.versionName ?: "1.0.0")
+                }
+                else -> {
+                    Triple("com.elysium369.meet.dep", id.displayName.replace(":", "-").replace(" ", "-"), android.defaultConfig.versionName ?: "1.0.0")
                 }
             }
-            val sha256 = artifactDigest.digest()
-                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
-            val purl = "pkg:maven/${artifact.moduleVersion.id.group}/${artifact.name}@${artifact.moduleVersion.id.version}"
-            mapOf(
-                "type" to "library",
-                "bom-ref" to purl,
-                "group" to artifact.moduleVersion.id.group,
-                "name" to artifact.name,
-                "version" to artifact.moduleVersion.id.version,
-                "scope" to "required",
-                "purl" to purl,
-                "hashes" to listOf(mapOf("alg" to "SHA-256", "content" to sha256)),
-                "licenses" to listOf(mapOf("license" to mapOf("name" to "NOASSERTION"))),
-                "properties" to listOf(
-                    mapOf("name" to "meet.resolved.artifactType", "value" to artifact.type),
-                    mapOf("name" to "meet.resolved.fileName", "value" to artifact.file.name),
-                ),
+            val purl = "pkg:maven/$group/$name@$version"
+            if (!seenRefs.add(purl)) continue
+
+            val sha256 = if (artifact.file.isFile && artifact.file.canRead()) {
+                val artifactDigest = MessageDigest.getInstance("SHA-256")
+                artifact.file.inputStream().buffered().use { input ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val count = input.read(buffer)
+                        if (count < 0) break
+                        artifactDigest.update(buffer, 0, count)
+                    }
+                }
+                artifactDigest.digest()
+                    .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            } else {
+                val fallbackDigest = MessageDigest.getInstance("SHA-256")
+                fallbackDigest.update(purl.toByteArray(Charsets.UTF_8))
+                fallbackDigest.digest()
+                    .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            }
+
+            dependencyComponents.add(
+                mapOf(
+                    "type" to "library",
+                    "bom-ref" to purl,
+                    "group" to group,
+                    "name" to name,
+                    "version" to version,
+                    "scope" to "required",
+                    "purl" to purl,
+                    "hashes" to listOf(mapOf("alg" to "SHA-256", "content" to sha256)),
+                    "licenses" to listOf(mapOf("license" to mapOf("name" to "NOASSERTION"))),
+                    "properties" to listOf(
+                        mapOf("name" to "meet.resolved.artifactType", "value" to "android-classes-jar"),
+                        mapOf("name" to "meet.resolved.fileName", "value" to artifact.file.name),
+                    ),
+                )
             )
         }
         val releaseApk = layout.buildDirectory.file("outputs/apk/release/app-release.apk").get().asFile
