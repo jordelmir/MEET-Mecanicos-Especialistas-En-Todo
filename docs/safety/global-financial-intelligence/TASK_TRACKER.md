@@ -68,3 +68,17 @@ Marcar una tarea solo cuando el cambio esté escrito. Compilación, ejecución d
 - **APK instalado físicamente:** NOT_EXECUTED.
 - **CI del SHA anterior:** las ejecuciones consultadas estaban en cola; sin conclusión.
 - **CI del SHA de esta actualización:** consultar después de publicar el commit.
+
+
+## Slice B2 — Reporte → afirmación → evidencia (ampliación local)
+
+- [x] Sustituir la referencia sintética `report:<id>` por IDs UUID reales de adjuntos en el vínculo evidencia–afirmación.
+- [x] Registrar nodos/aristas de procedencia para reporte, afirmación, evento, adjuntos y, si se crea, hipótesis.
+- [x] Tratar adjuntos nuevos como `CONTEXTUALIZES`, sin asignarles apoyo probatorio automático.
+- [x] No generar hipótesis ni hipótesis nula sintéticas cuando el análisis científico está desactivado.
+- [x] Si el usuario activa análisis científico, exigir hipótesis, hipótesis nula y criterio de falsación explícitos.
+- [x] Conservar `occurredAt=null` cuando el usuario no conoce la fecha del acontecimiento; registrar el tiempo de recepción por separado.
+- [x] Hacer transaccional la proyección científica local.
+- [x] Añadir una evaluación que conserva TruthState original junto al mapeo científico conservador.
+- [ ] Conectar la proyección con el outbox científico remoto; esta implementación local no significa sincronización.
+- [ ] Ejecutar pruebas Kotlin y revisar el resultado de CI.

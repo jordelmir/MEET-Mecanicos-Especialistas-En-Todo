@@ -33,9 +33,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import com.elysium369.meet.safety.science.data.SafetyScienceDao
-import com.elysium369.meet.safety.science.data.SciClaimEntity
-import com.elysium369.meet.safety.science.data.SciEventEntity
-import com.elysium369.meet.safety.science.data.SciHypothesisEntity
+import com.elysium369.meet.safety.science.application.SafetyReportEvidenceInput
+import com.elysium369.meet.safety.science.application.SafetyReportScientificProjectionFactory
+import com.elysium369.meet.safety.science.application.SafetyReportScientificProjectionInput
 import kotlinx.coroutines.delay
 import javax.inject.Inject
 
@@ -311,6 +311,20 @@ class SafetyReportViewModel @Inject constructor(
         if (snapshot.submitting || snapshot.staging || snapshot.locating) return
         if (snapshot.category == null || snapshot.sourceRelation == null) return
         if (snapshot.narrative.trim().length < 10) return
+        if (snapshot.enableScientificAnalysis) {
+            val missingScientificFields =
+                snapshot.scientificHypothesis.trim().length < 10 ||
+                    snapshot.nullHypothesis.trim().length < 10 ||
+                    snapshot.falsificationCriteria.trim().length < 10
+            if (missingScientificFields) {
+                _state.update {
+                    it.copy(
+                        error = "Para crear análisis científico, completa hipótesis, hipótesis nula y criterio de falsación (mínimo 10 caracteres cada uno), o desactiva esa opción.",
+                    )
+                }
+                return
+            }
+        }
 
         // Extract any URLs typed or pasted directly into the narrative
         val narrativeUrls = Regex("""(https?://[^\s]+)""").findAll(snapshot.narrative)
@@ -361,83 +375,55 @@ class SafetyReportViewModel @Inject constructor(
                     ),
                 )
 
-                // Project into Room Scientific Platform (Hypothesis, Popperian Falsification, Factual Claim, Event)
-                val now = System.currentTimeMillis()
-                val occurredMs = snapshot.occurredAtIso?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: now
-                val shortId = if (reportId.length >= 8) reportId.substring(0, 8) else reportId
-
-                // 1. SciClaimEntity: Factual Assertion
-                val claimProposition = if (snapshot.factualClaim.isNotBlank()) {
-                    snapshot.factualClaim.trim()
-                } else {
-                    "[Reporte #$shortId] Incidente observado: " + snapshot.narrative.take(160).trim()
-                }
-                val claimId = UUID.randomUUID().toString()
-                safetyScienceDao.upsertClaim(
-                    SciClaimEntity(
-                        id = claimId,
-                        proposition = claimProposition,
-                        predicate = "REPORTED_INCIDENT",
-                        assertionState = "OBSERVED",
-                        causalStatus = if (snapshot.scientificHypothesis.isNotBlank()) "HYPOTHESIS_FORMULATED" else "NOT_ASSESSED",
-                        occurredAt = occurredMs,
-                        knownAt = now,
-                        createdAt = now,
-                        updatedAt = now,
+                // The report is saved by SafetyRepository first. Its scientific projection is
+                // a separate LOCAL transaction: failure must not mislabel the report save.
+                val projectionWarning = try {
+                    val now = System.currentTimeMillis()
+                    val occurredMs = snapshot.occurredAtIso?.let {
+                        runCatching { Instant.parse(it).toEpochMilli() }.getOrNull()
+                    }
+                    val projection = SafetyReportScientificProjectionFactory.build(
+                        SafetyReportScientificProjectionInput(
+                            reportId = reportId,
+                            category = requireNotNull(snapshot.category),
+                            narrative = snapshot.narrative,
+                            factualClaim = snapshot.factualClaim,
+                            sourceRelation = requireNotNull(snapshot.sourceRelation),
+                            scientificHypothesis = snapshot.scientificHypothesis,
+                            nullHypothesis = snapshot.nullHypothesis,
+                            falsificationCriteria = snapshot.falsificationCriteria,
+                            enableScientificAnalysis = snapshot.enableScientificAnalysis,
+                            occurredAt = occurredMs,
+                            recordedAt = now,
+                            evidence = snapshot.evidence.map {
+                                SafetyReportEvidenceInput(
+                                    evidenceId = it.evidenceId,
+                                    contentSha256 = it.contentSha256,
+                                )
+                            },
+                        ),
                     )
-                )
-
-                // 2. SciHypothesisEntity: Popperian Falsifiable Hypothesis
-                val hypothesisProposition = if (snapshot.scientificHypothesis.isNotBlank()) {
-                    "[Reporte #$shortId] " + snapshot.scientificHypothesis.trim()
-                } else {
-                    "[Reporte #$shortId] Hechos observados en categoría ${snapshot.category.name} asociados a reporte territorial"
-                }
-                val nullHyp = if (snapshot.nullHypothesis.isNotBlank()) {
-                    snapshot.nullHypothesis.trim()
-                } else {
-                    "Los hechos reportados en #$shortId responden a eventos aislados sin correlación causal o sistemática."
-                }
-                val falsificationCriteriaJson = if (snapshot.falsificationCriteria.isNotBlank()) {
-                    "[\"${snapshot.falsificationCriteria.replace("\"", "\\\"").trim()}\"]"
-                } else {
-                    "[\"Atestación contradictoria irrefutable o prueba documental concluyente\"]"
-                }
-                val hypothesisId = UUID.randomUUID().toString()
-                safetyScienceDao.upsertHypothesis(
-                    SciHypothesisEntity(
-                        id = hypothesisId,
-                        proposition = hypothesisProposition,
-                        nullHypothesis = nullHyp,
-                        supportingEvidenceIdsJson = "[\"report:$reportId\"]",
-                        contradictingEvidenceIdsJson = "[]",
-                        alternativeHypothesisIdsJson = "[]",
-                        falsificationCriteriaJson = falsificationCriteriaJson,
-                        status = "PROPOSED",
-                        methodologyVersion = "safety-science-v1",
-                        createdAt = now,
-                        updatedAt = now,
+                    safetyScienceDao.persistReportProjection(
+                        claim = projection.claim,
+                        hypothesis = projection.hypothesis,
+                        event = projection.event,
+                        evidenceLinks = projection.claimEvidenceLinks,
+                        provenanceNodes = projection.provenanceNodes,
+                        provenanceEdges = projection.provenanceEdges,
                     )
-                )
-
-                // 3. SciEventEntity: Timeline projection
-                safetyScienceDao.upsertEvent(
-                    SciEventEntity(
-                        id = UUID.randomUUID().toString(),
-                        eventType = snapshot.category.name,
-                        occurredAt = occurredMs,
-                        recordedAt = now,
-                        assertionState = "OBSERVED",
-                        claimIdsJson = "[\"$claimId\"]",
-                        createdAt = now,
-                    )
-                )
+                    null
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (projectionError: Exception) {
+                    "El reporte se registró en Safety, pero no se pudo completar el índice científico local. La relación de evidencia queda pendiente de reparación; esto no confirma el hecho reportado."
+                }
 
                 _state.update {
                     it.copy(
                         submitting = false,
                         createdReportId = reportId,
                         step = it.totalSteps,
+                        error = projectionWarning,
                     )
                 }
             } catch (cancelled: CancellationException) {

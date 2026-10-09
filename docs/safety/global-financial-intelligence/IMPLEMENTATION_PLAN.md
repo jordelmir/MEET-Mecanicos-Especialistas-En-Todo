@@ -346,6 +346,8 @@ La línea financiera es secundaria y modular. Reutiliza el núcleo científico d
 
 ## 11. Orden de ejecución inmediato
 
+La lista viva [TASK_TRACKER.md](TASK_TRACKER.md) registra la implementación y las brechas restantes. La proyección de reportes enlaza IDs reales de evidencia local; el outbox científico remoto aún necesita integración y prueba.
+
 El seguimiento verificable por fase está en [TASK_TRACKER.md](TASK_TRACKER.md). Cada casilla distingue el código escrito de las pruebas ejecutadas.
 
 1. Corregir pruebas de UI que sigan esperando componentes ya retirados.

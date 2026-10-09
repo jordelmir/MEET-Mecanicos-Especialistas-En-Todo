@@ -87,4 +87,32 @@ class TruthStateMappingTest {
             )
         }
     }
+    @Test
+    fun assessmentPreservesOriginalStatesThatShareAConservativeProjection() {
+        val estimated = TruthState.ESTIMATED.toScientificAssessment()
+        val simulated = TruthState.SIMULATED.toScientificAssessment()
+        val notIntegrated = TruthState.NOT_INTEGRATED.toScientificAssessment()
+        val notExecuted = TruthState.NOT_EXECUTED.toScientificAssessment()
+
+        listOf(estimated, simulated, notIntegrated, notExecuted).forEach { assessment ->
+            assertEquals(EvidenceAssertionState.INSUFFICIENT_EVIDENCE, assessment.scientificState)
+            assertTrue(assessment.explanation.isNotBlank())
+        }
+        assertEquals(TruthState.ESTIMATED, estimated.sourceState)
+        assertEquals(TruthState.SIMULATED, simulated.sourceState)
+        assertEquals(TruthState.NOT_INTEGRATED, notIntegrated.sourceState)
+        assertEquals(TruthState.NOT_EXECUTED, notExecuted.sourceState)
+        assertNotEquals(simulated.explanation, notIntegrated.explanation)
+        assertNotEquals(notIntegrated.explanation, notExecuted.explanation)
+    }
+
+    @Test
+    fun assessmentNeverChangesOriginalStateAndKeepsExistingProjection() {
+        TruthState.entries.forEach { source ->
+            val assessment = source.toScientificAssessment()
+            assertEquals(source, assessment.sourceState)
+            assertEquals(source.toScientificState(), assessment.scientificState)
+        }
+    }
+
 }
