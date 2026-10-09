@@ -5,6 +5,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -39,12 +40,12 @@ class SafetyInstitutionalPresentationScreenTest {
         composeRule.onNodeWithText("Mapa territorial").assertIsDisplayed()
         composeRule.onNodeWithText("Expedientes de seguridad").assertIsDisplayed()
         composeRule.onNodeWithText("Investigación científica y cadena de evidencia").assertIsDisplayed()
-        composeRule.onNodeWithText("INGESTA REAL NO INTEGRADA").assertIsDisplayed()
-        composeRule.onNodeWithText("PENDIENTE DE PILOTO AUTORIZADO").assertIsDisplayed()
+        composeRule.onNodeWithText("INGESTA REAL NO INTEGRADA").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("PENDIENTE DE PILOTO AUTORIZADO").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(
             "El adaptador de normalización y la regla de concentración existen como lógica de dominio.",
             substring = true,
-        ).assertIsDisplayed()
+        ).performScrollTo().assertIsDisplayed()
     }
 
     @Test
@@ -65,7 +66,7 @@ class SafetyInstitutionalPresentationScreenTest {
             }
         }
 
-        composeRule.onNodeWithText("Reportar un incidente").performClick()
+        composeRule.onNodeWithText("Reportar un incidente").performScrollTo().performClick()
         composeRule.runOnIdle {
             assertTrue(reportDestinationOpened)
         }
