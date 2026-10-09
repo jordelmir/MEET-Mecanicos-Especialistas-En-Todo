@@ -4,6 +4,12 @@ import android.view.View
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -213,16 +219,11 @@ fun SafetyHubScreen(
             }
 
             item {
-                SafetyHubCard(
-                    title = "🏛️ Presentación institucional · Elysium Safety",
-                    subtitle = "Panel ejecutivo de seguridad, evidencia y análisis territorial; identifica explícitamente las integraciones pendientes.",
-                    icon = Icons.Filled.AccountBalance,
-                    iconColor = MeetColors.cyberCyan,
+                SafetyInstitutionalEntryCard(
                     onClick = {
                         SafetyHaptics.selectionTick(view)
                         onNavigateToInstitutionalPresentation()
                     },
-                    enabled = true,
                 )
             }
 
@@ -370,6 +371,100 @@ fun SafetyHubScreen(
     }
 
 
+}
+
+@Composable
+private fun SafetyInstitutionalEntryCard(
+    onClick: () -> Unit,
+) {
+    val transition = rememberInfiniteTransition(label = "safety-entry-neon")
+    val glow by transition.animateFloat(
+        initialValue = 0.30f,
+        targetValue = 0.92f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "entry-glow",
+    )
+
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(
+            1.3.dp,
+            Brush.linearGradient(
+                colors = listOf(
+                    MeetColors.electricBlue.copy(alpha = glow),
+                    MeetColors.hotMagenta.copy(alpha = glow * 0.72f),
+                    MeetColors.neonGreen.copy(alpha = glow * 0.55f),
+                ),
+            ),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 7.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                MeetColors.electricBlue.copy(alpha = 0.25f),
+                                MeetColors.hotMagenta.copy(alpha = 0.16f),
+                                MeetColors.backgroundDeep,
+                            ),
+                        ),
+                    )
+                    .border(1.dp, MeetColors.electricBlue.copy(alpha = glow), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.AccountBalance,
+                    contentDescription = null,
+                    tint = MeetColors.electricBlue,
+                    modifier = Modifier.size(25.dp),
+                )
+            }
+            Spacer(Modifier.width(13.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = "🏛️ PRESENTACIÓN INSTITUCIONAL",
+                    color = MeetColors.electricBlue,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 11.sp,
+                    letterSpacing = 0.85.sp,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "ELYSIUM SAFETY · 3D COMMAND DECK",
+                    color = MeetColors.textPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = "Recorre reportes, evidencia, territorio y estados de integración en una interfaz futurista.",
+                    color = MeetColors.textSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = "Abrir presentación institucional",
+                tint = MeetColors.hotMagenta,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+    }
 }
 
 @Composable

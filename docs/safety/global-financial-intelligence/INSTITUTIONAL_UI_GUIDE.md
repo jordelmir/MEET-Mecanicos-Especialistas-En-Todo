@@ -101,3 +101,22 @@ La pantalla institucional conduce a las vistas Android existentes de reporte, ma
 - Un hash confirma la identidad de bytes comparados, no la veracidad del contenido.
 - Una presentación institucional no concede privilegios adicionales y no modifica políticas RLS ni autoridad del servidor.
 - No se borran ni reducen módulos del sistema operativo integral: esta es una vista enfocada y aditiva para el público institucional.
+
+
+## Actualización visual: holografía 3D y guía animada
+
+La cabecera institucional utiliza una composición Canvas con retícula de HUD, perspectiva, brillo radial, anillos orbitales cian/magenta, núcleo luminoso con pulsación y ligera inclinación 3D. Los movimientos son sutiles para conservar la legibilidad y limitar la distracción.
+
+La guía pasa de cinco tarjetas largas a un stepper persistente. Cada etapa presenta su explicación, un consejo específico, indicador 1–5, barra de progreso, transición animada y una acción real hacia la pantalla existente correspondiente. La guía recuerda qué automatiza y qué no automatiza la aplicación: no presenta un botón visual como si adjuntara evidencia, remitiera un caso o validara una integración.
+
+CI compila las pruebas Android instrumentadas y las ejecuta en un emulador API 36. Esto es distinto de una prueba física en un teléfono y debe reportarse por separado.
+
+## Criterios de aceptación de esta mejora
+
+- [ ] La cabecera 3D tiene retícula, scanline, anillos orbitales y movimiento de perspectiva.
+- [ ] Los colores se consumen del sistema de paleta Elysium; no reemplazan la configuración guardada por el usuario.
+- [ ] La guía permite avanzar, retroceder y reiniciar y conserva el paso al recomponer/restaurar estado.
+- [ ] La acción principal cambia según la etapa y abre un destino de Safety real.
+- [ ] La tarjeta de entrada institucional del hub tiene un borde neón animado sin alterar la navegación de los otros módulos.
+- [ ] Las pruebas instrumentadas se ejecutan en un emulador Android durante CI.
+- [ ] No se declaran verificados el APK instalado físicamente ni las integraciones SICOP/institucionales sin evidencia separada.
