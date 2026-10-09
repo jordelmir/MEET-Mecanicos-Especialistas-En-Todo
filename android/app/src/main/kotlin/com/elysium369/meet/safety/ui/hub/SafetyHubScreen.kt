@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,6 +63,7 @@ fun SafetyHubScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val view = LocalView.current
+    val showInstitutionalPresentation = rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
 
     val pulseState = when {
         uiState.error != null -> PulseState.ERROR
@@ -213,6 +215,20 @@ fun SafetyHubScreen(
 
             item {
                 SafetyHubCard(
+                    title = "🏛️ Presentación institucional · Elysium Safety",
+                    subtitle = "Panel ejecutivo de seguridad, evidencia y análisis territorial; identifica explícitamente las integraciones pendientes.",
+                    icon = Icons.Filled.AccountBalance,
+                    iconColor = MeetColors.cyberCyan,
+                    onClick = {
+                        SafetyHaptics.selectionTick(view)
+                        showInstitutionalPresentation.value = true
+                    },
+                    enabled = true,
+                )
+            }
+
+            item {
+                SafetyHubCard(
                     title = "🔬 Plataforma Científica & Research",
                     subtitle = "Claims, Timeline, Hipótesis, Replicaciones, Paquetes Forenses",
                     icon = Icons.Filled.Analytics,
@@ -351,6 +367,53 @@ fun SafetyHubScreen(
             }
 
             item { Spacer(modifier = Modifier.height(24.dp)) }
+        }
+    }
+
+    if (showInstitutionalPresentation.value) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showInstitutionalPresentation.value = false },
+            properties = androidx.compose.ui.window.DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = MeetColors.backgroundDeep,
+            ) {
+                com.elysium369.meet.safety.ui.institutional.SafetyInstitutionalPresentationScreen(
+                    onBack = { showInstitutionalPresentation.value = false },
+                    onNavigateToReport = {
+                        showInstitutionalPresentation.value = false
+                        onNavigateToReport()
+                    },
+                    onNavigateToMap = {
+                        showInstitutionalPresentation.value = false
+                        onNavigateToMap()
+                    },
+                    onNavigateToMyReports = {
+                        showInstitutionalPresentation.value = false
+                        onNavigateToMyReports()
+                    },
+                    onNavigateToCases = {
+                        showInstitutionalPresentation.value = false
+                        onNavigateToCases()
+                    },
+                    onNavigateToTimelines = {
+                        showInstitutionalPresentation.value = false
+                        onNavigateToTimelines()
+                    },
+                    onNavigateToObservatory = {
+                        showInstitutionalPresentation.value = false
+                        onNavigateToObservatory()
+                    },
+                    onNavigateToResearch = {
+                        showInstitutionalPresentation.value = false
+                        onNavigateToResearch()
+                    },
+                )
+            }
         }
     }
 }
