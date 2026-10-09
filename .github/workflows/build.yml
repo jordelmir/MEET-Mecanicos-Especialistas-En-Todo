@@ -39,6 +39,9 @@ jobs:
       - name: Unit tests
         working-directory: android
         run: ./gradlew testDebugUnitTest --no-daemon
+      - name: Compile Android Compose UI instrumentation tests
+        working-directory: android
+        run: ./gradlew :app:assembleDebugAndroidTest --no-daemon
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
