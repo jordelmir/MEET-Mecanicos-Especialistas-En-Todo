@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Map
@@ -43,7 +44,7 @@ import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -170,16 +171,6 @@ fun SafetyInstitutionalPresentationScreen(
                 }
             }
 
-            item {
-                Text(
-                    text = "GUÍA INTERACTIVA · 5 ETAPAS",
-                    color = MeetColors.cyberCyan,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 11.sp,
-                    letterSpacing = 1.0.sp,
-                    modifier = Modifier.padding(top = 4.dp),
-                )
-            }
             item {
                 GuideStepperCard(
                     activeIndex = activeGuideStep.intValue,
@@ -501,13 +492,13 @@ private fun NeonCommandHero() {
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 4.dp)
-                .size(154.dp),
+                .size(136.dp),
         )
 
         Column(
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .fillMaxWidth(0.72f)
+                .fillMaxWidth(0.64f)
                 .padding(start = 18.dp, top = 18.dp, bottom = 18.dp, end = 4.dp),
             verticalArrangement = Arrangement.Center,
         ) {

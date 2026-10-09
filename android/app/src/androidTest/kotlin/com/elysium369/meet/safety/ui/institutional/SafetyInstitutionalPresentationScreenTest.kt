@@ -35,14 +35,15 @@ class SafetyInstitutionalPresentationScreenTest {
         }
 
         composeRule.onNodeWithText("ELYSIUM SAFETY").assertIsDisplayed()
+        composeRule.mainClock.autoAdvance = false
         composeRule.onNodeWithText("PRESENTACIÓN INSTITUCIONAL").assertIsDisplayed()
         composeRule.onNodeWithText("3D HOLOGRAPHIC COMMAND DECK").assertIsDisplayed()
-        composeRule.onNodeWithText("GUÍA INTERACTIVA · 5 ETAPAS").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("Siguiente etapa").performScrollTo().performClick()
-        composeRule.waitForIdle()
         composeRule.onNodeWithText("Crear reporte").assertIsDisplayed()
         composeRule.onNodeWithText("Abrir mapa").assertIsDisplayed()
-                composeRule.onNodeWithText("Registra el acontecimiento").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("GUÍA INTERACTIVA · 5 ETAPAS").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Registra el acontecimiento").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Siguiente etapa").performScrollTo().performClick()
+        composeRule.mainClock.advanceTimeBy(500)
         composeRule.onNodeWithText("Conserva el material original").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("QUÉ SIGNIFICA CADA ESTADO").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Reportar un incidente").performScrollTo().assertIsDisplayed()
@@ -59,6 +60,7 @@ class SafetyInstitutionalPresentationScreenTest {
 
     @Test
     fun reportCardInvokesTheExistingSafetyReportDestination() {
+        composeRule.mainClock.autoAdvance = false
         var reportDestinationOpened = false
         composeRule.setContent {
             MaterialTheme {
@@ -76,8 +78,6 @@ class SafetyInstitutionalPresentationScreenTest {
         }
 
         composeRule.onNodeWithText("Reportar un incidente").performScrollTo().performClick()
-        composeRule.runOnIdle {
-            assertTrue(reportDestinationOpened)
-        }
+        assertTrue(reportDestinationOpened)
     }
 }
