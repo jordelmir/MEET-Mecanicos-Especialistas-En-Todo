@@ -1,7 +1,7 @@
 # Elysium Safety — Lista viva de tareas
 
 **Rama:** `feat/elysium-safety-intelligence-plan`  
-**SHA de partida de esta actualización:** `8e46697b289eb0b10b7fe47f4e72f5f27b97c7ef`  
+**SHA de partida de esta actualización:** `76805b54fa62012f9a4bd6457c6698da862d76c0`  
 **Estado:** rama de trabajo, PR #56 abierto en borrador; `main` no modificada por este cambio.
 
 Marcar una tarea solo cuando el cambio esté escrito. Compilación, ejecución de tests, staging y dispositivo físico son verificaciones diferentes.
@@ -67,7 +67,7 @@ Marcar una tarea solo cuando el cambio esté escrito. Compilación, ejecución d
 - **Gradle local en esta sesión:** NOT_EXECUTED.
 - **Supabase staging / RLS:** NOT_EXECUTED.
 - **APK instalado físicamente:** NOT_EXECUTED.
-- **CI del SHA anterior:** las ejecuciones consultadas estaban en cola; sin conclusión.
+- **CI del SHA base `76805b54...`:** no está verde. El workflow CI #37878488345 falló al compilar la pantalla institucional por imports y `StatusLegendRow`; el siguiente SHA debe volver a compilarse.
 - **CI del SHA de esta actualización:** consultar después de publicar el commit.
 
 
@@ -94,3 +94,17 @@ Marcar una tarea solo cuando el cambio esté escrito. Compilación, ejecución d
 - [x] Añadir un estado explícito `UNAVAILABLE`; consulta fallida no equivale a conteos medidos en cero.
 - [x] Añadir tests para el estado no disponible y los conteos reales de la proyección V3.
 - [ ] Ejecutar Gradle/CI para validar el cambio y reparar posibles regresiones.
+
+
+## Slice H — Fiabilidad de compilación y recibos de reportes
+
+- [x] Corregir el import de `rememberSaveable` y los imports de Compose faltantes en la presentación institucional.
+- [x] Añadir `StatusLegendRow` con jerarquía visual, estados legibles y descripciones accesibles.
+- [x] Ampliar la prueba instrumentada para confirmar que se muestran los cuatro estados de conocimiento.
+- [x] Hacer que solo `syncState == SYNCED` se represente como confirmación remota; no inferir éxito únicamente porque `serverState` tenga valor.
+- [x] Retirar las afirmaciones de publicación y visibilidad comunitaria del recibo; recepción del servidor no equivale a publicación o remisión institucional.
+- [x] Identificar la proyección científica como local y distinguirla de la sincronización remota.
+- [x] Mostrar una advertencia visible cuando falle la proyección científica local.
+- [x] Añadir pruebas unitarias puras para la clasificación del estado del recibo.
+- [ ] Verificar compilación y pruebas en CI para el SHA resultante.
+- [ ] Instalar el APK de ese mismo SHA en un Android y comprobar visualmente el recibo y el modo institucional.

@@ -4,7 +4,7 @@
 **Repositorio:** jordelmir/MEET-Mecanicos-Especialistas-En-Todo  
 **Rama de trabajo:** feat/elysium-safety-intelligence-plan  
 **PR de trabajo:** #56, abierto en borrador; no fusionado durante esta auditoría  
-**SHA de línea base de esta revisión:** 32f4854de1152f008e641770d706eac882ee4952
+**SHA de línea base de esta revisión:** 76805b54fa62012f9a4bd6457c6698da862d76c0
 
 > Principio operativo: añadir capacidades sin borrar ni degradar funciones, contratos, migraciones o módulos existentes. La presentación para instituciones sí se limita a Elysium Safety; el producto completo conserva mecánica, movilidad y los demás módulos.
 >
@@ -55,6 +55,9 @@ La línea financiera no es requisito para que el núcleo ciudadano funcione y no
 10. **Ninguna fusión o publicación automática:** la rama de trabajo no se fusiona por esta orden; la preparación de producción requiere gates independientes.
 
 ## 4. Estado observado en código: línea base y limitaciones
+
+**Gate de compilación de esta línea base:** CI #37878488345 falló en `:app:compileDebugKotlin` dentro de `SafetyInstitutionalPresentationScreen.kt`, antes de validar el APK. Los errores observados fueron un paquete incorrecto para `rememberSaveable`, imports faltantes para `Box`/`clip` y una función de leyenda sin definición. Esta falla antecede al incremento de corrección documentado en el tracker; ningún APK de la línea base debe presentarse como validado.
+
 
 Este cuadro resume la inspección estática del SHA de línea base declarado arriba. No equivale a una ejecución de Gradle, a pruebas contra Supabase desplegado ni a validación física del APK.
 

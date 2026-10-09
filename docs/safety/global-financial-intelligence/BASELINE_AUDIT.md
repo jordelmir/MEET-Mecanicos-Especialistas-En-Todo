@@ -1,13 +1,15 @@
 # Elysium Safety — Auditoría de línea base y conciliación
 ## Revisión de fuente del 8 de octubre de 2026
 
-**SHA de la línea base inspeccionada:** 32f4854de1152f008e641770d706eac882ee4952  
+**SHA de la línea base inspeccionada:** 76805b54fa62012f9a4bd6457c6698da862d76c0  
 **Rama:** feat/elysium-safety-intelligence-plan  
 **PR:** https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/pull/56  
 **Estado del PR al inspeccionarlo:** abierto, en borrador, sin fusionar.  
 **Tipo de comprobación:** lectura estática de archivos de GitHub; no es una ejecución local ni una atestación de producción.
 
-> No heredar PASS de un documento o commit anterior. Este documento debe regenerarse cuando cambie el SHA auditado. En esta revisión no se ejecutaron Gradle, Vitest, migraciones PostgreSQL, RPCs, RLS ni pruebas físicas de Android.
+> No heredar PASS de un documento o commit anterior. Este documento corresponde a la línea base previa a la corrección visual/funcional de esta iteración. No se ejecutó Gradle local, Vitest local, migraciones PostgreSQL, RPCs, RLS ni pruebas físicas de Android.
+>
+> **CI observado para esta línea base:** el run [CI #37878488345](https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/actions/runs/37878488345) falló en `:app:compileDebugKotlin`. Los errores concretos incluyen el import incorrecto de `rememberSaveable`, imports ausentes de `Box` y `clip`, y la ausencia de `StatusLegendRow`. No se debe distribuir un APK de esta línea base.
 
 ## 1. Resultado ejecutivo
 

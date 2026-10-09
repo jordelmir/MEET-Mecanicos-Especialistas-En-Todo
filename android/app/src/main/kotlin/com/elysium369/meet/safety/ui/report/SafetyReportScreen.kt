@@ -143,6 +143,9 @@ fun SafetyReportScreen(
             onBack = onBack,
             onDone = { onReportSubmitted(state.createdReportId!!) },
             onNavigateToResearch = onNavigateToResearch,
+            hasScientificHypothesis = state.enableScientificAnalysis &&
+                state.scientificHypothesis.isNotBlank(),
+            localProjectionWarning = state.error,
         )
         return
     }
@@ -1258,41 +1261,64 @@ private fun SafetyReportReceiptScreen(
     onBack: () -> Unit,
     onDone: () -> Unit,
     onNavigateToResearch: () -> Unit = {},
+    hasScientificHypothesis: Boolean = false,
+    localProjectionWarning: String? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
 
-    val isOnline = report?.syncState == "SYNCED" || report?.serverState != null
-    val isSyncing = report?.syncState == "SYNCING"
+    val receiptStatus = safetyReportReceiptStatus(report?.syncState)
+    val serverConfirmed = receiptStatus == SafetyReportReceiptStatus.SERVER_CONFIRMED
+    val isSyncing = receiptStatus == SafetyReportReceiptStatus.SYNCING
+    val isFailed = receiptStatus == SafetyReportReceiptStatus.FAILED
 
-    val statusText = when {
-        isOnline -> "EN LÍNEA (SYNCED)"
-        isSyncing -> "SINCRONIZANDO..."
-        else -> "PENDIENTE DE RED"
+    val statusText = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING -> "CONSULTANDO ESTADO"
+        SafetyReportReceiptStatus.SERVER_CONFIRMED -> "RECIBIDO POR SERVIDOR"
+        SafetyReportReceiptStatus.SYNCING -> "SINCRONIZACIÓN EN CURSO"
+        SafetyReportReceiptStatus.FAILED -> "NO CONFIRMADO · REVISAR"
+        SafetyReportReceiptStatus.LOCAL_PENDING -> "GUARDADO LOCAL · PENDIENTE"
     }
 
-    val statusColor = when {
-        isOnline -> MeetColors.neonGreen
-        isSyncing -> MeetColors.cyberCyan
-        else -> MeetColors.warning
+    val statusColor = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING,
+        SafetyReportReceiptStatus.LOCAL_PENDING,
+        SafetyReportReceiptStatus.FAILED -> MeetColors.warning
+        SafetyReportReceiptStatus.SERVER_CONFIRMED -> MeetColors.neonGreen
+        SafetyReportReceiptStatus.SYNCING -> MeetColors.cyberCyan
     }
 
-    val titleText = when {
-        isOnline -> "Reporte publicado en línea"
-        isSyncing -> "Transmitiendo reporte..."
-        else -> stringResource(R.string.safety_report_receipt_saved_title)
+    val titleText = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING -> "Consultando el estado del reporte"
+        SafetyReportReceiptStatus.SERVER_CONFIRMED -> "Reporte recibido por el servidor"
+        SafetyReportReceiptStatus.SYNCING -> "Reporte guardado · sincronización en curso"
+        SafetyReportReceiptStatus.FAILED -> "Reporte guardado localmente"
+        SafetyReportReceiptStatus.LOCAL_PENDING -> stringResource(R.string.safety_report_receipt_saved_title)
     }
 
-    val descText = when {
-        isOnline -> "Transmitido exitosamente al servidor. Proyectado en tiempo real en Mapa, Casos Públicos, Líneas de Tiempo y Rendición de Cuentas."
-        isSyncing -> "Conectando con el servidor seguro y proyectando datos en tiempo real..."
-        else -> stringResource(R.string.safety_report_receipt_saved_desc)
+    val descText = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING ->
+            "Se está consultando el estado del reporte. No se declara un envío exitoso hasta que exista confirmación remota."
+        SafetyReportReceiptStatus.SERVER_CONFIRMED ->
+            "El servidor confirmó la recepción. Esto no significa que el incidente esté confirmado, que el reporte sea público ni que se haya remitido a una institución."
+        SafetyReportReceiptStatus.SYNCING ->
+            "El reporte permanece guardado y la sincronización está en curso. La recepción remota todavía no está confirmada."
+        SafetyReportReceiptStatus.FAILED ->
+            "No hay confirmación remota disponible. Conserva el identificador y revisa el estado en Mis reportes."
+        SafetyReportReceiptStatus.LOCAL_PENDING ->
+            stringResource(R.string.safety_report_receipt_saved_desc)
     }
 
-    val networkDescText = when {
-        isOnline -> "Confirmado por el servidor · visible para toda la comunidad"
-        isSyncing -> "Enviando paquete cifrado al servidor..."
-        else -> stringResource(R.string.safety_report_receipt_network_desc)
+    val networkDescText = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING -> "Consultando el estado local y remoto."
+        SafetyReportReceiptStatus.SERVER_CONFIRMED ->
+            "Confirmación remota recibida · publicación y visibilidad sujetas a revisión y controles de divulgación."
+        SafetyReportReceiptStatus.SYNCING ->
+            "Sincronización pendiente · aún no hay confirmación final del servidor."
+        SafetyReportReceiptStatus.FAILED ->
+            "Error de sincronización · el reporte local y su identificador se conservan."
+        SafetyReportReceiptStatus.LOCAL_PENDING ->
+            "Guardado localmente · recibo remoto pendiente."
     }
 
     Scaffold(
@@ -1315,11 +1341,12 @@ private fun SafetyReportReceiptScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            SafetyPulse(state = if (isOnline) PulseState.NOMINAL else PulseState.PENDING, size = 88.dp)
+            SafetyPulse(state = if (serverConfirmed) PulseState.NOMINAL else PulseState.PENDING, size = 88.dp)
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -1347,7 +1374,7 @@ private fun SafetyReportReceiptScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-                border = BorderStroke(1.dp, if (isOnline) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.cyberCyan.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, if (serverConfirmed) MeetColors.neonGreen.copy(alpha = 0.5f) else statusColor.copy(alpha = 0.55f)),
             ) {
                 Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
@@ -1391,7 +1418,30 @@ private fun SafetyReportReceiptScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            localProjectionWarning?.takeIf { it.isNotBlank() }?.let { warning ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                    border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.75f)),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text("⚠", fontSize = 18.sp, color = MeetColors.warning)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = warning,
+                            modifier = Modifier.weight(1f),
+                            fontSize = 11.sp,
+                            color = MeetColors.warning,
+                            lineHeight = 16.sp,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -1412,7 +1462,14 @@ private fun SafetyReportReceiptScreen(
                         )
                     }
                     Text(
-                        "Tu reporte y su hipótesis forense fueron proyectados con rigor Popperiano (falsabilidad) en la red científica descentralizada.",
+                        text = when {
+                            localProjectionWarning != null ->
+                                "El reporte se conservó, pero no se pudo completar la proyección científica local. La relación de evidencia requiere revisión; esto no confirma el hecho reportado."
+                            hasScientificHypothesis ->
+                                "La hipótesis que declaraste se guardó como propuesta en el índice científico local. No es una conclusión ni una confirmación del incidente; esta acción no acredita sincronización remota de la proyección."
+                            else ->
+                                "El reporte se registró como afirmación no corroborada. No se genera una hipótesis automática. La proyección científica de este flujo permanece local y no implica una confirmación remota."
+                        },
                         fontSize = 11.sp,
                         color = MeetColors.textSecondary,
                         lineHeight = 16.sp,
