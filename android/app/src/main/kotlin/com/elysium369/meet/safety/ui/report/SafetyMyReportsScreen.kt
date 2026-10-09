@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import com.elysium369.meet.R
 import com.elysium369.meet.safety.evidence.SafetyEvidenceEntity
+import com.elysium369.meet.safety.evidence.SafetyEvidenceStatusTone
+import com.elysium369.meet.safety.evidence.safetyEvidencePresentation
 import com.elysium369.meet.safety.ui.common.SafetyCategoryIcons
 import com.elysium369.meet.safety.ui.common.SafetyEmptyState
 import com.elysium369.meet.safety.ui.common.SafetyShimmer
@@ -476,7 +478,7 @@ private fun MyReportCard(
 @Composable
 private fun SyncStatusBadge(report: com.elysium369.meet.safety.data.local.SafetyReportEntity) {
     val (syncColor, syncLabel, syncIcon) = when (report.syncState) {
-        "SYNCED" -> Triple(MeetColors.neonGreen, "ONLINE", Icons.Filled.CloudDone)
+        "SYNCED" -> Triple(MeetColors.neonGreen, "RECIBIDO", Icons.Filled.CloudDone)
         "SYNCING" -> Triple(MeetColors.cyberCyan, "SYNCING", Icons.Filled.CloudSync)
         "FAILED" -> Triple(MeetColors.error, "FAILED", Icons.Filled.CloudOff)
         "QUEUED" -> Triple(Color(0xFFFFB020), "QUEUED", Icons.Filled.CloudUpload)
@@ -509,12 +511,13 @@ private fun SyncStatusBadge(report: com.elysium369.meet.safety.data.local.Safety
 @Composable
 private fun EvidenceChip(item: SafetyEvidenceEntity, onClick: () -> Unit = {}) {
     val (icon, label) = resolveEvidenceType(item.mimeType)
-    val uploadColor = when (item.uploadState) {
-        "RECEIVED" -> MeetColors.neonGreen
-        "UPLOADED" -> MeetColors.cyberCyan
-        "UPLOADING" -> Color(0xFFFFB020)
-        "FAILED" -> MeetColors.error
-        else -> MeetColors.textMuted
+    val evidenceStatus = safetyEvidencePresentation(item.uploadState, item.lastErrorCode)
+    val uploadColor = when (evidenceStatus.tone) {
+        SafetyEvidenceStatusTone.VERIFIED -> MeetColors.neonGreen
+        SafetyEvidenceStatusTone.IN_PROGRESS -> MeetColors.cyberCyan
+        SafetyEvidenceStatusTone.PENDING -> MeetColors.warning
+        SafetyEvidenceStatusTone.ERROR -> MeetColors.error
+        SafetyEvidenceStatusTone.NEUTRAL -> MeetColors.textMuted
     }
 
     Row(
@@ -540,7 +543,7 @@ private fun EvidenceChip(item: SafetyEvidenceEntity, onClick: () -> Unit = {}) {
                 color = MeetColors.textPrimary,
             )
             Text(
-                "${item.byteCount / 1024} KB · ${resolveUploadLabel(item.uploadState)}",
+                "${item.byteCount / 1024} KB · ${evidenceStatus.label}",
                 fontSize = 8.sp,
                 color = uploadColor,
             )
@@ -552,8 +555,10 @@ private fun EvidenceChip(item: SafetyEvidenceEntity, onClick: () -> Unit = {}) {
 private fun resolveLocalState(report: com.elysium369.meet.safety.data.local.SafetyReportEntity): Triple<ImageVector, Color, String> {
     // Priority: if synced online, show that. Otherwise show raw state.
     return when {
-        report.localState == "SYNCED_ONLINE" || report.syncState == "SYNCED" ->
-            Triple(Icons.Filled.CloudDone, Color(0xFF10B981), "Sincronizado mundialmente")
+        report.syncState == "SYNCED" ->
+            Triple(Icons.Filled.CloudDone, Color(0xFF10B981), "Recibido por el servidor")
+        report.localState == "SYNCED_ONLINE" ->
+            Triple(Icons.Filled.CloudUpload, Color(0xFFFFB020), "Estado legado; confirmar recibo")
         report.syncState == "SYNCING" ->
             Triple(Icons.Filled.CloudSync, Color(0xFF06B6D4), "Sincronizando...")
         report.syncState == "QUEUED" ->
@@ -573,16 +578,6 @@ private fun resolveEvidenceType(mimeType: String): Pair<ImageVector, String> = w
     mimeType.startsWith("audio/") -> Icons.Filled.AudioFile to "Audio"
     mimeType == "application/pdf" -> Icons.Filled.PictureAsPdf to "PDF"
     else -> Icons.Filled.AttachFile to "Archivo"
-}
-
-private fun resolveUploadLabel(state: String): String = when (state) {
-    "STAGED" -> "Pendiente"
-    "UPLOADING" -> "Subiendo..."
-    "UPLOADED" -> "Subido"
-    "RECEIVED" -> "Verificado ✓"
-    "RETRY" -> "Reintentando..."
-    "FAILED" -> "Error"
-    else -> state
 }
 
 private fun formatTimestamp(epochMs: Long): String = try {

@@ -108,3 +108,16 @@ Marcar una tarea solo cuando el cambio esté escrito. Compilación, ejecución d
 - [x] Añadir pruebas unitarias puras para la clasificación del estado del recibo.
 - [ ] Verificar compilación y pruebas en CI para el SHA resultante.
 - [ ] Instalar el APK de ese mismo SHA en un Android y comprobar visualmente el recibo y el modo institucional.
+
+
+## Slice J — Evidencia: recepción ≠ verificación
+
+- [x] Introducir un mapper común para el ciclo de evidencia (STAGED, UPLOADING, UPLOADED, RECEIVED, RETRY, VERIFIED, QUARANTINED, FAILED y estados desconocidos).
+- [x] Mostrar RECEIVED como “verificación de bytes pendiente”; solo VERIFIED indica que el verificador del servidor devolvió MATCH.
+- [x] Mostrar el estado de evidencia también en el detalle territorial.
+- [x] Eliminar “sincronizado mundialmente” y “atestación criptográfica” donde el código solo demuestra recepción/disponibilidad.
+- [x] Evitar presentar una fuente ciudadana como verificada solo por su categoría.
+- [x] Separar cifrado local y acceso a copias remotas controlado por servidor.
+- [x] Añadir pruebas unitarias para la presentación del ciclo de evidencia.
+- [ ] Ejecutar tests/compilación CI para el SHA resultante.
+- [ ] Verificar en un dispositivo el ciclo STAGED → RECEIVED → VERIFIED / QUARANTINED con datos de prueba autorizados.
