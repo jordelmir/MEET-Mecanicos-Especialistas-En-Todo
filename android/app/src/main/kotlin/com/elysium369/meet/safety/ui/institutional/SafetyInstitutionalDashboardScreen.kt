@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.elysium369.meet.safety.domain.SafetyReportCategory
 import com.elysium369.meet.safety.ui.PresentationMode
 import com.elysium369.meet.safety.ui.SafetyInstitutionalPresentationMode
 import com.elysium369.meet.safety.ui.common.SafetyHaptics
@@ -73,6 +74,7 @@ fun SafetyInstitutionalDashboardScreen(
     onBack: () -> Unit = {},
     onNavigateToMap: () -> Unit = {},
     onNavigateToReport: () -> Unit = {},
+    onNavigateToReportCategory: (SafetyReportCategory) -> Unit = { onNavigateToReport() },
     onNavigateToMyReports: () -> Unit = {},
     onNavigateToCases: () -> Unit = {},
     onNavigateToTimelines: () -> Unit = {},
@@ -599,7 +601,10 @@ fun SafetyInstitutionalDashboardScreen(
                     )
                 }
                 item {
-                    SafetyIncidentTypologyExplorer(onNavigateToReport = onNavigateToReport)
+                    SafetyIncidentTypologyExplorer(
+                        onNavigateToReport = onNavigateToReport,
+                        onNavigateToReportCategory = onNavigateToReportCategory,
+                    )
                 }
                 item {
                     SafetyEvidenceManagerPanel()

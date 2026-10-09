@@ -1815,6 +1815,9 @@ fun MeetApp(
                     },
                     onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
                     onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
+                    onNavigateToReportCategory = { category ->
+                        navController.navigate("${MeetDestinations.SAFETY_REPORT}?category=${category.name}")
+                    },
                     onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
                     onNavigateToCases = { navController.navigate(MeetDestinations.SAFETY_CASES) },
                     onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_TIMELINES) },
@@ -1840,6 +1843,9 @@ fun MeetApp(
                     onBack = { navController.backOrHome() },
                     onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
                     onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
+                    onNavigateToReportCategory = { category ->
+                        navController.navigate("${MeetDestinations.SAFETY_REPORT}?category=${category.name}")
+                    },
                     onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
                     onNavigateToCases = { navController.navigate(MeetDestinations.SAFETY_CASES) },
                     onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_TIMELINES) },
@@ -1864,7 +1870,21 @@ fun MeetApp(
                     onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
                 )
             }
-            composable(MeetDestinations.SAFETY_REPORT) {
+            composable(
+                route = "${MeetDestinations.SAFETY_REPORT}?category={category}&relation={relation}",
+                arguments = listOf(
+                    navArgument("category") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("relation") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) {
                 com.elysium369.meet.safety.ui.report.SafetyReportScreen(
                     onBack = { navController.popBackStack() },
                     onReportSubmitted = {

@@ -59,6 +59,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -202,6 +203,57 @@ fun SafetyReportScreen(
                     .padding(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
+                val activeCategory = state.category
+                if (activeCategory != null) {
+                    val visual = SafetyCategoryIcons.of(activeCategory)
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = visual.color.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, visual.color.copy(alpha = 0.45f)),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                visual.icon,
+                                contentDescription = null,
+                                tint = visual.color,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "TIPOLOGÍA ACTIVA",
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = visual.color,
+                                    letterSpacing = 1.sp,
+                                )
+                                Text(
+                                    activeCategory.label(),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MeetColors.cardBackground,
+                            ) {
+                                Text(
+                                    "Paso ${state.step + 1} de ${state.totalSteps + 1}",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MeetColors.cyberCyan,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+
                 AnimatedContent(
                     targetState = state.step,
                     transitionSpec = {

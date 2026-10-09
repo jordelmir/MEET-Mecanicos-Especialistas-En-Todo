@@ -56,6 +56,7 @@ data class IncidentTypologyDetail(
 fun SafetyIncidentTypologyExplorer(
     modifier: Modifier = Modifier,
     onNavigateToReport: () -> Unit = {},
+    onNavigateToReportCategory: (SafetyReportCategory) -> Unit = { onNavigateToReport() },
 ) {
     val typologies = remember {
         listOf(
@@ -314,7 +315,7 @@ fun SafetyIncidentTypologyExplorer(
             Spacer(Modifier.height(14.dp))
 
             Button(
-                onClick = onNavigateToReport,
+                onClick = { onNavigateToReportCategory(active.category) },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(10.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = visual.color),

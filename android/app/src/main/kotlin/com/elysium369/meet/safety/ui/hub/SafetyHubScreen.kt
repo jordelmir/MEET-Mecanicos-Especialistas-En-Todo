@@ -34,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.elysium369.meet.R
 import com.elysium369.meet.safety.domain.RemoteAvailability
+import com.elysium369.meet.safety.domain.SafetyReportCategory
 import com.elysium369.meet.safety.ui.common.PulseState
 import com.elysium369.meet.safety.ui.common.SafetyHaptics
 import com.elysium369.meet.safety.ui.common.SafetyOfflineBanner
@@ -78,6 +79,7 @@ enum class SafetyHubTab(
 fun SafetyHubScreen(
     onNavigateToMap: () -> Unit = {},
     onNavigateToReport: () -> Unit = {},
+    onNavigateToReportCategory: (SafetyReportCategory) -> Unit = { onNavigateToReport() },
     onNavigateToMyReports: () -> Unit = {},
     onNavigateToCases: () -> Unit = {},
     onNavigateToTimelines: () -> Unit = {},
@@ -398,6 +400,26 @@ fun SafetyHubScreen(
                 }
 
                 item {
+                    Text(
+                        "⚡ REPORTE RÁPIDO POR TIPOLOGÍA (1 TAP)",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Black,
+                        color = MeetColors.cyberCyan,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
+                    )
+                }
+
+                item {
+                    SafetyQuickTypologiesGrid(
+                        onSelectCategory = { category ->
+                            SafetyHaptics.selectionTick(view)
+                            onNavigateToReportCategory(category)
+                        },
+                    )
+                }
+
+                item {
                     SafetyHubCard(
                         title = "🏛️ Presentación Institucional (Diputados)",
                         subtitle = "Vista ejecutiva parlamentaria, 7 pilares y marco de soberanía nacional",
@@ -529,6 +551,7 @@ fun SafetyHubScreen(
                 item {
                     SafetyIncidentTypologyExplorer(
                         onNavigateToReport = onNavigateToReport,
+                        onNavigateToReportCategory = onNavigateToReportCategory,
                     )
                 }
             }
@@ -708,3 +731,93 @@ private fun SafetyHubCard(
         }
     }
 }
+
+@Composable
+private fun SafetyQuickTypologiesGrid(
+    onSelectCategory: (SafetyReportCategory) -> Unit,
+) {
+    val typologies = remember {
+        listOf(
+            Triple(SafetyReportCategory.EMERGENCY, "🚨 Emergencia", MeetColors.neonGreen),
+            Triple(SafetyReportCategory.HOMICIDE, "🔫 Homicidio", MeetColors.error),
+            Triple(SafetyReportCategory.MISSING_PERSON, "👤 Desaparición", MeetColors.cyberCyan),
+            Triple(SafetyReportCategory.DRUG_SALE_ACTIVITY, "💊 Narcotráfico", Color(0xFFBA68C8)),
+            Triple(SafetyReportCategory.ASSAULT_ROBBERY, "🔪 Asalto / Robo", MeetColors.warning),
+            Triple(SafetyReportCategory.VIOLENT_INCIDENT, "⚠️ Violencia", MeetColors.hotMagenta),
+            Triple(SafetyReportCategory.SUSPICIOUS_SITUATION, "👁️ Sospecha", Color(0xFF80D8FF)),
+            Triple(SafetyReportCategory.ZONE_INCIDENT, "🏘️ Territorial", MeetColors.electricBlue),
+        )
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (i in typologies.indices step 2) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val first = typologies[i]
+                QuickTypologyButton(
+                    modifier = Modifier.weight(1f),
+                    title = first.second,
+                    color = first.third,
+                    onClick = { onSelectCategory(first.first) },
+                )
+                if (i + 1 < typologies.size) {
+                    val second = typologies[i + 1]
+                    QuickTypologyButton(
+                        modifier = Modifier.weight(1f),
+                        title = second.second,
+                        color = second.third,
+                        onClick = { onSelectCategory(second.first) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickTypologyButton(
+    modifier: Modifier,
+    title: String,
+    color: Color,
+    onClick: () -> Unit,
+) {
+    Surface(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = MeetColors.cardBackground,
+        border = BorderStroke(1.dp, color.copy(alpha = 0.45f)),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                title,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.weight(1f),
+            )
+            Surface(
+                shape = CircleShape,
+                color = color.copy(alpha = 0.2f),
+                modifier = Modifier.size(20.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = color,
+                        modifier = Modifier.size(11.dp),
+                    )
+                }
+            }
+        }
+    }
+}
+
