@@ -1,176 +1,153 @@
-# Elysium Safety — Implementation Plan
-## Citizen safety, evidence integrity, territorial analysis and public-interest financial intelligence
+# Elysium Safety — Master Implementation Plan
+## Citizen Security, Evidence Integrity, Territorial Intelligence & Anti-Corruption Framework
 
-**Plan status:** Initial implementation baseline; not a production approval.
-**Baseline branch:** main
-**Baseline commit:** f1eb6de4aeb7d1441b4cf02ec3ef0df5e7216e63
-**Plan branch:** feat/elysium-safety-intelligence-plan
-**Product rule:** add capabilities; do not remove existing Elysium Vanguard AI OS modules.
+> **Operating Invariant (Charter & AGENTS.md):**  
+> *"Todo en uno. Siempre a más, nunca a menos. Al máximo nivel de la humanidad."*  
+> **Evidence ≠ Guilt · Claim ≠ Conviction · Anomaly ≠ Crime · A report is not proof · Visible personal wealth alone is never evidence of illegality.**
 
-## 1. Product boundaries
+---
 
-Elysium Safety is the institutional-facing safety and evidence experience. For the deputies' presentation, show only safety reporting, evidence provenance, timelines, controlled territorial views and the institutional-collaboration proposal. This is a presentation/demo scope, not a mandate to delete automotive, mobility, marketplace, learning or other existing product capabilities.
+## 1. Executive Strategy & Dual-Track Separation
 
-Global Financial Intelligence is a separate, future investigative domain within the broader Safety product. It must use lawfully accessible sources, source-backed relationships, explainable signals and mandatory human review. The citizen-safety pilot must not depend on an unfinished financial-intelligence subsystem.
+Elysium Safety addresses two complementary domains:
 
-Non-negotiable distinctions:
-- REPORT != FACT.
-- CLAIM != EVENT.
-- EVENT != CASE.
-- HASH INTEGRITY != TRUTH.
-- CORRELATION != CAUSATION.
-- ANOMALY != CRIME.
-- VISIBLE WEALTH != EVIDENCE OF ILLEGALITY.
-- LOCAL INTENT != REMOTE SUCCESS.
-- AI OUTPUT != AUTHORITATIVE STATE.
+1. **Track 1: Citizen Security & Territorial Evidence (Institutional Track for Deputies):**
+   - Structured incident reporting, forensic media custody (`SAFETY-CUSTODY-V2`), timeline chronology, spatial intelligence, and institutional gateway with Costa Rican authorities (Fuerza Pública, OIJ, Ministerio Público, Poder Judicial).
+   - Dedicated **Institutional Presentation Mode** in Android for parliamentary demonstrations, presenting only security and evidence workflows without exposing automotive/mobility modules, while preserving 100% of the underlying codebase.
+2. **Track 2: Public-Interest Financial Intelligence & Anomaly Engine (Investigative Track):**
+   - Lawful ingestion of authentic public procurement (Costa Rica SICOP), corporate registries, official audits, and sanctions lists.
+   - Explainable deterministic signals, graph relations, strict entity resolution without weak merges, and mathematical safeguards against personal wealth bias.
 
-## 2. Baseline already found in the repository
+---
 
-The inspected main commit contains:
-- Safety Constitution and Authority Map at docs/safety/SAFETY_CONSTITUTION.md and docs/safety/AUTHORITY_MAP.md.
-- A threat model at docs/safety/THREAT_MODEL.md.
-- Android Safety surfaces and repositories beneath android/app/src/main/kotlin/com/elysium369/meet/safety/.
-- Scientific-forensic models and custody code beneath android/app/src/main/kotlin/com/elysium369/meet/safety/science/.
-- Safety-specific PostgreSQL migrations, including scientific-core, custody parity, institutional gateway, public map/projection, publication and retention changes.
-- PostgreSQL and Android/TypeScript safety test suites and CI workflows.
-- An existing financial aggregate sandbox at tools/safety-financial-sandbox-demo.ts and lib/safety/fi_analytics/FinancialCorrelationSandbox.ts. The demo labels its data SYNTHETIC and productionVerified=false; it is not evidence of a production source adapter.
-- A financial-observation safety gate added in this branch at android/app/src/main/kotlin/com/elysium369/meet/safety/science/domain/FinancialObservationReviewPolicy.kt, with negative-invariant tests. This is a domain policy contract, not an end-to-end financial-intelligence feature and is not yet wired to an ingestion/UI workflow.
+## 2. 16-Phase Master Engineering Directive
 
-These are repository observations. They do not prove that live Supabase deployment, every RPC/RLS boundary, external-source ingestion, institutional integration or production-scale behavior has been executed.
+```mermaid
+flowchart TD
+    P0["Phase 0: Baseline Forensics & Reconciliation"] --> P1["Phase 1: Product & Threat Modeling"]
+    P1 --> P2["Phase 2: Domain Model & Epistemic Contracts"]
+    P2 --> P3["Phase 3: Lawful Source Ingestion (SICOP)"]
+    P3 --> P4["Phase 4: Relational Entity Graph Engine"]
+    P4 --> P5["Phase 5: Deterministic Anomaly Engine"]
+    P5 --> P6["Phase 6: AI Investigation Assistant Sandbox"]
+    P6 --> P7["Phase 7: PostgreSQL & Supabase Security (RLS)"]
+    P7 --> P8["Phase 8: Android Presentation Mode & Workspace"]
+    P8 --> P9["Phase 9: Forensic Integrity & Parity Harness"]
+    P9 --> P10["Phase 10: Investigative Case Lifecycle"]
+    P10 --> P11["Phase 11: Institutional & Parliamentary Briefs"]
+    P11 --> P12["Phase 12: Interoperability & Country Adapters"]
+    P12 --> P13["Phase 13: Sustainable B2B Governance"]
+    P13 --> P14["Phase 14: Phased Vertical Slices"]
+    P14 --> P15["Phase 15: Automated Acceptance Matrix"]
+    P15 --> P16["Phase 16: Production Verification Gates"]
+```
 
-## 3. Workstream A — reconcile the source of truth
+### Phase 0: Baseline Forensics & Reconciliation
+- Pin repository state to exact HEAD SHA `f1eb6de4...` / `6ef0fef5...`.
+- Reconcile status artifacts (`ELYSIUM_SAFETY_STATUS.json` vs `PRODUCTION-ATTESTATION.md`).
+- Document real call sites for `ScientificEntity`, `CustodyProtocolV2`, and `AssertionStateMachine`.
+- *Status:* **COMPLETED** (Recorded in `BASELINE_AUDIT.md`).
 
-1. Pin each audit and test result to an exact Git SHA, build artifact hash, test command and environment.
-2. Reconcile docs/audits/ELYSIUM-SAFETY-PRODUCTION-ATTESTATION.md with ELYSIUM_SAFETY_STATUS.json and the currently checked-out commit.
-3. Do not overwrite status fields with remembered results. Distinguish CODED, UNIT_TESTED, INTEGRATED, DEPLOYED, E2E_VERIFIED, PHYSICALLY_VERIFIED, INDEPENDENTLY_VERIFIED, UNKNOWN and NOT_EXECUTED.
-4. Run the actual safety CI, Android unit tests, PostgreSQL migration/RLS tests and device checks from a controlled worktree; record logs and commit identities.
-5. Keep production NO-GO wherever mandatory live infrastructure, backup/restore or external delivery evidence remains NOT_EXECUTED.
+### Phase 1: Product Scope & Threat Model
+- Delineate boundaries: public-interest investigation vs civilian surveillance.
+- Forbid neighbor dossiers, residential pinpoints, and wealth-based criminalization.
+- Implement defense in depth against hostile document prompt injection and Sybil report networks.
+- *Status:* **COMPLETED** (Recorded in `THREAT_MODEL.md`).
 
-## 4. Workstream B — institutional safety experience
+### Phase 2: Domain Model & Epistemic Contract
+- Unify truth states: `OBSERVED`, `AUTHORITATIVE`, `DERIVED`, `ESTIMATED`, `SIMULATED`, `UNKNOWN`.
+- Formulate entities: `InvestigativeCase`, `SourceRecord`, `EconomicEntity`, `EntityRelationship`, `FinancialObservation`, `InvestigativeSignal`, `EvidenceReference`, `ReviewDecision`.
+- Map directly to existing Room schema 90 and PostgreSQL migrations.
+- *Status:* **COMPLETED** (Recorded in `DOMAIN_MODEL.md`).
 
-Audit then complete these vertical flows against the current contracts:
-1. Citizen creates a structured report with occurrence time, recording time, location accuracy, source type and explicit unknowns.
-2. Original media/document is associated with stable IDs, content integrity metadata and provenance.
-3. The report is persisted locally as local intent and synchronized through the existing command/outbox path where applicable.
-4. UI shows pending/offline/error until the server returns an authoritative receipt.
-5. Reviewer can distinguish the reporter's claim from source-verified and authority-confirmed records.
-6. Timeline links events, claims, source records and evidence without elevating hypotheses automatically.
-7. Map projection respects publication authority and privacy-safe location granularity.
-8. Corrections, withdrawals, disputes and new contradictory evidence preserve the required history.
-9. Institutional sharing is purpose-limited, permission-checked, auditable and recipient-specific.
+### Phase 3: Evidence Ingestion & Lawful Adapters
+- Interface boundary declaring legal provenance, rate limits, and error classification.
+- Byte-exact SHA-256 computation of original incoming payloads.
+- Reference adapter for Costa Rica SICOP (*Ley N.° 9986*).
+- *Status:* **SPECIFIED & IMPLEMENTED** (Recorded in `SOURCE_ADAPTER_CONTRACT.md` and `SicopProcurementSourceAdapter.kt`).
 
-Do not infer that a flow is complete because a screen, entity, migration or README entry exists. Trace the full path from UI through repository/outbox, RPC, server authority, database policy and resulting projection.
+### Phase 4: Graph & Cross-Reference Engine
+- Relational PostgreSQL schema with indexed B-Trees and recursive CTEs (ADR-001).
+- Conservative entity resolution: require matching Tax ID / Cédula Jurídica; forbid merging solely on name similarity.
+- Explainable provenance for every edge in the graph.
 
-## 5. Workstream C — evidence integrity and privacy
+### Phase 5: Explainable Deterministic Anomaly Engine
+- Deterministic rules before machine learning (ADR-004).
+- Rule 1: `ProcurementConcentrationRule` (uncompetitive award concentration).
+- Mandatory inclusion of legitimate alternative hypotheses (emergency decrees, sole supplier).
+- Mandatory missing data handling (`INSUFFICIENT_DATA`).
+- Rejection of visible wealth observations (`FinancialObservationReviewPolicy`).
 
-- Reuse existing canonical hashing, Ed25519, Merkle, source-provenance and cross-runtime contracts where verified.
-- Preserve originals and mark derivatives/transcripts/summaries as derived artifacts.
-- Treat a hash as a byte-integrity check, not a truth verdict.
-- Treat a signature as a verifiable relationship to a key, not proof of the real-world claim.
-- Do not claim legal admissibility or court certification without jurisdiction-specific validation.
-- Keep reporter identity, exact sensitive locations and private source material out of public projections.
-- Audit EXIF, filenames, thumbnails, embedded metadata, exports and AI-generated summaries for leakage.
-- Test RLS and authorization at the database/API boundary, not only in Android UI.
+### Phase 6: AI Investigation Assistant Boundaries
+- AI acts solely as an analyst assistant (ADR-002).
+- Permitted: summarization, timeline drafting, finding contradictions.
+- Prohibited: promoting epistemic states, altering evidence, assigning criminal scores, or executing tools from untrusted text.
 
-## 6. Workstream D — financial intelligence as a separate extension
+### Phase 7: PostgreSQL and Supabase Security
+- Multi-tenant isolation with server-enforced Row-Level Security (RLS).
+- Zero client-side role authority; identity bound to Supabase auth claims.
+- Private evidence storage with short-lived signed URLs.
+- Append-only immutability triggers for evidentiary records.
 
-### Allowed initial source classes
-- Public procurement and awards.
-- Legally accessible company/corporate registries.
-- Official audit findings.
-- Published judicial/regulatory records.
-- Official sanctions lists.
-- Authorized datasets and lawfully submitted source material.
+### Phase 8: Android Integration & Institutional Presentation
+- Dedicated Android Presentation Mode (`PresentationMode.INSTITUTIONAL_DEPUTIES`).
+- Renders Citizen Reporting, Evidence Custody, Investigative Timeline, and Territorial Map without displaying mechanics or rides.
+- Preserves 100% of the entire codebase and modules.
 
-### Initial architecture
-Start with existing Safety scientific entities, claim/evidence relations and PostgreSQL relational tables. Do not create duplicate truth-state enums, parallel custody systems or a graph database until benchmarked needs justify it.
+### Phase 9: Forensic Integrity & Parity Harness
+- Protocol `SAFETY-CUSTODY-V2`.
+- Byte-exact canonical JSON serialization.
+- Cross-runtime parity verified across TypeScript and Kotlin (`tests/parity/ci-verify.sh`).
+- Ed25519 digital signatures and Merkle inclusion proofs.
 
-Each source record must retain issuer, source URL/identifier when applicable, publication/retrieval times, jurisdiction, collection method, permitted use, raw/derived distinction, content hash where available and known coverage limitations.
+### Phase 10: Investigative Lifecycle & Governance
+- Life stages: `DRAFT` $\to$ `SUBMITTED` $\to$ `SOURCE_VALIDATION` $\to$ `CORROBORATION` $\to$ `ANALYST_REVIEW` $\to$ `EDITORIAL_REVIEW` $\to$ `DISCLOSURE_APPROVED` $\to$ `CLOSED_OR_CORRECTED`.
+- Contestability: named entities may attach contradictory evidence; no silent deletions.
 
-Each relationship must be source-backed or explicitly marked as an unresolved hypothesis. Similar names, addresses, surnames or visual wealth must not automatically merge identities.
+### Phase 11: Institutional & Parliamentary Briefs
+- Structured brief for the Deputies of Costa Rica (`INSTITUTIONAL_BRIEF_ES.md`).
+- Clear classification: DEMONSTRATED NOW vs REQUIRES PILOT vs FUTURE EXTENSION.
+- Formal meeting opening statement.
 
-### Signal policy
-Implement deterministic, explainable rules before machine learning. A signal must include rule/version, input references, time window, formula, data-coverage requirements, false-positive modes, alternative explanations and review status. It may be eligible for human review; it must not output a criminality verdict or automatically trigger public disclosure.
+### Phase 12: Globalization & Interoperability
+- Country-specific data adapters (Costa Rica SICOP, Registro Nacional, CGR).
+- Normalization of currencies (ISO-4217 integer minor units) and dates.
 
-The first implemented guard in this branch ensures that visible-wealth observations alone cannot qualify a financial observation for investigative human review. It requires lawful, verified, discrepancy-bearing documentary sources from at least two independent source groups to return the limited disposition ELIGIBLE_FOR_HUMAN_REVIEW. This is only a policy primitive until wired, reviewed and tested end to end.
+### Phase 13: Sustainable Commercialization & Ethics
+- B2B model: newsroom workspaces, auditor/compliance seats, procurement risk monitoring.
+- Zero monetization of whistleblower identities, private dossiers, or paid suppression.
 
-### AI boundary
-AI can extract candidate entities, summarize records, identify contradictions and suggest competing hypotheses. Every factual statement must link to sources. Model output cannot modify original evidence, grant access, approve disclosure or promote epistemic states.
+### Phase 14: Vertical Slices & Execution Order
+- **Slice A:** Baseline audit, threat model, domain contracts, ADRs.
+- **Slice B:** Policy contracts & wealth-only negative gate (`FinancialObservationReviewPolicy`).
+- **Slice C:** Costa Rica SICOP Source Adapter with canonical hashing.
+- **Slice D:** Procurement concentration anomaly rule with alternative explanations.
+- **Slice E:** Android institutional presentation navigation mode.
+- **Slice F:** Full automated verification & parity execution.
 
-## 7. Workstream E — Costa Rica pilot
+### Phase 15: Required Acceptance Matrix
+- Test 1: Wealth-only observation produces `INSUFFICIENT_EVIDENCE`.
+- Test 2: Unverified/unauthorized sources rejected.
+- Test 3: Multiple copies of single source do not count as independent corroboration.
+- Test 4: Similar entity names without matching tax ID are not merged.
+- Test 5: Hash mismatch is detected; matching hash does not prove factual truth.
+- Test 6: Offline report does not synthesize remote server receipt.
+- Test 7: Institutional presentation mode filters out automotive/mobility routes.
 
-Start with a bounded public-procurement case study using lawfully accessible authentic records, not a fabricated corruption case.
+### Phase 16: Production Verification Gates
+- No item marked PASS without physically reproducible execution command.
+- Verified test reports archived with SHA commit bindings.
 
-Acceptance sequence:
-1. Import one real public award with origin and retrieval metadata.
-2. Resolve the company using a reliable identifier; ambiguous matches remain unresolved.
-3. Link a second public source only when the relationship can be demonstrated.
-4. Run one deterministic signal only if required fields and coverage are present.
-5. Present source records, missing data, alternative explanations and evidence contradicting the hypothesis.
-6. Generate a restricted case bundle with hashes/references and review history.
-7. Have an independent second reviewer reproduce the result.
-8. Demonstrate that an unauthorized user cannot read or export the restricted case.
-9. If no anomaly is supported, report no supported signal; do not invent a finding.
+---
 
-## 8. Workstream F — acceptance tests
+## 3. Companion Deliverables Registry
 
-Required negative and integration tests:
-- Wealth/lifestyle-only observation cannot create a criminal finding, public alert or illicit-wealth inference.
-- Missing, unauthorized or unverified source material cannot satisfy the evidence gate.
-- One source copied by multiple outlets is not multiple independent corroboration.
-- Entity name similarity never silently merges two legal entities.
-- Every graph edge resolves to a source or is explicitly hypothetical.
-- A model-generated relationship cannot bypass human review.
-- An offline report cannot show a remote receipt.
-- Failed RPCs cannot mutate authoritative UI state.
-- Unauthorized tenants cannot read, modify, enumerate or export another tenant's private case.
-- Public maps/exports do not leak exact sensitive locations or source identity.
-- Corrections and contradictions remain auditable.
-- Hash mismatch is detected, while a matching hash is never described as proving truth.
-- Existing mobility, automotive, marketplace, learning, parity, migrations and Safety regression checks remain intact.
-
-## 9. Phased execution and release gates
-
-| Phase | Deliverable | Exit condition |
-|---|---|---|
-| 0. Baseline | Exact-head audit and reconciled status | Evidence linked to current SHA |
-| 1. Policy contracts | Truth/provenance/wealth-only negative gate | Unit tests pass in CI |
-| 2. Safety vertical slice | Report → evidence → server receipt → timeline/map projection | Integration tests prove authority and privacy |
-| 3. Institutional review | Restricted sharing, audit, correction/withdrawal | Authorization and RLS tests pass |
-| 4. One source adapter | Real authorized procurement records | Reproducible imports and provenance tests |
-| 5. Relationship model | Temporal, source-backed entity links | Identity-resolution adversarial tests pass |
-| 6. One deterministic signal | Explainable result and alternative hypotheses | Rule tests and independent replication pass |
-| 7. Android workspace | Case/source/timeline/review screens | Device tests; offline and failure states verified |
-| 8. AI support | Source-grounded summaries and contradiction discovery | Prompt-injection and human-review tests pass |
-| 9. Pilot | Limited institutional/journalistic evaluation | Participants, legal basis, metrics and incidents documented |
-| 10. Production | Operations, monitoring, backups, recovery, release attestation | No mandatory gate remains NOT_EXECUTED |
-
-Do not skip a phase by relaxing prior gates. Do not run live destructive tests against production. Use staging, explicitly authorized test accounts, and synthetic fixtures for adversarial cases.
-
-## 10. Monetization and governance
-
-Validate buyer demand before forecasting revenue. Candidates:
-- Team subscriptions for investigative newsrooms.
-- Licenses for auditors, integrity organizations and eligible public institutions.
-- Corporate due-diligence workspaces using lawful source data.
-- Procurement monitoring and authorized source/API integrations.
-
-Never sell private source identities, restricted case files, unverified accusations or paid suppression of findings. Contracts must state purpose limitation, access boundaries, retention, incident response, correction process and data-processing responsibilities.
-
-## 11. Institutional presentation boundary
-
-The deputies' demo and one-page brief should expose only Elysium Safety functions relevant to incident reports, evidence, provenance, timeline, privacy-preserving territorial views and the proposed pilot. Do not navigate into automotive, mobility, marketplace or other unrelated modules. This is not a destructive product scope reduction.
-
-Show each claim using one of three categories:
-- DEMONSTRATED NOW — accompanied by reproducible evidence.
-- REQUIRES PILOT/INSTITUTIONAL INTEGRATION — not yet confirmed in the target environment.
-- FUTURE EXTENSION — including global financial intelligence unless a real source-backed workflow is implemented and verified.
-
-## 12. Change-management requirements
-
-- Work on a feature branch; never push directly to protected main.
-- Review AGENTS.md, product vision, Safety Constitution, Authority Map and threat model.
-- Keep migrations additive, versioned and compatible; do not reimplement existing tables without schema evidence.
-- Include tests with each code change.
-- Provide changed-file summary, exact test commands, results, unverified gates and residual risks.
-- A written plan or a successful compile is not proof of production readiness.
+| Document | Purpose |
+|---|---|
+| `docs/safety/global-financial-intelligence/BASELINE_AUDIT.md` | Audit of exact HEAD, test evidence, and status reconciliation |
+| `docs/safety/global-financial-intelligence/THREAT_MODEL.md` | Privacy perimeter, adversary analysis, whistleblower safety |
+| `docs/safety/global-financial-intelligence/DOMAIN_MODEL.md` | Formal entity specifications and epistemic state contracts |
+| `docs/safety/global-financial-intelligence/SOURCE_ADAPTER_CONTRACT.md` | Lawful public records ingestion and SICOP schema |
+| `docs/safety/global-financial-intelligence/DATA_PROTECTION_AND_DISCLOSURE.md` | Data classification, two-person rule, metadata stripping |
+| `docs/safety/global-financial-intelligence/ARCHITECTURE_DECISIONS.md` | ADR-001 through ADR-005 technical rationales |
+| `docs/safety/global-financial-intelligence/INSTITUTIONAL_BRIEF_ES.md` | Complete Spanish brief for the Legislative Assembly of Costa Rica |
