@@ -157,9 +157,10 @@ flowchart TD
 
 ## 3. Companion Deliverables Registry
 
-| Document | Purpose |
-|---|---|
-| `docs/safety/global-financial-intelligence/BASELINE_AUDIT.md` | Audit of exact HEAD, test evidence, and status reconciliation |
+| `docs/safety/global-financial-intelligence/MASTER_DIRECTIVE_ADDENDUM.md` | Addendum obligatorio de seguridad ciudadana, evidencia digital, inteligencia territorial y límites legales |
+| `docs/safety/global-financial-intelligence/BASELINE_AUDIT.md` | Audit of exact HEAD, test evidence, end-to-end trace, and capability classification matrix |
+| `docs/safety/global-financial-intelligence/AUTHORIZED_PUBLIC_CLAIMS.md` | Marco de afirmaciones públicas autorizadas, demostradas vs piloto vs prohibidas |
+| `docs/safety/global-financial-intelligence/COSTA_RICA_PILOT_PLAN.md` | Protocolo de piloto controlado verificable con OIJ, Fuerza Pública y Fiscalía en Costa Rica |
 | `docs/safety/global-financial-intelligence/THREAT_MODEL.md` | Privacy perimeter, adversary analysis, whistleblower safety |
 | `docs/safety/global-financial-intelligence/DOMAIN_MODEL.md` | Formal entity specifications and epistemic state contracts |
 | `docs/safety/global-financial-intelligence/SOURCE_ADAPTER_CONTRACT.md` | Lawful public records ingestion and SICOP schema |

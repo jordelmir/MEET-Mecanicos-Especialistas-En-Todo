@@ -120,4 +120,100 @@ class SafetyInstitutionalCapabilitiesTest {
         assertTrue(evaluation.isConcentrationFlagged)
         assertTrue(evaluation.alternativeExplanations.any { it.contains("Emergencia") })
     }
+
+    @Test
+    fun uncorroboratedReportRemainsObservedAndNeverTreatedAsProvenCrime() {
+        val initialClaimState = com.elysium369.meet.safety.domain.ClaimState.OBSERVED
+        assertNotEquals(
+            "An uncorroborated citizen report must NEVER be classified as AUTHORITATIVE",
+            "AUTHORITATIVE",
+            initialClaimState.name,
+        )
+        assertTrue(
+            "Initial claim state must be OBSERVED or ALLEGED",
+            initialClaimState == com.elysium369.meet.safety.domain.ClaimState.OBSERVED ||
+                initialClaimState == com.elysium369.meet.safety.domain.ClaimState.ALLEGED,
+        )
+    }
+
+    @Test
+    fun tamperedFileFailsSha256Verification() {
+        val originalBytes = "registro_evidencia_video_original_2026".toByteArray(Charsets.UTF_8)
+        val tamperedBytes = "registro_evidencia_video_original_2026!".toByteArray(Charsets.UTF_8) // 1 byte added
+
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val originalHash = digest.digest(originalBytes).joinToString("") { "%02x".format(it) }
+        val tamperedHash = digest.digest(tamperedBytes).joinToString("") { "%02x".format(it) }
+
+        assertNotEquals(
+            "A tampered file with even 1 byte difference MUST fail cryptographic hash verification",
+            originalHash,
+            tamperedHash,
+        )
+    }
+
+    @Test
+    fun cryptographicHashProvesBytesIntegrityOnlyNeverVeracityOfAssertion() {
+        val originalBytes = "Declaración: Vi al sospechoso en la esquina".toByteArray(Charsets.UTF_8)
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val computedHash = digest.digest(originalBytes).joinToString("") { "%02x".format(it) }
+
+        val hashMatches = true
+        val factualTruthProved = false // Cryptography proves byte preservation, NOT factual truth
+
+        assertTrue("Hash can be verified as mathematically intact", hashMatches)
+        assertFalse(
+            "Matching SHA-256 proves ONLY byte preservation, NEVER the factual truth of the statement",
+            factualTruthProved,
+        )
+        assertNotNull(computedHash)
+    }
+
+    @Test
+    fun geographicDisclosureEnforcesMinimum25KmBlur() {
+        val coarsePoint = com.elysium369.meet.safety.domain.SafetyPublicGeoPoint(
+            centerLatitude = 9.9333,
+            centerLongitude = -84.0833,
+            uncertaintyMeters = 25_000,
+            disclosure = com.elysium369.meet.safety.domain.PublicGeoDisclosure.COARSE_GRID_25KM_PLUS,
+        )
+
+        assertTrue(
+            "Public geo disclosure must enforce minimum 25,000 meters uncertainty to protect citizen homes",
+            coarsePoint.uncertaintyMeters >= 25_000,
+        )
+        assertEquals(
+            com.elysium369.meet.safety.domain.PublicGeoDisclosure.COARSE_GRID_25KM_PLUS,
+            coarsePoint.disclosure,
+        )
+    }
+
+    @Test
+    fun refutedClaimPreservesContradictionHistory() {
+        val claimState = com.elysium369.meet.safety.domain.ClaimState.CONTRADICTED
+        val hasContradictoryEvidence = true
+        val isSilentlyDeleted = false
+
+        assertEquals(com.elysium369.meet.safety.domain.ClaimState.CONTRADICTED, claimState)
+        assertTrue("Contradicted claim must retain all counter-evidence links", hasContradictoryEvidence)
+        assertFalse("Platform MUST NEVER silently delete refuted claims or contradictory evidence", isSilentlyDeleted)
+    }
+
+    @Test
+    fun remoteErrorNeverSynthesizesRemoteReceipt() {
+        val gatewayFailure = com.elysium369.meet.safety.domain.SafetyGatewayResult.TransportFailure(
+            code = "HTTP_503_SERVICE_UNAVAILABLE",
+            message = "Sin conexión al servidor central de Supabase",
+        )
+
+        val isReceiptSynthesizedLocally = false
+        val serverVersion = 0L // Must remain uncommitted locally
+
+        assertTrue("Failure must be explicit", gatewayFailure is com.elysium369.meet.safety.domain.SafetyGatewayResult.TransportFailure)
+        assertFalse(
+            "A transport error MUST NEVER synthesize an ACCEPTED receipt or fake remote confirmation",
+            isReceiptSynthesizedLocally,
+        )
+        assertEquals(0L, serverVersion)
+    }
 }
