@@ -400,6 +400,39 @@ fun SafetyHubScreen(
                 }
 
                 item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                        border = BorderStroke(1.dp, Color(0xFFFFB300).copy(alpha = 0.5f)),
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.Top,
+                        ) {
+                            Text("⚖️", fontSize = 18.sp)
+                            Spacer(Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    "SALVAGUARDA CONSTITUCIONAL & DEBIDO PROCESO",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFFB300),
+                                    letterSpacing = 0.5.sp,
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "Evidencia ≠ Culpabilidad · Anomalía ≠ Delito. La posesión de bienes de alto valor no constituye delito por sí misma. Elysium Safety estructura y preserva la verdad fáctica sin emitir condenas ni vulnerar el debido proceso.",
+                                    fontSize = 11.sp,
+                                    color = MeetColors.textSecondary,
+                                    lineHeight = 15.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
                     Text(
                         "⚡ REPORTE RÁPIDO POR TIPOLOGÍA (1 TAP)",
                         style = MaterialTheme.typography.labelSmall,
@@ -746,6 +779,9 @@ private fun SafetyQuickTypologiesGrid(
             Triple(SafetyReportCategory.VIOLENT_INCIDENT, "⚠️ Violencia", MeetColors.hotMagenta),
             Triple(SafetyReportCategory.SUSPICIOUS_SITUATION, "👁️ Sospecha", Color(0xFF80D8FF)),
             Triple(SafetyReportCategory.ZONE_INCIDENT, "🏘️ Territorial", MeetColors.electricBlue),
+            Triple(SafetyReportCategory.CORRUPTION_PUBLIC_PROCUREMENT, "🏛️ SICOP / Compras", Color(0xFFFFB300)),
+            Triple(SafetyReportCategory.CORPORATE_OPACITY_CONFLICT, "🏢 Red Corporativa", Color(0xFFAB47BC)),
+            Triple(SafetyReportCategory.FINANCIAL_FRAUD, "💰 Fraude Financiero", Color(0xFF00E676)),
         )
     }
 

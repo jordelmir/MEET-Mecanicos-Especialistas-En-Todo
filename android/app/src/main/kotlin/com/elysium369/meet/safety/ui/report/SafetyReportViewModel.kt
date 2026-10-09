@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import com.elysium369.meet.safety.science.data.SafetyScienceDao
 import com.elysium369.meet.safety.science.data.SciClaimEntity
+import com.elysium369.meet.safety.science.data.SciEntityEntity
 import com.elysium369.meet.safety.science.data.SciEventEntity
 import com.elysium369.meet.safety.science.data.SciHypothesisEntity
 import kotlinx.coroutines.delay
@@ -78,9 +79,23 @@ data class SafetyReportUiState(
     val nullHypothesis: String = "",
     val falsificationCriteria: String = "",
     val factualClaim: String = "",
+    // V6 — Financial Intelligence, SICOP & Corporate Integrity
+    val sicopProcedureNumber: String = "",
+    val economicEntityName: String = "",
+    val economicEntityTaxId: String = "",
+    val contractAmountMajor: String = "",
+    val contractCurrency: String = "CRC",
+    val officialDocumentSource: String = "",
 ) {
     /** Whether victim demographics step should be shown (only for homicide). */
     val showVictimStep: Boolean get() = category == SafetyReportCategory.HOMICIDE
+
+    /** Whether financial intelligence & SICOP investigation section is active for this category. */
+    val isFinancialCategory: Boolean get() = category in setOf(
+        SafetyReportCategory.CORRUPTION_PUBLIC_PROCUREMENT,
+        SafetyReportCategory.CORPORATE_OPACITY_CONFLICT,
+        SafetyReportCategory.FINANCIAL_FRAUD,
+    )
 }
 
 @HiltViewModel
@@ -305,6 +320,30 @@ class SafetyReportViewModel @Inject constructor(
         _state.update { it.copy(factualClaim = value) }
     }
 
+    fun updateSicopProcedureNumber(value: String) {
+        _state.update { it.copy(sicopProcedureNumber = value.take(80)) }
+    }
+
+    fun updateEconomicEntityName(value: String) {
+        _state.update { it.copy(economicEntityName = value.take(120)) }
+    }
+
+    fun updateEconomicEntityTaxId(value: String) {
+        _state.update { it.copy(economicEntityTaxId = value.take(40)) }
+    }
+
+    fun updateContractAmountMajor(value: String) {
+        _state.update { it.copy(contractAmountMajor = value.filter { c -> c.isDigit() || c == '.' }.take(20)) }
+    }
+
+    fun updateContractCurrency(value: String) {
+        _state.update { it.copy(contractCurrency = value.take(10)) }
+    }
+
+    fun updateOfficialDocumentSource(value: String) {
+        _state.update { it.copy(officialDocumentSource = value.take(300)) }
+    }
+
     fun submit() {
         commitVideoInput()
         val snapshot = _state.value
@@ -326,16 +365,32 @@ class SafetyReportViewModel @Inject constructor(
             snapshot.narrative.trim()
         }
 
-        // Ensure video URLs are permanently preserved in narrative for worldwide read
-        val finalNarrative = if (allVideoUrls.isNotEmpty()) {
-            val missingInNarrative = allVideoUrls.filterNot { baseNarrative.contains(it) }
-            if (missingInNarrative.isNotEmpty()) {
-                baseNarrative + "\n\n[VIDEOS ADJUNTOS]\n" + missingInNarrative.joinToString("\n")
-            } else {
-                baseNarrative
-            }
+        val financialSummary = buildString {
+            if (snapshot.sicopProcedureNumber.isNotBlank()) append("\n- Procedimiento SICOP: ").append(snapshot.sicopProcedureNumber.trim())
+            if (snapshot.economicEntityName.isNotBlank()) append("\n- Entidad / Empresa: ").append(snapshot.economicEntityName.trim())
+            if (snapshot.economicEntityTaxId.isNotBlank()) append("\n- Cédula Jurídica / ID Fiscal: ").append(snapshot.economicEntityTaxId.trim())
+            if (snapshot.contractAmountMajor.isNotBlank()) append("\n- Monto Referencial: ").append(snapshot.contractCurrency).append(" ").append(snapshot.contractAmountMajor.trim())
+            if (snapshot.officialDocumentSource.isNotBlank()) append("\n- Fuente Oficial / Expediente: ").append(snapshot.officialDocumentSource.trim())
+        }
+
+        val narrativeWithFinancial = if (financialSummary.isNotBlank()) {
+            "[INTELIGENCIA FINANCIERA & CONTRATACIÓN PÚBLICA]\n" +
+            "Aviso de Salvaguarda: La tenencia de vehículos de alta gama o bienes de alto valor no constituye delito por sí misma.$financialSummary\n\n" +
+            baseNarrative
         } else {
             baseNarrative
+        }
+
+        // Ensure video URLs are permanently preserved in narrative for worldwide read
+        val finalNarrative = if (allVideoUrls.isNotEmpty()) {
+            val missingInNarrative = allVideoUrls.filterNot { narrativeWithFinancial.contains(it) }
+            if (missingInNarrative.isNotEmpty()) {
+                narrativeWithFinancial + "\n\n[VIDEOS ADJUNTOS]\n" + missingInNarrative.joinToString("\n")
+            } else {
+                narrativeWithFinancial
+            }
+        } else {
+            narrativeWithFinancial
         }
 
         viewModelScope.launch {
@@ -361,14 +416,42 @@ class SafetyReportViewModel @Inject constructor(
                     ),
                 )
 
-                // Project into Room Scientific Platform (Hypothesis, Popperian Falsification, Factual Claim, Event)
+                // Project into Room Scientific Platform (Entity, Hypothesis, Popperian Falsification, Factual Claim, Event)
                 val now = System.currentTimeMillis()
                 val occurredMs = snapshot.occurredAtIso?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: now
                 val shortId = if (reportId.length >= 8) reportId.substring(0, 8) else reportId
 
+                // 0. SciEntityEntity: Corporate / Economic Entity projection if provided
+                var projectedEntityId: String? = null
+                if (snapshot.economicEntityName.isNotBlank()) {
+                    val entityId = "ent_" + UUID.randomUUID().toString().take(12)
+                    projectedEntityId = entityId
+                    val extIds = mutableListOf<String>()
+                    if (snapshot.economicEntityTaxId.isNotBlank()) extIds.add("tax_id:${snapshot.economicEntityTaxId.trim()}")
+                    if (snapshot.sicopProcedureNumber.isNotBlank()) extIds.add("sicop:${snapshot.sicopProcedureNumber.trim()}")
+                    val extIdsJson = if (extIds.isNotEmpty()) {
+                        extIds.joinToString(prefix = "[\"", separator = "\",\"", postfix = "\"]") { it.replace("\"", "\\\"") }
+                    } else "[]"
+
+                    safetyScienceDao.upsertEntity(
+                        SciEntityEntity(
+                            id = entityId,
+                            entityType = if (snapshot.category == SafetyReportCategory.CORRUPTION_PUBLIC_PROCUREMENT) "PUBLIC_CONTRACTOR" else "ECONOMIC_ENTITY",
+                            canonicalName = snapshot.economicEntityName.trim(),
+                            aliasesJson = "[]",
+                            externalIdentifiersJson = extIdsJson,
+                            assertionState = "OBSERVED",
+                            createdAt = now,
+                            updatedAt = now,
+                        )
+                    )
+                }
+
                 // 1. SciClaimEntity: Factual Assertion
                 val claimProposition = if (snapshot.factualClaim.isNotBlank()) {
                     snapshot.factualClaim.trim()
+                } else if (snapshot.economicEntityName.isNotBlank() && snapshot.sicopProcedureNumber.isNotBlank()) {
+                    "[Reporte #$shortId] Licitación SICOP ${snapshot.sicopProcedureNumber.trim()} asociada a ${snapshot.economicEntityName.trim()}"
                 } else {
                     "[Reporte #$shortId] Incidente observado: " + snapshot.narrative.take(160).trim()
                 }
@@ -377,7 +460,8 @@ class SafetyReportViewModel @Inject constructor(
                     SciClaimEntity(
                         id = claimId,
                         proposition = claimProposition,
-                        predicate = "REPORTED_INCIDENT",
+                        subjectEntityId = projectedEntityId,
+                        predicate = if (snapshot.isFinancialCategory) "FINANCIAL_INTELLIGENCE_RECORD" else "REPORTED_INCIDENT",
                         assertionState = "OBSERVED",
                         causalStatus = if (snapshot.scientificHypothesis.isNotBlank()) "HYPOTHESIS_FORMULATED" else "NOT_ASSESSED",
                         occurredAt = occurredMs,

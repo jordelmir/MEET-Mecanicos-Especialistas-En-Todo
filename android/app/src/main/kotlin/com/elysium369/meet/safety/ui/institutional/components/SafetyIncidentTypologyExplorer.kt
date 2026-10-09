@@ -140,6 +140,36 @@ fun SafetyIncidentTypologyExplorer(
                 supportingEvidenceTypes = "Fotografías de alumbrado vandalizado, actas de comité vecinal, solicitudes municipales de reparación.",
                 sampleSha256 = "2c624232cdd221771294dfbb310aca000a0df6ec8b6602f7470f5e1f0e4d0818",
             ),
+            IncidentTypologyDetail(
+                category = SafetyReportCategory.CORRUPTION_PUBLIC_PROCUREMENT,
+                title = "Contratación Pública y SICOP",
+                subtitle = "Licitaciones del Estado, obras públicas y erario",
+                scopeDescription = "Auditoría ciudadana y documental sobre compras públicas (Ley N.° 9986). Registra número de procedimiento licitatorio, adjudicatario, sobreprecios y actas municipales.",
+                exampleOccurrence = "Adjudicado: 2026-09-15 · Expediente SICOP: 2024LN-000015-0005900001",
+                exampleLocation = "San José · Sede Institucional Central",
+                supportingEvidenceTypes = "Pliegos de condiciones de SICOP, informes de auditoría interna de la CGR, facturas proforma y contratos firmados.",
+                sampleSha256 = "9f83a45c612b7a8c4390021e1d3e89fb2301ca1029384756abcdef0123456789",
+            ),
+            IncidentTypologyDetail(
+                category = SafetyReportCategory.CORPORATE_OPACITY_CONFLICT,
+                title = "Estructuras Corporativas y Conflicto",
+                subtitle = "Mallas societarias, empresas de papel y beneficiarios finales",
+                scopeDescription = "Relacionamiento entre sociedades mercantiles, apoderados comunes y empresas pantalla vinculadas a adjudicaciones públicas o desvío de capitales.",
+                exampleOccurrence = "Constitución: 2023-04-10 · Modificación registral: 2026-05-18",
+                exampleLocation = "Registro Nacional · San José",
+                supportingEvidenceTypes = "Certificaciones de personería jurídica, actas de asambleas de accionistas, trazabilidad de apoderados y cédulas jurídicas.",
+                sampleSha256 = "a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0",
+            ),
+            IncidentTypologyDetail(
+                category = SafetyReportCategory.FINANCIAL_FRAUD,
+                title = "Fraude Financiero y Desvío de Fondos",
+                subtitle = "Lavado de activos, esquemas fraudulentos y desfalco",
+                scopeDescription = "Patrones de transacciones irregulares, triangulación bancaria o captación ilegal de fondos con soporte documental legítimo.",
+                exampleOccurrence = "Transferencias: 2026-08-01 a 2026-09-30 · Registrado: 2026-10-01",
+                exampleLocation = "Sistema Bancario Nacional / Flujo Transfronterizo",
+                supportingEvidenceTypes = "Comprobantes de transferencia, extractos contables anonimizados, comunicaciones contractuales y denuncias judiciales radicadas.",
+                sampleSha256 = "b2c3d4e5f6a17890123456789abcdef0123456789abcdef0123456789abcdef1",
+            ),
         )
     }
 
@@ -161,7 +191,7 @@ fun SafetyIncidentTypologyExplorer(
             ) {
                 Column {
                     Text(
-                        "1. TIPOLOGÍA DE INCIDENTES DE SEGURIDAD",
+                        "1. TIPOLOGÍA DE INCIDENTES & INTEGRIDAD PÚBLICA",
                         color = MeetColors.cyberCyan,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
@@ -169,7 +199,7 @@ fun SafetyIncidentTypologyExplorer(
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        "Estructuración de datos en 8 categorías",
+                        "Estructuración de datos en 11 categorías oficiales",
                         color = Color.White,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
@@ -181,7 +211,7 @@ fun SafetyIncidentTypologyExplorer(
                     border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
                 ) {
                     Text(
-                        "8 CATEGORÍAS",
+                        "11 CATEGORÍAS",
                         color = MeetColors.neonGreen,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black,

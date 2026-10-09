@@ -39,6 +39,9 @@ fun SafetyReportCategory.label(): String = when (this) {
     SafetyReportCategory.SUSPICIOUS_SITUATION -> "Situación sospechosa"
     SafetyReportCategory.EMERGENCY -> "Emergencia / Auxilio"
     SafetyReportCategory.ZONE_INCIDENT -> "Incidente territorial de zona"
+    SafetyReportCategory.CORRUPTION_PUBLIC_PROCUREMENT -> "Contratación Pública y Fondos Estatales (SICOP)"
+    SafetyReportCategory.CORPORATE_OPACITY_CONFLICT -> "Estructuras Corporativas y Conflicto de Interés"
+    SafetyReportCategory.FINANCIAL_FRAUD -> "Fraude Financiero y Desvío de Fondos"
     SafetyReportCategory.OTHER -> "Otro incidente"
 }
 

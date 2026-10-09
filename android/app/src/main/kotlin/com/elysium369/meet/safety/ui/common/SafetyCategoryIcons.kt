@@ -7,6 +7,9 @@ import androidx.compose.material.icons.filled.LocalPharmacy
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.BusinessCenter
+import androidx.compose.material.icons.filled.AccountTree
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -82,6 +85,24 @@ object SafetyCategoryIcons {
             color = Color(0xFF00E5FF),
             emoji = "📍",
             labelEs = "Zona Territorial",
+        ),
+        SafetyReportCategory.CORRUPTION_PUBLIC_PROCUREMENT to SafetyCategoryVisual(
+            icon = Icons.Filled.BusinessCenter,
+            color = Color(0xFFFFB300),
+            emoji = "🏛️",
+            labelEs = "SICOP / Contratación",
+        ),
+        SafetyReportCategory.CORPORATE_OPACITY_CONFLICT to SafetyCategoryVisual(
+            icon = Icons.Filled.AccountTree,
+            color = Color(0xFFAB47BC),
+            emoji = "🏢",
+            labelEs = "Red Corporativa",
+        ),
+        SafetyReportCategory.FINANCIAL_FRAUD to SafetyCategoryVisual(
+            icon = Icons.Filled.AttachMoney,
+            color = Color(0xFF00E676),
+            emoji = "💰",
+            labelEs = "Fraude Financiero",
         ),
         SafetyReportCategory.OTHER to SafetyCategoryVisual(
             icon = Icons.Filled.Description,

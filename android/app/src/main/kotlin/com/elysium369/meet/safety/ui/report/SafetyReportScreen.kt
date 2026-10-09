@@ -639,6 +639,12 @@ private fun StepNarrative(state: SafetyReportUiState, viewModel: SafetyReportVie
             }
         }
 
+        FinancialIntelligenceSection(
+            state = state,
+            viewModel = viewModel,
+            defaultExpanded = state.isFinancialCategory || state.sicopProcedureNumber.isNotBlank() || state.economicEntityName.isNotBlank(),
+        )
+
         ScientificAnalysisSection(state = state, viewModel = viewModel)
     }
 }
@@ -785,6 +791,236 @@ private fun ScientificAnalysisSection(
                         maxLines = 3,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MeetColors.warning,
+                            unfocusedBorderColor = MeetColors.borderSubtle,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
+                        ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FinancialIntelligenceSection(
+    state: SafetyReportUiState,
+    viewModel: SafetyReportViewModel,
+    defaultExpanded: Boolean,
+) {
+    var expanded by remember(defaultExpanded) {
+        mutableStateOf(defaultExpanded || state.sicopProcedureNumber.isNotBlank() || state.economicEntityName.isNotBlank())
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.dp, if (expanded) Color(0xFFFFB300).copy(alpha = 0.8f) else MeetColors.borderSubtle),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Text("🏛️", fontSize = 18.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "INTELIGENCIA FINANCIERA & SICOP",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFFFFB300),
+                            letterSpacing = 0.8.sp,
+                        )
+                        Text(
+                            if (expanded) "Contratación estatal, personas jurídicas y montos" else "Toca para registrar licitación SICOP o red corporativa",
+                            fontSize = 11.sp,
+                            color = MeetColors.textSecondary,
+                        )
+                    }
+                }
+                Text(
+                    if (expanded) "▲" else "▼",
+                    color = Color(0xFFFFB300),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                )
+            }
+
+            if (expanded) {
+                HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
+
+                // Mandatory Constitutional Safeguard Banner
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFB300).copy(alpha = 0.08f)),
+                    border = BorderStroke(1.dp, Color(0xFFFFB300).copy(alpha = 0.4f)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text("⚖️", fontSize = 16.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                "SALVAGUARDA CONSTITUCIONAL E INTELIGENCIA",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFFFB300),
+                                letterSpacing = 0.5.sp,
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                "La tenencia o exhibición de vehículos de alta gama, residencias u otros bienes de alto valor NO constituye por sí misma delito ni corrupción. Elysium Safety no tramita acusaciones basadas exclusivamente en ostentación. Se requiere sustento documental, número licitatorio o nexo contractual comprobable.",
+                                fontSize = 11.sp,
+                                color = MeetColors.textPrimary,
+                                lineHeight = 15.sp,
+                            )
+                        }
+                    }
+                }
+
+                // 1. Procedimiento SICOP
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "NÚMERO DE PROCEDIMIENTO SICOP / EXPEDIENTE",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFFFB300),
+                        letterSpacing = 0.8.sp,
+                    )
+                    OutlinedTextField(
+                        value = state.sicopProcedureNumber,
+                        onValueChange = viewModel::updateSicopProcedureNumber,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Ej: 2024LN-000015-0005900001...", fontSize = 12.sp, color = MeetColors.textMuted) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFFFB300),
+                            unfocusedBorderColor = MeetColors.borderSubtle,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
+                        ),
+                    )
+                }
+
+                // 2. Entidad / Empresa
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "ENTIDAD ECONÓMICA / EMPRESA ADJUDICATARIA",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.cyberCyan,
+                        letterSpacing = 0.8.sp,
+                    )
+                    OutlinedTextField(
+                        value = state.economicEntityName,
+                        onValueChange = viewModel::updateEconomicEntityName,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Ej: Consorcio Vial del Pacífico S.A...", fontSize = 12.sp, color = MeetColors.textMuted) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MeetColors.cyberCyan,
+                            unfocusedBorderColor = MeetColors.borderSubtle,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
+                        ),
+                    )
+                }
+
+                // 3. Cédula Jurídica
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "CÉDULA JURÍDICA / IDENTIFICACIÓN FISCAL",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.textSecondary,
+                        letterSpacing = 0.8.sp,
+                    )
+                    OutlinedTextField(
+                        value = state.economicEntityTaxId,
+                        onValueChange = viewModel::updateEconomicEntityTaxId,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Ej: 3-101-987654...", fontSize = 12.sp, color = MeetColors.textMuted) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MeetColors.cyberCyan,
+                            unfocusedBorderColor = MeetColors.borderSubtle,
+                            focusedTextColor = MeetColors.textPrimary,
+                            unfocusedTextColor = MeetColors.textPrimary,
+                        ),
+                    )
+                }
+
+                // 4. Monto y Moneda
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "MONTO ESTIMADO / CONTRATO",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.neonGreen,
+                        letterSpacing = 0.8.sp,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Button(
+                            onClick = {
+                                val next = if (state.contractCurrency == "CRC") "USD" else "CRC"
+                                viewModel.updateContractCurrency(next)
+                            },
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (state.contractCurrency == "CRC") Color(0xFF00B0FF) else MeetColors.neonGreen,
+                                contentColor = Color.Black,
+                            ),
+                            modifier = Modifier.height(52.dp),
+                        ) {
+                            Text(state.contractCurrency, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+
+                        OutlinedTextField(
+                            value = state.contractAmountMajor,
+                            onValueChange = viewModel::updateContractAmountMajor,
+                            modifier = Modifier.weight(1f),
+                            placeholder = { Text("Ej: 45000000", fontSize = 12.sp, color = MeetColors.textMuted) },
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = MeetColors.neonGreen,
+                                unfocusedBorderColor = MeetColors.borderSubtle,
+                                focusedTextColor = MeetColors.textPrimary,
+                                unfocusedTextColor = MeetColors.textPrimary,
+                            ),
+                        )
+                    }
+                }
+
+                // 5. Fuente oficial
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "FUENTE OFICIAL / ENLACE PÚBLICO",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.textSecondary,
+                        letterSpacing = 0.8.sp,
+                    )
+                    OutlinedTextField(
+                        value = state.officialDocumentSource,
+                        onValueChange = viewModel::updateOfficialDocumentSource,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("Ej: https://www.sicop.go.cr o Informe CGR...", fontSize = 12.sp, color = MeetColors.textMuted) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MeetColors.cyberCyan,
                             unfocusedBorderColor = MeetColors.borderSubtle,
                             focusedTextColor = MeetColors.textPrimary,
                             unfocusedTextColor = MeetColors.textPrimary,
@@ -1273,6 +1509,19 @@ private fun StepReview(state: SafetyReportUiState) {
                 )
             }
 
+            if (state.sicopProcedureNumber.isNotBlank() || state.economicEntityName.isNotBlank()) {
+                ReviewRow(
+                    label = "SICOP / ENTIDAD",
+                    value = buildString {
+                        if (state.economicEntityName.isNotBlank()) append(state.economicEntityName)
+                        if (state.sicopProcedureNumber.isNotBlank()) {
+                            if (isNotEmpty()) append(" · ")
+                            append("SICOP: ").append(state.sicopProcedureNumber)
+                        }
+                    },
+                )
+            }
+
             Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.safety_report_step_review_notice),
@@ -1430,6 +1679,24 @@ private fun SafetyReportReceiptScreen(
                         Text(statusText, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = statusColor)
                     }
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("ESTADO EPISTÉMICO", fontSize = 11.sp, color = MeetColors.textSecondary)
+                        Text("OBSERVED (Registro)", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = MeetColors.cyberCyan)
+                    }
+
+                    if (report?.category in setOf("CORRUPTION_PUBLIC_PROCUREMENT", "CORPORATE_OPACITY_CONFLICT", "FINANCIAL_FRAUD")) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text("AUDITORÍA FINANCIERA", fontSize = 11.sp, color = MeetColors.textSecondary)
+                            Text("SICOP / Integridad", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFB300))
+                        }
+                    }
+
                     HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
 
                     Text(
@@ -1437,6 +1704,15 @@ private fun SafetyReportReceiptScreen(
                         fontSize = 11.sp,
                         color = MeetColors.textSecondary,
                         lineHeight = 16.sp,
+                    )
+
+                    Spacer(modifier = Modifier.height(2.dp))
+
+                    Text(
+                        "⚖️ Salvaguarda Institucional: Un reporte ciudadano constituye información fáctica estructurada; no equivale a condena ni imputación judicial probada. Preserva la verdad material y la cadena de custodia.",
+                        fontSize = 10.sp,
+                        color = MeetColors.textMuted,
+                        lineHeight = 14.sp,
                     )
                 }
             }

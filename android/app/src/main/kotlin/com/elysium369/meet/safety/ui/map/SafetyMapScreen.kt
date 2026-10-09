@@ -911,6 +911,9 @@ private fun SafetyMapLayer.labelResource() = when (this) {
     SafetyMapLayer.THREAT -> R.string.safety_public_threat
     SafetyMapLayer.MISSING_PERSON -> R.string.safety_public_missing
     SafetyMapLayer.INSTITUTIONAL -> R.string.safety_public_institutional
+    SafetyMapLayer.SICOP_PROCUREMENT -> R.string.safety_public_procurement
+    SafetyMapLayer.CORPORATE_STRUCTURES -> R.string.safety_public_corporate
+    SafetyMapLayer.FINANCIAL_INTELLIGENCE -> R.string.safety_public_financial
 }
 private fun SafetyTimeRange.labelResource() = when (this) {
     SafetyTimeRange.ALL -> R.string.safety_public_all_dates
