@@ -27,4 +27,28 @@ class MeetBackStackPolicyTest {
             MeetBackStackPolicy.action(MeetDestinations.HOME, hasPreviousEntry = true),
         )
     }
+
+    @Test
+    fun safetyInstitutionalNeverExitsToAutomotiveHome() {
+        assertEquals(
+            MeetBackStackPolicy.Action.STAY_HOME,
+            MeetBackStackPolicy.action(
+                currentRoute = MeetDestinations.SAFETY_INSTITUTIONAL,
+                hasPreviousEntry = false,
+                startRoute = MeetDestinations.SAFETY_INSTITUTIONAL,
+            ),
+        )
+    }
+
+    @Test
+    fun safetyInstitutionalStaysHomeEvenWithPreviousEntry() {
+        assertEquals(
+            MeetBackStackPolicy.Action.STAY_HOME,
+            MeetBackStackPolicy.action(
+                currentRoute = MeetDestinations.SAFETY_INSTITUTIONAL,
+                hasPreviousEntry = true,
+                startRoute = MeetDestinations.SAFETY_INSTITUTIONAL,
+            ),
+        )
+    }
 }

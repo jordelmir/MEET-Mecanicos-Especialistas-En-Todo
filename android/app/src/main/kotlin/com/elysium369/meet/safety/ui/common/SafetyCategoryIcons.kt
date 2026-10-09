@@ -59,6 +59,30 @@ object SafetyCategoryIcons {
             emoji = "🏛️",
             labelEs = "Institucional",
         ),
+        SafetyReportCategory.ASSAULT_ROBBERY to SafetyCategoryVisual(
+            icon = Icons.Filled.Dangerous,
+            color = Color(0xFFFF5722),
+            emoji = "🚨",
+            labelEs = "Asalto / Robo",
+        ),
+        SafetyReportCategory.SUSPICIOUS_SITUATION to SafetyCategoryVisual(
+            icon = Icons.Filled.Warning,
+            color = Color(0xFFFF9800),
+            emoji = "👁️",
+            labelEs = "Sospecha",
+        ),
+        SafetyReportCategory.EMERGENCY to SafetyCategoryVisual(
+            icon = Icons.Filled.Dangerous,
+            color = Color(0xFFE91E63),
+            emoji = "🆘",
+            labelEs = "Emergencia",
+        ),
+        SafetyReportCategory.ZONE_INCIDENT to SafetyCategoryVisual(
+            icon = Icons.Filled.Description,
+            color = Color(0xFF00E5FF),
+            emoji = "📍",
+            labelEs = "Zona Territorial",
+        ),
         SafetyReportCategory.OTHER to SafetyCategoryVisual(
             icon = Icons.Filled.Description,
             color = Color(0xFF00BCD4),

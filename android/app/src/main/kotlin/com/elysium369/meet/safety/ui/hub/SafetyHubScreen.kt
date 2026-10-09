@@ -57,6 +57,7 @@ fun SafetyHubScreen(
     onNavigateToAccountability: () -> Unit = {},
     onNavigateToObservatory: () -> Unit = {},
     onNavigateToResearch: () -> Unit = {},
+    onNavigateToInstitutional: () -> Unit = {},
     onBack: () -> Unit = {},
     viewModel: SafetyHomeViewModel = hiltViewModel(),
 ) {
@@ -208,6 +209,20 @@ fun SafetyHubScreen(
                     color = MeetColors.cyberCyan,
                     letterSpacing = 1.2.sp,
                     modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+
+            item {
+                SafetyHubCard(
+                    title = "🏛️ Presentación Institucional (Diputados)",
+                    subtitle = "Plataforma de seguridad, evidencia y análisis territorial para Costa Rica",
+                    icon = Icons.Filled.AccountBalance,
+                    iconColor = MeetColors.neonGreen,
+                    onClick = {
+                        SafetyHaptics.selectionTick(view)
+                        onNavigateToInstitutional()
+                    },
+                    enabled = true,
                 )
             }
 

@@ -90,9 +90,24 @@ flowchart TD
 - Append-only immutability triggers for evidentiary records.
 
 ### Phase 8: Android Integration & Institutional Presentation
-- Dedicated Android Presentation Mode (`PresentationMode.INSTITUTIONAL_DEPUTIES`).
-- Renders Citizen Reporting, Evidence Custody, Investigative Timeline, and Territorial Map without displaying mechanics or rides.
-- Preserves 100% of the entire codebase and modules.
+- Dedicated Android Presentation Mode (`PresentationMode.INSTITUTIONAL_DEPUTIES_SAFETY`).
+- `SafetyInstitutionalDashboardScreen` & `SafetyPresentationModeStore`: Executive parliamentary dashboard displaying the 7 Core Capabilities and approved opening declaration.
+- Mode switcher: Tabbed focus mode (`📑 Vista por Pestaña`) vs Full continuous reading (`📄 Documento Completo`).
+- Interactive visual components:
+  - `SafetyIncidentTypologyExplorer` (Interactive exploration of all 8 parliamentary categories with sample SHA-256 hashes, occurrence vs reporting timestamps, and structured evidence criteria)
+  - `SafetyEvidenceManagerPanel` (Interactive SHA-256 integrity inspection, 1-byte tamper simulation, and custody protocol)
+  - `SafetyTerritorialIntelligenceConsole` (Cantonal breakdown: San José, Limón, Puntarenas, Desamparados, Alajuela, temporal windows, and 25 km public residential blur)
+  - `SafetyEpistemicTraceabilityCard` (OBSERVED -> AUTHORITATIVE -> DERIVED -> ESTIMATED -> UNKNOWN)
+  - `SafetyEvidenceChainVisualizer` (Evento -> Afirmación -> Hipótesis -> Evidencia -> Análisis -> Conclusión)
+  - `SafetyInstitutionalBridgeCard` (Puente Ciudadano -> Fuerza Pública / OIJ / Ministerio Público / Poder Judicial)
+  - `SafetyInstitutionalBriefExportDialog` (Generador modal de expediente forense exportable con QR y SHA-256 manifest)
+  - `SafetyFinancialIntelligenceCard` (SICOP Costa Rica & Salvaguarda Riqueza visible ≠ Delito)
+- Strict navigation filtering in `MainActivity.kt`:
+  - Automotive OBD diagnostics, rides dispatch, and marketplace modules completely suppressed from view/navigation.
+  - Outer top status bars, palette customization icon, 3D companion overlays, and ride call overlays strictly hidden when `isInstitutionalPresentation == true`.
+  - Back stack policy (`MeetBackStackPolicy`) hardened so back navigation never exits to the automotive home during parliamentary presentation.
+- Preserves 100% of the entire codebase and modules intact without deleting any contracts (abiding by *"Todo en uno. Siempre a más, nunca a menos"*).
+- *Status:* **IMPLEMENTED & VERIFIED**.
 
 ### Phase 9: Forensic Integrity & Parity Harness
 - Protocol `SAFETY-CUSTODY-V2`.

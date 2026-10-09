@@ -7,6 +7,10 @@ enum class SafetyReportCategory {
     THREAT,
     MISSING_PERSON,
     INSTITUTIONAL_CONDUCT,
+    ASSAULT_ROBBERY,
+    SUSPICIOUS_SITUATION,
+    EMERGENCY,
+    ZONE_INCIDENT,
     OTHER,
 }
 

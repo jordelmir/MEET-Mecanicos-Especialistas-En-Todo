@@ -31,11 +31,15 @@ enum class LocationSource {
 fun SafetyReportCategory.label(): String = when (this) {
     SafetyReportCategory.HOMICIDE -> "Homicidio"
     SafetyReportCategory.VIOLENT_INCIDENT -> "Incidente violento"
-    SafetyReportCategory.DRUG_SALE_ACTIVITY -> "Actividad reportada relacionada con drogas"
+    SafetyReportCategory.DRUG_SALE_ACTIVITY -> "Actividad reportada relacionada con drogas / Narcotráfico"
     SafetyReportCategory.THREAT -> "Amenaza"
     SafetyReportCategory.MISSING_PERSON -> "Persona desaparecida"
     SafetyReportCategory.INSTITUTIONAL_CONDUCT -> "Actuación institucional"
-    SafetyReportCategory.OTHER -> "Otro"
+    SafetyReportCategory.ASSAULT_ROBBERY -> "Asalto / Robo"
+    SafetyReportCategory.SUSPICIOUS_SITUATION -> "Situación sospechosa"
+    SafetyReportCategory.EMERGENCY -> "Emergencia / Auxilio"
+    SafetyReportCategory.ZONE_INCIDENT -> "Incidente territorial de zona"
+    SafetyReportCategory.OTHER -> "Otro incidente"
 }
 
 fun SourceRelation.label(): String = when (this) {
