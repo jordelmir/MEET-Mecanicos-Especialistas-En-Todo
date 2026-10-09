@@ -6,10 +6,11 @@ import org.junit.Test
 
 class SafetyEvidencePolicyTest {
     @Test
-    fun directlyAttachedVideosMatchTheExistingServerAllowlist() {
-        assertTrue(SafetyEvidencePolicy.allowedMimeTypes.contains("video/mp4"))
-        assertTrue(SafetyEvidencePolicy.allowedMimeTypes.contains("video/webm"))
-        // The server RPC rejects these; the Android selector must not promise them.
+    fun videosRemainLinkOnlyAndAreNotAcceptedAsDirectAttachments() {
+        // The server RPC may technically allow these MIME types, but the client
+        // deliberately does not expose them because Elysium is not video hosting.
+        assertFalse(SafetyEvidencePolicy.allowedMimeTypes.contains("video/mp4"))
+        assertFalse(SafetyEvidencePolicy.allowedMimeTypes.contains("video/webm"))
         assertFalse(SafetyEvidencePolicy.allowedMimeTypes.contains("video/quicktime"))
         assertFalse(SafetyEvidencePolicy.allowedMimeTypes.contains("video/3gpp"))
     }

@@ -981,7 +981,7 @@ private fun StepEvidence(
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.safety_report_step_evidence_title), fontWeight = FontWeight.Black, fontSize = 15.sp, color = MeetColors.textPrimary)
             Text(
-                "Adjunta fotos, videos MP4/WebM, audios o documentos que respalden el hecho. Los archivos directos admiten hasta 20 MB; para videos mayores, usa el enlace de abajo.",
+                "Adjunta fotografías, audios o documentos que respalden el hecho. Para videos, usa el enlace compartible de abajo; el video no se carga al servidor de Elysium.",
                 color = MeetColors.textSecondary,
                 fontSize = 12.sp,
             )
@@ -1039,8 +1039,6 @@ private fun StepEvidence(
                     picker.launch(
                         arrayOf(
                             "image/*",
-                            "video/mp4",
-                            "video/webm",
                             "audio/*",
                             "application/pdf",
                             "text/*",
@@ -1093,7 +1091,7 @@ private fun StepEvidence(
                 )
             }
             Text(
-                "Puedes combinar videos MP4/WebM de hasta 20 MB con enlaces compartibles a videos alojados en otras plataformas. Revisa los permisos del enlace antes de enviarlo.",
+                "Los videos se comparten únicamente mediante enlaces; no se sube el archivo de video a Elysium. Usa un enlace accesible para el destinatario y revisa los permisos antes de enviarlo.",
                 color = MeetColors.textSecondary,
                 fontSize = 11.sp,
                 lineHeight = 15.sp,

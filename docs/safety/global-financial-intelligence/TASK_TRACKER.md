@@ -26,15 +26,16 @@ Marcar una tarea solo cuando el cambio esté escrito. Compilación, ejecución d
 - [ ] Confirmar CI en el SHA final.
 - [ ] Instalar el APK de ese mismo SHA en Android y verificar visualmente la ruta completa.
 
-## Slice C — Adjuntos de evidencia multimedia
+## Slice C — Evidencia multimedia (decisión de arquitectura: video por enlace)
 
-- [x] Habilitar adjuntos directos de video MP4/WebM —ambos ya permitidos por el RPC existente— en la allowlist Android.
-- [x] Añadir ambos MIME types al selector de documentos y al texto de ayuda.
-- [x] Etiquetar los adjuntos de video y conservar el flujo alternativo de enlaces para archivos mayores de 20 MB.
-- [x] Añadir tests unitarios de la allowlist y el límite existente.
+- [x] Mantener videos fuera de las cargas directas a Elysium para proteger ancho de banda, coste de almacenamiento y capacidad del servidor.
+- [x] Conservar el campo de enlace compartible de video dentro del reporte; el archivo alojado permanece en la plataforma externa elegida por quien reporta.
+- [x] Retirar MP4/WebM de la allowlist y del selector Android aunque el RPC acepte técnicamente esos MIME types: el contrato cliente es intencionalmente más restrictivo.
+- [x] Mantener etiquetas de visualización heredada para no romper registros existentes.
+- [x] Añadir prueba unitaria que impide la carga directa de video.
 - [ ] Compilar y ejecutar tests Kotlin/UI para el SHA final.
-- [ ] Verificar la subida de video en staging, incluidos casos MATCH/MISMATCH/error del verificador remoto.
-- [ ] Comprobar apertura/descarga del video después de reiniciar el proceso en un dispositivo.
+- [ ] Validar en staging la persistencia del enlace, su escape/normalización, permisos de lectura y comportamiento ante URLs no válidas o enlaces retirados.
+- [ ] Verificar que el recibo de reporte no afirme que el video fue preservado dentro de Elysium: el sistema conserva el enlace, no los bytes remotos.
 
 ## Slice D — Reporte, evidencia, outbox, autoridad y mapa
 

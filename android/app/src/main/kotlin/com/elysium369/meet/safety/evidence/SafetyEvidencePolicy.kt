@@ -9,8 +9,7 @@ object SafetyEvidencePolicy {
     const val MAX_ATTACHMENTS = 5
     val allowedMimeTypes = setOf(
         "image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif",
-        // Align supported direct-video uploads with the existing server RPC allowlist.
-        "video/mp4", "video/webm",
+        // Video is intentionally link-only to avoid turning Elysium into a video-hosting service.
         "audio/mpeg", "audio/mp4", "audio/aac", "audio/ogg", "audio/wav", "audio/x-wav",
         "application/pdf",
         "text/plain", "text/csv", "text/html",
