@@ -376,7 +376,7 @@ fun SafetyObservatoryScreen(
                             SourceProvenanceDetailRow(
                                 icon = "📰",
                                 title = "Investigación Periodística",
-                                desc = "Reportajes de medios, crónicas de investigación independiente y prensa verificada.",
+                                desc = "Material clasificado como periodístico. La clasificación no autentica automáticamente la autoría ni el contenido.",
                                 count = stats.journalistic_source_count,
                                 total = totalSources,
                                 color = Color(0xFF69F0AE)
@@ -384,7 +384,7 @@ fun SafetyObservatoryScreen(
                             SourceProvenanceDetailRow(
                                 icon = "🛡️",
                                 title = "Reportes Ciudadanos / Casos Públicos",
-                                desc = "Alertas de la comunidad, denuncias de testigos protegidos y reportes con corroboración.",
+                                desc = "Reportes ciudadanos. Los estados de corroboración solo se muestran cuando la proyección autorizada los aporta.",
                                 count = stats.civil_source_count,
                                 total = totalSources,
                                 color = Color(0xFF00E5FF)
@@ -392,7 +392,7 @@ fun SafetyObservatoryScreen(
                             SourceProvenanceDetailRow(
                                 icon = "🏛️",
                                 title = "Registros Públicos y Judiciales",
-                                desc = "Gacetas oficiales, juzgados, autos de apertura procesal y documentos registrales.",
+                                desc = "Material clasificado como registro público o judicial; verificar el documento original, la autoridad emisora y su alcance.",
                                 count = stats.public_record_source_count,
                                 total = totalSources,
                                 color = Color(0xFFFFD700)
@@ -400,7 +400,7 @@ fun SafetyObservatoryScreen(
                             SourceProvenanceDetailRow(
                                 icon = "🏢",
                                 title = "Expedientes Institucionales",
-                                desc = "Oficios y respuestas formales de fiscalías, comisarías, ministerios y defensorías.",
+                                desc = "Material declarado de origen institucional; la entidad emisora y la autenticidad requieren comprobación en la fuente.",
                                 count = stats.institutional_source_count,
                                 total = totalSources,
                                 color = Color(0xFF82B1FF)
@@ -408,7 +408,7 @@ fun SafetyObservatoryScreen(
                             SourceProvenanceDetailRow(
                                 icon = "📄",
                                 title = "Evidencias Documentales y Peritajes",
-                                desc = "Peritajes forenses certificados, metadatos multimedia verificados y hash SHA-256.",
+                                desc = "Documentos y peritajes aportados. Una huella SHA-256 solo indica correspondencia de bytes cuando se calcula y verifica; no certifica la veracidad del contenido.",
                                 count = stats.documentary_source_count,
                                 total = totalSources,
                                 color = Color(0xFFFF80AB)

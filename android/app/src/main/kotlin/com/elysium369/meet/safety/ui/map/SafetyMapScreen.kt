@@ -670,7 +670,7 @@ private fun PublicPointDetail(
                             color = MeetColors.textPrimary,
                         )
                         val accuracyText = point.locationAccuracyMeters?.let { "Precisión: ±${it}m" } ?: "Precisión no informada"
-                        Text("$accuracyText · Red pública global", fontSize = 11.sp, color = MeetColors.textMuted)
+                        Text("$accuracyText · Proyección pública de Safety", fontSize = 11.sp, color = MeetColors.textMuted)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(

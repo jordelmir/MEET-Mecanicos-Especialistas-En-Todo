@@ -120,9 +120,9 @@ fun SafetyReportScreen(
             onSaved = { role, name, org, cred ->
                 impunityStore.saveInitialRegistration(role, name, org, cred)
                 val detail = when (role) {
-                    "JOURNALIST" -> "Medio: $org | Periodista: $name | Carné: $cred"
-                    "INSTITUTION" -> "Institución: $org | Identificador: $cred"
-                    else -> if (name.isBlank()) "Civil: Anónimo Protegido" else "Civil: $name (Anónimo Protegido)"
+                    "JOURNALIST" -> "Rol autodeclarado: periodista | Medio declarado: $org | Nombre declarado: $name | Acreditación declarada: $cred"
+                    "INSTITUTION" -> "Rol autodeclarado: institución | Entidad declarada: $org | Unidad o identificador declarado: $cred"
+                    else -> if (name.isBlank()) "Rol autodeclarado: ciudadano | Alias no aportado" else "Rol autodeclarado: ciudadano | Alias declarado: $name"
                 }
                 viewModel.updateParticipantDetails(detail)
                 showInitialRegistration = false
@@ -1536,7 +1536,7 @@ private fun SafetyInitialRegistrationScreen(
                             color = MeetColors.textPrimary
                         )
                         Text(
-                            "Configura tu perfil de reporte (se realiza una única vez)",
+                            "Declara cómo deseas identificar tu participación en este dispositivo",
                             fontSize = 11.sp,
                             color = MeetColors.cyberCyan
                         )
@@ -1564,14 +1564,20 @@ private fun SafetyInitialRegistrationScreen(
         ) {
             Spacer(Modifier.height(4.dp))
             Text(
-                "SELECCIONA QUIÉN REPORTA",
+                "DECLARA EL TIPO DE PARTICIPACIÓN",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Black,
                 color = MeetColors.cyberCyan,
                 letterSpacing = 1.2.sp
             )
             Text(
-                "Define tu categoría de participación para el sistema de seguridad y corroboración forense:",
+                "Elige la categoría que describes para tu participación. Es un dato autodeclarado, no una validación de identidad, credencial ni autoridad.",
+            Text(
+                "El nombre, medio, institución o alias que aportes se asocia al reporte como declaración del usuario; no se autentica en este flujo.",
+                fontSize = 11.sp,
+                color = MeetColors.warning,
+                lineHeight = 15.sp,
+            )
                 fontSize = 12.sp,
                 color = MeetColors.textSecondary
             )
@@ -1601,7 +1607,7 @@ private fun SafetyInitialRegistrationScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("🛡️ Civil", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isCivil) Color.White else MeetColors.textPrimary)
                             Spacer(Modifier.height(2.dp))
-                            Text("Civiles, familias y testigos · Máximo anonimato soberano", fontSize = 11.sp, color = MeetColors.textSecondary)
+                            Text("Civiles y testigos · Alias opcional; anonimato no garantizado", fontSize = 11.sp, color = MeetColors.textSecondary)
                         }
                         if (isCivil) {
                             Icon(Icons.Filled.Check, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
@@ -1628,14 +1634,14 @@ private fun SafetyInitialRegistrationScreen(
                         ) {
                             Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text(
-                                    "🛡️ BLINDAJE DE VIDA Y PROTOCOLO ZERO-KNOWLEDGE",
+                                    "PRIVACIDAD Y ALCANCE",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     color = MeetColors.neonGreen,
                                     letterSpacing = 0.8.sp,
                                 )
                                 Text(
-                                    "Para proteger la vida de los seres humanos y prevenir riesgos ante cualquier filtración o hackeo, NO se recopilan parentescos, familias, domicilios, barrios ni identidades personales. Tu reporte está blindado criptográficamente con clave soberana AEAD.",
+                                    "Los adjuntos preparados en este dispositivo se cifran localmente. El reporte puede incluir el texto que escribas, la ubicación que aportes y esta declaración de rol. No incluyas datos personales o domicilios de terceros si no son necesarios y legítimos. Esta pantalla no garantiza anonimato absoluto ni protección frente a todos los riesgos.",
                                     fontSize = 10.sp,
                                     color = MeetColors.textSecondary,
                                     lineHeight = 14.sp,
@@ -1669,7 +1675,7 @@ private fun SafetyInitialRegistrationScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("📰 Periodista / Medio", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isJournalist) Color.White else MeetColors.textPrimary)
+                            Text("📰 Perfil periodístico declarado", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isJournalist) Color.White else MeetColors.textPrimary)
                             Spacer(Modifier.height(2.dp))
                             Text("Prensa, reporteros, agencias y medios de comunicación", fontSize = 11.sp, color = MeetColors.textSecondary)
                         }
@@ -1705,7 +1711,7 @@ private fun SafetyInitialRegistrationScreen(
                                 singleLine = true,
                             )
                             Text(
-                                "✓ Como periodista registrado, tendrás autoridad para certificar operativos oficiales y hallazgos.",
+                                "Estos datos son autodeclarados. Este formulario no verifica tu identidad o acreditación, no otorga autoridad institucional y no certifica operativos ni hallazgos.",
                                 fontSize = 10.sp,
                                 color = MeetColors.neonGreen,
                                 fontWeight = FontWeight.SemiBold,
@@ -1740,7 +1746,7 @@ private fun SafetyInitialRegistrationScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("🏢 Institución", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isInstitution) Color.White else MeetColors.textPrimary)
                             Spacer(Modifier.height(2.dp))
-                            Text("Fuerza Pública, OIJ, Cruz Roja, Bomberos u organismos oficiales", fontSize = 11.sp, color = MeetColors.textSecondary)
+                            Text("Perfil de una institución declarado por el usuario; no constituye una afiliación verificada", fontSize = 11.sp, color = MeetColors.textSecondary)
                         }
                         if (isInstitution) {
                             Icon(Icons.Filled.Check, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
@@ -1765,6 +1771,12 @@ private fun SafetyInitialRegistrationScreen(
                                 label = { Text("Unidad / Identificador (Opcional)", fontSize = 11.sp) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
+                            )
+                            Text(
+                                "El nombre de la institución y la unidad se registran como datos declarados. Los permisos institucionales requieren validación independiente en el servidor.",
+                                fontSize = 10.sp,
+                                color = MeetColors.textSecondary,
+                                lineHeight = 14.sp,
                             )
                         }
                     }

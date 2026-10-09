@@ -121,3 +121,12 @@ Marcar una tarea solo cuando el cambio esté escrito. Compilación, ejecución d
 - [x] Añadir pruebas unitarias para la presentación del ciclo de evidencia.
 - [ ] Ejecutar tests/compilación CI para el SHA resultante.
 - [ ] Verificar en un dispositivo el ciclo STAGED → RECEIVED → VERIFIED / QUARANTINED con datos de prueba autorizados.
+
+
+## Slice K — Privacidad y procedencia de la fuente declarada
+
+- [x] Quitar promesas de anonimato absoluto/zero-knowledge que la implementación local no demuestra.
+- [x] Aclarar que el rol de periodista/institución se declara en el cliente; no autentica identidad ni concede permisos.
+- [x] Cambiar las descripciones del Observatorio para que los tipos de fuente no se interpreten como certificación.
+- [x] Añadir política y pruebas unitarias para validar el formato HTTP(S) de referencias externas.
+- [ ] Cifrar y migrar de forma segura los perfiles en SharedPreferences antes de ofrecer garantías fuertes de privacidad.
