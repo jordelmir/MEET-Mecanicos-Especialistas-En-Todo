@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.ReportProblem
 import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -156,6 +158,115 @@ fun SafetyInstitutionalPresentationScreen(
             }
 
             item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Button(
+                        onClick = onNavigateToReport,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 13.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.ReportProblem,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(7.dp))
+                        Text("Crear reporte")
+                    }
+                    OutlinedButton(
+                        onClick = onNavigateToMap,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 13.dp),
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Map,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(7.dp))
+                        Text("Abrir mapa")
+                    }
+                }
+            }
+
+            item {
+                Text(
+                    text = "GUÍA DE USO · RECORRIDO RECOMENDADO",
+                    color = MeetColors.cyberCyan,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 11.sp,
+                    letterSpacing = 1.0.sp,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            item {
+                GuideStepCard(
+                    number = "01",
+                    title = "Registra el acontecimiento",
+                    body = "Describe qué ocurrió, cuándo y dónde. Separa lo que observaste directamente de lo que otra persona te contó. Si no sabes un dato, déjalo como desconocido en lugar de adivinar.",
+                    accent = MeetColors.neonGreen,
+                )
+            }
+            item {
+                GuideStepCard(
+                    number = "02",
+                    title = "Conserva el material original",
+                    body = "Adjunta material que tengas derecho a compartir. No edites el original para hacerlo parecer concluyente; añade contexto por separado y evita exponer a personas vulnerables o ubicaciones residenciales.",
+                    accent = MeetColors.cyberCyan,
+                )
+            }
+            item {
+                GuideStepCard(
+                    number = "03",
+                    title = "Contextualiza el tiempo y el territorio",
+                    body = "Consulta el mapa y la cronología para ordenar los hechos. Una ubicación aproximada, un hueco de datos o una coincidencia temporal no prueban causalidad ni identifican automáticamente a una persona.",
+                    accent = MeetColors.electricBlue,
+                )
+            }
+            item {
+                GuideStepCard(
+                    number = "04",
+                    title = "Contrasta antes de concluir",
+                    body = "Relaciona cada afirmación con las fuentes que realmente la respaldan. Distingue documentos originales de copias o republicaciones y registra también contradicciones y explicaciones alternativas.",
+                    accent = MeetColors.hotMagenta,
+                )
+            }
+            item {
+                GuideStepCard(
+                    number = "05",
+                    title = "Solicita revisión autorizada",
+                    body = "Comparte solo con destinatarios habilitados y mediante un procedimiento aprobado. El sistema organiza información; no determina culpabilidad ni sustituye una investigación formal.",
+                    accent = MeetColors.warning,
+                )
+            }
+
+            item {
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MeetColors.backgroundDeep,
+                    border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            text = "QUÉ SIGNIFICA CADA ESTADO",
+                            color = MeetColors.textPrimary,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 11.sp,
+                            letterSpacing = 0.8.sp,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        StatusLegendRow("REGISTRADO", "Alguien lo reportó; aún no implica confirmación.", MeetColors.electricBlue)
+                        StatusLegendRow("CORROBORADO", "Existen fuentes adicionales cuya independencia debe verificarse.", MeetColors.cyberCyan)
+                        StatusLegendRow("PENDIENTE", "Falta revisión, datos o una integración autorizada.", MeetColors.warning)
+                        StatusLegendRow("REFUTADO / CORREGIDO", "La contradicción queda registrada; no debe borrarse silenciosamente.", MeetColors.hotMagenta)
+                    }
+                }
+            }
+
+            item {
                 Text(
                     text = "PANTALLAS DISPONIBLES EN ESTA APLICACIÓN",
                     color = MeetColors.cyberCyan,
@@ -270,6 +381,79 @@ fun SafetyInstitutionalPresentationScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun GuideStepCard(
+    number: String,
+    title: String,
+    body: String,
+    accent: Color,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.32f)),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(15.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                shape = RoundedCornerShape(12.dp),
+                color = accent.copy(alpha = 0.14f),
+            ) {
+                androidx.compose.foundation.layout.Box(contentAlignment = Alignment.Center) {
+                    Text(
+                        text = number,
+                        color = accent,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 14.sp,
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, color = MeetColors.textPrimary, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.height(4.dp))
+                Text(body, color = MeetColors.textSecondary, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusLegendRow(
+    label: String,
+    explanation: String,
+    color: Color,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        verticalAlignment = Alignment.Top,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(6.dp),
+            color = color.copy(alpha = 0.14f),
+        ) {
+            Text(
+                text = label,
+                color = color,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier.padding(horizontal = 7.dp, vertical = 5.dp),
+            )
+        }
+        Spacer(Modifier.width(9.dp))
+        Text(
+            text = explanation,
+            color = MeetColors.textSecondary,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
