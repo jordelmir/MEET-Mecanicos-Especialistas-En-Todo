@@ -181,12 +181,11 @@ fun DrugMarketImpunityClockCard(
                     )
                     Text(
                         text = when {
-                            record.isIntervened && isHomicide -> "JUSTICIA Y CAPTURA VERIFICADA (PRENSA)"
-                            record.isIntervened && isMissingPerson -> "PERSONA LOCALIZADA (CONFIRMADO POR PRENSA)"
-                            record.isIntervened -> "ACCIÓN OFICIAL VERIFICADA"
-                            isHomicide -> "HOMICIDIO IMPUNE · SIN JUSTICIA NI CAPTURAS"
-                            isMissingPerson -> "BÚSQUEDA ACTIVA · PERSONA NO LOCALIZADA"
-                            else -> "CRONÓMETRO DE INACCIÓN"
+                            record.isIntervened -> "ACTUALIZACIÓN APORTADA · NO VERIFICADA"
+                            record.isReactivated -> "NUEVA OBSERVACIÓN APORTADA · NO VERIFICADA"
+                            isHomicide -> "REPORTE DE HOMICIDIO"
+                            isMissingPerson -> "REPORTE DE PERSONA DESAPARECIDA"
+                            else -> "REPORTE DE ACTIVIDAD RELACIONADA CON DROGAS"
                         },
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Black,
@@ -203,7 +202,7 @@ fun DrugMarketImpunityClockCard(
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
                         Text(
-                            "CICLO ${record.cycleCount} · REINCIDENCIA",
+                            "SEGUIMIENTO ${record.cycleCount} · ACTUALIZACIONES",
                             fontSize = 9.sp,
                             fontWeight = FontWeight.Bold,
                             color = MeetColors.warning,
@@ -248,12 +247,8 @@ fun DrugMarketImpunityClockCard(
 
                 Text(
                     text = when {
-                        record.isIntervened && isHomicide -> "TIEMPO TRANSCURRIDO HASTA LA CAPTURA / ESCLARECIMIENTO"
-                        record.isIntervened && isMissingPerson -> "TIEMPO TRANSCURRIDO HASTA LA LOCALIZACIÓN"
-                        record.isIntervened -> "TIEMPO TRANSCURRIDO HASTA LA INTERVENCIÓN"
-                        isHomicide -> "TIEMPO TRANSCURRIDO SIN JUSTICIA NI CAPTURAS"
-                        isMissingPerson -> "TIEMPO DESDE LA DESAPARICIÓN REPORTADA"
-                        else -> "TIEMPO PERMITIDO SIN INTERVENCIÓN EFECTIVA"
+                        record.isIntervened -> "TIEMPO HASTA EL REGISTRO DE LA ACTUALIZACIÓN APORTADA"
+                        else -> "TIEMPO DESDE LA FECHA DE REGISTRO DEL REPORTE"
                     },
                     fontSize = 9.sp,
                     fontWeight = FontWeight.Bold,
@@ -265,23 +260,14 @@ fun DrugMarketImpunityClockCard(
             // Mandatory Legend
             Text(
                 text = when {
-                    record.isIntervened && isHomicide -> {
-                        "Las autoridades esclarecieron el homicidio y aprehendieron a los responsables tras ${formatDurationText(years, months, days, hours, minutes)}. Cobertura periodística certificada."
-                    }
-                    record.isIntervened && isMissingPerson -> {
-                        "Persona localizada tras ${formatDurationText(years, months, days, hours, minutes)} de búsqueda. Confirmado oficialmente con cobertura periodística."
-                    }
                     record.isIntervened -> {
-                        "Las autoridades intervinieron este punto tras ${formatDurationText(years, months, days, hours, minutes)}. Cobertura periodística certificada."
+                        "Se registró una actualización aportada por un usuario tras ${formatDurationText(years, months, days, hours, minutes)}. El título y el enlace son declaraciones externas no verificadas por Elysium."
                     }
-                    isHomicide -> {
-                        "Las autoridades han permanecido sin capturar a los perpetradores ni esclarecer este homicidio en esta ubicación durante este tiempo desde la fecha del reporte."
-                    }
-                    isMissingPerson -> {
-                        "Tiempo transcurrido desde la desaparición reportada. Persona aún no localizada. La búsqueda ciudadana continúa activa."
+                    record.isReactivated -> {
+                        "Se registró una nueva observación aportada por un usuario. Esta entrada no valida la observación inicial ni confirma que el hecho continúe."
                     }
                     else -> {
-                        "Las autoridades han permitido la venta de droga en esta ubicación durante este tiempo desde la creación del reporte, sin intervención efectiva verificada."
+                        "Este contador mide el tiempo desde la fecha de registro del reporte. No confirma que el incidente esté corroborado, que una persona siga desaparecida ni que una autoridad haya actuado u omitido actuar."
                     }
                 },
                 fontSize = 12.sp,
@@ -303,7 +289,7 @@ fun DrugMarketImpunityClockCard(
                             Icon(Icons.Filled.Newspaper, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                record.mediaName ?: "Medio de Comunicación",
+                                record.mediaName ?: "Fuente aportada por usuario",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MeetColors.cyberCyan,
@@ -336,9 +322,9 @@ fun DrugMarketImpunityClockCard(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     when {
-                                        isHomicide -> "VER NOTICIA DE LA CAPTURA"
-                                        isMissingPerson -> "VER NOTICIA DE LA LOCALIZACIÓN"
-                                        else -> "VER NOTICIA DEL OPERATIVO"
+                                        isHomicide -> "ABRIR FUENTE APORTADA · NO VERIFICADA"
+                                        isMissingPerson -> "ABRIR FUENTE APORTADA · NO VERIFICADA"
+                                        else -> "ABRIR FUENTE APORTADA · NO VERIFICADA"
                                     },
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
@@ -351,61 +337,31 @@ fun DrugMarketImpunityClockCard(
 
             HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
 
-            // Action Buttons
-            if (!record.isIntervened) {
-                Button(
-                    onClick = {
-                        if (pressProfile.isRegisteredPress) {
-                            showInterventionModal = true
-                        } else {
-                            showCivilianDeniedModal = true
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = when {
-                            isHomicide -> Color(0xFFB71C1C)
-                            isMissingPerson -> Color(0xFFE65100)
-                            else -> Color(0xFFC62828)
-                        },
-                        contentColor = Color.White,
-                    ),
-                ) {
-                    Icon(
-                        if (isMissingPerson) Icons.Filled.PersonSearch else Icons.Filled.Shield,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        when {
-                            isHomicide -> "DETENER CONTADOR (JUSTICIA / CAPTURA - PRENSA)"
-                            isMissingPerson -> "DETENER CONTADOR (PERSONA APARECIÓ - PRENSA)"
-                            else -> "DETENER CONTADOR (PRENSA / PERIODISTAS)"
-                        },
-                        fontWeight = FontWeight.Black,
-                        fontSize = 11.sp,
-                    )
-                }
-            } else if (!isMissingPerson && !isHomicide) {
-                // Drug sales can be reactivated by community
-                Button(
+            Button(
+                onClick = { showCivilianDeniedModal = true },
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MeetColors.cyberCyan,
+                    contentColor = Color.Black,
+                ),
+            ) {
+                Icon(Icons.Filled.Newspaper, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("APORTAR ACTUALIZACIÓN", fontWeight = FontWeight.Black, fontSize = 12.sp)
+            }
+
+            if (record.isIntervened && !isMissingPerson && !isHomicide) {
+                OutlinedButton(
                     onClick = { showReactivationModal = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFE65100),
-                        contentColor = Color.White,
-                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.warning),
+                    border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.5f)),
                 ) {
                     Icon(Icons.Filled.Warning, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("REPORTAR REINCIDENCIA (VENTA CONTINÚA)", fontWeight = FontWeight.Black, fontSize = 12.sp)
+                    Text("APORTAR NUEVA OBSERVACIÓN", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }
@@ -418,7 +374,7 @@ fun DrugMarketImpunityClockCard(
             icon = { Icon(Icons.Filled.Lock, contentDescription = null, tint = MeetColors.warning, modifier = Modifier.size(32.dp)) },
             title = {
                 Text(
-                    "Exclusivo para Medios y Periodistas",
+                    "Antes de aportar una actualización",
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     color = MeetColors.textPrimary,
@@ -428,27 +384,19 @@ fun DrugMarketImpunityClockCard(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        when {
-                            isHomicide -> "Por protocolo de rigor fáctico y justicia ciudadana, solo periodistas y medios de comunicación registrados pueden certificar la captura oficial de responsables o esclarecimiento del homicidio y detener el contador."
-                            isMissingPerson -> "Por seguridad fáctica, solo periodistas y medios de comunicación registrados pueden certificar oficialmente la localización de una persona desaparecida y detener el contador."
-                            else -> "Por protocolo de seguridad y rigor de rendición de cuentas, solo periodistas y medios de comunicación registrados pueden certificar la intervención de las autoridades y detener el cronómetro."
-                        },
+                        "El cronómetro parte de la fecha registrada del reporte. Por sí solo no prueba que el hecho haya ocurrido como fue descrito ni que una autoridad haya actuado u omitido actuar.",
                         fontSize = 13.sp,
                         color = MeetColors.textSecondary,
                         lineHeight = 18.sp,
                     )
                     Text(
-                        when {
-                            isHomicide -> "Esto evita que sicarios, cómplices o personas interesadas intenten silenciar el contador alegando falsamente que el caso ya fue resuelto."
-                            isMissingPerson -> "Esto evita que agresores o terceras personas difundan falsamente que la persona ya apareció para frenar las labores de búsqueda."
-                            else -> "Esto impide que los vendedores o terceras personas intenten apagar el contador alegando falsamente que ya no operan."
-                        },
+                        "La actualización y su enlace son datos aportados por el usuario. El sistema no autentica automáticamente la fuente ni certifica una decisión oficial.",
                         fontSize = 12.sp,
                         color = Color(0xFFFFCDD2),
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "Si eres reportero o representas un medio de prensa, puedes registrar tu acreditación a continuación.",
+                        "Puedes aportar una referencia externa. El formato válido no comprueba el origen ni el contenido de ese enlace.",
                         fontSize = 12.sp,
                         color = MeetColors.cyberCyan,
                     )
@@ -458,11 +406,11 @@ fun DrugMarketImpunityClockCard(
                 Button(
                     onClick = {
                         showCivilianDeniedModal = false
-                        showPressRegistrationModal = true
+                        showInterventionModal = true
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan, contentColor = Color.Black),
                 ) {
-                    Text("REGISTRARME COMO PRENSA", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("CONTINUAR AL FORMULARIO", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             },
             dismissButton = {
@@ -487,7 +435,7 @@ fun DrugMarketImpunityClockCard(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "Registra tus datos profesionales para tener autoridad de certificar noticias, intervenciones y resoluciones de casos.",
+                        "Los datos de medio, nombre y acreditación son autodeclarados. Guardarlos no verifica tu identidad ni concede autoridad para certificar hechos.",
                         fontSize = 12.sp,
                         color = MeetColors.textSecondary,
                     )
@@ -530,7 +478,7 @@ fun DrugMarketImpunityClockCard(
                     enabled = mediaOutletInput.isNotBlank() && journalistNameInput.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black),
                 ) {
-                    Text("GUARDAR Y CONTINUAR", fontWeight = FontWeight.Bold)
+                    Text("GUARDAR PERFIL DECLARADO", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -546,6 +494,7 @@ fun DrugMarketImpunityClockCard(
     if (showInterventionModal) {
         var headlineInput by remember { mutableStateOf("") }
         var urlInput by remember { mutableStateOf("") }
+        var sourceError by remember { mutableStateOf<String?>(null) }
 
         AlertDialog(
             onDismissRequest = { showInterventionModal = false },
@@ -560,9 +509,9 @@ fun DrugMarketImpunityClockCard(
             title = {
                 Text(
                     when {
-                        isHomicide -> "Certificar Captura o Esclarecimiento en Homicidio"
-                        isMissingPerson -> "Certificar Persona Localizada"
-                        else -> "Certificar Intervención de Autoridades"
+                        isHomicide -> "Registrar una actualización aportada"
+                        isMissingPerson -> "Registrar una actualización aportada"
+                        else -> "Registrar una actualización aportada"
                     },
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
@@ -572,17 +521,13 @@ fun DrugMarketImpunityClockCard(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "Medio: ${pressProfile.mediaOutlet} · Periodista: ${pressProfile.journalistFullName}",
+                        "Perfil declarado: ${pressProfile.mediaOutlet.ifBlank { "usuario" }} · ${pressProfile.journalistFullName.ifBlank { "sin nombre declarado" }} (no verificado)",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = MeetColors.cyberCyan,
                     )
                     Text(
-                        when {
-                            isHomicide -> "Al confirmar, el cronómetro de impunidad se detendrá con la fecha actual y se publicará tu titular confirmando la captura o resolución judicial de este homicidio."
-                            isMissingPerson -> "Al confirmar, el cronómetro de búsqueda se detendrá con la fecha actual y se publicará tu titular confirmando que la persona fue localizada."
-                            else -> "Al confirmar, el cronómetro de inacción se detendrá con la fecha actual y se publicará tu titular en este punto."
-                        },
+                        "Al guardar, el seguimiento se pausará en la fecha de esta entrada. Elysium registra el título y enlace aportados, pero no verifica automáticamente su origen ni declara confirmado el acontecimiento.",
                         fontSize = 12.sp,
                         color = MeetColors.textSecondary,
                     )
@@ -590,66 +535,75 @@ fun DrugMarketImpunityClockCard(
                     OutlinedTextField(
                         value = headlineInput,
                         onValueChange = { headlineInput = it },
-                        label = {
-                            Text(
-                                when {
-                                    isHomicide -> "Titular de la Captura / Esclarecimiento Judicial"
-                                    isMissingPerson -> "Titular de la Localización"
-                                    else -> "Titular o Resumen del Operativo"
-                                },
-                                fontSize = 12.sp,
-                            )
-                        },
-                        placeholder = {
-                            Text(
-                                when {
-                                    isHomicide -> "Ej. OIJ y Fiscalía capturan a sospechosos de homicidio en allanamiento"
-                                    isMissingPerson -> "Ej. OIJ y familiares confirman localización en buen estado"
-                                    else -> "Ej. OIJ y Fuerza Pública allanan búnker y decomisan droga"
-                                },
-                                fontSize = 12.sp,
-                            )
-                        },
+                        label = { Text("Resumen de la actualización aportada", fontSize = 12.sp) },
+                        placeholder = { Text("Ej. Se publicó una nota relacionada con este reporte", fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth(),
                     )
 
                     OutlinedTextField(
                         value = urlInput,
                         onValueChange = { urlInput = it },
-                        label = { Text("Enlace a la Noticia / Comunicado Oficial", fontSize = 12.sp) },
-                        placeholder = { Text("https://...", fontSize = 12.sp) },
+                        label = { Text("Enlace externo de referencia (requerido)", fontSize = 12.sp) },
+                        placeholder = { Text("https://sitio.example/noticia", fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                     )
+                    if (urlInput.isNotBlank() && !isValidSafetyUpdateSourceUrl(urlInput)) {
+                        Text(
+                            "El enlace debe ser una URL HTTP(S) absoluta y no puede contener credenciales.",
+                            fontSize = 11.sp,
+                            color = MeetColors.error,
+                        )
+                    }
+                    Text(
+                        "Un formato válido no verifica el origen ni el contenido del enlace.",
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                        color = MeetColors.textSecondary,
+                    )
+                    sourceError?.let { error -> Text(error, fontSize = 11.sp, color = MeetColors.error) }
+                    TextButton(onClick = {
+                        showInterventionModal = false
+                        showPressRegistrationModal = true
+                    }) {
+                        Text("Editar perfil declarado", color = MeetColors.cyberCyan)
+                    }
                 }
             },
             confirmButton = {
                 Button(
                     onClick = {
                         if (headlineInput.isNotBlank()) {
-                            store.certifyIntervention(
-                                pointId = pointId,
-                                initialReportedAt = initialReportedAt,
-                                mediaName = pressProfile.mediaOutlet,
-                                mediaUrl = urlInput,
-                                headline = headlineInput,
-                                journalistName = pressProfile.journalistFullName,
-                                clockType = clockType,
+                            normalizeSafetyUpdateSourceUrl(urlInput).fold(
+                                onSuccess = { safeUrl ->
+                                    val declaredSource = pressProfile.mediaOutlet.trim()
+                                        .takeIf { it.isNotEmpty() }
+                                        ?.let { "Fuente autodeclarada: $it" }
+                                        ?: "Fuente aportada por usuario"
+                                    store.recordExternalUpdate(
+                                        pointId = pointId,
+                                        initialReportedAt = initialReportedAt,
+                                        mediaName = declaredSource,
+                                        mediaUrl = safeUrl,
+                                        headline = headlineInput.trim(),
+                                        journalistName = pressProfile.journalistFullName.trim(),
+                                        clockType = clockType,
+                                    ).onSuccess {
+                                        showInterventionModal = false
+                                    }.onFailure { error ->
+                                        sourceError = error.message ?: "No se pudo registrar la actualización."
+                                    }
+                                },
+                                onFailure = { error ->
+                                    sourceError = error.message ?: "El enlace no es válido."
+                                },
                             )
-                            showInterventionModal = false
                         }
                     },
-                    enabled = headlineInput.isNotBlank(),
+                    enabled = headlineInput.isNotBlank() && isValidSafetyUpdateSourceUrl(urlInput),
                     colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen, contentColor = Color.Black),
                 ) {
-                    Text(
-                        when {
-                            isHomicide -> "CERTIFICAR CAPTURA / JUSTICIA"
-                            isMissingPerson -> "CERTIFICAR HALLAZGO"
-                            else -> "DETENER CRONÓMETRO"
-                        },
-                        fontWeight = FontWeight.Bold,
-                    )
+                    Text("GUARDAR ACTUALIZACIÓN APORTADA", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
@@ -668,17 +622,17 @@ fun DrugMarketImpunityClockCard(
         AlertDialog(
             onDismissRequest = { showReactivationModal = false },
             icon = { Icon(Icons.Filled.Warning, contentDescription = null, tint = MeetColors.warning, modifier = Modifier.size(32.dp)) },
-            title = { Text("Reportar Reincidencia de Venta", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary) },
+            title = { Text("Aportar nueva observación de seguimiento", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MeetColors.textPrimary) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        "¿La venta de droga continuó o se reactivó en este punto tras la intervención de las autoridades?",
+                        "¿Tienes una nueva observación o información de seguimiento relacionada con este reporte?",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.White,
                     )
                     Text(
-                        "Cualquier ciudadano puede reportar reincidencia. El cronómetro se reactivará de inmediato acumulando nuevo tiempo de inacción oficial.",
+                        "Al registrarla comenzará un nuevo tramo de seguimiento desde la fecha de esta observación. La entrada no confirma la actividad inicial, su continuidad ni la actuación de una institución.",
                         fontSize = 12.sp,
                         color = MeetColors.textSecondary,
                     )
@@ -686,8 +640,8 @@ fun DrugMarketImpunityClockCard(
                     OutlinedTextField(
                         value = reasonInput,
                         onValueChange = { reasonInput = it },
-                        label = { Text("Detalle de la Reincidencia (Opcional)", fontSize = 12.sp) },
-                        placeholder = { Text("Ej. Reanudaron la venta el mismo día en la tarde con nuevos custodios", fontSize = 12.sp) },
+                        label = { Text("Detalle de la nueva observación (opcional)", fontSize = 12.sp) },
+                        placeholder = { Text("Describe únicamente lo que observaste o la información documental que aportas", fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 2,
                     )
@@ -705,7 +659,7 @@ fun DrugMarketImpunityClockCard(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE65100), contentColor = Color.White),
                 ) {
-                    Text("REACTIVAR CRONÓMETRO", fontWeight = FontWeight.Bold)
+                    Text("REGISTRAR NUEVA OBSERVACIÓN", fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {

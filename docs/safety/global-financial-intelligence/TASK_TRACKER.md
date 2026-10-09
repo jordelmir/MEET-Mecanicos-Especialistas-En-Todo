@@ -130,3 +130,15 @@ Marcar una tarea solo cuando el cambio esté escrito. Compilación, ejecución d
 - [x] Cambiar las descripciones del Observatorio para que los tipos de fuente no se interpreten como certificación.
 - [x] Añadir política y pruebas unitarias para validar el formato HTTP(S) de referencias externas.
 - [ ] Cifrar y migrar de forma segura los perfiles en SharedPreferences antes de ofrecer garantías fuertes de privacidad.
+
+
+## Slice L — Seguimiento: reporte y actualización no son un hecho confirmado
+
+- [x] El cronómetro mide tiempo desde el reporte o hasta una actualización aportada; no infiere impunidad, captura, justicia ni inacción oficial desde la categoría.
+- [x] La antigua certificación local por prensa se presenta como actualización externa declarada y no verificada.
+- [x] Cualquier usuario puede aportar una actualización sin adquirir autoridad institucional por declarar un rol.
+- [x] Se exige referencia HTTP(S) absoluta, sin credenciales embebidas; validar el formato no autentica el contenido.
+- [x] Se mantiene el seguimiento posterior sin convertirlo en hecho confirmado.
+- [ ] Ejecutar Kotlin/Gradle/CI para este incremento.
+- [ ] Migrar perfiles locales desde SharedPreferences plano a almacenamiento cifrado con Android Keystore antes de prometer protección fuerte.
+- [ ] Probar el cronómetro en dispositivo y validar visualmente la separación entre actualización aportada y hecho corroborado.
