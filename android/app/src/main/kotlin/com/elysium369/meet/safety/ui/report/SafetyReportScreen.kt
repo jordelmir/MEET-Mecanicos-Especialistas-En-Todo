@@ -1572,14 +1572,14 @@ private fun SafetyInitialRegistrationScreen(
             )
             Text(
                 "Elige la categoría que describes para tu participación. Es un dato autodeclarado, no una validación de identidad, credencial ni autoridad.",
+                fontSize = 12.sp,
+                color = MeetColors.textSecondary,
+            )
             Text(
                 "El nombre, medio, institución o alias que aportes se asocia al reporte como declaración del usuario; no se autentica en este flujo.",
                 fontSize = 11.sp,
                 color = MeetColors.warning,
                 lineHeight = 15.sp,
-            )
-                fontSize = 12.sp,
-                color = MeetColors.textSecondary
             )
 
             // 1. Civil
