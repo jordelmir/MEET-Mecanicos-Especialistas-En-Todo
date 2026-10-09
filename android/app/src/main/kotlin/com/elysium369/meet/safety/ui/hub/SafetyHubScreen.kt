@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,12 +57,12 @@ fun SafetyHubScreen(
     onNavigateToAccountability: () -> Unit = {},
     onNavigateToObservatory: () -> Unit = {},
     onNavigateToResearch: () -> Unit = {},
+    onNavigateToInstitutionalPresentation: () -> Unit = {},
     onBack: () -> Unit = {},
     viewModel: SafetyHomeViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val view = LocalView.current
-    val showInstitutionalPresentation = rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
 
     val pulseState = when {
         uiState.error != null -> PulseState.ERROR
@@ -221,7 +220,7 @@ fun SafetyHubScreen(
                     iconColor = MeetColors.cyberCyan,
                     onClick = {
                         SafetyHaptics.selectionTick(view)
-                        showInstitutionalPresentation.value = true
+                        onNavigateToInstitutionalPresentation()
                     },
                     enabled = true,
                 )
@@ -370,52 +369,7 @@ fun SafetyHubScreen(
         }
     }
 
-    if (showInstitutionalPresentation.value) {
-        androidx.compose.ui.window.Dialog(
-            onDismissRequest = { showInstitutionalPresentation.value = false },
-            properties = androidx.compose.ui.window.DialogProperties(
-                usePlatformDefaultWidth = false,
-                decorFitsSystemWindows = false,
-            ),
-        ) {
-            Surface(
-                modifier = Modifier.fillMaxSize(),
-                color = MeetColors.backgroundDeep,
-            ) {
-                com.elysium369.meet.safety.ui.institutional.SafetyInstitutionalPresentationScreen(
-                    onBack = { showInstitutionalPresentation.value = false },
-                    onNavigateToReport = {
-                        showInstitutionalPresentation.value = false
-                        onNavigateToReport()
-                    },
-                    onNavigateToMap = {
-                        showInstitutionalPresentation.value = false
-                        onNavigateToMap()
-                    },
-                    onNavigateToMyReports = {
-                        showInstitutionalPresentation.value = false
-                        onNavigateToMyReports()
-                    },
-                    onNavigateToCases = {
-                        showInstitutionalPresentation.value = false
-                        onNavigateToCases()
-                    },
-                    onNavigateToTimelines = {
-                        showInstitutionalPresentation.value = false
-                        onNavigateToTimelines()
-                    },
-                    onNavigateToObservatory = {
-                        showInstitutionalPresentation.value = false
-                        onNavigateToObservatory()
-                    },
-                    onNavigateToResearch = {
-                        showInstitutionalPresentation.value = false
-                        onNavigateToResearch()
-                    },
-                )
-            }
-        }
-    }
+
 }
 
 @Composable
