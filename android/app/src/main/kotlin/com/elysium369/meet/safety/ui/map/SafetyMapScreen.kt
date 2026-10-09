@@ -1821,7 +1821,7 @@ private fun openWazeNavigation(context: android.content.Context, lat: Double, lo
 
 
 @Composable
-private fun MapTruthNotice() {
+internal fun MapTruthNotice() {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),

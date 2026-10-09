@@ -981,7 +981,7 @@ private fun StepEvidence(
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.safety_report_step_evidence_title), fontWeight = FontWeight.Black, fontSize = 15.sp, color = MeetColors.textPrimary)
             Text(
-                "Adjunta fotos, audios o documentos que respalden el hecho. Para videos, adjunta el link más abajo para no saturar el servidor.",
+                "Adjunta fotos, videos MP4/WebM, audios o documentos que respalden el hecho. Los archivos directos admiten hasta 20 MB; para videos mayores, usa el enlace de abajo.",
                 color = MeetColors.textSecondary,
                 fontSize = 12.sp,
             )
@@ -989,11 +989,13 @@ private fun StepEvidence(
             state.evidence.forEach { item ->
                 val evidenceIcon = when {
                     item.mimeType.startsWith("image/") -> Icons.Filled.AttachFile
+                    item.mimeType.startsWith("video/") -> Icons.Filled.Videocam
                     item.mimeType.startsWith("audio/") -> Icons.Filled.AttachFile
                     else -> Icons.Filled.AttachFile
                 }
                 val evidenceLabel = when {
                     item.mimeType.startsWith("image/") -> "📷 Imagen"
+                    item.mimeType.startsWith("video/") -> "🎬 Video"
                     item.mimeType.startsWith("audio/") -> "🎙️ Audio"
                     item.mimeType == "application/pdf" -> "📄 PDF"
                     item.mimeType.contains("word") || item.mimeType.contains("document") -> "📝 Documento"
@@ -1037,6 +1039,8 @@ private fun StepEvidence(
                     picker.launch(
                         arrayOf(
                             "image/*",
+                            "video/mp4",
+                            "video/webm",
                             "audio/*",
                             "application/pdf",
                             "text/*",
@@ -1058,7 +1062,7 @@ private fun StepEvidence(
                 Icon(Icons.Filled.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (state.staging) stringResource(R.string.safety_report_step_evidence_protecting) else "Adjuntar fotos / audios / docs",
+                    if (state.staging) stringResource(R.string.safety_report_step_evidence_protecting) else "Adjuntar evidencia",
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -1089,7 +1093,7 @@ private fun StepEvidence(
                 )
             }
             Text(
-                "Para no saturar el servidor, si quieres poner un video adjunta el link (YouTube, TikTok, Drive, redes, etc.). Al tocarlo se abrirá el video directamente.",
+                "Puedes combinar videos MP4/WebM de hasta 20 MB con enlaces compartibles a videos alojados en otras plataformas. Revisa los permisos del enlace antes de enviarlo.",
                 color = MeetColors.textSecondary,
                 fontSize = 11.sp,
                 lineHeight = 15.sp,

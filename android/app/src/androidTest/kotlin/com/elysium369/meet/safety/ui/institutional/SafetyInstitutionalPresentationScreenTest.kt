@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -82,4 +83,37 @@ class SafetyInstitutionalPresentationScreenTest {
         composeRule.onNodeWithText("Reportar un incidente").performScrollTo().performClick()
         assertTrue(reportDestinationOpened)
     }
+    @Test
+    fun pipelineStagesNavigateToExistingSafetyDestinations() {
+        composeRule.mainClock.autoAdvance = false
+        val openedDestinations = mutableListOf<String>()
+        composeRule.setContent {
+            MaterialTheme {
+                SafetyInstitutionalPresentationScreen(
+                    onBack = {},
+                    onNavigateToReport = { openedDestinations.add("report") },
+                    onNavigateToMap = { openedDestinations.add("map") },
+                    onNavigateToMyReports = { openedDestinations.add("my-reports") },
+                    onNavigateToCases = { openedDestinations.add("cases") },
+                    onNavigateToTimelines = { openedDestinations.add("timelines") },
+                    onNavigateToObservatory = { openedDestinations.add("observatory") },
+                    onNavigateToResearch = { openedDestinations.add("research") },
+                )
+            }
+        }
+
+        val routeAssertions = listOf(
+            "CAPTURAR" to "report",
+            "PRESERVAR" to "report",
+            "UBICAR" to "map",
+            "RELACIONAR" to "research",
+            "CONTRASTAR" to "research",
+            "REVISAR" to "cases",
+        )
+        routeAssertions.forEach { (stageLabel, expectedDestination) ->
+            composeRule.onNodeWithText(stageLabel).performScrollTo().performClick()
+            assertEquals("Stage $stageLabel", expectedDestination, openedDestinations.last())
+        }
+    }
+
 }

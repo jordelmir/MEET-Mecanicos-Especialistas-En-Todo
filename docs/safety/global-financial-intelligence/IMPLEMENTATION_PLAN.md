@@ -346,6 +346,8 @@ La línea financiera es secundaria y modular. Reutiliza el núcleo científico d
 
 ## 11. Orden de ejecución inmediato
 
+El seguimiento verificable por fase está en [TASK_TRACKER.md](TASK_TRACKER.md). Cada casilla distingue el código escrito de las pruebas ejecutadas.
+
 1. Corregir pruebas de UI que sigan esperando componentes ya retirados.
 2. Completar la experiencia visual de la presentación institucional con un flujo accionable de seis etapas.
 3. Añadir al mapa una explicación visible: punto accesible no equivale a incidente confirmado.
