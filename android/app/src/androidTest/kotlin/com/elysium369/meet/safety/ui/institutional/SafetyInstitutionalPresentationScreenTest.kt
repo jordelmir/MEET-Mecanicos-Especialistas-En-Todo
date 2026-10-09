@@ -36,10 +36,10 @@ class SafetyInstitutionalPresentationScreenTest {
 
         composeRule.onNodeWithText("ELYSIUM SAFETY").assertIsDisplayed()
         composeRule.onNodeWithText("PRESENTACIÓN INSTITUCIONAL").assertIsDisplayed()
-        composeRule.onNodeWithText("Reportar un incidente").assertIsDisplayed()
-        composeRule.onNodeWithText("Mapa territorial").assertIsDisplayed()
-        composeRule.onNodeWithText("Expedientes de seguridad").assertIsDisplayed()
-        composeRule.onNodeWithText("Investigación científica y cadena de evidencia").assertIsDisplayed()
+        composeRule.onNodeWithText("Reportar un incidente").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Mapa territorial").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Expedientes de seguridad").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("Investigación científica y cadena de evidencia").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("INGESTA REAL NO INTEGRADA").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("PENDIENTE DE PILOTO AUTORIZADO").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText(
