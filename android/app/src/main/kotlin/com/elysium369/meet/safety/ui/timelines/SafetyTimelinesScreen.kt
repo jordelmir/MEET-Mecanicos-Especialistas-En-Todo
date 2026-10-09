@@ -353,7 +353,7 @@ private fun TimelineCommandDeck(eventCount: Int, sourceCount: Int, evidenceCount
                 Box(Modifier.size(9.dp).clip(CircleShape).background(MeetColors.neonGreen.copy(alpha = pulse)))
             }
             Spacer(Modifier.height(10.dp))
-            Text("$eventCount hitos · $sourceCount fuentes · $evidenceCount evidencias", fontSize = 12.sp, color = MeetColors.textSecondary, fontWeight = FontWeight.SemiBold)
+            Text("$eventCount hitos · $sourceCount vínculos a fuentes · $evidenceCount vínculos a evidencia", fontSize = 12.sp, color = MeetColors.textSecondary, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.height(8.dp))
             Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(Brush.horizontalGradient(listOf(
                 MeetColors.cyberCyan.copy(alpha = pulse),

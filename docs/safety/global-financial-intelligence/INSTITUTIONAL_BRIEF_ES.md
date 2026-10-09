@@ -1,139 +1,70 @@
 # Elysium Safety
-### Plataforma tecnológica para seguridad ciudadana, evidencia y análisis territorial
+## Plataforma tecnológica para seguridad ciudadana, evidencia y análisis territorial
 
-**Elysium Safety** es un sistema tecnológico orientado a fortalecer la capacidad de ciudadanos e instituciones para **documentar, organizar, preservar, georreferenciar y analizar información relacionada con incidentes de seguridad**.
+**Elysium Safety** busca fortalecer la capacidad de ciudadanos e instituciones para documentar, organizar, preservar, georreferenciar y analizar información relacionada con incidentes de seguridad.
 
-La propuesta no busca sustituir a la Fuerza Pública, el Ministerio Público, el Organismo de Investigación Judicial ni al Poder Judicial. Busca proporcionar una **capa tecnológica de información y trazabilidad** que facilite el trabajo de las instituciones competentes.
+No pretende sustituir a la Fuerza Pública, al Organismo de Investigación Judicial, al Ministerio Público ni al Poder Judicial. Su propósito es proporcionar una capa tecnológica de información y trazabilidad que facilite el trabajo de las instituciones competentes, según sus atribuciones y permisos.
 
----
+## ¿Qué permite abordar?
 
-## ¿Qué permite Elysium Safety?
+### 1. Reportes estructurados de incidentes
+La experiencia de Safety contempla un flujo para registrar categoría, relato, relación con la información, fecha de ocurrencia, ubicación cuando se conoce y material de respaldo. Entre las categorías del producto se incluyen situaciones de violencia, asaltos, homicidios, desapariciones, amenazas, actividad relacionada con drogas y otros incidentes.
 
-### 1. Reportar incidentes de seguridad
-Permite estructurar información sobre acontecimientos como:
-- Asaltos.
-- Homicidios.
-- Desapariciones.
-- Situaciones sospechosas.
-- Violencia.
-- Narcotráfico y actividades relacionadas.
-- Emergencias.
-- Incidentes ocurridos en una determinada zona.
+La existencia de un formulario no significa que toda categoría tenga cobertura estadística completa ni que cada reporte haya sido verificado por una autoridad.
 
-El reporte puede asociarse con ubicación, fecha, hora, descripción y material de respaldo.
+### 2. Evidencia y documentos vinculados
+El código de Safety incluye almacenamiento local cifrado para adjuntos, validación de tipos/tamaño, hash SHA-256 de los bytes leídos, estados de carga y una ruta de verificación remota del contenido. La capacidad debe demostrarse en el APK y contra el almacenamiento del entorno de prueba antes de afirmarla como flujo operativo completo.
 
-### 2. Adjuntar y organizar evidencia
-Un reporte puede incorporar diferentes tipos de evidencia:
-- Fotografías.
-- Videos.
-- Documentos.
-- Información geográfica.
-- Cronología de acontecimientos.
-- Datos aportados por diferentes fuentes.
+Fotografías, audios, documentos, enlaces de vídeo, ubicación y cronología deben permanecer vinculados a su reporte con IDs estables y una procedencia rastreable. Originales y derivados deben mantenerse separados y sujetos a la política de retención correspondiente.
 
-El objetivo es evitar que información potencialmente relevante quede dispersa entre mensajes, redes sociales, fotografías o archivos aislados.
+### 3. Mapa e información territorial
+La aplicación contiene un mapa de Safety con filtros por categoría y rango temporal y rutas separadas para puntos públicos y reportes privados. Una publicación geográfica requiere autorización, precisión adecuada y controles del servidor.
 
-### 3. Georreferenciar los acontecimientos
-Los incidentes pueden visualizarse territorialmente mediante mapas.
-Esto permite identificar:
-- Dónde ocurren los eventos.
-- Concentraciones geográficas.
-- Patrones territoriales.
-- Relación entre diferentes acontecimientos.
-- Zonas que requieren mayor atención.
+Un marcador solo significa que existe un registro accesible en esa vista. No confirma por sí mismo un delito. Una capa vacía tampoco prueba que no hayan ocurrido incidentes: puede reflejar cobertura incompleta, filtros o ausencia de datos publicados.
 
-La información geográfica puede convertirse posteriormente en una herramienta de análisis para instituciones públicas.
+### 4. Trazabilidad y estados de conocimiento
+El código distingue estados de conocimiento y tiene reglas para impedir promociones automáticas de una hipótesis. La interfaz debe separar:
+- “Una persona reportó este acontecimiento”.
+- “Existe un documento que respalda una afirmación concreta”.
+- “Existen fuentes independientes que corroboran un aspecto”.
+- “Una autoridad competente confirmó determinado hecho”, solo cuando haya un registro válido que lo demuestre.
 
-### 4. Mantener trazabilidad de la información
-Elysium Safety está diseñado para distinguir entre diferentes estados de conocimiento.
+Los estados de sincronización, verificación de bytes, disponibilidad de una integración y permisos tampoco deben confundirse con el estado epistemológico.
 
-Por ejemplo:
-$$\text{OBSERVED} \longrightarrow \text{AUTHORITATIVE} \longrightarrow \text{DERIVED} \longrightarrow \text{ESTIMATED} \longrightarrow \text{UNKNOWN}$$
+### 5. Cadena de evidencia e investigación
+El repositorio contiene componentes de custodia con hashes, cadenas, checkpoints, árboles de Merkle, firma/verificación criptográfica y relaciones científicas entre entidades, afirmaciones, eventos, hipótesis y evidencia. Su ejecución, configuración y conexión completa deben verificarse para el SHA del APK que se presente.
 
-Esto es importante porque un reporte ciudadano no debe convertirse automáticamente en un "hecho probado".
+Un hash acredita igualdad de bytes comparados; no demuestra que el documento sea verdadero, que la fuente sea independiente o que el contenido sea admisible judicialmente. Tampoco se afirmará que un QR está operativo hasta verificar la ruta real del registro, su autorización y la protección de datos.
 
-El sistema puede mantener la diferencia estricta entre:
-> **"Una persona reportó este acontecimiento"**
-y:
-> **"La autoridad competente confirmó este acontecimiento".**
+### 6. Inteligencia territorial y cronología
+El conjunto de registros, filtros y líneas de tiempo puede ayudar a organizar evolución temporal y distribución geográfica. Los patrones deben tener una cobertura suficiente, período explícito, procedencia y límites. No se deben fabricar patrones, cifras ni resultados de eficacia.
 
-Esta separación reduce el riesgo de convertir rumores, hipótesis o información no verificada en conclusiones oficiales.
+### 7. Colaboración ciudadano–institución
+La plataforma pretende crear un puente tecnológico entre ciudadano, evidencia, información estructurada e institución competente. La interoperabilidad real requiere autorización, base jurídica, acuerdos, credenciales, seguridad y pruebas de extremo a extremo. El código de un gateway, sin configuración y validación con una contraparte, no demuestra una conexión operativa.
 
-### 5. Construir una cadena de evidencia
-La arquitectura permite relacionar:
-$$\text{Evento} \longrightarrow \text{Afirmación} \longrightarrow \text{Hipótesis} \longrightarrow \text{Evidencia} \longrightarrow \text{Análisis} \longrightarrow \text{Conclusión}$$
+## Estado honesto de capacidades
 
-De esta manera, una investigación puede partir de un acontecimiento concreto y posteriormente incorporar evidencia y análisis sin perder la relación entre cada elemento.
+- **Código presente:** formularios de reporte, modelos locales, adjuntos cifrados, hash y verificador, mapa, cronología, expedientes, observatorio y núcleo científico.
+- **Parcialmente integrado / por verificar:** persistencia y sincronización completa en entorno desplegado; relación completa entre evidencia y afirmaciones; exposición geográfica; activación de gates; estados remotos y recibos.
+- **Pendiente de piloto autorizado:** intercambio de datos con instituciones, protocolos de recepción, auditoría operativa y aceptación por las contrapartes.
+- **Extensión separada:** inteligencia financiera de interés público basada en fuentes documentales legalmente accesibles, con reglas explicables y revisión humana.
 
-El sistema también contempla mecanismos de integridad mediante **hashes y códigos QR**, permitiendo verificar que determinados elementos de evidencia corresponden al registro con el que fueron asociados.
-
-### 6. Crear inteligencia territorial
-Al acumular información estructurada y georreferenciada, Elysium Safety puede convertirse en una herramienta para analizar tendencias.
-
-Por ejemplo:
-- Incremento de incidentes en determinada zona.
-- Repetición de determinados tipos de eventos.
-- Evolución temporal de una problemática.
-- Relación espacial entre acontecimientos.
-- Identificación de zonas que requieren investigación o intervención.
-
-La plataforma no determina por sí misma quién es culpable. **Transforma información dispersa en información estructurada para que pueda ser analizada por las personas e instituciones responsables.**
-
-### 7. Facilitar la colaboración ciudadano–institución
-La visión de Elysium Safety es crear un puente tecnológico entre:
-$$\text{Ciudadano} \longrightarrow \text{Evidencia} \longrightarrow \text{Información estructurada} \longrightarrow \text{Institución competente}$$
-
-Esto podría facilitar que una persona pueda aportar información de manera más organizada, mientras que las instituciones puedan recibir datos con mayor contexto y trazabilidad.
-
----
-
-## Principio fundamental
-
-Elysium Safety no pretende reemplazar una investigación judicial.
-
-Su función es proporcionar infraestructura tecnológica para:
-$$\text{capturar} \longrightarrow \text{preservar} \longrightarrow \text{organizar} \longrightarrow \text{georreferenciar} \longrightarrow \text{relacionar} \longrightarrow \text{verificar} \longrightarrow \text{analizar}$$
-
-información relacionada con seguridad.
-
-La plataforma debe entenderse como una **herramienta de apoyo**, no como una autoridad que determina culpabilidad.
-
----
+La revisión de código de un SHA no sustituye la compilación, los tests del mismo commit, la prueba de staging ni la instalación del APK en el teléfono. Los materiales finales deben identificar el SHA probado y marcar como NOT_EXECUTED todo aquello que no se haya ejecutado.
 
 ## Potencial para Costa Rica
 
-Una implementación institucional adecuada podría permitir desarrollar una infraestructura nacional capaz de complementar los mecanismos existentes de seguridad mediante:
-- Participación ciudadana con salvaguardas de privacidad.
-- Evidencia digital estructurada y trazable.
-- Inteligencia territorial y análisis geoespacial.
-- Trazabilidad y cadena de custodia criptográfica.
-- Análisis de patrones y concentraciones de incidentes.
-- Interoperabilidad institucional mediante pasarelas de acceso seguro.
-- Preservación de información contra alteraciones silenciosas.
-- Mejor organización de información previa a una investigación formal.
+Una implementación institucional adecuada podría complementar los mecanismos existentes mediante participación ciudadana con salvaguardas, evidencia digital estructurada, análisis territorial, trazabilidad, cronologías reproducibles, preservación, correcciones auditables e interoperabilidad autorizada.
 
-El objetivo final es que información que actualmente puede permanecer fragmentada en teléfonos, redes sociales, conversaciones o archivos pueda convertirse en **información estructurada, trazable y potencialmente útil para las autoridades competentes**.
+No se afirma que exista un despliegue nacional ni que la plataforma haya demostrado reducir delitos. El valor propuesto es que la información potencialmente relevante no se pierda y pueda revisarse con contexto, procedencia y limitaciones.
 
 **Elysium Safety propone tecnología para que la información no se pierda.**
 
----
+## Frase para abrir la reunión
 
-## Frase para abrir la reunión con los Diputados
+> “Elysium Safety no pretende reemplazar a las autoridades ni decidir quién es culpable. Pretende resolver un problema anterior: cómo capturar, preservar, estructurar y analizar información de seguridad para que la evidencia no se pierda y pueda llegar a las instituciones competentes con trazabilidad.”
 
-> **“Elysium Safety no pretende reemplazar a las autoridades ni decidir quién es culpable. Pretende resolver un problema anterior: cómo capturar, preservar, estructurar y analizar información de seguridad para que la evidencia no se pierda y pueda llegar a las instituciones competentes con trazabilidad.”**
+## Alcance de la demostración
 
----
+La demostración para diputados se limita a Elysium Safety: reporte, evidencia, mapa, expedientes, cronología, observatorio e investigación. Esta separación es de presentación y navegación; no elimina del repositorio los módulos de mecánica, diagnóstico, movilidad, marketplace u otras capacidades de Elysium Vanguard AI OS.
 
-## Precisiones operativas y alcance de la presentación
-
-1. **Separación de marca y presentación enfocada:**
-   - El repositorio técnico base engloba la plataforma general (`MEET / Elysium Vanguard AI OS`).
-   - Para la reunión institucional con los señores y señoras diputadas, **la presentación y navegación se centran exclusivamente en Elysium Safety** (Seguridad ciudadana, gestión de evidencia y análisis territorial).
-   - **Regla de integridad arquitectónica:** No se eliminan ni destruyen los módulos de mecánica, diagnóstico ni movilidad del repositorio; la exclusión corresponde al modo de demostración y navegación institucional dedicada.
-2. **Matriz de estado honesto de capacidades:**
-   - **DEMOSTRADA:** Estructura de reportes, cadena de custodia criptográfica (SAFETY-CUSTODY-V2, hashes SHA-256, firmas Ed25519, paridad multiplataforma TS ≡ Kotlin), visualización en mapa con firewall de publicación, y reglas deterministas de rechazo a inferencias por mera riqueza visible.
-   - **PENDIENTE DE PILOTO / INTEGRACIÓN:** Pasarela de intercambio bidireccional con bases de datos del OIJ / Fuerza Pública y validación con datos oficiales del país.
-   - **PROPUESTA FUTURA:** Inteligencia financiera transnacional y correlaciones automatizadas a gran escala.
-3. **Solicitud formal a la Asamblea Legislativa:**
-   - Facilitar mesas de trabajo técnicas conjuntas con los departamentos de tecnología, análisis criminal y protección de datos (PRODHAB) de las instituciones pertinentes.
-   - Autorizar la realización de un piloto controlado con datos de prueba estructurados para validar la cadena de custodia y la privacidad territorial.
+La reunión debe mostrar capacidades verificadas y explicar qué necesita un piloto: fuente de datos autorizada, validación de privacidad, controles de acceso, recepción institucional, métricas y resultados reproducibles.

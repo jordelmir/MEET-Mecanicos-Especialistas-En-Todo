@@ -1,69 +1,156 @@
-# Elysium Safety — Baseline Audit & Reconciliation Report
-## Exact HEAD Verification & Physical Test Execution Evidence
+# Elysium Safety — Auditoría de línea base y conciliación
+## Revisión de fuente del 8 de octubre de 2026
 
-> **Audit Timestamp:** 2026-10-08T18:36:00-06:00  
-> **Parent HEAD SHA:** `f1eb6de4aeb7d1441b4cf02ec3ef0df5e7216e63`  
-> **Working Branch:** `feat/elysium-safety-intelligence-plan` (PR #56)  
-> **Commit SHA:** `6ef0fef52c09a790266a85e706ac053c17847671`  
-> **Execution Environment:** macOS (Darwin arm64), OpenJDK 17.0.18, Gradle 9.4.1, Node v26.7.0, Vitest 3.2.7  
-> **Attestation Posture:** RULE ZERO ENFORCED — No test is claimed as PASS without reproducible command execution.
+**SHA de la línea base inspeccionada:** 32f4854de1152f008e641770d706eac882ee4952  
+**Rama:** feat/elysium-safety-intelligence-plan  
+**PR:** https://github.com/jordelmir/MEET-Mecanicos-Especialistas-En-Todo/pull/56  
+**Estado del PR al inspeccionarlo:** abierto, en borrador, sin fusionar.  
+**Tipo de comprobación:** lectura estática de archivos de GitHub; no es una ejecución local ni una atestación de producción.
 
----
+> No heredar PASS de un documento o commit anterior. Este documento debe regenerarse cuando cambie el SHA auditado. En esta revisión no se ejecutaron Gradle, Vitest, migraciones PostgreSQL, RPCs, RLS ni pruebas físicas de Android.
 
-## 1. Physical Verification & Test Results (Executed on Current HEAD)
+## 1. Resultado ejecutivo
 
-### 1.1. Cross-Runtime Parity Verification (`tests/parity/ci-verify.sh`)
-- **Command:** `bash tests/parity/ci-verify.sh`
-- **Result:** **PASS (Exit code 0)**
-- **Verification Details:**
-  - TypeScript Parity: `[OK]` P0230 hash: `71b393aeb4ddbb23dc4fdeb3720450a91734ebf567a0698620b273f4b545072e`
-  - Kotlin Parity: `[OK]` `HashEngineParityTest` & `RidePricingAuthorityParityTest`
-  - Pricing Parity: `[OK]` CR_GAM canonical pricing: `currency=CRC;decimalPlaces=0;base=0;distancePerKm=300...`
-  - Byte-Exact Diff: 0 differences between TypeScript and Kotlin runtimes.
+El repositorio ya contiene una base sustancial de Safety: formulario de reporte, entidad Room y outbox, almacenamiento local cifrado de adjuntos, hash SHA-256, un verificador de bytes del lado servidor, mapa, expedientes, cronología, observatorio, entidades/afirmaciones/hipótesis/eventos científicos, migraciones de autoridad, una capa de custodia criptográfica y un gateway institucional sujeto a configuración.
 
-### 1.2. Cryptographic Custody Protocol V2 Tests (`tests/safety/*.test.ts`)
-- **Command:** `npx vitest run tests/safety/*.test.ts`
-- **Result:** **PASS (5 files, 37 tests passed, 0 failed, 547 ms)**
-  - `ed25519-verifier.test.ts`: 6 passed
-  - `cli-verifier.test.ts`: 5 passed
-  - `custody-protocol-v2.test.ts`: 10 passed
-    - Canonical Event Hash: `f40ef568a767e9a98f79c7306c4365d4d5435fe101bb613a846b00f4a90dd62a`
-    - Canonical Chain Root: `c9d4ac3b00315e177f8387737b7ceb13b4b919d9397126e64b34d1c53c5b6ca4`
-  - `evidence-verification.test.ts`: 8 passed
-  - `core-conformance.test.ts`: 8 passed
+Eso no demuestra por sí solo que todos esos componentes estén conectados y funcionando en el entorno desplegado. La evaluación correcta es: **existe código relevante para varios tramos, pero el recorrido completo de extremo a extremo permanece NOT_EXECUTED en esta revisión**.
 
-### 1.3. Android Kotlin Unit Tests (`FinancialObservationReviewPolicyTest`)
-- **Command:** `cd android && ./gradlew --no-parallel :app:testDebugUnitTest --tests "com.elysium369.meet.safety.science.domain.FinancialObservationReviewPolicyTest"`
-- **Result:** **PASS (BUILD SUCCESSFUL, 5 tests executed, 0 failures, 100% success rate)**
-  1. `visibleWealthAloneNeverQualifiesForInvestigativeReview`: **PASSED** (returns `INSUFFICIENT_EVIDENCE`)
-  2. `documentarySourceWithoutSpecificDiscrepancyIsInsufficient`: **PASSED** (returns `INSUFFICIENT_EVIDENCE`)
-  3. `unauthorizedOrUnverifiedSourceCannotQualify`: **PASSED** (returns `INSUFFICIENT_EVIDENCE`)
-  4. `multipleCopiesFromOneSourceAreNotIndependentCorroboration`: **PASSED** (identifies single source group, returns `INSUFFICIENT_EVIDENCE`)
-  5. `independentlySourcedDocumentedDiscrepancyAllowsHumanReviewOnly`: **PASSED** (2 independent source groups return `ELIGIBLE_FOR_HUMAN_REVIEW` only)
+No se encontró la tabla literalmente llamada safety_scientific_evidence_bridge en las migraciones científicas examinadas. En cambio, los archivos revisados contienen safety_scientific_claim_evidence, safety_scientific_evidence_references, safety_scientific_cases y safety_scientific_case_items. Antes de crear una tabla nueva se debe demostrar la carencia y la relación contractual que falta.
 
----
+## 2. Componentes revisados
 
-## 2. Inconsistency Reconciliation: `ELYSIUM_SAFETY_STATUS.json` vs `PRODUCTION-ATTESTATION.md`
+### Captura y persistencia Android
 
-| Item | `ELYSIUM_SAFETY_STATUS.json` | `PRODUCTION-ATTESTATION.md` | Reconciled Audit Verdict (This Run) |
-|---|---|---|---|
-| **Git HEAD** | `2d5374ac1fa7...` | Stated `main` | Reconciled to current HEAD `f1eb6de4...` / `6ef0fef5...` |
-| **Unit Tests** | 155 (118 KT + 37 TS) | 155 (118 KT + 37 TS) | **CONFIRMED & EXPANDED:** 37 TS verified + new Financial Review Policy Kotlin tests executed and passing |
-| **Custody Parity** | PASS | PASS | **PHYSICALLY VERIFIED:** Byte-exact match on `tests/parity/ci-verify.sh` and `custody-protocol-v2` |
-| **Live Supabase** | `NOT_EXECUTED` | Marked PASS | **CONSERVATIVE RECONCILIATION: PARTIALLY_EXECUTED / STAGING REQUIRED.** Migrations and RPCs are coded in source; live staging execution must be re-run per deployment |
-| **Backup/Restore** | `NOT_EXECUTED` | `NOT_EXECUTED` | **CONCUR: NOT_EXECUTED.** A formal restore test from production dump remains outstanding |
+- android/app/src/main/kotlin/com/elysium369/meet/safety/ui/report/SafetyReportViewModel.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/data/local/SafetyReportEntity.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/data/local/SafetyCommandOutboxEntity.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/evidence/SafetyEvidenceEntity.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/evidence/SafetyEvidencePolicy.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/evidence/SafetyEvidenceRepository.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/evidence/SafetyEvidenceVerificationGateway.kt
 
----
+SafetyReportViewModel modela el flujo de varios pasos, categoría, fuente/relación, relato, fecha de ocurrencia, ubicación, adjuntos, URLs de video y campos científicos opcionales. SafetyReportEntity separa localState, serverState, serverVersion y syncState. SafetyCommandOutboxEntity conserva clave de idempotencia, hash del payload, estado de la orden, contador de intentos y error.
 
-## 3. Capability Classification Matrix
+SafetyEvidenceRepository.stage comprueba sesión e ID del propietario, valida MIME contra una allowlist, limita el archivo a 20 MB mediante SafetyEvidencePolicy, lee bytes, cifra el contenido local con AEAD, escribe archivo temporal y lo renombra, calcula SHA-256 sobre los bytes leídos y persiste una entidad local. El modelo contempla uploadState y serverReceipt. SafetyEvidenceVerificationGateway solo transforma MATCH en VERIFIED; MISMATCH/QUARANTINED van a cuarentena y otros resultados continúan pendientes/error.
 
-| Capability | Status | Verified Evidence |
+**Estado:** IMPLEMENTADO EN CÓDIGO, pero flujo completo, descargas, seguridad de Storage, persistencia del recibo y comportamiento de recuperación requieren pruebas de ejecución.
+
+### Mapa territorial y visualización
+
+- android/app/src/main/kotlin/com/elysium369/meet/safety/ui/map/SafetyMapScreen.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/ui/map/SafetyMapViewModel.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/data/local/SafetyPublicPointEntity.kt
+- supabase/migrations/20260918100000_safety_public_views.sql
+- supabase/migrations/20260920010000_safety_global_citizen_map_and_withdrawal.sql
+- supabase/migrations/20260920020000_safety_geographic_timeline_search.sql
+- supabase/migrations/20260928090000_safety_publication_firewall_v3.sql
+- supabase/migrations/20260928110000_safety_case_publication_authority_v3.sql
+
+En código hay filtros por categoría y rango temporal, separación entre puntos públicos y reportes privados, búsqueda, detalle y visualización de procedencia. SafetyMapViewModel.filterFor aplica reglas locales a geoDisclosure, precisión, límites geográficos, rango y serverVersion. La pantalla muestra datos del punto y vínculos a afirmaciones/hipótesis cuando los encuentra.
+
+**Estado:** PARCIALMENTE IMPLEMENTADO. Deben probarse todas las rutas de publicación y detalle, el origen autoritativo de geoDisclosure, la precisión expuesta, la cobertura y la coincidencia entre política de servidor y presentación Android. La presencia de filtros locales no reemplaza RLS ni la política remota.
+
+### Núcleo científico, estados y relaciones
+
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/application/SafetyScienceRepository.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/data/ScientificAuthorityEntities.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/data/SafetyScientificGateway.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/data/SupabaseScientificGateway.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/domain/EvidenceAssertionState.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/domain/TruthStateMapping.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/domain/ScientificClaim.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/domain/ScientificEntity.kt
+
+En código existen entidades científicas de Room para entidades, afirmaciones, hipótesis y eventos; la capa remota envía comandos mediante RPC y describe PostgreSQL como autoridad. Las migraciones científicas definen tablas de entidades, relaciones, afirmaciones, evidencia, eventos, hipótesis, procedencia, casos, checkpoints y otros registros.
+
+**Hallazgo semántico:** TruthStateMapping convierte ESTIMATED, SIMULATED, NOT_INTEGRATED y NOT_EXECUTED en INSUFFICIENT_EVIDENCE al mapear a EvidenceAssertionState. Es conservador frente a una promoción falsa, pero colapsa diferencias útiles para auditoría. Mantener el estado original y el resultado del gate como campos diferentes antes de ampliar el contrato.
+
+Las migraciones de gates siembran varias funciones científicas desactivadas. La ejecución y configuración de esos gates en un entorno desplegado no se verificó.
+
+### Cadena de custodia e integridad criptográfica
+
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/provenance/CustodyProtocolV2.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/provenance/CustodyChain.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/provenance/MerkleTree.kt
+- packages/elysium-safety-core/src/ed25519-verifier.ts
+- supabase/functions/safety-evidence-verify/handler.ts
+- supabase/migrations/20261001010000_safety_evidence_verification_custody_v2.sql
+- supabase/migrations/20261004155000_safety_custody_v2_parity.sql
+
+Hay código para canonización de eventos, hashes, raíz de cadena, árbol de Merkle, firma/verificación Ed25519 y comparación de bytes descargados. El verificador TypeScript limita el tamaño y devuelve estados MATCH, MISMATCH, QUARANTINED o ERROR.
+
+**Estado:** IMPLEMENTADO EN CÓDIGO; paridad y pruebas de custodia no se ejecutaron contra este SHA en esta revisión. Se debe verificar también serialización byte-exacta, validación de entrada, clave pública/privada, checkpoint y significado de cada prueba de inclusión. Ningún mecanismo criptográfico prueba la verdad del contenido.
+
+### Seguridad de servidor e interoperabilidad
+
+Archivos relevantes:
+- supabase/functions/safety-institutional-gateway/auth.ts
+- supabase/functions/safety-institutional-gateway/index.ts
+- supabase/functions/safety-device-trust/*
+- supabase/migrations/20261004130000_safety_scientific_core_v1.sql
+- supabase/migrations/20261004150000_safety_scientific_immutability_and_authority.sql
+- supabase/migrations/20261004154000_safety_scientific_authority_infrastructure.sql
+- supabase/migrations/20261004160000_safety_scientific_feature_gates_and_rpcs.sql
+
+El gateway de máquina comprueba JWTs con issuer, audience, claves configuradas, firma, duración y una segunda assertion de gateway vinculada. Las migraciones contienen RLS, funciones RPC, restricciones de inmutabilidad y autoridad.
+
+**Estado:** IMPLEMENTADO EN CÓDIGO, INTEGRACIÓN OPERATIVA NO VERIFICADA. Faltan entorno de prueba autorizado, credenciales administradas, pruebas de permisos reales, trazas de ida/vuelta, auditoría de errores y aceptación institucional. No hay base para decir que ya existe intercambio operativo con una autoridad pública.
+
+### Inteligencia financiera de interés público
+
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/domain/FinancialObservationReviewPolicy.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/domain/ProcurementConcentrationRule.kt
+- android/app/src/main/kotlin/com/elysium369/meet/safety/science/domain/PublicProcurementRecordNormalizer.kt
+- pruebas correspondientes bajo android/app/src/test/kotlin/com/elysium369/meet/safety/science/domain/
+
+La política de revisión excluye observaciones de riqueza visible por sí solas y requiere material documental lícito/verificado, discrepancia específica y dos grupos independientes para ser elegible únicamente a revisión humana. La regla de concentración exige un mínimo de observaciones y ahora detiene la escalada si la procedencia está incompleta o no verificada.
+
+El normalizador actual es lógica de dominio genérica: valida campos y URL y calcula un digest de la representación normalizada. No descarga documentos originales, no tiene planificador de ingesta, no conserva los bytes originales por sí mismo, ni constituye un conector de fuente externo.
+
+**Estado:** PARCIALMENTE IMPLEMENTADO. La ingesta documental real, la autoridad de la procedencia, el almacenamiento y la validación de datasets permanecen pendientes.
+
+## 3. Matriz consolidada
+
+| Requisito | Estado | Evidencia o brecha principal |
 |---|---|---|
-| **Safety Constitution Invariants** | IMPLEMENTED & TESTED | `docs/safety/SAFETY_CONSTITUTION.md`, unit tests in `core-conformance.test.ts` |
-| **Cryptographic Custody (SAFETY-CUSTODY-V2)** | IMPLEMENTED & TESTED | TS $\equiv$ Kotlin parity verified; Ed25519 verification passing |
-| **Publication Firewall & Map Projection** | IMPLEMENTED IN SOURCE | `safety_public_points` projection, spatial jitter, and RLS rules coded |
-| **Institutional Gateway & Audit Logs** | IMPLEMENTED IN SOURCE | Migrations `20261001040000`, `20261004130000`, `20261004160000` |
-| **Wealth-Only Non-Inference Guard** | IMPLEMENTED & TESTED | `FinancialObservationReviewPolicy.kt` + 5 unit tests passing |
-| **Costa Rica SICOP Procurement Adapter** | IN PROGRESS (Slice C) | Specification drafted in `SOURCE_ADAPTER_CONTRACT.md` |
-| **Deterministic Anomaly Engine** | IN PROGRESS (Slice E) | Rule design drafted; zero-wealth input guard enforced |
-| **Institutional Demo Mode** | IN PROGRESS (Slice F) | Navigation abstraction drafted in `ARCHITECTURE_DECISIONS.md` |
+| Reportes de incidentes estructurados | PARCIALMENTE IMPLEMENTADO | UI/ViewModel, entidad Room, RPC de creación; ejecución E2E no realizada aquí |
+| Adjuntos multimedia y cifrado local | IMPLEMENTADO EN CÓDIGO | AEAD, allowlist, límite de tamaño, hash de bytes; prueba física no ejecutada |
+| Hash y verificación de bytes en servidor | IMPLEMENTADO EN CÓDIGO | Edge handler de verificación; staging/Storage/RLS no ejecutados |
+| Mapa público y reportes privados | PARCIALMENTE IMPLEMENTADO | ViewModel, proyecciones y migraciones; revisión de exposición y prueba negativa pendientes |
+| Cronología y expediente | PARCIALMENTE IMPLEMENTADO | Pantallas/modelos; replay y trazabilidad E2E pendientes |
+| Cadena evento–claim–fuente–evidencia–hipótesis | PARCIALMENTE IMPLEMENTADO | Modelos, relaciones, referencias y tablas SQL; grafo completo no verificado en ejecución |
+| Estados epistemológicos | IMPLEMENTADO EN CÓDIGO, BRECHA SEMÁNTICA | Mapeo conservador colapsa algunos estados del OS |
+| Custodia criptográfica y firma | IMPLEMENTADO EN CÓDIGO | Código Kotlin/TS/SQL; pruebas actuales no ejecutadas en esta revisión |
+| Reglas contra riqueza visible | IMPLEMENTADO EN CÓDIGO | Policy y tests existentes; resultado de tests en este SHA pendiente |
+| Fuente documental externa | DOCUMENTADO / NORMALIZADOR DE DOMINIO | No hay adaptador vivo demostrado |
+| AI grounding y defensa de documentos hostiles | PENDIENTE DE VALIDACIÓN | Requiere pruebas adversariales, referencias de fuente y límites de tool |
+| Gateway institucional | CÓDIGO DISPONIBLE; NO VERIFICADO EN VIVO | Requiere issuer/JWKS, gateway assertion, autorización y pruebas E2E |
+| Preparación del APK actual | NOT EXECUTED EN ESTA AUDITORÍA | No se compiló ni instaló el APK de este SHA |
+
+## 4. Riesgos a priorizar
+
+1. **P0 — Autoridad de estados:** comprobar que ningún cliente ni IA promueve afirmaciones o evidencia sin una transición autorizada de servidor.
+2. **P0 — Publicación geográfica:** probar que coordenadas y metadatos sensibles no salen por detalles, exportaciones, notificaciones o endpoints alternativos.
+3. **P0 — Recibo remoto:** demostrar que un éxito visible requiere recibo remoto válido; el estado local o una respuesta ambigua nunca bastan.
+4. **P1 — Custodia de bytes:** probar original → almacenamiento → verificación → recibo, incluyendo hash incorrecto, archivo corrupto, error y repetición.
+5. **P1 — Puente de modelos:** reconciliar los nombres de tablas/relaciones reales antes de crear otro bridge.
+6. **P1 — Estado epistemológico:** preservar el estado original y distinguirlo del gate conservador de revisión.
+7. **P1 — Fuentes externas:** no afirmar ingestión real hasta que exista fuente legítima, cobertura medida, procedencia de servidor y tests.
+8. **P2 — Experiencia visual:** mejorar comprensión de los flujos sin sacrificar accesibilidad, rendimiento o exactitud de métricas.
+
+## 5. Estado de pruebas y CI
+
+En la consulta de línea base, los runs de CI y gates del commit estaban en cola o pendientes y no ofrecían una conclusión final. No se declara PASS en este documento.
+
+Ejecutar localmente cuando haya checkout de la rama:
+- cd android && ./gradlew :app:testDebugUnitTest --no-daemon
+- cd android && ./gradlew :app:assembleDebug --no-daemon
+- cd android && ./gradlew :app:assembleDebugAndroidTest --no-daemon
+- bash tests/parity/ci-verify.sh
+- npx vitest run tests/safety/*.test.ts
+
+Los comandos anteriores son el protocolo de verificación esperado, no resultados ejecutados durante la auditoría.
+
+## 6. Criterio de cierre de auditoría
+
+La auditoría de código estática establece la línea base y los riesgos; el cierre operativo requiere los tests del SHA final, pruebas SQL/RLS en entorno autorizado, verificación del APK físico y reproducción de un recorrido completo desde el reporte hasta el recibo, mapa y expediente revisable.

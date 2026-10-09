@@ -45,17 +45,19 @@ class SafetyInstitutionalPresentationScreenTest {
         composeRule.onNodeWithText("Siguiente etapa").performScrollTo().performClick()
         composeRule.mainClock.advanceTimeBy(500)
         composeRule.onNodeWithText("Conserva el material original").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("FLUJO DE INFORMACIÓN · 6 ETAPAS").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("CAPTURAR").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("PRESERVAR").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("UBICAR").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("RELACIONAR").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("CONTRASTAR").performScrollTo().assertIsDisplayed()
+        composeRule.onNodeWithText("REVISAR").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("QUÉ SIGNIFICA CADA ESTADO").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Reportar un incidente").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Mapa territorial").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Expedientes de seguridad").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("Investigación científica y cadena de evidencia").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText("INGESTA REAL NO INTEGRADA").performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithText("PENDIENTE DE PILOTO AUTORIZADO").performScrollTo().assertIsDisplayed()
-        composeRule.onNodeWithText(
-            "El adaptador de normalización y la regla de concentración existen como lógica de dominio.",
-            substring = true,
-        ).performScrollTo().assertIsDisplayed()
     }
 
     @Test

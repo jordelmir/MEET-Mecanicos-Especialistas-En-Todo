@@ -1,124 +1,156 @@
-# Elysium Safety — Domain Model & Epistemic Contracts
-## Public-Interest Financial Intelligence & Investigative Evidence
+# Elysium Safety — Modelo de dominio y contratos epistemológicos
+## Documento vivo que distingue código existente de arquitectura objetivo
 
-> **Epistemic Invariant:**  
-> $$\text{OBSERVED} \longrightarrow \text{AUTHORITATIVE} \longrightarrow \text{DERIVED} \longrightarrow \text{ESTIMATED} \longrightarrow \text{UNKNOWN}$$  
-> State transitions are unidirectional and require verifiable proof.  
-> An allegation, visible lifestyle, or AI inference can never unilaterally promote a state to `AUTHORITATIVE`.
+**SHA de línea base revisada:** 32f4854de1152f008e641770d706eac882ee4952
 
----
+> Invariantes: CLAIM ≠ CONVICTION · REPORT ≠ VERIFIED FACT · ANOMALY ≠ CRIME · CORRELATION ≠ CAUSATION · AI OUTPUT ≠ FACT.
 
-## 1. Domain Entities
+## 1. Entidades existentes que deben reutilizarse
 
-```mermaid
-erDiagram
-    InvestigativeCase ||--o{ SourceRecord : references
-    InvestigativeCase ||--o{ EconomicEntity : investigates
-    EconomicEntity ||--o{ EntityRelationship : participates
-    SourceRecord ||--o{ EvidenceReference : backs
-    SourceRecord ||--o{ FinancialObservation : documents
-    EntityRelationship ||--o{ InvestigativeSignal : triggers
-    InvestigativeSignal ||--o{ ReviewDecision : requires
-    ReviewDecision ||--o{ AccessAuditEvent : audited_by
-```
+### 1.1 Reporte de seguridad
+El modelo Room SafetyReportEntity contiene identificador estable, propietario, categoría, payloadId, occurredAt, localState, serverState, serverVersion, syncState y timestamps de creación/actualización. El payload y los metadatos asociados se gestionan desde el repositorio y el contrato remoto existentes.
 
-### 1.1. `InvestigativeCase`
-Represents an authorized, bounded investigative workspace.
-- `caseId`: UUID (stable identifier).
-- `title`: String (descriptive title).
-- `purposeAndScope`: String (legal/journalistic rationale; required).
-- `responsibleOrganization`: String (institution, newsroom, or research unit).
-- `accessClassification`: Enum (`RESTRICTED_INTERNAL`, `CONFIDENTIAL`, `APPROVED_FOR_DISCLOSURE`).
-- `lifecycleState`: Enum (`DRAFT`, `SUBMITTED`, `SOURCE_VALIDATION`, `CORROBORATION`, `ANALYST_REVIEW`, `EDITORIAL_REVIEW`, `DISCLOSURE_APPROVED`, `CLOSED_OR_CORRECTED`).
-- `createdAt` / `updatedAt`: ISO-8601 UTC.
-- `retentionPolicy`: String (legal preservation or scheduled archival policy).
+Requisito: distinguir al menos:
+- cuándo ocurrió el acontecimiento, si se conoce;
+- cuándo se registró o conoció la información;
+- fuente/relación de la persona con la información;
+- ubicación, precisión y origen de ubicación;
+- estado local, estado remoto y versión remota;
+- relato, adjuntos y enlaces relacionados;
+- incertidumbres, correcciones y contradicciones.
 
-### 1.2. `SourceRecord`
-An authentic, lawfully obtained document or public record.
-- `sourceRecordId`: UUID.
-- `sourceType`: Enum (`PUBLIC_PROCUREMENT`, `CORPORATE_REGISTRY`, `OFFICIAL_AUDIT`, `JUDICIAL_DECISION`, `REGULATORY_SANCTION`, `AUTHORIZED_SUBMISSION`).
-- `publisherAuthority`: String (e.g., "SICOP Costa Rica", "Contraloría General de la República").
-- `canonicalUrl`: String (URL or official archive identifier).
-- `publicationDate`: ISO-8601 UTC (when published by the authority).
-- `retrievalTimestamp`: ISO-8601 UTC (when ingested by the system).
-- `contentSha256`: String (64 hex characters, byte-exact digest of original).
-- `legalProvenanceBasis`: String (legal foundation for access and processing).
-- `reliabilityAssessment`: Enum (`AUTHENTIC_OFFICIAL`, `PUBLIC_REGISTERED`, `CORROBORATED_INDEPENDENT`, `UNVERIFIED_PENDING`).
-- `isSuperseded`: Boolean (true if newer official document modified or retracted this).
+No crear una segunda tabla de reportes si los contratos vigentes pueden ampliarse aditivamente.
 
-### 1.3. `EconomicEntity`
-A legal or corporate entity appearing in documentary evidence.
-- `entityId`: UUID.
-- `entityType`: Enum (`LEGAL_ENTITY_CORPORATION`, `PUBLIC_INSTITUTION`, `DOCUMENTED_ASSET`, `CONTRACT_TENDER`).
-- `jurisdiction`: ISO 3166-1 alpha-2 (e.g., `CR`).
-- `canonicalTaxId`: String (e.g., Cédula Jurídica `3-101-XXXXXX`).
-- `registeredName`: String (official registered legal name).
-- `aliases`: List of String (trade names, previous corporate names with source references).
-- `resolutionConfidence`: Enum (`EXACT_IDENTIFIER_MATCH`, `PROBABLE_MATCH_REVIEW_REQUIRED`, `UNRESOLVED_CANDIDATE`, `REJECTED_MATCH`).
-- *Strict Rule:* Never automatically merge two entities solely by partial name or shared municipality without matching tax ID or corroborating corporate registry filings.
+### 1.2 Evidencia
+SafetyEvidenceEntity conserva ID, reportId, ownerUserId, ruta local cifrada, contentSha256, mimeType, byteCount, stagedAt, uploadState, attemptCount, lastErrorCode y serverReceipt.
 
-### 1.4. `EntityRelationship`
-A documented or hypothesized link between two economic entities.
-- `relationshipId`: UUID.
-- `sourceEntityId`: UUID.
-- `targetEntityId`: UUID.
-- `relationshipType`: Enum (`CONTRACT_AWARDED_TO`, `CORPORATE_SHAREHOLDER`, `LEGAL_REPRESENTATIVE`, `SUBSIDIARY_OF`, `JOINT_VENTURE_PARTNER`).
-- `validTimeRange`: Start and End timestamps of the relationship.
-- `sourceRecordId`: UUID (the underlying document establishing the connection).
-- `epistemicStatus`: Enum (`DOCUMENTED_FACT`, `CORROBORATED_LINK`, `HYPOTHETICAL_CANDIDATE`).
-- `uncertaintyNotes`: String (explicit documentation of gaps or alternative interpretations).
+Requisitos objetivo:
+- hash de bytes originales, no únicamente del nombre o de un objeto normalizado;
+- vínculo explícito con reporte y, cuando proceda, afirmación;
+- registro de incorporación, verificación, descarga, derivación y exportación;
+- separación entre original y cualquier thumbnail, transcripción, resumen u otro derivado;
+- retención por política y base jurídica; no prometer retención infinita en todos los casos;
+- cualquier corrección debe ser atribuible, conservando el historial autorizado.
 
-### 1.5. `FinancialObservation`
-A specific monetary transaction or contractual amount.
-- `observationId`: UUID.
-- `amountMinorUnits`: Long (integer minor units, e.g., cents or colones without floating-point error).
-- `currencyCode`: ISO 4217 (e.g., `CRC`, `USD`, `EUR`).
-- `observationDate`: ISO-8601 UTC.
-- `sourceRecordId`: UUID.
-- `observationType`: Enum (`CONTRACT_AWARD_VALUE`, `DISCLOSED_PAYMENT`, `AUDIT_DISCREPANCY_AMOUNT`).
-- `nature`: Enum (`DOCUMENTED_TRANSACTION`, `MODEL_ESTIMATE`).
+### 1.3 Núcleo científico existente
+El repo contiene SciEntityEntity, SciClaimEntity, SciHypothesisEntity y SciEventEntity en los modelos de la capa científica. ScientificAuthorityEntities.kt define entidades para comandos/outbox y registros de autoridad. SafetyScienceRepository usa AssertionStateMachine; SupabaseScientificGateway encapsula operaciones RPC.
 
-### 1.6. `InvestigativeSignal`
-A deterministic alert generated by explainable rules.
-- `signalId`: UUID.
-- `ruleId`: String & Version (e.g., `PROCUREMENT_CONCENTRATION_v1`).
-- `inputEntityIds`: List of UUIDs.
-- `inputSourceRecordIds`: List of UUIDs.
-- `deterministicExplanation`: String (step-by-step formula and thresholds evaluated).
-- `alternativeHypotheses`: List of String (mandatory legitimate business explanations).
-- `dataCompleteness`: Enum (`COMPLETE_COVERAGE`, `PARTIAL_COVERAGE`, `INSUFFICIENT_DATA`).
-- `humanReviewState`: Enum (`PENDING_REVIEW`, `REVIEWED_DISMISSED`, `REVIEWED_CORROBORATED`).
-- *Strict Rule:* Signals evaluate patterns in documented transactions, never personal lifestyles or presumed individual criminality.
+Las entidades de dominio ScientificEntity, ScientificClaim, ScientificClaimRelation y TemporalScope expresan identificadores, afirmaciones, evidencias que apoyan/contradicen, relaciones entre claims y dimensiones temporales.
 
-### 1.7. `ReviewDecision`
-The binding evaluation of an authorized investigator or editor.
-- `decisionId`: UUID.
-- `caseId`: UUID.
-- `reviewerId`: UUID (authenticated authority).
-- `disposition`: Enum (`INSUFFICIENT_EVIDENCE`, `ELIGIBLE_FOR_HUMAN_REVIEW`, `DISMISSED_EXPLAINED`, `PROMOTED_FOR_DISCLOSURE`).
-- `supportingEvidenceIds`: Set of UUIDs.
-- `contradictoryEvidenceIds`: Set of UUIDs (preserves evidence refuting the hypothesis).
-- `rationale`: String.
-- `timestamp`: ISO-8601 UTC.
+No duplicar estos objetos en un segundo sistema de investigación. Mapear firmas y consumidores reales antes de cambiar esquema.
 
----
+### 1.4 Registro de fuente y procedencia
+Modelo objetivo, que debe mapearse a las tablas reales antes de implementarlo:
 
-## 2. Epistemic Contract & Chain of Custody
+- Identificador estable de fuente.
+- Tipo, autoridad emisora, jurisdicción y URL/identificador original.
+- Fecha de publicación y de recuperación.
+- Método/versión de extracción.
+- Hash de bytes originales y hash de la representación normalizada como propiedades distintas.
+- Base legal y permisos de uso.
+- Estado de autenticación/verificación con fundamento explícito.
+- Cobertura, caducidad, corrección o supersesión.
+- Limitaciones, error de parser y datos desconocidos.
 
-The financial intelligence extension maps directly to the existing scientific core:
-- **`ScientificEntity`** $\longleftrightarrow$ `EconomicEntity`
-- **`ScientificClaim`** $\longleftrightarrow$ Documented relationship or transaction claim
-- **`ScientificHypothesis`** $\longleftrightarrow$ Investigative anomaly hypothesis
-- **`CustodyProtocolV2`** $\longleftrightarrow$ Cryptographic manifest, canonical JSON, SHA-256 event hash, Ed25519 signature
+La presencia de un archivo o URL no autoriza a marcar sourceVerified o lawfullyObtained como true. Esos valores deben venir de una autoridad de procedencia confiable.
 
-```text
-[ Authentic Source Record ]
-       ↓  (Extract bytes)
-[ Canonical JSON + SHA-256 Hash ]
-       ↓  (Custody Event: SOURCE_INGESTED)
-[ Provenance Chain Root ]
-       ↓  (Deterministic Rule Engine)
-[ InvestigativeSignal with Alternative Hypotheses ]
-       ↓  (Human Review Decision with 2+ Independent Sources)
-[ Case File with Audit Receipt ]
-```
+### 1.5 Entidad y relación
+ScientificEntity tiene tipo, nombre canónico, alias, identificadores externos y estado de aserción. EntityRelation mantiene sujetos/objetos, tipo, intervalo de vigencia, evidencia de apoyo y estado de aserción.
+
+Reglas:
+- no fusionar dos entidades por similitud de nombre, dirección, apellido o proximidad;
+- los identificadores ausentes o en conflicto dejan la relación sin resolver y requieren revisión;
+- cada relación documentada debe tener fuente verificable;
+- las relaciones inferidas deben quedar marcadas como hipótesis, incluyendo alternativas;
+- conservar el valor original de cada documento junto a cualquier valor normalizado.
+
+### 1.6 Señal analítica
+Las reglas deterministas deben producir entradas, versión, fórmula, ventana temporal, muestra, cobertura, referencias de fuente, alternativas, datos faltantes y resultado reproducible.
+
+Una señal significa que se cumple una regla estadística/de documentación, no que ocurrió un delito. No debe haber puntuación pública de criminalidad de personas.
+
+## 2. Estados: dominios distintos, sin mezclarlos
+
+### 2.1 Estados de conocimiento
+El OS mantiene TruthState con valores tales como OBSERVED, AUTHORITATIVE, DERIVED, ESTIMATED, SIMULATED, UNKNOWN, NOT_INTEGRATED y NOT_EXECUTED. La capa científica usa EvidenceAssertionState con OBSERVED, DOCUMENTED, AUTHORITATIVE, CORROBORATED, DERIVED, estados analíticos y estados negativos/indeterminados.
+
+No se debe crear un enum duplicado con semántica supuestamente idéntica. El mapeo entre ambos debe estar documentado y probado.
+
+### 2.2 Brecha semántica que debe solucionarse
+TruthStateMapping actualmente mapea ESTIMATED, SIMULATED, NOT_INTEGRATED y NOT_EXECUTED a INSUFFICIENT_EVIDENCE. Es conservador para impedir una elevación, pero pierde cuál fue el estado original.
+
+Solución objetivo: conservar el estado original o un metadato de procedencia junto al resultado de elegibilidad. El gate puede negar revisión, pero el registro debe permitir saber si el origen fue estimado, simulado, no integrado, no ejecutado o desconocido. Cualquier cambio de contrato requiere actualización coordinada de Kotlin, TypeScript y SQL, con migración aditiva y pruebas de paridad.
+
+### 2.3 Estados de flujo que son diferentes
+No mezclar estas categorías:
+
+- Epistemología: qué se conoce y con qué fundamento.
+- Sincronización: LOCAL/PENDING/IN_FLIGHT/ACKNOWLEDGED/CONFLICT/ERROR según el contrato vigente.
+- Verificación criptográfica: MATCH/MISMATCH/QUARANTINED/ERROR.
+- Publicación: borrador, pendiente de revisión, autorizado, retirado o corregido.
+- Permisos: permitido/denegado para actor, organización, finalidad y recurso.
+- Integración: disponible, pendiente, no integrada o no ejecutada.
+
+Un envío local nunca se traduce automáticamente en recepción remota. Una verificación MATCH tampoco significa que el contenido sea verdadero.
+
+## 3. Ciclo de vida de una afirmación
+
+- Crear: estado inicial OBSERVED según el contrato existente.
+- Adjuntar referencias a evidencia y contraevidencia.
+- Registrar el método y la justificación de transición.
+- Cambiar de estado únicamente mediante la máquina de estados y autoridad correspondiente.
+- Conservar quién, cuándo, por qué y qué fuentes soportaron la transición.
+- Permitir hipótesis alternativas y refutación.
+- Registrar corrección o retirada como evento nuevo cuando lo exige la política de inmutabilidad.
+- Bloquear la promoción automática por IA o por un reportante.
+
+No introducir una nueva máquina paralela sin demostrar que AssertionStateMachine no satisface el caso.
+
+## 4. Modelo de divulgación
+
+Clases conceptuales:
+- PRIVADO: información aportada por una fuente o reporte privado.
+- RESTRINGIDO: expediente accesible a un grupo autorizado.
+- PUBLICABLE: registro revisado para una finalidad y público definidos.
+- AGREGADO: proyección territorial con granularidad y retraso autorizados.
+- FUENTE DOCUMENTAL PÚBLICA: registro externo cuyo uso y retención están permitidos.
+- RETIRADO/CORREGIDO: publicación cambiada, con historial conforme a las obligaciones de retención.
+
+Estos niveles conceptuales no sustituyen los permisos reales de RLS, Storage o RPC. La autorización debe imponerse en el servidor.
+
+## 5. Dominio de inteligencia financiera separado
+
+Modelos objetivo:
+- SourceRecord
+- EconomicEntity
+- EntityRelationship
+- FinancialObservation
+- InvestigativeSignal
+- ReviewDecision
+- AccessAuditEvent
+
+Estos nombres son conceptos de trabajo, no autorización para crear nuevas tablas inmediatamente. Primero se comparan con safety_scientific_entities, safety_scientific_entity_relations, safety_scientific_claim_evidence, safety_scientific_evidence_references, safety_scientific_cases, safety_scientific_case_items y el resto del esquema real.
+
+La línea financiera solo procesa documentación lícita y pertinente. Riqueza visible por sí sola no cuenta como evidencia de ilegalidad. Las reglas son reproducibles, se limitan a relaciones documentadas y requieren revisión humana. No hay ingreso de datos externo activo hasta probar un adaptador real.
+
+## 6. Relaciones y custodia
+
+Modelo conceptual:
+Evento → Afirmación → Fuente → Evidencia → Hipótesis → Análisis → Revisión.
+
+Cada flecha requiere referencia estable, relación con semántica precisa, estado y evidencia de respaldo o una marca explícita de hipótesis. Debe ser posible recorrer la relación hasta el origen y ver contraevidencia.
+
+Los hashes prueban igualdad de bytes comparados. Una firma relaciona contenido con una clave. Un árbol de Merkle prueba las propiedades de inclusión implementadas sobre una raíz. Ninguno de estos mecanismos valida por sí solo la verdad del documento, la identidad real del autor o la admisibilidad judicial.
+
+## 7. Cambios de datos permitidos
+
+Antes de cada migración:
+1. fijar SHA y esquema de partida;
+2. identificar consultas, vistas, funciones y consumidores;
+3. definir rollback/forward-fix y compatibilidad;
+4. agregar constraints e índices solo a partir de uso real;
+5. probar permisos y aislamiento de tenants;
+6. verificar aplicación desde esquemas soportados;
+7. preservar contratos con clientes de versiones anteriores.
+
+No se autoriza crear un bridge, segundo outbox, fuente de verdad o entidad de evidencia duplicada sin un ADR basado en código y consultas reales.

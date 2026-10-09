@@ -188,6 +188,15 @@ fun SafetyInstitutionalPresentationScreen(
             }
 
             item {
+                SafetyPipelineCard(
+                    onNavigateToReport = onNavigateToReport,
+                    onNavigateToMap = onNavigateToMap,
+                    onNavigateToResearch = onNavigateToResearch,
+                    onNavigateToCases = onNavigateToCases,
+                )
+            }
+
+            item {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -969,6 +978,184 @@ private fun StatusNoticeCard(
                 color = MeetColors.textSecondary,
                 style = MaterialTheme.typography.bodySmall,
             )
+        }
+    }
+}
+
+
+/**
+ * Interactive map of the information lifecycle. Every action reuses an existing
+ * Safety destination; none of these cards implies a live institutional integration.
+ */
+@Composable
+private fun SafetyPipelineCard(
+    onNavigateToReport: () -> Unit,
+    onNavigateToMap: () -> Unit,
+    onNavigateToResearch: () -> Unit,
+    onNavigateToCases: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(
+            1.dp,
+            Brush.linearGradient(
+                listOf(
+                    MeetColors.cyberCyan.copy(alpha = 0.72f),
+                    MeetColors.electricBlue.copy(alpha = 0.48f),
+                    MeetColors.hotMagenta.copy(alpha = 0.46f),
+                ),
+            ),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(
+                            MeetColors.electricBlue.copy(alpha = 0.10f),
+                            MeetColors.cardBackground,
+                            MeetColors.hotMagenta.copy(alpha = 0.07f),
+                        ),
+                    ),
+                )
+                .padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Column {
+                Text(
+                    "FLUJO DE INFORMACIÓN · 6 ETAPAS",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 1.25.sp,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Del reporte a un expediente revisable",
+                    color = MeetColors.textPrimary,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text(
+                    "Cada etapa abre herramientas existentes; la disponibilidad de datos y los permisos siguen siendo los reales de la sesión.",
+                    color = MeetColors.textSecondary,
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                )
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SafetyPipelineStage(
+                    number = "01",
+                    title = "CAPTURAR",
+                    detail = "Reporte, relato y fecha",
+                    icon = Icons.Filled.ReportProblem,
+                    accent = MeetColors.neonGreen,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToReport,
+                )
+                SafetyPipelineStage(
+                    number = "02",
+                    title = "PRESERVAR",
+                    detail = "Adjuntos y estado de custodia",
+                    icon = Icons.Filled.CheckCircle,
+                    accent = MeetColors.electricBlue,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToReport,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SafetyPipelineStage(
+                    number = "03",
+                    title = "UBICAR",
+                    detail = "Tiempo, territorio y filtros",
+                    icon = Icons.Filled.Map,
+                    accent = MeetColors.cyberCyan,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToMap,
+                )
+                SafetyPipelineStage(
+                    number = "04",
+                    title = "RELACIONAR",
+                    detail = "Fuentes, afirmaciones e hipótesis",
+                    icon = Icons.Filled.Timeline,
+                    accent = MeetColors.hotMagenta,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToResearch,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SafetyPipelineStage(
+                    number = "05",
+                    title = "CONTRASTAR",
+                    detail = "Procedencia y contradicciones",
+                    icon = Icons.Filled.Analytics,
+                    accent = MeetColors.electricBlue,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToResearch,
+                )
+                SafetyPipelineStage(
+                    number = "06",
+                    title = "REVISAR",
+                    detail = "Expedientes disponibles",
+                    icon = Icons.Filled.FolderOpen,
+                    accent = MeetColors.warning,
+                    modifier = Modifier.weight(1f),
+                    onClick = onNavigateToCases,
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MeetColors.backgroundDeep,
+                border = BorderStroke(1.dp, MeetColors.borderSubtle),
+            ) {
+                Text(
+                    "Un reporte no es una confirmación. Un hash no demuestra la verdad del contenido. Compartir con una institución requiere autorización y una integración validada.",
+                    color = MeetColors.textSecondary,
+                    fontSize = 10.sp,
+                    lineHeight = 14.sp,
+                    modifier = Modifier.padding(10.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SafetyPipelineStage(
+    number: String,
+    title: String,
+    detail: String,
+    icon: ImageVector,
+    accent: Color,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.height(94.dp),
+        shape = RoundedCornerShape(13.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+        border = BorderStroke(0.8.dp, accent.copy(alpha = 0.62f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        Column(
+            Modifier.fillMaxSize().padding(9.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = accent, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(5.dp))
+                Text(number, color = accent, fontSize = 9.sp, fontWeight = FontWeight.Black)
+            }
+            Column {
+                Text(title, color = MeetColors.textPrimary, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                Text(detail, color = MeetColors.textSecondary, fontSize = 9.sp, lineHeight = 11.sp)
+            }
         }
     }
 }

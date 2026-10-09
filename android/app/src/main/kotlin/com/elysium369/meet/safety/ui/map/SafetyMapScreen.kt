@@ -46,6 +46,7 @@ import com.elysium369.meet.safety.drugimpunity.DrugMarketImpunityClockCard
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -163,6 +164,8 @@ fun SafetyMapScreen(
                 SafetyMetricCard(stringResource(R.string.safety_map_my_reports), state.privatePoints.size.toString(), MeetColors.neonGreen, Modifier.weight(1f))
                 SafetyMetricCard(stringResource(R.string.safety_map_public_points), state.points.size.toString(), MeetColors.textPrimary, Modifier.weight(1f))
             }
+
+            MapTruthNotice()
 
             // Search Bar
             OutlinedTextField(
@@ -1812,6 +1815,54 @@ private fun openWazeNavigation(context: android.content.Context, lat: Double, lo
             context.startActivity(playIntent)
         } catch (_: Exception) {
             // Silently fail if even Play Store is not available
+        }
+    }
+}
+
+
+@Composable
+private fun MapTruthNotice() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(
+            1.dp,
+            Brush.linearGradient(
+                listOf(
+                    MeetColors.cyberCyan.copy(alpha = 0.65f),
+                    MeetColors.electricBlue.copy(alpha = 0.45f),
+                    MeetColors.hotMagenta.copy(alpha = 0.28f),
+                ),
+            ),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Filled.Info,
+                contentDescription = null,
+                tint = MeetColors.cyberCyan,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    "LECTURA RESPONSABLE DEL MAPA",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.8.sp,
+                )
+                Text(
+                    "Cada punto representa un registro accesible con su nivel de exposición. Un marcador no confirma por sí solo un delito; una capa vacía puede reflejar cobertura incompleta.",
+                    color = MeetColors.textSecondary,
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
+                )
+            }
         }
     }
 }
