@@ -19,6 +19,7 @@ class SafetyInstitutionalPresentationScreenTest {
 
     @Test
     fun screenRendersSafetyDestinationsAndHonestIntegrationStatuses() {
+        composeRule.mainClock.autoAdvance = false
         composeRule.setContent {
             MaterialTheme {
                 SafetyInstitutionalPresentationScreen(
@@ -35,7 +36,6 @@ class SafetyInstitutionalPresentationScreenTest {
         }
 
         composeRule.onNodeWithText("ELYSIUM SAFETY").assertIsDisplayed()
-        composeRule.mainClock.autoAdvance = false
         composeRule.onNodeWithText("PRESENTACIÓN INSTITUCIONAL").assertIsDisplayed()
         composeRule.onNodeWithText("3D HOLOGRAPHIC COMMAND DECK").assertIsDisplayed()
         composeRule.onNodeWithText("Crear reporte").assertIsDisplayed()
