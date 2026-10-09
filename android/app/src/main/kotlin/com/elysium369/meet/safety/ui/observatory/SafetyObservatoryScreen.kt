@@ -346,6 +346,7 @@ fun SafetyObservatoryScreen(
                     )
                 }
 
+            if (stats.sensitive_metrics_available) {
                 // ── Procedencia y Tipos de Fuentes de Información ──
                 item {
                     val totalSources = (stats.civil_source_count + stats.journalistic_source_count +
@@ -365,7 +366,7 @@ fun SafetyObservatoryScreen(
                                 color = MeetColors.textPrimary,
                             )
                             Text(
-                                "El Observatorio de Seguridad MEET audita rigurosamente el origen de cada reporte. No divulga datos personales de denunciantes, pero sí clasifica de qué tipo de canal procede la información para total transparencia forense.",
+                                "El desglose por tipo de fuente solo se muestra cuando la proyección remota lo autoriza y dispone de esos datos. Los conteos de fuentes no deben inferirse a partir del número de reportes.",
                                 fontSize = 12.sp,
                                 color = MeetColors.textSecondary,
                                 lineHeight = 16.sp,
@@ -415,6 +416,34 @@ fun SafetyObservatoryScreen(
                         }
                     }
                 }
+            } else {
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = ObservatoryColors.cardSurface),
+                        border = BorderStroke(1.dp, ObservatoryColors.cardBorder),
+                        shape = RoundedCornerShape(16.dp),
+                    ) {
+                        Column(
+                            Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                "DESGLOSE DE FUENTES NO PUBLICADO",
+                                color = ObservatoryColors.accentAmber,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 11.sp,
+                                letterSpacing = 0.8.sp,
+                            )
+                            Text(
+                                "La proyección actual suprime las métricas por tipo de fuente para proteger la privacidad. Elysium Safety no estima ni inventa esas cantidades; la ausencia del desglose no significa que no existan fuentes.",
+                                color = MeetColors.textSecondary,
+                                fontSize = 12.sp,
+                                lineHeight = 17.sp,
+                            )
+                        }
+                    }
+                }
+            }
 
                 // ── Filtro y Lista de Reportes Auditados ──
                 item {

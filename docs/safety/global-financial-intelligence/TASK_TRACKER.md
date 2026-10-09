@@ -82,3 +82,14 @@ Marcar una tarea solo cuando el cambio esté escrito. Compilación, ejecución d
 - [x] Añadir una evaluación que conserva TruthState original junto al mapeo científico conservador.
 - [ ] Conectar la proyección con el outbox científico remoto; esta implementación local no significa sincronización.
 - [ ] Ejecutar pruebas Kotlin y revisar el resultado de CI.
+
+
+## Slice G — Integridad del Observatorio (brecha P0 encontrada en revisión)
+
+- [x] Eliminar estimaciones sintéticas de conteos de fuentes (mínimos, porcentajes y multiplicadores por punto).
+- [x] No convertir el fallo de agregación remota en métricas marcadas como sensibles/disponibles.
+- [x] No usar el punto/caché local para reconstruir un agregado que el servidor ha suprimido por privacidad.
+- [x] Mostrar desglose de fuentes solo cuando la proyección remota autoriza esas métricas.
+- [x] Añadir un estado explícito `UNAVAILABLE`; consulta fallida no equivale a conteos medidos en cero.
+- [x] Añadir tests para el estado no disponible y los conteos reales de la proyección V3.
+- [ ] Ejecutar Gradle/CI para validar el cambio y reparar posibles regresiones.

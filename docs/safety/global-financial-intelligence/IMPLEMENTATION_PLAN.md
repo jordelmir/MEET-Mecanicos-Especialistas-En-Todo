@@ -346,6 +346,8 @@ La línea financiera es secundaria y modular. Reutiliza el núcleo científico d
 
 ## 11. Orden de ejecución inmediato
 
+La revisión también encontró que el Observatorio sintetizaba conteos de fuentes cuando faltaban datos. El Slice G de [TASK_TRACKER.md](TASK_TRACKER.md) corrige esa condición: los agregados provienen de la proyección V3 y, si falla, la UI declara que no hay métricas disponibles en lugar de inventarlas.
+
 La lista viva [TASK_TRACKER.md](TASK_TRACKER.md) registra la implementación y las brechas restantes. La proyección de reportes enlaza IDs reales de evidencia local; el outbox científico remoto aún necesita integración y prueba.
 
 El seguimiento verificable por fase está en [TASK_TRACKER.md](TASK_TRACKER.md). Cada casilla distingue el código escrito de las pruebas ejecutadas.
