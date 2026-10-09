@@ -92,6 +92,7 @@ object MeetDestinations {
     const val SAFETY_OBSERVATORY = "safety/observatory"
     const val SAFETY_RESEARCH = "safety/research"
     const val SAFETY_INSTITUTIONAL = "safety/institutional"
+    const val SAFETY_INVESTIGATIVE_WORKSPACE = "safety/investigative-workspace"
 }
 
 fun androidx.navigation.NavController.safeNavigate(route: String) {
@@ -147,7 +148,13 @@ fun NavController.navigateTopLevel(route: String) {
 }
 
 private fun NavController.navigateHomeFallback(startRoute: String = MeetDestinations.HOME): Boolean {
-    val target = if (startRoute.isNotBlank()) startRoute else MeetDestinations.HOME
+    val target = if (startRoute == MeetDestinations.SAFETY_INSTITUTIONAL) {
+        MeetDestinations.SAFETY_HOME
+    } else if (startRoute.isNotBlank()) {
+        startRoute
+    } else {
+        MeetDestinations.HOME
+    }
     navigate(target) {
         popUpTo(graph.findStartDestination().id) { inclusive = false }
         launchSingleTop = true
@@ -164,7 +171,11 @@ object MeetBackStackPolicy {
         hasPreviousEntry: Boolean,
         startRoute: String = MeetDestinations.HOME,
     ): Action = when {
-        currentRoute == startRoute || currentRoute == MeetDestinations.HOME || currentRoute == MeetDestinations.SAFETY_INSTITUTIONAL -> Action.STAY_HOME
+        currentRoute == startRoute && currentRoute != MeetDestinations.SAFETY_INSTITUTIONAL -> Action.STAY_HOME
+        currentRoute == MeetDestinations.HOME -> Action.STAY_HOME
+        currentRoute == MeetDestinations.SAFETY_INSTITUTIONAL -> {
+            if (hasPreviousEntry) Action.POP_ONE else Action.NAVIGATE_HOME
+        }
         currentRoute == null -> Action.NAVIGATE_HOME
         hasPreviousEntry -> Action.POP_ONE
         else -> Action.NAVIGATE_HOME

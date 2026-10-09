@@ -1808,6 +1808,11 @@ fun MeetApp(
             // SAFETY INSTITUTIONAL PARLIAMENTARY PRESENTATION (COSTA RICA DEPUTIES)
             composable(MeetDestinations.SAFETY_INSTITUTIONAL) {
                 com.elysium369.meet.safety.ui.institutional.SafetyInstitutionalDashboardScreen(
+                    onBack = {
+                        navController.navigate(MeetDestinations.SAFETY_HOME) {
+                            launchSingleTop = true
+                        }
+                    },
                     onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
                     onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
                     onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
@@ -1822,7 +1827,14 @@ fun MeetApp(
                 )
             }
 
-            // SAFETY FOUNDATION V1
+            // SAFETY INVESTIGATIVE WORKSPACE (FINANCIAL INTELLIGENCE & SICOP)
+            composable(MeetDestinations.SAFETY_INVESTIGATIVE_WORKSPACE) {
+                com.elysium369.meet.safety.ui.intelligence.SafetyInvestigativeWorkspaceScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
+
+            // SAFETY FOUNDATION V1 & UNIFIED CORE
             composable(MeetDestinations.SAFETY_HOME) {
                 com.elysium369.meet.safety.ui.hub.SafetyHubScreen(
                     onBack = { navController.backOrHome() },
@@ -1835,6 +1847,7 @@ fun MeetApp(
                     onNavigateToObservatory = { navController.navigate(MeetDestinations.SAFETY_OBSERVATORY) },
                     onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
                     onNavigateToInstitutional = { navController.navigate(MeetDestinations.SAFETY_INSTITUTIONAL) },
+                    onNavigateToInvestigativeWorkspace = { navController.navigate(MeetDestinations.SAFETY_INVESTIGATIVE_WORKSPACE) },
                 )
             }
             composable(MeetDestinations.SAFETY_RESEARCH) {
@@ -2018,9 +2031,14 @@ fun MeetApp(
             )
         }
         }
-        val presentationRootRoute = if (isInstitutionalPresentation) MeetDestinations.SAFETY_INSTITUTIONAL else MeetDestinations.HOME
-        BackHandler(enabled = activeRoute != null && activeRoute != presentationRootRoute && activeRoute != MeetDestinations.HOME) {
-            navController.backOrHome()
+        BackHandler(enabled = activeRoute != null && activeRoute != MeetDestinations.HOME) {
+            if (activeRoute == MeetDestinations.SAFETY_INSTITUTIONAL) {
+                navController.navigate(MeetDestinations.SAFETY_HOME) {
+                    launchSingleTop = true
+                }
+            } else {
+                navController.backOrHome()
+            }
         }
     }
 }

@@ -31,7 +31,7 @@ class MeetBackStackPolicyTest {
     @Test
     fun safetyInstitutionalNeverExitsToAutomotiveHome() {
         assertEquals(
-            MeetBackStackPolicy.Action.STAY_HOME,
+            MeetBackStackPolicy.Action.NAVIGATE_HOME,
             MeetBackStackPolicy.action(
                 currentRoute = MeetDestinations.SAFETY_INSTITUTIONAL,
                 hasPreviousEntry = false,
@@ -41,9 +41,9 @@ class MeetBackStackPolicyTest {
     }
 
     @Test
-    fun safetyInstitutionalStaysHomeEvenWithPreviousEntry() {
+    fun safetyInstitutionalPopsToPreviousEntryWhenAvailable() {
         assertEquals(
-            MeetBackStackPolicy.Action.STAY_HOME,
+            MeetBackStackPolicy.Action.POP_ONE,
             MeetBackStackPolicy.action(
                 currentRoute = MeetDestinations.SAFETY_INSTITUTIONAL,
                 hasPreviousEntry = true,

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AccountTree
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Policy
@@ -34,6 +35,7 @@ import com.elysium369.meet.ui.theme.MeetColors
 @Composable
 fun SafetyFinancialIntelligenceCard(
     modifier: Modifier = Modifier,
+    onOpenInvestigativeWorkspace: () -> Unit = {},
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -175,6 +177,30 @@ fun SafetyFinancialIntelligenceCard(
                         )
                     }
                 }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            Button(
+                onClick = onOpenInvestigativeWorkspace,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFB300)),
+            ) {
+                Icon(
+                    Icons.Default.AccountTree,
+                    contentDescription = null,
+                    tint = Color.Black,
+                    modifier = Modifier.size(18.dp),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "ABRIR ESPACIO INVESTIGATIVO & GRAFO DE REDES",
+                    color = Color.Black,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.5.sp,
+                )
             }
         }
     }

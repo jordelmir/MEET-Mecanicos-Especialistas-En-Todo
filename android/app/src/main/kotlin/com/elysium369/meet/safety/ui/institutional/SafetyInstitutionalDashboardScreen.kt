@@ -1,6 +1,7 @@
 package com.elysium369.meet.safety.ui.institutional
 
 import android.view.View
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -35,6 +37,7 @@ import com.elysium369.meet.safety.ui.institutional.components.SafetyIncidentTypo
 import com.elysium369.meet.safety.ui.institutional.components.SafetyInstitutionalBridgeCard
 import com.elysium369.meet.safety.ui.institutional.components.SafetyInstitutionalBriefExportDialog
 import com.elysium369.meet.safety.ui.institutional.components.SafetyTerritorialIntelligenceConsole
+import com.elysium369.meet.safety.ui.intelligence.SafetyInvestigativeWorkspaceScreen
 import com.elysium369.meet.ui.theme.MeetColors
 
 enum class InstitutionalNavTab(
@@ -67,6 +70,7 @@ enum class InstitutionalNavTab(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SafetyInstitutionalDashboardScreen(
+    onBack: () -> Unit = {},
     onNavigateToMap: () -> Unit = {},
     onNavigateToReport: () -> Unit = {},
     onNavigateToMyReports: () -> Unit = {},
@@ -81,12 +85,37 @@ fun SafetyInstitutionalDashboardScreen(
     var isContinuousDocumentMode by remember { mutableStateOf(false) }
     var showModeDialog by remember { mutableStateOf(false) }
     var showExportBriefDialog by remember { mutableStateOf(false) }
+    var showInvestigativeWorkspace by remember { mutableStateOf(false) }
     val view = LocalView.current
+
+    BackHandler(enabled = true) {
+        if (showInvestigativeWorkspace) {
+            showInvestigativeWorkspace = false
+        } else {
+            onBack()
+        }
+    }
+
+    if (showInvestigativeWorkspace) {
+        SafetyInvestigativeWorkspaceScreen(
+            onNavigateBack = { showInvestigativeWorkspace = false },
+        )
+        return
+    }
 
     Scaffold(
         containerColor = MeetColors.backgroundDeep,
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Volver a Elysium Safety",
+                            tint = Color.White,
+                        )
+                    }
+                },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
@@ -684,7 +713,9 @@ fun SafetyInstitutionalDashboardScreen(
                     )
                 }
                 item {
-                    SafetyFinancialIntelligenceCard()
+                    SafetyFinancialIntelligenceCard(
+                        onOpenInvestigativeWorkspace = { showInvestigativeWorkspace = true },
+                    )
                 }
             }
 
