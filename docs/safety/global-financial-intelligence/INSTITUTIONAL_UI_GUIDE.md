@@ -64,10 +64,13 @@ Cuando el dominio exponga estados autoritativos distintos, la interfaz debe most
 
 La pantalla institucional conduce a las vistas Android existentes de reporte, mapa, mis reportes, expedientes, cronología, observatorio e investigación científica. Cada destino debe evaluarse mediante navegación real y pruebas UI; la mera existencia de una función composable no demuestra que el usuario pueda alcanzarla.
 
-### SICOP / contratación pública
+### Fuentes públicas y documentales en los flujos existentes
 
-**Estado: ingesta real no integrada.** El adaptador Kotlin y la regla de concentración son lógica de dominio; no deben presentarse como un conector vivo ni como un panel ya poblado con adjudicaciones reales hasta comprobar una ingesta reproducible desde fuente autorizada, la procedencia, la cobertura de datos, los controles de error y la reconciliación de actualizaciones.
-
+- [ ] Las fuentes públicas, registros documentales y expedientes se vinculan desde los flujos existentes de reporte, caso, cronología e investigación; no se crea una pantalla dependiente de un proveedor.
+- [ ] Cada registro conserva URL de origen, fecha de consulta, integridad del contenido y procedencia verificable cuando esos datos existen.
+- [ ] Los conectores no se presentan como activos sin captura real, permisos, cobertura documentada y pruebas de extremo a extremo.
+- [ ] La concentración estadística es una señal explicable, nunca una conclusión de corrupción ni una atribución automática de culpabilidad.
+- [ ] Los registros incompletos o con procedencia no verificada producen insuficiencia de datos, no alertas positivas.
 ### Intercambio institucional
 
 **Estado: pendiente de piloto autorizado.** No afirmar una conexión operativa con Fuerza Pública, OIJ, Ministerio Público o Poder Judicial sin convenio/base jurídica, credenciales, permisos, auditoría y pruebas de extremo a extremo verificables.
@@ -81,7 +84,7 @@ La pantalla institucional conduce a las vistas Android existentes de reporte, ma
 - [ ] Crear reporte y Abrir mapa abren los destinos actuales y el botón de regresar vuelve a una pantalla válida.
 - [ ] Las vistas vacías describen que no hay registros accesibles; no inventan incidentes, fuentes, adjudicaciones, métricas ni resultados de investigaciones.
 - [ ] La disponibilidad remota se refleja con los estados de conectividad del modelo. No etiquetar ONLINE a partir de una respuesta de error ni de un valor por defecto.
-- [ ] La etiqueta de SICOP declara explícitamente que la ingesta real no está integrada mientras no exista el adaptador conectado.
+- [ ] Las fuentes externas solo se presentan como integradas cuando existe captura real, procedencia verificable, permisos y pruebas de extremo a extremo.
 - [ ] Las pruebas Compose verifican renderizado, scroll a secciones inferiores y callbacks de los CTA.
 - [ ] El pipeline compila debug, ejecuta unit tests y tests de UI instrumentados. El build exitoso por sí solo no significa que el usuario haya instalado esa versión.
 - [ ] La validación física confirma que el APK construido desde el SHA probado se instala y que la ruta se ve en el dispositivo.
@@ -119,4 +122,4 @@ CI compila las pruebas Android instrumentadas y las ejecuta en un emulador API 3
 - [ ] La acción principal cambia según la etapa y abre un destino de Safety real.
 - [ ] La tarjeta de entrada institucional del hub tiene un borde neón animado sin alterar la navegación de los otros módulos.
 - [ ] Las pruebas instrumentadas se ejecutan en un emulador Android durante CI.
-- [ ] No se declaran verificados el APK instalado físicamente ni las integraciones SICOP/institucionales sin evidencia separada.
+- [ ] No se declaran verificados el APK instalado físicamente ni las integraciones de fuentes externas o institucionales sin evidencia separada.

@@ -90,17 +90,23 @@ class ProcurementConcentrationRuleTest {
         vendor: String,
         amount: Long,
     ): NormalizedProcurementRecord {
-        val raw = SicopRawRecord(
+        val raw = PublicProcurementRawRecord(
             expedienteNumber = expediente,
-            procurementType = SicopProcurementType.LICITACION_MAYOR,
+            procurementType = PublicProcurementType.TENDER,
             buyerInstitution = buyer,
             vendorTaxId = vendor,
             vendorName = "Vendor Test S.A.",
             amountMinorUnits = amount,
             currencyCode = "CRC",
             awardDateIso = "2024-01-01T00:00:00Z",
-            officialPortalUrl = "https://www.sicop.go.cr/proc/$expediente",
+            sourceSystem = "public-records-test",
+            sourceDocumentUrl = "https://records.example.test/procurement/$expediente",
+            independenceGroup = "official-records-test",
+            lawfullyObtained = true,
+            sourceVerified = true,
+            hasSpecificDocumentedDiscrepancy = true,
+            statutoryLegalBasis = "Test legal basis",
         )
-        return SicopProcurementSourceAdapter.normalize(raw).getOrThrow()
+        return PublicProcurementRecordNormalizer.normalize(raw).getOrThrow()
     }
 }

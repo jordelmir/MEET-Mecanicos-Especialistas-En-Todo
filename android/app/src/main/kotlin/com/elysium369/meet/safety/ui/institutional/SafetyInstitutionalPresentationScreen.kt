@@ -80,10 +80,11 @@ import kotlin.math.sin
 /**
  * Visible institutional overview for Elysium Safety.
  *
- * Existing destinations open the application's current Safety screens. SICOP is
- * intentionally presented as NOT INTEGRATED: the current adapter is a domain
- * normalizer, not a live SICOP fetcher or a populated procurement dashboard.
- * No synthetic case, procurement record, or investigative finding is displayed.
+ * Existing destinations open the application's current Safety screens.
+ * Public records and documentary sources belong in the existing report, case,
+ * timeline, observatory, and scientific-research flows. No source is presented
+ * as live unless its integration and provenance are actually verified.
+ * No synthetic case, source record, or investigative finding is displayed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -284,7 +285,7 @@ fun SafetyInstitutionalPresentationScreen(
             item {
                 InstitutionalActionCard(
                     title = "Investigación científica y cadena de evidencia",
-                    description = "Abrir las herramientas de entidades, afirmaciones, hipótesis, contradicciones y procedencia.",
+                    description = "Contrastar fuentes periodísticas, registros públicos, expedientes institucionales y material documental; vincular afirmaciones, hipótesis, contradicciones y procedencia sin inferir culpabilidad.",
                     status = "PANTALLA ENLAZADA",
                     icon = Icons.Filled.Analytics,
                     iconColor = MeetColors.hotMagenta,
@@ -294,7 +295,7 @@ fun SafetyInstitutionalPresentationScreen(
 
             item {
                 Text(
-                    text = "CAPACIDADES EN DESARROLLO / INTEGRACIÓN PENDIENTE",
+                    text = "GOBERNANZA Y DISPONIBILIDAD",
                     color = MeetColors.warning,
                     fontWeight = FontWeight.Black,
                     fontSize = 11.sp,
@@ -303,13 +304,6 @@ fun SafetyInstitutionalPresentationScreen(
                 )
             }
 
-            item {
-                StatusNoticeCard(
-                    title = "Contratación pública y SICOP",
-                    status = "INGESTA REAL NO INTEGRADA",
-                    body = "El adaptador de normalización y la regla de concentración existen como lógica de dominio. Esta pantalla no consulta SICOP, no tiene un catálogo de adjudicaciones conectado y no produce hallazgos reales. Para activarlo faltan un adaptador de captura verificable, procedencia de los documentos, cobertura de datos, permisos y pruebas de integración.",
-                )
-            }
             item {
                 StatusNoticeCard(
                     title = "Intercambio con instituciones",

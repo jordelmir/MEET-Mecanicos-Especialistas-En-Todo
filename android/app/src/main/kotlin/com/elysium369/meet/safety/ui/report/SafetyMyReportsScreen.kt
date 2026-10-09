@@ -3,6 +3,8 @@ package com.elysium369.meet.safety.ui.report
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
@@ -40,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -147,6 +150,14 @@ fun SafetyMyReportsScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     item { Spacer(modifier = Modifier.height(4.dp)) }
+
+                    item {
+                        ReportsCommandDeck(
+                            totalCount = state.totalReports,
+                            pendingCount = state.pendingCount,
+                            failedCount = state.reports.count { it.syncState == "FAILED" },
+                        )
+                    }
 
                     // Action message banner
                     state.actionMessage?.let { message ->
@@ -621,3 +632,61 @@ private fun VideoLinkChip(url: String, onClick: () -> Unit) {
     }
 }
 
+
+
+@Composable
+private fun ReportsCommandDeck(totalCount: Int, pendingCount: Int, failedCount: Int) {
+    val glow by animateFloatAsState(
+        targetValue = if (pendingCount > 0 || failedCount > 0) 0.95f else 0.55f,
+        animationSpec = tween(durationMillis = 700), label = "reports-command-glow",
+    )
+    val statusColor = when {
+        failedCount > 0 -> MeetColors.error
+        pendingCount > 0 -> MeetColors.warning
+        else -> MeetColors.neonGreen
+    }
+    Card(
+        modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.2.dp, Brush.linearGradient(listOf(
+            MeetColors.electricBlue.copy(alpha = glow),
+            statusColor.copy(alpha = glow),
+            MeetColors.hotMagenta.copy(alpha = glow * 0.52f),
+        ))),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(
+            MeetColors.electricBlue.copy(alpha = 0.10f),
+            MeetColors.cardBackground,
+            statusColor.copy(alpha = 0.06f),
+        ))).padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("REPORTS COMMAND", color = MeetColors.cyberCyan, fontWeight = FontWeight.Black, fontSize = 10.sp, letterSpacing = 1.4.sp)
+                    Text("Estado real de tus reportes", color = MeetColors.textPrimary, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+                Surface(shape = RoundedCornerShape(7.dp), color = statusColor.copy(alpha = 0.13f), border = BorderStroke(1.dp, statusColor.copy(alpha = glow))) {
+                    Text(when {
+                        failedCount > 0 -> "REVISAR SINCRONIZACIÓN"
+                        pendingCount > 0 -> "PENDIENTES"
+                        else -> "SIN PENDIENTES LOCALES"
+                    }, color = statusColor, fontSize = 8.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp))
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                ReportsCommandMetric("REPORTES", totalCount.toString(), MeetColors.cyberCyan)
+                ReportsCommandMetric("PENDIENTES", pendingCount.toString(), MeetColors.warning)
+                ReportsCommandMetric("CON ERROR", failedCount.toString(), MeetColors.error)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReportsCommandMetric(label: String, value: String, color: Color) {
+    Column {
+        Text(label, fontSize = 8.sp, color = MeetColors.textSecondary, fontWeight = FontWeight.Bold)
+        Text(value, fontSize = 17.sp, color = color, fontWeight = FontWeight.Black)
+    }
+}

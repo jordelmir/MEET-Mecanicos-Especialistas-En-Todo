@@ -1,6 +1,12 @@
 package com.elysium369.meet.safety.ui.cases
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
@@ -22,6 +28,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -99,6 +106,14 @@ fun SafetyCasesScreen(
                 .fillMaxSize()
                 .padding(padding),
         ) {
+            CasesCommandStrip(
+                totalCases = uiState.totalCases,
+                visibleCases = filteredCases.size,
+                openCases = uiState.cases.count { it.lifecycle.equals("OPEN", ignoreCase = true) },
+                reviewCases = uiState.cases.count { it.lifecycle.equals("UNDER_REVIEW", ignoreCase = true) },
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+            )
+
             // Search and filter header
             Column(
                 modifier = Modifier
@@ -235,7 +250,15 @@ private fun CaseCard(case: SafetyPublicCaseEntity, onClick: () -> Unit) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-        border = BorderStroke(1.dp, MeetColors.borderSubtle),
+        border = BorderStroke(
+            1.dp,
+            Brush.linearGradient(listOf(
+                MeetColors.cyberCyan.copy(alpha = 0.42f),
+                MeetColors.hotMagenta.copy(alpha = 0.22f),
+                MeetColors.borderSubtle,
+            )),
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -324,5 +347,55 @@ private fun CaseCard(case: SafetyPublicCaseEntity, onClick: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun CasesCommandStrip(totalCases: Int, visibleCases: Int, openCases: Int, reviewCases: Int, modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "cases-command-strip")
+    val pulse by transition.animateFloat(
+        initialValue = 0.35f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(animation = tween(1450, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
+        label = "cases-command-pulse",
+    )
+    Card(
+        modifier = modifier.fillMaxWidth(), shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.dp, Brush.linearGradient(listOf(
+            MeetColors.electricBlue.copy(alpha = pulse),
+            MeetColors.hotMagenta.copy(alpha = pulse * 0.65f),
+            MeetColors.cyberCyan.copy(alpha = pulse * 0.8f),
+        ))),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().background(Brush.horizontalGradient(listOf(
+            MeetColors.electricBlue.copy(alpha = 0.10f),
+            MeetColors.cardBackground,
+            MeetColors.hotMagenta.copy(alpha = 0.06f),
+        ))).padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("CASE INTELLIGENCE", color = MeetColors.cyberCyan, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.4.sp)
+                    Text("Expedientes y estados de revisión", color = MeetColors.textPrimary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+                Box(Modifier.size(9.dp).clip(CircleShape).background(MeetColors.neonGreen.copy(alpha = pulse)))
+            }
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                CommandMetric("EN VISTA", visibleCases.toString(), MeetColors.cyberCyan)
+                CommandMetric("ABIERTOS", openCases.toString(), MeetColors.neonGreen)
+                CommandMetric("EN REVISIÓN", reviewCases.toString(), MeetColors.warning)
+                CommandMetric("TOTAL", totalCases.toString(), MeetColors.textPrimary)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CommandMetric(label: String, value: String, color: Color) {
+    Column {
+        Text(label, fontSize = 8.sp, color = MeetColors.textSecondary, fontWeight = FontWeight.Bold)
+        Text(value, fontSize = 16.sp, color = color, fontWeight = FontWeight.Black)
     }
 }
