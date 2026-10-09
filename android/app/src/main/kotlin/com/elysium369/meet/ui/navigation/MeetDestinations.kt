@@ -91,6 +91,7 @@ object MeetDestinations {
     const val SAFETY_ACCOUNTABILITY = "safety/accountability"
     const val SAFETY_OBSERVATORY = "safety/observatory"
     const val SAFETY_RESEARCH = "safety/research"
+    const val SAFETY_INSTITUTIONAL_PRESENTATION = "safety/institutional-presentation"
 }
 
 fun androidx.navigation.NavController.safeNavigate(route: String) {
