@@ -31,6 +31,30 @@ class ProcurementConcentrationRuleTest {
     }
 
     @Test
+    fun unverifiedSourceProvenanceProducesInsufficientData() {
+        val awards = listOf(
+            createAward("2024LN-000001-0001101142", targetBuyer, targetVendor, 1000000L),
+            createAward("2024LN-000002-0001101142", targetBuyer, targetVendor, 1500000L),
+            createAward("2024LN-000003-0001101142", targetBuyer, targetVendor, 2000000L),
+            createAward("2024LN-000004-0001101142", targetBuyer, "3-101-000000", 500000L),
+        ).map { award ->
+            award.copy(
+                evidenceReference = award.evidenceReference.copy(sourceVerified = false),
+            )
+        }
+
+        val result = ProcurementConcentrationRule.evaluate(
+            buyerInstitution = targetBuyer,
+            vendorTaxId = targetVendor,
+            institutionAwards = awards,
+        )
+
+        assertEquals(AnomalySignalDisposition.INSUFFICIENT_DATA, result.disposition)
+        assertFalse(result.eligibleForHumanReview)
+        assertTrue(result.deterministicFormulaExplanation.contains("provenance", ignoreCase = true))
+    }
+
+    @Test
     fun concentrationExceedingThresholdTriggersSignalWithMandatoryHypotheses() {
         val awards = listOf(
             createAward("2024LN-000001-0001101142", targetBuyer, targetVendor, 1000000L),
@@ -90,17 +114,23 @@ class ProcurementConcentrationRuleTest {
         vendor: String,
         amount: Long,
     ): NormalizedProcurementRecord {
-        val raw = SicopRawRecord(
+        val raw = PublicProcurementRawRecord(
             expedienteNumber = expediente,
-            procurementType = SicopProcurementType.LICITACION_MAYOR,
+            procurementType = PublicProcurementType.TENDER,
             buyerInstitution = buyer,
             vendorTaxId = vendor,
             vendorName = "Vendor Test S.A.",
             amountMinorUnits = amount,
             currencyCode = "CRC",
             awardDateIso = "2024-01-01T00:00:00Z",
-            officialPortalUrl = "https://www.sicop.go.cr/proc/$expediente",
+            sourceSystem = "public-records-test",
+            sourceDocumentUrl = "https://records.example.test/procurement/$expediente",
+            independenceGroup = "official-records-test",
+            lawfullyObtained = true,
+            sourceVerified = true,
+            hasSpecificDocumentedDiscrepancy = true,
+            statutoryLegalBasis = "Test legal basis",
         )
-        return SicopProcurementSourceAdapter.normalize(raw).getOrThrow()
+        return PublicProcurementRecordNormalizer.normalize(raw).getOrThrow()
     }
 }

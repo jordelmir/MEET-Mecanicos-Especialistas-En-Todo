@@ -1872,6 +1872,21 @@ fun MeetApp(
                     onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
                     onNavigateToInstitutional = { navController.navigate(MeetDestinations.SAFETY_INSTITUTIONAL) },
                     onNavigateToInvestigativeWorkspace = { navController.navigate(MeetDestinations.SAFETY_INVESTIGATIVE_WORKSPACE) },
+                    onNavigateToInstitutionalPresentation = {
+                        navController.navigate(MeetDestinations.SAFETY_INSTITUTIONAL_PRESENTATION)
+                    },
+                )
+            }
+            composable(MeetDestinations.SAFETY_INSTITUTIONAL_PRESENTATION) {
+                com.elysium369.meet.safety.ui.institutional.SafetyInstitutionalPresentationScreen(
+                    onBack = { navController.backOrHome() },
+                    onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
+                    onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
+                    onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
+                    onNavigateToCases = { navController.navigate(MeetDestinations.SAFETY_CASES) },
+                    onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_TIMELINES) },
+                    onNavigateToObservatory = { navController.navigate(MeetDestinations.SAFETY_OBSERVATORY) },
+                    onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
                 )
             }
             composable(MeetDestinations.SAFETY_RESEARCH) {

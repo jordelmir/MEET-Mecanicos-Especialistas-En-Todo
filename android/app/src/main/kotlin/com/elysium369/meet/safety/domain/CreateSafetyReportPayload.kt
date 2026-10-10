@@ -52,8 +52,8 @@ fun SourceRelation.label(): String = when (this) {
     SourceRelation.DOCUMENTARY -> "Fuente documental (Documentos / Grabación)"
     SourceRelation.JOURNALISTIC -> "Fuente periodística (Prensa / Investigación)"
     SourceRelation.PUBLIC_RECORD -> "Registro público (Judicial / Notarial)"
-    SourceRelation.INSTITUTIONAL -> "Fuente institucional (Fuerza Pública / OIJ / Oficial)"
-    SourceRelation.UNKNOWN -> "Otra fuente protegida"
+    SourceRelation.INSTITUTIONAL -> "Origen institucional declarado (no verificado)"
+    SourceRelation.UNKNOWN -> "Otra fuente declarada (nivel de protección no determinado)"
 }
 
 enum class SafetySourceBadgeType(
@@ -62,12 +62,12 @@ enum class SafetySourceBadgeType(
     val emoji: String,
     val badgeColorHex: Long
 ) {
-    CIVIL("Fuente Civil (Anónima)", "Testimonio ciudadano protegido", "🛡️", 0xFF00E5FF),
-    JOURNALISTIC("Fuente Periodística", "Investigación periodística / medios", "📰", 0xFF69F0AE),
-    PUBLIC_RECORD("Registro Público", "Expediente judicial o registral", "🏛️", 0xFFFFD700),
-    DOCUMENTARY("Fuente Documental", "Evidencia física, video o peritaje", "📄", 0xFFFF9100),
-    INSTITUTIONAL("Fuente Institucional", "Autoridad u órgano del estado", "🏢", 0xFFB388FF),
-    ANONYMOUS("Fuente Protegida", "Reporte anónimo cifrado", "🔒", 0xFF80D8FF)
+    CIVIL("Fuente ciudadana declarada", "Relato ciudadano; no implica corroboración", "🛡️", 0xFF00E5FF),
+    JOURNALISTIC("Fuente Periodística", "Medio y contenido aportados; autenticidad pendiente", "📰", 0xFF69F0AE),
+    PUBLIC_RECORD("Registro Público", "Consultar el documento de origen y su alcance", "🏛️", 0xFFFFD700),
+    DOCUMENTARY("Fuente Documental", "Documento o enlace aportado; revisar procedencia", "📄", 0xFFFF9100),
+    INSTITUTIONAL("Fuente Institucional", "La categoría no acredita a la persona ni al organismo", "🏢", 0xFFB388FF),
+    ANONYMOUS("Fuente declarada como anónima", "No garantiza anonimato técnico ni jurídico", "🔒", 0xFF80D8FF)
 }
 
 fun SourceRelation.toObservatoryBadge(): SafetySourceBadgeType = when (this) {

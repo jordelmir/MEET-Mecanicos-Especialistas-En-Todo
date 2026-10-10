@@ -121,9 +121,9 @@ fun SafetyReportScreen(
             onSaved = { role, name, org, cred ->
                 impunityStore.saveInitialRegistration(role, name, org, cred)
                 val detail = when (role) {
-                    "JOURNALIST" -> "Medio: $org | Periodista: $name | Carné: $cred"
-                    "INSTITUTION" -> "Institución: $org | Identificador: $cred"
-                    else -> if (name.isBlank()) "Civil: Anónimo Protegido" else "Civil: $name (Anónimo Protegido)"
+                    "JOURNALIST" -> "Rol autodeclarado: periodista | Medio declarado: $org | Nombre declarado: $name | Acreditación declarada: $cred"
+                    "INSTITUTION" -> "Rol autodeclarado: institución | Entidad declarada: $org | Unidad o identificador declarado: $cred"
+                    else -> if (name.isBlank()) "Rol autodeclarado: ciudadano | Alias no aportado" else "Rol autodeclarado: ciudadano | Alias declarado: $name"
                 }
                 viewModel.updateParticipantDetails(detail)
                 showInitialRegistration = false
@@ -144,6 +144,9 @@ fun SafetyReportScreen(
             onBack = onBack,
             onDone = { onReportSubmitted(state.createdReportId!!) },
             onNavigateToResearch = onNavigateToResearch,
+            hasScientificHypothesis = state.enableScientificAnalysis &&
+                state.scientificHypothesis.isNotBlank(),
+            localProjectionWarning = state.error,
         )
         return
     }
@@ -1269,7 +1272,7 @@ private fun StepEvidence(
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.safety_report_step_evidence_title), fontWeight = FontWeight.Black, fontSize = 15.sp, color = MeetColors.textPrimary)
             Text(
-                "Adjunta fotos, audios o documentos que respalden el hecho. Para videos, adjunta el link más abajo para no saturar el servidor.",
+                "Adjunta fotografías, audios o documentos que respalden el hecho. Para videos, usa el enlace compartible de abajo; el video no se carga al servidor de Elysium.",
                 color = MeetColors.textSecondary,
                 fontSize = 12.sp,
             )
@@ -1277,11 +1280,13 @@ private fun StepEvidence(
             state.evidence.forEach { item ->
                 val evidenceIcon = when {
                     item.mimeType.startsWith("image/") -> Icons.Filled.AttachFile
+                    item.mimeType.startsWith("video/") -> Icons.Filled.Videocam
                     item.mimeType.startsWith("audio/") -> Icons.Filled.AttachFile
                     else -> Icons.Filled.AttachFile
                 }
                 val evidenceLabel = when {
                     item.mimeType.startsWith("image/") -> "📷 Imagen"
+                    item.mimeType.startsWith("video/") -> "🎬 Video"
                     item.mimeType.startsWith("audio/") -> "🎙️ Audio"
                     item.mimeType == "application/pdf" -> "📄 PDF"
                     item.mimeType.contains("word") || item.mimeType.contains("document") -> "📝 Documento"
@@ -1346,7 +1351,7 @@ private fun StepEvidence(
                 Icon(Icons.Filled.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    if (state.staging) stringResource(R.string.safety_report_step_evidence_protecting) else "Adjuntar fotos / audios / docs",
+                    if (state.staging) stringResource(R.string.safety_report_step_evidence_protecting) else "Adjuntar evidencia",
                     fontWeight = FontWeight.Bold,
                 )
             }
@@ -1484,7 +1489,6 @@ private fun StepEvidence(
                     letterSpacing = 1.sp,
                 )
             }
-
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
@@ -1499,16 +1503,20 @@ private fun StepEvidence(
                         color = MeetColors.neonGreen,
                     )
                     Text(
-                        "Para no saturar la memoria y el ancho de banda del servidor de seguridad ciudadana, no subas archivos de video pesados directamente a la aplicación. En su lugar, usa un enlace web.",
+                        "Los videos se comparten únicamente mediante enlaces; no se sube el archivo de video a Elysium. Para no saturar la memoria y el ancho de banda del servidor de seguridad ciudadana, usa un enlace accesible para el destinatario y revisa los permisos antes de enviarlo.",
                         color = MeetColors.textSecondary,
                         fontSize = 10.sp,
                         lineHeight = 14.sp,
                     )
                     Text(
-                        "Pasos recomendados:\n" +
-                            "1. Sube tu video primero a YouTube (puedes marcarlo como 'Oculto / No listado' si deseas privacidad, o 'Público'), Google Drive, TikTok, X o Facebook.\n" +
-                            "2. Copia el enlace web (URL) del video.\n" +
-                            "3. Pégalo en el campo inferior y presiona 'Agregar Video'.\n" +
+                        "Pasos recomendados:
+" +
+                            "1. Sube tu video primero a YouTube (puedes marcarlo como 'Oculto / No listado' si deseas privacidad, o 'Público'), Google Drive, TikTok, X o Facebook.
+" +
+                            "2. Copia el enlace web (URL) del video.
+" +
+                            "3. Pégalo en el campo inferior y presiona 'Agregar Video'.
+" +
                             "✓ Las autoridades y peritos podrán abrir y reproducir el video al instante sin demoras ni pérdida de calidad.",
                         color = MeetColors.textPrimary,
                         fontSize = 10.sp,
@@ -1691,41 +1699,64 @@ private fun SafetyReportReceiptScreen(
     onBack: () -> Unit,
     onDone: () -> Unit,
     onNavigateToResearch: () -> Unit = {},
+    hasScientificHypothesis: Boolean = false,
+    localProjectionWarning: String? = null,
 ) {
     val clipboard = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
 
-    val isOnline = report?.syncState == "SYNCED" || report?.serverState != null
-    val isSyncing = report?.syncState == "SYNCING"
+    val receiptStatus = safetyReportReceiptStatus(report?.syncState)
+    val serverConfirmed = receiptStatus == SafetyReportReceiptStatus.SERVER_CONFIRMED
+    val isSyncing = receiptStatus == SafetyReportReceiptStatus.SYNCING
+    val isFailed = receiptStatus == SafetyReportReceiptStatus.FAILED
 
-    val statusText = when {
-        isOnline -> "EN LÍNEA (SYNCED)"
-        isSyncing -> "SINCRONIZANDO..."
-        else -> "PENDIENTE DE RED"
+    val statusText = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING -> "CONSULTANDO ESTADO"
+        SafetyReportReceiptStatus.SERVER_CONFIRMED -> "RECIBIDO POR SERVIDOR"
+        SafetyReportReceiptStatus.SYNCING -> "SINCRONIZACIÓN EN CURSO"
+        SafetyReportReceiptStatus.FAILED -> "NO CONFIRMADO · REVISAR"
+        SafetyReportReceiptStatus.LOCAL_PENDING -> "GUARDADO LOCAL · PENDIENTE"
     }
 
-    val statusColor = when {
-        isOnline -> MeetColors.neonGreen
-        isSyncing -> MeetColors.cyberCyan
-        else -> MeetColors.warning
+    val statusColor = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING,
+        SafetyReportReceiptStatus.LOCAL_PENDING,
+        SafetyReportReceiptStatus.FAILED -> MeetColors.warning
+        SafetyReportReceiptStatus.SERVER_CONFIRMED -> MeetColors.neonGreen
+        SafetyReportReceiptStatus.SYNCING -> MeetColors.cyberCyan
     }
 
-    val titleText = when {
-        isOnline -> "Reporte publicado en línea"
-        isSyncing -> "Transmitiendo reporte..."
-        else -> stringResource(R.string.safety_report_receipt_saved_title)
+    val titleText = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING -> "Consultando el estado del reporte"
+        SafetyReportReceiptStatus.SERVER_CONFIRMED -> "Reporte recibido por el servidor"
+        SafetyReportReceiptStatus.SYNCING -> "Reporte guardado · sincronización en curso"
+        SafetyReportReceiptStatus.FAILED -> "Reporte guardado localmente"
+        SafetyReportReceiptStatus.LOCAL_PENDING -> stringResource(R.string.safety_report_receipt_saved_title)
     }
 
-    val descText = when {
-        isOnline -> "Transmitido exitosamente al servidor. Proyectado en tiempo real en Mapa, Casos Públicos, Líneas de Tiempo y Rendición de Cuentas."
-        isSyncing -> "Conectando con el servidor seguro y proyectando datos en tiempo real..."
-        else -> stringResource(R.string.safety_report_receipt_saved_desc)
+    val descText = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING ->
+            "Se está consultando el estado del reporte. No se declara un envío exitoso hasta que exista confirmación remota."
+        SafetyReportReceiptStatus.SERVER_CONFIRMED ->
+            "El servidor confirmó la recepción. Esto no significa que el incidente esté confirmado, que el reporte sea público ni que se haya remitido a una institución."
+        SafetyReportReceiptStatus.SYNCING ->
+            "El reporte permanece guardado y la sincronización está en curso. La recepción remota todavía no está confirmada."
+        SafetyReportReceiptStatus.FAILED ->
+            "No hay confirmación remota disponible. Conserva el identificador y revisa el estado en Mis reportes."
+        SafetyReportReceiptStatus.LOCAL_PENDING ->
+            stringResource(R.string.safety_report_receipt_saved_desc)
     }
 
-    val networkDescText = when {
-        isOnline -> "Confirmado por el servidor · visible para toda la comunidad"
-        isSyncing -> "Enviando paquete cifrado al servidor..."
-        else -> stringResource(R.string.safety_report_receipt_network_desc)
+    val networkDescText = when (receiptStatus) {
+        SafetyReportReceiptStatus.CHECKING -> "Consultando el estado local y remoto."
+        SafetyReportReceiptStatus.SERVER_CONFIRMED ->
+            "Confirmación remota recibida · publicación y visibilidad sujetas a revisión y controles de divulgación."
+        SafetyReportReceiptStatus.SYNCING ->
+            "Sincronización pendiente · aún no hay confirmación final del servidor."
+        SafetyReportReceiptStatus.FAILED ->
+            "Error de sincronización · el reporte local y su identificador se conservan."
+        SafetyReportReceiptStatus.LOCAL_PENDING ->
+            "Guardado localmente · recibo remoto pendiente."
     }
 
     Scaffold(
@@ -1748,11 +1779,12 @@ private fun SafetyReportReceiptScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            SafetyPulse(state = if (isOnline) PulseState.NOMINAL else PulseState.PENDING, size = 88.dp)
+            SafetyPulse(state = if (serverConfirmed) PulseState.NOMINAL else PulseState.PENDING, size = 88.dp)
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -1780,7 +1812,7 @@ private fun SafetyReportReceiptScreen(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-                border = BorderStroke(1.dp, if (isOnline) MeetColors.neonGreen.copy(alpha = 0.5f) else MeetColors.cyberCyan.copy(alpha = 0.5f)),
+                border = BorderStroke(1.dp, if (serverConfirmed) MeetColors.neonGreen.copy(alpha = 0.5f) else statusColor.copy(alpha = 0.55f)),
             ) {
                 Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(
@@ -1851,7 +1883,30 @@ private fun SafetyReportReceiptScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            localProjectionWarning?.takeIf { it.isNotBlank() }?.let { warning ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                    border = BorderStroke(1.dp, MeetColors.warning.copy(alpha = 0.75f)),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        Text("⚠", fontSize = 18.sp, color = MeetColors.warning)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = warning,
+                            modifier = Modifier.weight(1f),
+                            fontSize = 11.sp,
+                            color = MeetColors.warning,
+                            lineHeight = 16.sp,
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+            }
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -1872,7 +1927,14 @@ private fun SafetyReportReceiptScreen(
                         )
                     }
                     Text(
-                        "Tu reporte y su hipótesis forense fueron proyectados con rigor Popperiano (falsabilidad) en la red científica descentralizada.",
+                        text = when {
+                            localProjectionWarning != null ->
+                                "El reporte se conservó, pero no se pudo completar la proyección científica local. La relación de evidencia requiere revisión; esto no confirma el hecho reportado."
+                            hasScientificHypothesis ->
+                                "La hipótesis que declaraste se guardó como propuesta en el índice científico local. No es una conclusión ni una confirmación del incidente; esta acción no acredita sincronización remota de la proyección."
+                            else ->
+                                "El reporte se registró como afirmación no corroborada. No se genera una hipótesis automática. La proyección científica de este flujo permanece local y no implica una confirmación remota."
+                        },
                         fontSize = 11.sp,
                         color = MeetColors.textSecondary,
                         lineHeight = 16.sp,
@@ -1939,7 +2001,7 @@ private fun SafetyInitialRegistrationScreen(
                             color = MeetColors.textPrimary
                         )
                         Text(
-                            "Configura tu perfil de reporte (se realiza una única vez)",
+                            "Declara cómo deseas identificar tu participación en este dispositivo",
                             fontSize = 11.sp,
                             color = MeetColors.cyberCyan
                         )
@@ -1967,16 +2029,22 @@ private fun SafetyInitialRegistrationScreen(
         ) {
             Spacer(Modifier.height(4.dp))
             Text(
-                "SELECCIONA QUIÉN REPORTA",
+                "DECLARA EL TIPO DE PARTICIPACIÓN",
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Black,
                 color = MeetColors.cyberCyan,
                 letterSpacing = 1.2.sp
             )
             Text(
-                "Define tu categoría de participación para el sistema de seguridad y corroboración forense:",
+                "Elige la categoría que describes para tu participación. Es un dato autodeclarado, no una validación de identidad, credencial ni autoridad.",
                 fontSize = 12.sp,
-                color = MeetColors.textSecondary
+                color = MeetColors.textSecondary,
+            )
+            Text(
+                "El nombre, medio, institución o alias que aportes se asocia al reporte como declaración del usuario; no se autentica en este flujo.",
+                fontSize = 11.sp,
+                color = MeetColors.warning,
+                lineHeight = 15.sp,
             )
 
             // 1. Civil
@@ -2004,7 +2072,7 @@ private fun SafetyInitialRegistrationScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("🛡️ Civil", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isCivil) Color.White else MeetColors.textPrimary)
                             Spacer(Modifier.height(2.dp))
-                            Text("Civiles, familias y testigos · Máximo anonimato soberano", fontSize = 11.sp, color = MeetColors.textSecondary)
+                            Text("Civiles y testigos · Alias opcional; anonimato no garantizado", fontSize = 11.sp, color = MeetColors.textSecondary)
                         }
                         if (isCivil) {
                             Icon(Icons.Filled.Check, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
@@ -2031,14 +2099,14 @@ private fun SafetyInitialRegistrationScreen(
                         ) {
                             Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                                 Text(
-                                    "🛡️ BLINDAJE DE VIDA Y PROTOCOLO ZERO-KNOWLEDGE",
+                                    "PRIVACIDAD Y ALCANCE",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Black,
                                     color = MeetColors.neonGreen,
                                     letterSpacing = 0.8.sp,
                                 )
                                 Text(
-                                    "Para proteger la vida de los seres humanos y prevenir riesgos ante cualquier filtración o hackeo, NO se recopilan parentescos, familias, domicilios, barrios ni identidades personales. Tu reporte está blindado criptográficamente con clave soberana AEAD.",
+                                    "Los adjuntos preparados en este dispositivo se cifran localmente. El reporte puede incluir el texto que escribas, la ubicación que aportes y esta declaración de rol. No incluyas datos personales o domicilios de terceros si no son necesarios y legítimos. Esta pantalla no garantiza anonimato absoluto ni protección frente a todos los riesgos.",
                                     fontSize = 10.sp,
                                     color = MeetColors.textSecondary,
                                     lineHeight = 14.sp,
@@ -2072,7 +2140,7 @@ private fun SafetyInitialRegistrationScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("📰 Periodista / Medio", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isJournalist) Color.White else MeetColors.textPrimary)
+                            Text("📰 Perfil periodístico declarado", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isJournalist) Color.White else MeetColors.textPrimary)
                             Spacer(Modifier.height(2.dp))
                             Text("Prensa, reporteros, agencias y medios de comunicación", fontSize = 11.sp, color = MeetColors.textSecondary)
                         }
@@ -2108,7 +2176,7 @@ private fun SafetyInitialRegistrationScreen(
                                 singleLine = true,
                             )
                             Text(
-                                "✓ Como periodista registrado, tendrás autoridad para certificar operativos oficiales y hallazgos.",
+                                "Estos datos son autodeclarados. Este formulario no verifica tu identidad o acreditación, no otorga autoridad institucional y no certifica operativos ni hallazgos.",
                                 fontSize = 10.sp,
                                 color = MeetColors.neonGreen,
                                 fontWeight = FontWeight.SemiBold,
@@ -2143,7 +2211,7 @@ private fun SafetyInitialRegistrationScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("🏢 Institución", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isInstitution) Color.White else MeetColors.textPrimary)
                             Spacer(Modifier.height(2.dp))
-                            Text("Fuerza Pública, OIJ, Cruz Roja, Bomberos u organismos oficiales", fontSize = 11.sp, color = MeetColors.textSecondary)
+                            Text("Perfil de una institución declarado por el usuario; no constituye una afiliación verificada", fontSize = 11.sp, color = MeetColors.textSecondary)
                         }
                         if (isInstitution) {
                             Icon(Icons.Filled.Check, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
@@ -2168,6 +2236,12 @@ private fun SafetyInitialRegistrationScreen(
                                 label = { Text("Unidad / Identificador (Opcional)", fontSize = 11.sp) },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
+                            )
+                            Text(
+                                "El nombre de la institución y la unidad se registran como datos declarados. Los permisos institucionales requieren validación independiente en el servidor.",
+                                fontSize = 10.sp,
+                                color = MeetColors.textSecondary,
+                                lineHeight = 14.sp,
                             )
                         }
                     }

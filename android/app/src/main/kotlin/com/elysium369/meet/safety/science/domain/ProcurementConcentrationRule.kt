@@ -32,7 +32,7 @@ data class ProcurementConcentrationAssessment(
 
 object ProcurementConcentrationRule {
 
-    const val RULE_ID = "RULE_CR_PROCUREMENT_CONCENTRATION_v1"
+    const val RULE_ID = "RULE_PUBLIC_PROCUREMENT_CONCENTRATION_v1"
     const val DEFAULT_CONCENTRATION_THRESHOLD_PERCENT = 70.0
     const val MINIMUM_AWARDS_SAMPLE_THRESHOLD = 3
 
@@ -59,7 +59,18 @@ object ProcurementConcentrationRule {
             it.rawRecord.buyerInstitution.equals(trimmedBuyer, ignoreCase = true)
         }
 
-        if (relevantAwards.size < MINIMUM_AWARDS_SAMPLE_THRESHOLD) {
+        val provenanceIncomplete = relevantAwards.any { award ->
+            !award.evidenceReference.lawfullyObtained ||
+                !award.evidenceReference.sourceVerified ||
+                award.evidenceReference.independenceGroup.isNullOrBlank()
+        }
+
+        if (relevantAwards.size < MINIMUM_AWARDS_SAMPLE_THRESHOLD || provenanceIncomplete) {
+            val reason = if (relevantAwards.size < MINIMUM_AWARDS_SAMPLE_THRESHOLD) {
+                "Sample size (${relevantAwards.size}) is below minimum threshold ($MINIMUM_AWARDS_SAMPLE_THRESHOLD)"
+            } else {
+                "Source provenance is incomplete or unverified; no concentration signal can be escalated"
+            }
             return ProcurementConcentrationAssessment(
                 disposition = AnomalySignalDisposition.INSUFFICIENT_DATA,
                 buyerInstitution = trimmedBuyer,
@@ -68,7 +79,7 @@ object ProcurementConcentrationRule {
                 vendorAwardsCount = 0,
                 totalInstitutionAwardsCount = relevantAwards.size,
                 totalVendorAmountMinorUnits = 0L,
-                deterministicFormulaExplanation = "Sample size (${relevantAwards.size}) is below minimum threshold ($MINIMUM_AWARDS_SAMPLE_THRESHOLD)",
+                deterministicFormulaExplanation = reason,
                 mandatoryAlternativeHypotheses = emptyList(),
                 eligibleForHumanReview = false,
             )
