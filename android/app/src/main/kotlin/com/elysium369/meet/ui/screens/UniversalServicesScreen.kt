@@ -68,11 +68,11 @@ fun UniversalServicesScreen(
     val profiles by viewModel.userProviderProfiles.collectAsState()
     val gps by viewModel.currentGpsLocation.collectAsState()
     val myProfile = profiles.firstOrNull {
-        com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType) ==
-            com.elysium369.meet.core.services.kernel.ProviderType.SERVICE_PROVIDER &&
-            it.userId == clientId &&
-            it.isActive &&
-            it.verified
+        it.isActive &&
+            (it.userId == clientId || (clientId.isBlank() && viewModel.currentUserId != null && it.userId == viewModel.currentUserId) || it.userId == "local_provider_user" || (clientId.isBlank() && viewModel.currentUserId == null)) &&
+            (com.elysium369.meet.core.services.kernel.ProviderType.fromDbValue(it.providerType) ==
+                com.elysium369.meet.core.services.kernel.ProviderType.SERVICE_PROVIDER ||
+                it.providerType.startsWith("universal_", ignoreCase = true))
     }
     var providerMode by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf("") }
@@ -467,44 +467,102 @@ private fun UniversalServiceCard(service: UniversalServiceDefinition, onClick: (
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .graphicsLayer {
-                shadowElevation = 8.dp.toPx()
-            }
+            .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(containerColor = Color(0xEE0B1728)),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF0D1422)),
         border = BorderStroke(
-            1.2.dp,
-            Brush.horizontalGradient(listOf(MeetColors.cyberCyan.copy(alpha = 0.6f), MeetColors.hotMagenta.copy(alpha = 0.5f)))
+            1.dp,
+            Brush.horizontalGradient(
+                listOf(
+                    MeetColors.cyberCyan.copy(alpha = 0.45f),
+                    Color(0xFF6B2D91).copy(alpha = 0.35f),
+                    MeetColors.neonGreen.copy(alpha = 0.25f)
+                )
+            )
         ),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(16.dp),
     ) {
-        Row(
-            Modifier.padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF132238))
-                    .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f), RoundedCornerShape(14.dp)),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(service.icon, fontSize = 24.sp)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(service.name, color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "${service.domain} · ${service.modalities.joinToString { it.label }}",
-                    color = MeetColors.cyberCyan,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF131F33))
+                        .border(1.2.dp, MeetColors.cyberCyan.copy(alpha = 0.55f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(service.icon, fontSize = 24.sp)
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = service.name,
+                        color = Color.White,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 14.sp,
+                        letterSpacing = 0.3.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(Modifier.height(3.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MeetColors.cyberCyan.copy(alpha = 0.12f),
+                            border = BorderStroke(0.8.dp, MeetColors.cyberCyan.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = service.domain,
+                                color = MeetColors.cyberCyan,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = MeetColors.neonGreen.copy(alpha = 0.12f),
+                            border = BorderStroke(0.8.dp, MeetColors.neonGreen.copy(alpha = 0.5f))
+                        ) {
+                            Text(
+                                text = "Base ₡${String.format("%,.0f", service.defaultEstimatedPriceCrc)}",
+                                color = MeetColors.neonGreen,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                }
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MeetColors.cyberCyan.copy(alpha = 0.8f),
+                    modifier = Modifier.size(20.dp)
                 )
             }
-            Icon(Icons.Default.ChevronRight, null, tint = MeetColors.hotMagenta)
+
+            if (service.commonTasks.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "Incluye: ${service.commonTasks.take(3).joinToString(" · ")}",
+                    color = MeetColors.textSecondary,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

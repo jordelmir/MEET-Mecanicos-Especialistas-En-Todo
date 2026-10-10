@@ -526,7 +526,80 @@ fun HomeClassicScreen(
             // ── Quick Actions Grid ──
             PhantomSectionHeader("Acciones Rápidas")
 
+            // ── Featured Education Quick Action Hero ──
+            AnimatedEntrance(5) {
+                EliteCard(
+                    glowColor = Color(0xFFD4AF37),
+                    borderColor = Color(0xFFD4AF37).copy(alpha = 0.5f),
+                    backgroundColor = MeetColors.cardBackground,
+                    shape = RoundedCornerShape(16.dp),
+                    onClick = { navController.navigate(MeetDestinations.ELYSIUM_LEARNING_OS) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("🎓", fontSize = 28.sp)
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        "ELYSIUM EDUCACIÓN OS",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp,
+                                        letterSpacing = 0.5.sp,
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(4.dp),
+                                        color = Color(0xFFD4AF37).copy(alpha = 0.2f),
+                                    ) {
+                                        Text(
+                                            "PISA 6",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = Color(0xFFD4AF37),
+                                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "Tutor Socrático IA · Estándar OCDE PISA · 100% Offline SHA-256",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 11.sp,
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                        Button(
+                            onClick = { navController.navigate(MeetDestinations.ELYSIUM_LEARNING_OS) },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFFD4AF37),
+                                contentColor = Color.Black,
+                            ),
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.height(34.dp),
+                        ) {
+                            Text("ENTRAR", fontSize = 11.sp, fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+            }
+
             val actions = buildList {
+                add(Triple("🎓", "Elysium Educación OS", Color(0xFFD4AF37)) to MeetDestinations.ELYSIUM_LEARNING_OS)
+                add(Triple("🌐", "PISA 6 Internacional", MeetColors.neonGreen) to MeetDestinations.ELYSIUM_LEARNING_OS)
                 add(Triple("🛡️", "Elysium Seguridad", MeetColors.warning) to MeetDestinations.SAFETY_HOME)
                 add(Triple("🔬", "Plataforma Científica", MeetColors.electricBlue) to MeetDestinations.SAFETY_RESEARCH)
                 add(Triple("🔊", "SupremeBass Neon", MeetColors.cyberCyan) to MeetDestinations.SUPREME_BASS)

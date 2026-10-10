@@ -115,7 +115,7 @@ fun SafetyInstitutionalBriefExportDialog(
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
                         Text(
-                            "Archivo: evidencia_video_2115.mp4",
+                            "Archivo: enlace_video_seguridad_2115.url (Enlace Verificado)",
                             color = Color.White,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,

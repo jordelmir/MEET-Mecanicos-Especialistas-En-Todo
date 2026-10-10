@@ -38,6 +38,7 @@ import com.elysium369.meet.safety.ui.institutional.components.SafetyIncidentTypo
 import com.elysium369.meet.safety.ui.institutional.components.SafetyInstitutionalBridgeCard
 import com.elysium369.meet.safety.ui.institutional.components.SafetyInstitutionalBriefExportDialog
 import com.elysium369.meet.safety.ui.institutional.components.SafetyTerritorialIntelligenceConsole
+import com.elysium369.meet.safety.ui.institutional.components.SafetyTwoPersonValidationCard
 import com.elysium369.meet.safety.ui.intelligence.SafetyInvestigativeWorkspaceScreen
 import com.elysium369.meet.ui.theme.MeetColors
 
@@ -88,11 +89,14 @@ fun SafetyInstitutionalDashboardScreen(
     var showModeDialog by remember { mutableStateOf(false) }
     var showExportBriefDialog by remember { mutableStateOf(false) }
     var showInvestigativeWorkspace by remember { mutableStateOf(false) }
+    var showAccreditationScreen by remember { mutableStateOf(false) }
     val view = LocalView.current
 
     BackHandler(enabled = true) {
         if (showInvestigativeWorkspace) {
             showInvestigativeWorkspace = false
+        } else if (showAccreditationScreen) {
+            showAccreditationScreen = false
         } else {
             onBack()
         }
@@ -101,6 +105,13 @@ fun SafetyInstitutionalDashboardScreen(
     if (showInvestigativeWorkspace) {
         SafetyInvestigativeWorkspaceScreen(
             onNavigateBack = { showInvestigativeWorkspace = false },
+        )
+        return
+    }
+
+    if (showAccreditationScreen) {
+        SafetyReviewerAccreditationScreen(
+            onBack = { showAccreditationScreen = false },
         )
         return
     }
@@ -313,6 +324,7 @@ fun SafetyInstitutionalDashboardScreen(
             // SECTION: VISION & OPENING DECLARATION (TAB 1 OR CONTINUOUS)
             // ═══════════════════════════════════════════════════════════════
             if (isContinuousDocumentMode || selectedTab == InstitutionalNavTab.VISION) {
+                // Executive Header & Platform Scope Card
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -326,18 +338,109 @@ fun SafetyInstitutionalDashboardScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(
-                                    "DECLARACIÓN DE APERTURA INSTITUCIONAL",
-                                    color = MeetColors.cyberCyan,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Black,
-                                    letterSpacing = 1.2.sp,
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🇨🇷", fontSize = 18.sp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            SafetyInstitutionalPresentationMode.PLATFORM_TITLE.uppercase(),
+                                            color = Color.White,
+                                            fontSize = 16.sp,
+                                            fontWeight = FontWeight.Black,
+                                            letterSpacing = 1.2.sp,
+                                        )
+                                        Text(
+                                            SafetyInstitutionalPresentationMode.PLATFORM_SUBTITLE,
+                                            color = MeetColors.cyberCyan,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MeetColors.backgroundDeep,
+                                    border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.5f)),
+                                ) {
+                                    Text(
+                                        "MODO DIPUTADOS",
+                                        color = MeetColors.neonGreen,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.height(12.dp))
+
+                            Text(
+                                SafetyInstitutionalPresentationMode.PLATFORM_SUMMARY,
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                lineHeight = 19.sp,
+                            )
+
+                            Spacer(Modifier.height(10.dp))
+
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = MeetColors.backgroundDeep,
+                                border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = null,
+                                        tint = MeetColors.neonGreen,
+                                        modifier = Modifier.size(18.dp),
+                                    )
+                                    Spacer(Modifier.width(10.dp))
+                                    Text(
+                                        SafetyInstitutionalPresentationMode.INSTITUTIONAL_MISSION_STATEMENT,
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 11.sp,
+                                        lineHeight = 16.sp,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Opening Statement Plaque for Parliamentary Meeting
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                        border = BorderStroke(1.5.dp, Color(0xFFFFD54F).copy(alpha = 0.6f)),
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("🏛️", fontSize = 16.sp)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "FRASE PARA ABRIR LA REUNIÓN CON DIPUTADOS",
+                                        color = Color(0xFFFFD54F),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.sp,
+                                    )
+                                }
                                 Icon(
-                                    Icons.Default.Shield,
+                                    Icons.Default.FormatQuote,
                                     contentDescription = null,
-                                    tint = MeetColors.cyberCyan,
-                                    modifier = Modifier.size(20.dp),
+                                    tint = Color(0xFFFFD54F),
+                                    modifier = Modifier.size(24.dp),
                                 )
                             }
 
@@ -348,35 +451,72 @@ fun SafetyInstitutionalDashboardScreen(
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                lineHeight = 21.sp,
+                                lineHeight = 22.sp,
+                            )
+                        }
+                    }
+                }
+
+                // Core Fundamental Principle & Pipeline Card
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                "PRINCIPIO FUNDAMENTAL",
+                                color = MeetColors.cyberCyan,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.2.sp,
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                "Elysium Safety no pretende reemplazar una investigación judicial. Su función es proporcionar infraestructura tecnológica para:",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                lineHeight = 17.sp,
                             )
 
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(10.dp))
 
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = MeetColors.backgroundDeep,
-                                border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                            // Sequential pipeline chips: capturar → preservar → organizar → georreferenciar → relacionar → verificar → analizar
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = null,
-                                        tint = MeetColors.neonGreen,
-                                        modifier = Modifier.size(16.dp),
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        "No reemplaza a la Fuerza Pública, OIJ, Fiscalía ni Tribunales. Proporciona infraestructura tecnológica para capturar, preservar, organizar y analizar evidencia.",
-                                        color = MeetColors.textSecondary,
-                                        fontSize = 11.sp,
-                                        lineHeight = 15.sp,
-                                    )
+                                items(SafetyInstitutionalPresentationMode.CORE_PRINCIPLE_PIPELINE) { step ->
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MeetColors.backgroundDeep,
+                                        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
+                                    ) {
+                                        Text(
+                                            step.uppercase(),
+                                            color = MeetColors.cyberCyan,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Black,
+                                            letterSpacing = 0.5.sp,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+                                        )
+                                    }
+                                    if (step != SafetyInstitutionalPresentationMode.CORE_PRINCIPLE_PIPELINE.last()) {
+                                        Text("→", color = MeetColors.textSecondary, fontSize = 12.sp)
+                                    }
                                 }
                             }
+
+                            Spacer(Modifier.height(10.dp))
+
+                            Text(
+                                "La plataforma debe entenderse como una herramienta de apoyo, no como una autoridad que determina culpabilidad.",
+                                color = MeetColors.textSecondary,
+                                fontSize = 11.sp,
+                                fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            )
                         }
                     }
                 }
@@ -432,7 +572,7 @@ fun SafetyInstitutionalDashboardScreen(
 
                 item {
                     Text(
-                        "LOS 7 PILARES TECNOLÓGICOS DE ELYSIUM SAFETY",
+                        "¿QUÉ PERMITE ELYSIUM SAFETY? — LOS 7 PILARES TECNOLÓGICOS",
                         color = MeetColors.cyberCyan,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Black,
@@ -441,12 +581,23 @@ fun SafetyInstitutionalDashboardScreen(
                     )
                 }
 
-                // Resumen de los 7 Pilares
+                // 1. Reportar incidentes de seguridad
                 item {
                     InstitutionalSectionCard(
                         sectionNumber = 1,
                         title = "1. Reportar incidentes de seguridad",
-                        description = "Estructura información en 8 categorías tipificadas: Asaltos, Homicidios, Desapariciones, Situaciones sospechosas, Violencia, Narcotráfico, Emergencias e Incidentes de zona territorial.",
+                        description = "Permite estructurar información sobre acontecimientos con ubicación, fecha, hora, descripción y material de respaldo:",
+                        bulletPoints = listOf(
+                            "Asaltos.",
+                            "Homicidios.",
+                            "Desapariciones.",
+                            "Situaciones sospechosas.",
+                            "Violencia.",
+                            "Narcotráfico y actividades relacionadas.",
+                            "Emergencias.",
+                            "Incidentes ocurridos en una determinada zona.",
+                            "El reporte puede asociarse con ubicación, fecha, hora, descripción y material de respaldo.",
+                        ),
                         statusBadge = "DEMOSTRADA",
                         statusColor = MeetColors.neonGreen,
                         actionLabel = "EXPLORAR REPORTE & TIPOLOGÍAS",
@@ -457,11 +608,22 @@ fun SafetyInstitutionalDashboardScreen(
                         icon = Icons.Default.ReportProblem,
                     )
                 }
+
+                // 2. Adjuntar y organizar evidencia
                 item {
                     InstitutionalSectionCard(
                         sectionNumber = 2,
                         title = "2. Adjuntar y organizar evidencia",
-                        description = "Fotografías, videos, documentos forenses y procedencia testimonial. Huella criptográfica SHA-256 sobre bytes originales y códigos QR de verificación inmediata.",
+                        description = "Un reporte puede incorporar diferentes tipos de evidencia estructurada para evitar la dispersión:",
+                        bulletPoints = listOf(
+                            "Fotografías.",
+                            "Videos.",
+                            "Documentos.",
+                            "Información geográfica.",
+                            "Cronología de acontecimientos.",
+                            "Datos aportados por diferentes fuentes.",
+                            "El objetivo es evitar que información potencialmente relevante quede dispersa entre mensajes, redes sociales, fotografías o archivos aislados.",
+                        ),
                         statusBadge = "DEMOSTRADA",
                         statusColor = MeetColors.neonGreen,
                         actionLabel = "EXPLORAR CUSTODIA DE EVIDENCIA",
@@ -472,11 +634,21 @@ fun SafetyInstitutionalDashboardScreen(
                         icon = Icons.Default.AttachFile,
                     )
                 }
+
+                // 3. Georreferenciar los acontecimientos
                 item {
                     InstitutionalSectionCard(
                         sectionNumber = 3,
                         title = "3. Georreferenciar los acontecimientos",
-                        description = "Visualización territorial con celdas de calor y concentraciones. Desenfoque residencial mínimo de 25 km en áreas públicas para evitar represalias contra víctimas.",
+                        description = "Los incidentes pueden visualizarse territorialmente mediante mapas interactivos:",
+                        bulletPoints = listOf(
+                            "Dónde ocurren los eventos.",
+                            "Concentraciones geográficas y mapas de calor.",
+                            "Patrones territoriales en cantones y distritos.",
+                            "Relación entre diferentes acontecimientos.",
+                            "Zonas que requieren mayor atención de seguridad.",
+                            "La información geográfica se convierte en una herramienta de análisis para instituciones públicas.",
+                        ),
                         statusBadge = "DEMOSTRADA",
                         statusColor = MeetColors.neonGreen,
                         actionLabel = "VER MAPA TERRITORIAL",
@@ -487,14 +659,22 @@ fun SafetyInstitutionalDashboardScreen(
                         icon = Icons.Default.LocationOn,
                     )
                 }
+
+                // 4. Mantener trazabilidad de la información
                 item {
                     InstitutionalSectionCard(
                         sectionNumber = 4,
                         title = "4. Mantener trazabilidad de la información",
-                        description = "Taxonomía epistémica: OBSERVED → AUTHORITATIVE → DERIVED → ESTIMATED → UNKNOWN. Ningún reporte ciudadano se convierte automáticamente en conclusión oficial sin autoridad.",
+                        description = "Diseñado para distinguir rigurosamente entre diferentes estados de conocimiento:",
+                        bulletPoints = listOf(
+                            "OBSERVED → AUTHORITATIVE → DERIVED → ESTIMATED → UNKNOWN.",
+                            "Mantiene la diferencia entre: 'Una persona reportó este acontecimiento' y 'La autoridad competente confirmó este acontecimiento'.",
+                            "Un reporte ciudadano no se convierte automáticamente en un hecho probado.",
+                            "Reduce el riesgo de convertir rumores, hipótesis o información no verificada en conclusiones oficiales.",
+                        ),
                         statusBadge = "DEMOSTRADA",
                         statusColor = MeetColors.neonGreen,
-                        actionLabel = "VER TRAZABILIDAD EPISTÉMICA",
+                        actionLabel = "VER TRAZABILIDAD & VALIDACIÓN A+B",
                         onAction = {
                             selectedTab = InstitutionalNavTab.INVESTIGATION_CASES
                             isContinuousDocumentMode = false
@@ -502,11 +682,19 @@ fun SafetyInstitutionalDashboardScreen(
                         icon = Icons.Default.Visibility,
                     )
                 }
+
+                // 5. Construir una cadena de evidencia
                 item {
                     InstitutionalSectionCard(
                         sectionNumber = 5,
                         title = "5. Construir una cadena de evidencia",
-                        description = "Estructura formal: Evento → Afirmación → Hipótesis → Evidencia → Análisis → Conclusión. Hashes SHA-256, códigos QR y árboles de Merkle auditables.",
+                        description = "La arquitectura permite relacionar todos los elementos de la investigación sin perder contexto:",
+                        bulletPoints = listOf(
+                            "Evento → Afirmación → Hipótesis → Evidencia → Análisis → Conclusión.",
+                            "Una investigación parte de un acontecimiento concreto e incorpora evidencia y análisis sin perder la relación entre cada elemento.",
+                            "Mecanismos de integridad mediante hashes criptográficos SHA-256.",
+                            "Códigos QR para verificar que los elementos corresponden exactamente al registro original asociado.",
+                        ),
                         statusBadge = "DEMOSTRADA",
                         statusColor = MeetColors.neonGreen,
                         actionLabel = "VER CADENA INVESTIGATIVA",
@@ -517,11 +705,21 @@ fun SafetyInstitutionalDashboardScreen(
                         icon = Icons.Default.AccountTree,
                     )
                 }
+
+                // 6. Crear inteligencia territorial
                 item {
                     InstitutionalSectionCard(
                         sectionNumber = 6,
                         title = "6. Crear inteligencia territorial",
-                        description = "Detección de incrementos en zonas calientes, repetición temporal y correlación espacial para orientar eficazmente los recursos preventivos y policiales.",
+                        description = "Al acumular información estructurada y georreferenciada, se convierte en herramienta de análisis de tendencias:",
+                        bulletPoints = listOf(
+                            "Incremento de incidentes en determinada zona.",
+                            "Repetición de determinados tipos de eventos.",
+                            "Evolución temporal de una problemática.",
+                            "Relación espacial entre acontecimientos.",
+                            "Identificación de zonas que requieren investigación o intervención.",
+                            "La plataforma no determina culpabilidad: Transforma información dispersa en información estructurada para las personas e instituciones responsables.",
+                        ),
                         statusBadge = "DEMOSTRADA",
                         statusColor = MeetColors.neonGreen,
                         actionLabel = "VER INTELIGENCIA TERRITORIAL",
@@ -532,11 +730,19 @@ fun SafetyInstitutionalDashboardScreen(
                         icon = Icons.Default.Timeline,
                     )
                 }
+
+                // 7. Facilitar la colaboración ciudadano–institución
                 item {
                     InstitutionalSectionCard(
                         sectionNumber = 7,
                         title = "7. Facilitar la colaboración ciudadano–institución",
-                        description = "Puente formal: Ciudadano → Evidencia → Información estructurada → Fuerza Pública, OIJ, Ministerio Público y Poder Judicial.",
+                        description = "Puente tecnológico de información y custodia entre la sociedad y el Estado:",
+                        bulletPoints = listOf(
+                            "Ciudadano → Evidencia → Información estructurada → Institución competente.",
+                            "Facilita que una persona aporte información de manera más organizada.",
+                            "Las instituciones reciben datos con mayor contexto, verificación y trazabilidad.",
+                            "Canal formal hacia Fuerza Pública, OIJ, Ministerio Público y Poder Judicial.",
+                        ),
                         statusBadge = "DEMOSTRADA",
                         statusColor = MeetColors.neonGreen,
                         actionLabel = "VER PUENTE INSTITUCIONAL",
@@ -650,6 +856,11 @@ fun SafetyInstitutionalDashboardScreen(
                     SafetyEpistemicTraceabilityCard()
                 }
                 item {
+                    SafetyTwoPersonValidationCard(
+                        onOpenAccreditation = { showAccreditationScreen = true },
+                    )
+                }
+                item {
                     SafetyEvidenceChainVisualizer(
                         onNavigateToResearch = onNavigateToResearch,
                     )
@@ -730,26 +941,115 @@ fun SafetyInstitutionalDashboardScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(18.dp),
+                    shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-                    border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                    border = BorderStroke(1.2.dp, MeetColors.cyberCyan.copy(alpha = 0.5f)),
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🇨🇷", fontSize = 16.sp)
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "POTENCIAL PARA LA REPÚBLICA DE COSTA RICA",
+                                    color = MeetColors.cyberCyan,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Black,
+                                    letterSpacing = 1.2.sp,
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MeetColors.backgroundDeep,
+                                border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f)),
+                            ) {
+                                Text(
+                                    "INFRAESTRUCTURA NACIONAL",
+                                    color = MeetColors.neonGreen,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(10.dp))
+
                         Text(
-                            "POTENCIAL PARA LA REPÚBLICA DE COSTA RICA",
-                            color = MeetColors.cyberCyan,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.2.sp,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            "Elysium Safety propone tecnología para que la información crítica de seguridad no se pierda entre teléfonos, redes sociales y archivos aislados. " +
-                                "Permite construir una infraestructura nacional de trazabilidad probatoria, respetando plenamente las competencias constitucionales y el debido proceso.",
-                            color = MeetColors.textSecondary,
+                            "Una implementación institucional adecuada podría permitir desarrollar una infraestructura nacional " +
+                                "capaz de complementar los mecanismos existentes de seguridad mediante:",
+                            color = Color.White,
                             fontSize = 12.sp,
-                            lineHeight = 18.sp,
+                            lineHeight = 17.sp,
                         )
+
+                        Spacer(Modifier.height(10.dp))
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MeetColors.backgroundDeep,
+                            border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                SafetyInstitutionalPresentationMode.POTENTIAL_COSTA_RICA_PILLARS.forEachIndexed { idx, point ->
+                                    Row(
+                                        modifier = Modifier.padding(vertical = 3.dp),
+                                        verticalAlignment = Alignment.Top,
+                                    ) {
+                                        Text(
+                                            "${idx + 1}. ",
+                                            color = MeetColors.cyberCyan,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Black,
+                                        )
+                                        Text(
+                                            point,
+                                            color = Color.White.copy(alpha = 0.9f),
+                                            fontSize = 11.sp,
+                                            lineHeight = 15.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(12.dp))
+
+                        Text(
+                            "El objetivo final es que información que actualmente puede permanecer fragmentada en teléfonos, redes sociales, " +
+                                "conversaciones o archivos pueda convertirse en información estructurada, trazable y potencialmente útil para las autoridades competentes.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 11.sp,
+                            lineHeight = 16.sp,
+                        )
+
+                        Spacer(Modifier.height(10.dp))
+
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MeetColors.backgroundDeep,
+                            border = BorderStroke(1.5.dp, MeetColors.neonGreen.copy(alpha = 0.6f)),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text("🛡️", fontSize = 16.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    "“Elysium Safety propone tecnología para que la información no se pierda.”",
+                                    color = MeetColors.neonGreen,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                    lineHeight = 17.sp,
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -866,6 +1166,7 @@ private fun InstitutionalSectionCard(
     sectionNumber: Int,
     title: String,
     description: String,
+    bulletPoints: List<String> = emptyList(),
     statusBadge: String,
     statusColor: Color,
     actionLabel: String,
@@ -931,6 +1232,37 @@ private fun InstitutionalSectionCard(
                 fontSize = 12.sp,
                 lineHeight = 17.sp,
             )
+
+            if (bulletPoints.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MeetColors.backgroundDeep,
+                    border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        bulletPoints.forEach { point ->
+                            Row(
+                                modifier = Modifier.padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.Top,
+                            ) {
+                                Text(
+                                    "• ",
+                                    color = MeetColors.cyberCyan,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                                Text(
+                                    point,
+                                    color = Color.White.copy(alpha = 0.9f),
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
 
             Spacer(Modifier.height(12.dp))
 

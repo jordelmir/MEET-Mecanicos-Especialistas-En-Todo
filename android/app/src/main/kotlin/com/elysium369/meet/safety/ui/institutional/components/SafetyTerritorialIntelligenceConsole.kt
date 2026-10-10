@@ -249,6 +249,82 @@ fun SafetyTerritorialIntelligenceConsole(
 
             Spacer(Modifier.height(14.dp))
 
+            // Pillars 3 & 6 Capabilities Breakdown
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MeetColors.backgroundDeep,
+                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Text(
+                        "CAPACIDADES ANALÍTICAS (PILARES 3 & 6)",
+                        color = MeetColors.cyberCyan,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        "3. Georreferenciación territorial permite identificar:",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    listOf(
+                        "Dónde ocurren los eventos con precisión espaciotemporal.",
+                        "Concentraciones geográficas y puntos calientes.",
+                        "Patrones territoriales en cantones y distritos.",
+                        "Relación entre diferentes acontecimientos próximos.",
+                        "Zonas que requieren mayor atención de seguridad pública.",
+                    ).forEach { point ->
+                        Row(modifier = Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
+                            Text("• ", color = MeetColors.cyberCyan, fontSize = 11.sp)
+                            Text(point, color = MeetColors.textSecondary, fontSize = 11.sp, lineHeight = 15.sp)
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "6. Inteligencia territorial y tendencias:",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    listOf(
+                        "Incremento de incidentes en determinada zona.",
+                        "Repetición de determinados tipos de eventos.",
+                        "Evolución temporal de una problemática.",
+                        "Relación espacial entre acontecimientos.",
+                        "Identificación de zonas que requieren investigación o intervención.",
+                    ).forEach { point ->
+                        Row(modifier = Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
+                            Text("• ", color = MeetColors.neonGreen, fontSize = 11.sp)
+                            Text(point, color = MeetColors.textSecondary, fontSize = 11.sp, lineHeight = 15.sp)
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MeetColors.cardBackground,
+                        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.3f)),
+                    ) {
+                        Text(
+                            "“Transforma información dispersa en información estructurada para que pueda ser analizada por las personas e instituciones responsables.”",
+                            color = MeetColors.neonGreen,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(10.dp),
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
             // Privacy and blur guarantee banner
             Surface(
                 shape = RoundedCornerShape(10.dp),

@@ -465,7 +465,6 @@ fun MeetApp(
     val isInstitutionalPresentation = presentationMode == com.elysium369.meet.safety.ui.PresentationMode.INSTITUTIONAL_DEPUTIES_SAFETY
 
     val startDestination = when {
-        isInstitutionalPresentation -> MeetDestinations.SAFETY_INSTITUTIONAL
         !onboardingCompleted -> "onboarding"
         !hasProfile -> "onboarding"
         else -> "home"
@@ -1809,8 +1808,12 @@ fun MeetApp(
             composable(MeetDestinations.SAFETY_INSTITUTIONAL) {
                 com.elysium369.meet.safety.ui.institutional.SafetyInstitutionalDashboardScreen(
                     onBack = {
-                        navController.navigate(MeetDestinations.SAFETY_HOME) {
-                            launchSingleTop = true
+                        val popped = navController.popBackStack()
+                        if (!popped) {
+                            navController.navigate(MeetDestinations.HOME) {
+                                popUpTo(MeetDestinations.HOME) { inclusive = false }
+                                launchSingleTop = true
+                            }
                         }
                     },
                     onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
@@ -1837,10 +1840,25 @@ fun MeetApp(
                 )
             }
 
+            // SAFETY REVIEWER ACCREDITATION PROTOCOL (REVISOR A / B)
+            composable(MeetDestinations.SAFETY_REVIEWER_ACCREDITATION) {
+                com.elysium369.meet.safety.ui.institutional.SafetyReviewerAccreditationScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
             // SAFETY FOUNDATION V1 & UNIFIED CORE
             composable(MeetDestinations.SAFETY_HOME) {
                 com.elysium369.meet.safety.ui.hub.SafetyHubScreen(
-                    onBack = { navController.backOrHome() },
+                    onBack = {
+                        val popped = navController.popBackStack()
+                        if (!popped) {
+                            navController.navigate(MeetDestinations.HOME) {
+                                popUpTo(MeetDestinations.HOME) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        }
+                    },
                     onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
                     onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
                     onNavigateToReportCategory = { category ->
@@ -2052,13 +2070,7 @@ fun MeetApp(
         }
         }
         BackHandler(enabled = activeRoute != null && activeRoute != MeetDestinations.HOME) {
-            if (activeRoute == MeetDestinations.SAFETY_INSTITUTIONAL) {
-                navController.navigate(MeetDestinations.SAFETY_HOME) {
-                    launchSingleTop = true
-                }
-            } else {
-                navController.backOrHome()
-            }
+            navController.backOrHome()
         }
     }
 }

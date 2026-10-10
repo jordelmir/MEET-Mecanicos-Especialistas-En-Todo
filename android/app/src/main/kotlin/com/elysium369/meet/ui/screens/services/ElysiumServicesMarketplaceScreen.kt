@@ -51,6 +51,8 @@ import com.elysium369.meet.core.geo.runtime.CommonMapPanel
 import com.elysium369.meet.ride.map.LayaEnhancedPlaceSearchProvider
 import com.elysium369.meet.ride.map.RidePlaceSuggestion
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.components.EliteCard
+import com.elysium369.meet.ui.components.EliteButton
 import com.elysium369.meet.ui.navigation.MeetDestinations
 import com.elysium369.meet.ui.navigation.safeNavigate
 import com.elysium369.meet.ui.theme.MeetColors
@@ -97,16 +99,21 @@ fun ElysiumServicesMarketplaceScreen(
 
     val categories = remember {
         listOf(
-            ServiceCategoryItem("Mecánica & OBD", "🔧", "AUTO_MECHANICAL", "Vanguard Titan"),
-            ServiceCategoryItem("Grúa & Rescate", "🛞", "AUTO_TOW", "Aura Sentinel"),
-            ServiceCategoryItem("Cerrajería", "🔐", "LOCKSMITH", "Aura Sentinel"),
-            ServiceCategoryItem("Batería & Arranque", "⚡", "BATTERY", "Vanguard Titan"),
-            ServiceCategoryItem("Ferretería", "🔩", "HARDWARE", "Vanguard Titan"),
-            ServiceCategoryItem("Lavado & Detailing", "✨", "DETAILING", "Neo Concierge"),
-            ServiceCategoryItem("Plomería", "🚰", "PLUMBING", "Vanguard Titan"),
-            ServiceCategoryItem("Electricidad", "💡", "ELECTRICAL", "Aura Sentinel"),
-            ServiceCategoryItem("Pulperías & Minisúper", "🏪", "PULPERIA", "Neo Concierge"),
-            ServiceCategoryItem("Sodas & Restaurantes", "🍳", "SODA_RESTAURANT", "Neo Concierge")
+            ServiceCategoryItem("Mecánica & OBD", "🔧", "AUTO_MECHANICAL", "Vanguard Titan", MeetColors.neonGreen, "Diagnóstico motor & escáner"),
+            ServiceCategoryItem("Grúa & Rescate", "🛞", "AUTO_TOW", "Aura Sentinel", MeetColors.warning, "Plataforma & auxilio vial"),
+            ServiceCategoryItem("Cerrajería", "🔐", "LOCKSMITH", "Aura Sentinel", MeetColors.hotMagenta, "Aperturas & llaves chip"),
+            ServiceCategoryItem("Batería & Arranque", "⚡", "BATTERY", "Vanguard Titan", MeetColors.cyberCyan, "Jumpstart & cambio in situ"),
+            ServiceCategoryItem("Ferretería & Materiales", "🔩", "HARDWARE", "Vanguard Titan", Color(0xFFFF9100), "Herramientas & suministros"),
+            ServiceCategoryItem("Lavado & Detailing", "✨", "DETAILING", "Neo Concierge", Color(0xFF00E5FF), "Estética & pulido pro"),
+            ServiceCategoryItem("Plomería & Fontanería", "🚰", "PLUMBING", "Vanguard Titan", MeetColors.electricBlue, "Fugas & cañerías"),
+            ServiceCategoryItem("Electricidad & Redes", "💡", "ELECTRICAL", "Aura Sentinel", Color(0xFFFFD600), "Breakers & acometidas"),
+            ServiceCategoryItem("Pulperías & Minisúper", "🏪", "PULPERIA", "Neo Concierge", MeetColors.neonGreen, "Abarrotes & víveres"),
+            ServiceCategoryItem("Sodas & Restaurantes", "🍳", "SODA_RESTAURANT", "Neo Concierge", Color(0xFFFF6D00), "Comida típica express"),
+            ServiceCategoryItem("Repuestos & Partes", "⚙️", "PARTS_STORE", "Vanguard Titan", Color(0xFF00E5FF), "OEM & compatibilidad VIN"),
+            ServiceCategoryItem("Mensajería & Paquetes", "📦", "COURIER", "Neo Concierge", MeetColors.cyberCyan, "Envíos directos express"),
+            ServiceCategoryItem("Mudanzas & Carga", "🚚", "MOVING", "Aura Sentinel", Color(0xFFFFAB00), "Fletes & acarreos"),
+            ServiceCategoryItem("Servicios Profesionales", "💼", "PROFESSIONAL", "Neo Concierge", Color(0xFF7C4DFF), "Técnicos & asesorías"),
+            ServiceCategoryItem("Educación & Tutorías", "🎓", "EDUCATION", "Vanguard Titan", Color(0xFFD4AF37), "Tutor socrático & PISA")
         )
     }
 
@@ -143,12 +150,19 @@ fun ElysiumServicesMarketplaceScreen(
     // Provider profile & constitutional wallet state (5% platform fee)
     val userProfiles by viewModel.userProviderProfiles.collectAsState()
     val activePrincipal by viewModel.activePrincipal.collectAsState()
-    val activeProfile = userProfiles.firstOrNull { it.isActive && it.userId == activePrincipal?.id }
+    val currentUserId = viewModel.currentUserId
+    val activeProfile = remember(userProfiles, activePrincipal, currentUserId) {
+        userProfiles.firstOrNull { it.isActive && (it.userId == activePrincipal?.id || it.userId == currentUserId) }
+            ?: userProfiles.firstOrNull { it.isActive }
+            ?: userProfiles.firstOrNull()
+    }
     val profileData = remember(activeProfile) {
         if (activeProfile != null && activeProfile.specialties.isNotBlank()) {
             ProviderServiceProfileData.fromJsonString(activeProfile.specialties)
         } else {
-            ProviderServiceProfileData.defaultTemplateForCategory(ProviderDomainCategory.AUTOMOTIVE_MECHANIC)
+            val domain = activeProfile?.providerType?.let { ProviderDomainCategory.fromId(it) }
+                ?: ProviderDomainCategory.AUTOMOTIVE_MECHANIC
+            ProviderServiceProfileData.defaultTemplateForCategory(domain)
         }
     }
     var showTopUpDialog by remember { mutableStateOf(false) }
@@ -458,36 +472,79 @@ fun ElysiumServicesMarketplaceScreen(
 
                 // Category selector pills
                 item {
-                    Text(
-                        text = "SELECCIONA EL TIPO DE SERVICIO",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 0.5.sp
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "SELECCIONA CATEGORÍA DE SERVICIO",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(activeCategory.accentColor.copy(alpha = 0.15f))
+                                .border(1.dp, activeCategory.accentColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "${categories.size} ACTIVAS",
+                                color = activeCategory.accentColor,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+                    }
                     Spacer(Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(vertical = 4.dp)
+                    ) {
                         items(categories.indices.toList()) { index ->
                             val cat = categories[index]
                             val isSelected = (index == selectedCategoryIndex)
-                            Surface(
-                                modifier = Modifier.clickable { selectedCategoryIndex = index },
+                            val accent = cat.accentColor
+                            EliteCard(
+                                glowColor = if (isSelected) accent else null,
+                                borderColor = if (isSelected) accent else MeetColors.borderSubtle.copy(alpha = 0.4f),
+                                backgroundColor = if (isSelected) Color(0xFF0F1A2E) else MeetColors.cardBackground,
                                 shape = RoundedCornerShape(14.dp),
-                                color = if (isSelected) MeetColors.cyberCyan.copy(alpha = 0.22f) else MeetColors.cardBackground,
-                                border = BorderStroke(1.dp, if (isSelected) MeetColors.cyberCyan else MeetColors.borderSubtle)
+                                onClick = { selectedCategoryIndex = index },
+                                modifier = Modifier.heightIn(min = 60.dp)
                             ) {
                                 Row(
                                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(cat.icon, fontSize = 16.sp)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text(
-                                        text = cat.name,
-                                        color = if (isSelected) MeetColors.cyberCyan else Color.White,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isSelected) accent.copy(alpha = 0.22f) else Color(0xFF141F33))
+                                            .border(1.dp, if (isSelected) accent else MeetColors.borderSubtle.copy(alpha = 0.35f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(cat.icon, fontSize = 16.sp)
+                                    }
+                                    Column {
+                                        Text(
+                                            text = cat.name,
+                                            color = if (isSelected) Color.White else Color(0xFFE2E8F0),
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = cat.subtitle,
+                                            color = if (isSelected) accent else MeetColors.textSecondary,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -496,19 +553,44 @@ fun ElysiumServicesMarketplaceScreen(
 
                 // Request Form Card
                 item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
+                    EliteCard(
+                        glowColor = activeCategory.accentColor,
+                        borderColor = activeCategory.accentColor.copy(alpha = 0.35f),
+                        backgroundColor = MeetColors.cardBackground,
                         shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-                        border = BorderStroke(1.dp, MeetColors.borderSubtle)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
-                            Text(
-                                text = "DETALLE DE LA SOLICITUD",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(activeCategory.icon, fontSize = 16.sp)
+                                    Text(
+                                        text = "DETALLE DE LA SOLICITUD",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 13.sp,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(activeCategory.accentColor.copy(alpha = 0.15f))
+                                        .border(1.dp, activeCategory.accentColor.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = activeCategory.name.uppercase(),
+                                        color = activeCategory.accentColor,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                }
+                            }
                             Spacer(Modifier.height(10.dp))
 
                             OutlinedTextField(
@@ -591,15 +673,36 @@ fun ElysiumServicesMarketplaceScreen(
                                             "LOCKSMITH" -> " [Chapa: $locksmithType | $locksmithIssue]"
                                             "ELECTRICAL" -> " [Voltaje: $electricalVoltage | $electricalIssue]"
                                             "AUTO_TOW" -> " [Condición: $towCondition | Destino: $towDestination]"
+                                            "BATTERY" -> " [Batería / Jumpstart]"
+                                            "PARTS_STORE" -> " [Repuestos: VIN/OEM compatible]"
+                                            "COURIER" -> " [Mensajería express]"
+                                            "MOVING" -> " [Mudanza & Flete]"
+                                            "DETAILING" -> " [Estética & Detailing]"
+                                            "HARDWARE" -> " [Materiales & Herramientas]"
+                                            "PULPERIA" -> " [Abarrotes express]"
+                                            "SODA_RESTAURANT" -> " [Comida típica express]"
+                                            "PROFESSIONAL" -> " [Servicio Profesional]"
+                                            "EDUCATION" -> " [Tutoría & Educación PISA]"
                                             else -> ""
                                         }
                                         val fullProblemDescription = "${activeCategory.name}: $problemInput$techSummary"
                                         val definitionId = when(activeCategory.domainKey) {
-                                            "AUTO_MECHANICAL" -> "mechanical"; "AUTO_TOW" -> "roadside"
-                                            "LOCKSMITH" -> "hardware_locksmith"; "BATTERY" -> "mechanical"
-                                            "HARDWARE" -> "hardware_materials"; "DETAILING" -> "vehicle_detailing"
-                                            "PLUMBING" -> "plumbing"; "ELECTRICAL" -> "electrical_home"
-                                            "PULPERIA" -> "pulperia_groceries"; else -> "soda_traditional_food"
+                                            "AUTO_MECHANICAL" -> "mechanical"
+                                            "AUTO_TOW" -> "roadside"
+                                            "LOCKSMITH" -> "hardware_locksmith"
+                                            "BATTERY" -> "mechanical"
+                                            "HARDWARE" -> "hardware_materials"
+                                            "DETAILING" -> "vehicle_detailing"
+                                            "PLUMBING" -> "plumbing"
+                                            "ELECTRICAL" -> "electrical_home"
+                                            "PULPERIA" -> "pulperia_groceries"
+                                            "SODA_RESTAURANT" -> "soda_traditional_food"
+                                            "PARTS_STORE" -> "auto_parts"
+                                            "COURIER" -> "courier"
+                                            "MOVING" -> "moving"
+                                            "PROFESSIONAL" -> "accounting"
+                                            "EDUCATION" -> "tutoring"
+                                            else -> "soda_traditional_food"
                                         }
                                         onPrepareRequest?.invoke(ServicesRequestDraft(definitionId,fullProblemDescription,
                                             "$problemInput$techSummary",locationInput,price.toLong(),"PHYSICAL",locationLat,locationLon))
@@ -636,19 +739,44 @@ fun ElysiumServicesMarketplaceScreen(
                 val openClientRequests = allRequests.filter { it.status == "OPEN" || it.status == "ACCEPTED" }
                 if (openClientRequests.isEmpty()) {
                     item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-                            border = BorderStroke(1.dp, MeetColors.borderSubtle)
+                        EliteCard(
+                            glowColor = MeetColors.cyberCyan,
+                            borderColor = MeetColors.cyberCyan.copy(alpha = 0.25f),
+                            backgroundColor = MeetColors.cardBackground,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = "No tienes solicitudes abiertas en este momento. Publica una arriba para recibir ofertas de especialistas cercanos.",
-                                color = MeetColors.textSecondary,
-                                fontSize = 12.sp,
+                            Row(
                                 modifier = Modifier.padding(16.dp),
-                                lineHeight = 17.sp
-                            )
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
+                                        .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text("📡", fontSize = 18.sp)
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column {
+                                    Text(
+                                        text = "SIN SOLICITUDES ACTIVAS",
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = "Publica una solicitud arriba para que especialistas cercanos te envíen ofertas en tiempo real.",
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 } else {
@@ -702,11 +830,12 @@ fun ElysiumServicesMarketplaceScreen(
                 val openMarketplaceRequests = allRequests.filter { it.status == "OPEN" }
                 if (openMarketplaceRequests.isEmpty()) {
                     item {
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-                            border = BorderStroke(1.dp, MeetColors.borderSubtle)
+                        EliteCard(
+                            glowColor = MeetColors.neonGreen,
+                            borderColor = MeetColors.neonGreen.copy(alpha = 0.3f),
+                            backgroundColor = MeetColors.cardBackground,
+                            shape = RoundedCornerShape(16.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
                             Row(
                                 modifier = Modifier.padding(16.dp),
@@ -718,12 +847,21 @@ fun ElysiumServicesMarketplaceScreen(
                                     strokeWidth = 2.dp
                                 )
                                 Spacer(Modifier.width(14.dp))
-                                Text(
-                                    text = "Escaneando solicitudes de clientes en Costa Rica... Las nuevas alertas aparecerán aquí en tiempo real.",
-                                    color = MeetColors.textSecondary,
-                                    fontSize = 11.sp,
-                                    lineHeight = 16.sp
-                                )
+                                Column {
+                                    Text(
+                                        text = "RADAR EN VIVO: ESCANEANDO COSTA RICA",
+                                        color = MeetColors.neonGreen,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        text = "Buscando nuevas solicitudes en tu zona. Las alertas aparecerán aquí con distancia y ruta en tiempo real.",
+                                        color = MeetColors.textSecondary,
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp
+                                    )
+                                }
                             }
                         }
                     }
@@ -863,6 +1001,8 @@ data class ServiceCategoryItem(
     val icon: String,
     val domainKey: String,
     val masterAgentName: String,
+    val accentColor: Color = MeetColors.cyberCyan,
+    val subtitle: String = "Servicio Especializado",
 )
 
 @Composable
@@ -870,11 +1010,12 @@ private fun AgentAdvisoryHeroCard(
     category: ServiceCategoryItem,
     diagnosticHint: String?,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    EliteCard(
+        glowColor = category.accentColor,
+        borderColor = category.accentColor.copy(alpha = 0.45f),
+        backgroundColor = Color(0xFF091424),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF091424)),
-        border = BorderStroke(1.dp, Brush.horizontalGradient(listOf(MeetColors.cyberCyan, MeetColors.neonGreen)))
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier.padding(16.dp),
@@ -882,34 +1023,53 @@ private fun AgentAdvisoryHeroCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(46.dp)
-                    .background(MeetColors.cyberCyan.copy(alpha = 0.15f), CircleShape)
-                    .border(1.dp, MeetColors.cyberCyan, CircleShape),
+                    .size(48.dp)
+                    .background(category.accentColor.copy(alpha = 0.16f), CircleShape)
+                    .border(1.dp, category.accentColor.copy(alpha = 0.6f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(category.icon, fontSize = 22.sp)
+                Text(category.icon, fontSize = 24.sp)
             }
 
             Spacer(Modifier.width(14.dp))
 
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Surface(
-                        shape = RoundedCornerShape(4.dp),
-                        color = MeetColors.neonGreen.copy(alpha = 0.15f)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(category.accentColor.copy(alpha = 0.18f))
+                            .border(1.dp, category.accentColor.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
                             text = "GUÍA: ${category.masterAgentName.uppercase()}",
+                            color = category.accentColor,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MeetColors.neonGreen.copy(alpha = 0.12f))
+                            .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.4f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "SUBASTA AUDITADA",
                             color = MeetColors.neonGreen,
                             fontSize = 9.sp,
-                            fontWeight = FontWeight.Black,
-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            fontWeight = FontWeight.ExtraBold
                         )
                     }
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = diagnosticHint ?: "Vanguard Titan audita precios en tiempo real para evitar fraudes en ${category.name}.",
+                    text = diagnosticHint ?: "${category.masterAgentName} audita precios de mercado en tiempo real para garantizar cobro justo en ${category.name}.",
                     color = Color.White,
                     fontSize = 11.sp,
                     lineHeight = 15.sp,
@@ -941,18 +1101,28 @@ private fun SpatialSearchBarCard(
         )
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    EliteCard(
+        glowColor = MeetColors.cyberCyan,
+        borderColor = MeetColors.cyberCyan.copy(alpha = 0.25f),
+        backgroundColor = MeetColors.cardBackground,
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-        border = BorderStroke(1.dp, MeetColors.borderSubtle)
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.LocationOn, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(20.dp))
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
+                        .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.LocationOn, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
+                }
                 Spacer(Modifier.width(8.dp))
                 OutlinedTextField(
                     value = query,
@@ -967,13 +1137,20 @@ private fun SpatialSearchBarCard(
                     ),
                     singleLine = true
                 )
-                IconButton(onClick = onVoiceClick) {
-                    Icon(Icons.Default.Mic, contentDescription = "Búsqueda por voz Laya", tint = MeetColors.neonGreen)
+                IconButton(
+                    onClick = onVoiceClick,
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(MeetColors.neonGreen.copy(alpha = 0.15f))
+                        .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    Icon(Icons.Default.Mic, contentDescription = "Búsqueda por voz Laya", tint = MeetColors.neonGreen, modifier = Modifier.size(18.dp))
                 }
             }
 
             // Quick POI Discovery Chips (Costa Rica master GIS)
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
@@ -982,22 +1159,22 @@ private fun SpatialSearchBarCard(
                     Surface(
                         modifier = Modifier.clickable { onSelectCategoryFilter(keyword) },
                         shape = RoundedCornerShape(8.dp),
-                        color = MeetColors.backgroundDark,
-                        border = BorderStroke(0.5.dp, MeetColors.borderSubtle)
+                        color = Color(0xFF0F1A2E),
+                        border = BorderStroke(1.dp, MeetColors.borderSubtle.copy(alpha = 0.6f))
                     ) {
                         Text(
                             text = label,
                             color = MeetColors.cyberCyan,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                         )
                     }
                 }
             }
 
             if (suggestions.isNotEmpty()) {
-                HorizontalDivider(color = MeetColors.borderSubtle.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 6.dp))
+                HorizontalDivider(color = MeetColors.borderSubtle.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
                 suggestions.forEach { suggestion ->
                     Row(
                         modifier = Modifier
@@ -1030,11 +1207,12 @@ private fun ClientActiveRequestCard(
     val bids by viewModel.getBidsForRequest(request.requestId).collectAsState(initial = emptyList())
     val isAccepted = request.status == "ACCEPTED"
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-        border = BorderStroke(1.dp, if (isAccepted) MeetColors.neonGreen.copy(alpha = 0.7f) else MeetColors.borderSubtle)
+    EliteCard(
+        glowColor = if (isAccepted) MeetColors.neonGreen else MeetColors.cyberCyan,
+        borderColor = if (isAccepted) MeetColors.neonGreen.copy(alpha = 0.6f) else MeetColors.cyberCyan.copy(alpha = 0.35f),
+        backgroundColor = MeetColors.cardBackground,
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -1281,11 +1459,12 @@ private fun SpecialistRequestItemCard(
         )
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
-        border = BorderStroke(1.dp, MeetColors.borderSubtle)
+    EliteCard(
+        glowColor = MeetColors.neonGreen,
+        borderColor = MeetColors.neonGreen.copy(alpha = 0.4f),
+        backgroundColor = MeetColors.cardBackground,
+        shape = RoundedCornerShape(18.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -2484,13 +2663,14 @@ private fun MultiDomainInspectionFields(
     towDestination: String,
     onTowDestinationChange: (String) -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDark),
-        border = BorderStroke(1.dp, MeetColors.borderSubtle)
+    EliteCard(
+        glowColor = MeetColors.cyberCyan.copy(alpha = 0.25f),
+        borderColor = MeetColors.cyberCyan.copy(alpha = 0.35f),
+        backgroundColor = MeetColors.backgroundDark,
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("📋", fontSize = 14.sp)
                 Spacer(Modifier.width(6.dp))
@@ -2648,11 +2828,87 @@ private fun MultiDomainInspectionFields(
                         )
                     }
                 }
+                "PARTS_STORE" -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = dtcCode,
+                            onValueChange = { onDtcCodeChange(it.uppercase()) },
+                            label = { Text("VIN / Código OEM") },
+                            placeholder = { Text("Ej: 1HGCR2F8... / OEM") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = mechanicalSystem,
+                            onValueChange = onMechanicalSystemChange,
+                            label = { Text("Pieza / Repuesto") },
+                            placeholder = { Text("Frenos, radiador...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                    }
+                }
+                "COURIER", "MOVING" -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = towCondition,
+                            onValueChange = onTowConditionChange,
+                            label = { Text("Tipo de Carga / Bulto") },
+                            placeholder = { Text("Documento, caja, muebles...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = towDestination,
+                            onValueChange = onTowDestinationChange,
+                            label = { Text("Destino de Entrega") },
+                            placeholder = { Text("Cantón, distrito o Waze...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                    }
+                }
+                "EDUCATION" -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = mechanicalSystem,
+                            onValueChange = onMechanicalSystemChange,
+                            label = { Text("Materia / Tema") },
+                            placeholder = { Text("Matemáticas, Física...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = towCondition,
+                            onValueChange = onTowConditionChange,
+                            label = { Text("Grado / Nivel") },
+                            placeholder = { Text("7° Colegio, Bachillerato...") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            singleLine = true
+                        )
+                    }
+                }
                 else -> {
                     Text(
-                        text = "Especificación general guiada por inteligencia Elysium.",
+                        text = "Especificación guiada por IA Elysium. Los especialistas responderán con su equipo profesional certificado.",
                         color = MeetColors.textSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
                     )
                 }
             }

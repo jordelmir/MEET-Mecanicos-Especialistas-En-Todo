@@ -87,7 +87,7 @@ fun SafetyInstitutionalBridgeCard(
 
             Spacer(Modifier.height(14.dp))
 
-            // Collaboration flowchart row
+            // Collaboration flowchart row: Ciudadano → Evidencia → Información estructurada → Institución competente
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -95,7 +95,7 @@ fun SafetyInstitutionalBridgeCard(
                 BridgeNode(
                     icon = Icons.Default.Person,
                     label = "Ciudadano",
-                    subtext = "Reporte & Evidencia",
+                    subtext = "Aporte voluntario",
                     color = MeetColors.cyberCyan,
                     modifier = Modifier.weight(1f),
                 )
@@ -103,12 +103,12 @@ fun SafetyInstitutionalBridgeCard(
                     Icons.Default.ArrowForward,
                     contentDescription = null,
                     tint = MeetColors.textSecondary,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(12.dp),
                 )
                 BridgeNode(
                     icon = Icons.Default.Lock,
-                    label = "Criptografía",
-                    subtext = "SHA-256 & Custodia",
+                    label = "Evidencia",
+                    subtext = "Material de respaldo",
                     color = MeetColors.electricBlue,
                     modifier = Modifier.weight(1f),
                 )
@@ -116,12 +116,25 @@ fun SafetyInstitutionalBridgeCard(
                     Icons.Default.ArrowForward,
                     contentDescription = null,
                     tint = MeetColors.textSecondary,
-                    modifier = Modifier.size(16.dp),
+                    modifier = Modifier.size(12.dp),
+                )
+                BridgeNode(
+                    icon = Icons.Default.AssignmentTurnedIn,
+                    label = "Info Estructurada",
+                    subtext = "Trazabilidad formal",
+                    color = Color(0xFFFFB300),
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    Icons.Default.ArrowForward,
+                    contentDescription = null,
+                    tint = MeetColors.textSecondary,
+                    modifier = Modifier.size(12.dp),
                 )
                 BridgeNode(
                     icon = Icons.Default.AccountBalance,
                     label = "Institución",
-                    subtext = "OIJ / Fiscalía",
+                    subtext = "Autoridad competente",
                     color = MeetColors.neonGreen,
                     modifier = Modifier.weight(1f),
                 )

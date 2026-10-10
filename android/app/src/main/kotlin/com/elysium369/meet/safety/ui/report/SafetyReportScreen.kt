@@ -1364,24 +1364,158 @@ private fun StepEvidence(
             HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
             Spacer(Modifier.height(4.dp))
 
-            // === SECCIÓN DE VIDEOS POR ENLACE ===
+            // === BLOQUE A: FOTOS Y DOCUMENTOS LOCALES ===
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.AttachFile, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "FOTOGRAFÍAS Y DOCUMENTOS (LOCAL)",
+                    fontWeight = FontWeight.Black,
+                    fontSize = 12.sp,
+                    color = MeetColors.cyberCyan,
+                    letterSpacing = 1.sp,
+                )
+            }
+            Text(
+                "Adjunta fotos fijas, audios o documentos PDF / actas directamente de tu dispositivo. Cada archivo se cifra con huella SHA-256.",
+                color = MeetColors.textSecondary,
+                fontSize = 11.sp,
+            )
+
+            state.evidence.forEach { item ->
+                val evidenceIcon = when {
+                    item.mimeType.startsWith("image/") -> Icons.Filled.AttachFile
+                    item.mimeType.startsWith("audio/") -> Icons.Filled.AttachFile
+                    else -> Icons.Filled.AttachFile
+                }
+                val evidenceLabel = when {
+                    item.mimeType.startsWith("image/") -> "📷 Imagen"
+                    item.mimeType.startsWith("audio/") -> "🎙️ Audio"
+                    item.mimeType == "application/pdf" -> "📄 PDF"
+                    item.mimeType.contains("word") || item.mimeType.contains("document") -> "📝 Documento"
+                    item.mimeType.contains("text") -> "📝 Texto"
+                    else -> "📎 ${item.mimeType.substringAfter("/")}"
+                }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MeetColors.backgroundDeep)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(evidenceIcon, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            evidenceLabel,
+                            color = MeetColors.textPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            "${item.byteCount / 1024} KB · ${item.mimeType}",
+                            color = MeetColors.textMuted,
+                            fontSize = 10.sp,
+                        )
+                    }
+                    IconButton(
+                        onClick = { viewModel.removeEvidence(item.evidenceId) },
+                        enabled = !state.staging,
+                    ) {
+                        Icon(Icons.Filled.Delete, contentDescription = null, tint = MeetColors.error, modifier = Modifier.size(18.dp))
+                    }
+                }
+            }
+
+            Button(
+                onClick = {
+                    picker.launch(
+                        arrayOf(
+                            "image/*",
+                            "audio/*",
+                            "application/pdf",
+                            "text/*",
+                            "application/msword",
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            "application/vnd.ms-excel",
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        )
+                    )
+                },
+                enabled = !state.staging && state.evidence.size < 5,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MeetColors.cyberCyan,
+                    contentColor = MeetColors.backgroundDeep,
+                ),
+            ) {
+                Icon(Icons.Filled.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    if (state.staging) stringResource(R.string.safety_report_step_evidence_protecting) else "Adjuntar fotos o PDFs del dispositivo",
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            if (state.evidence.isNotEmpty()) {
+                Text(
+                    "${state.evidence.size}/5 archivos adjuntos",
+                    fontSize = 10.sp,
+                    color = MeetColors.textMuted,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+            HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
+            Spacer(Modifier.height(4.dp))
+
+            // === BLOQUE B: VIDEOS ESTRICTAMENTE MEDIANTE ENLACE WEB / URL ===
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.Videocam, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "VIDEOS (MEDIANTE ENLACE)",
+                    "VIDEOS (ESTRICTAMENTE MEDIANTE ENLACE)",
                     fontWeight = FontWeight.Black,
                     fontSize = 12.sp,
                     color = MeetColors.neonGreen,
                     letterSpacing = 1.sp,
                 )
             }
-            Text(
-                "Para no saturar el servidor, si quieres poner un video adjunta el link (YouTube, TikTok, Drive, redes, etc.). Al tocarlo se abrirá el video directamente.",
-                color = MeetColors.textSecondary,
-                fontSize = 11.sp,
-                lineHeight = 15.sp,
-            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+                border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.35f)),
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        "🛡️ ¿Por qué mediante enlace? (Protección de servidores)",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp,
+                        color = MeetColors.neonGreen,
+                    )
+                    Text(
+                        "Para no saturar la memoria y el ancho de banda del servidor de seguridad ciudadana, no subas archivos de video pesados directamente a la aplicación. En su lugar, usa un enlace web.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                    )
+                    Text(
+                        "Pasos recomendados:\n" +
+                            "1. Sube tu video primero a YouTube (puedes marcarlo como 'Oculto / No listado' si deseas privacidad, o 'Público'), Google Drive, TikTok, X o Facebook.\n" +
+                            "2. Copia el enlace web (URL) del video.\n" +
+                            "3. Pégalo en el campo inferior y presiona 'Agregar Video'.\n" +
+                            "✓ Las autoridades y peritos podrán abrir y reproducir el video al instante sin demoras ni pérdida de calidad.",
+                        color = MeetColors.textPrimary,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                    )
+                }
+            }
 
             // Added video URLs
             state.videoUrls.forEach { url ->
@@ -1417,7 +1551,7 @@ private fun StepEvidence(
                 OutlinedTextField(
                     value = state.videoInputText,
                     onValueChange = { viewModel.updateVideoInputText(it) },
-                    placeholder = { Text("Pega el link del video...", fontSize = 11.sp, color = MeetColors.textMuted) },
+                    placeholder = { Text("Pega el enlace del video (YouTube, Drive, etc.)...", fontSize = 11.sp, color = MeetColors.textMuted) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(10.dp),
@@ -1440,7 +1574,7 @@ private fun StepEvidence(
                     ),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
                 ) {
-                    Text("Agregar", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    Text("Agregar Video", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
             }
         }

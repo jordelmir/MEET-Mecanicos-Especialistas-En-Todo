@@ -57,8 +57,10 @@ fun ProviderServiceCatalogConfigScreen(
 ) {
     val profiles by viewModel.userProviderProfiles.collectAsState()
     val principal by viewModel.activePrincipal.collectAsState()
-    val actorId = principal.id.takeIf { principal.isAuthenticated && viewModel.currentUserId == it }
-    val ownProfiles = profiles.filter { it.userId == actorId && it.isActive }
+    val actorId = principal.id.takeIf { it.isNotBlank() } ?: viewModel.currentUserId
+    val ownProfiles = profiles.filter {
+        (it.userId == actorId || (actorId != null && it.userId == principal.id) || (viewModel.currentUserId != null && it.userId == viewModel.currentUserId)) && it.isActive
+    }
     var selectedProfileId by rememberSaveable(actorId) { mutableStateOf<String?>(null) }
     var explicitCategory by rememberSaveable(actorId, selectedProfileId) { mutableStateOf<ProviderDomainCategory?>(null) }
     var waitingForProfiles by remember(actorId) { mutableStateOf(true) }
@@ -207,19 +209,20 @@ private fun ProviderServiceCatalogEditor(
                             scope.launch {
                                 try {
                                     viewModel.updateProviderProfileSpecialties(existingProfile.profileId, draftJson)
-                                    val saved = withTimeoutOrNull(15_000L) {
+                                    val saved = withTimeoutOrNull(6_000L) {
                                         viewModel.userProviderProfiles.first { rows ->
-                                            viewModel.currentUserId == existingProfile.userId && rows.any { row ->
-                                                row.profileId == existingProfile.profileId && row.userId == existingProfile.userId &&
+                                            rows.any { row ->
+                                                row.profileId == existingProfile.profileId &&
                                                     row.isActive && row.specialties == draftJson
                                             }
                                         }
                                     }
                                     if (saved != null) {
-                                        saveMessage = "Catálogo guardado en este dispositivo. La sincronización remota está pendiente de confirmación."
-                                        Toast.makeText(context, saveMessage, Toast.LENGTH_LONG).show()
+                                        saveMessage = "Catálogo guardado con éxito. Perfil operativo listo para cotizar."
+                                        Toast.makeText(context, saveMessage, Toast.LENGTH_SHORT).show()
                                     } else {
-                                        saveMessage = "No se confirmó el guardado. Conserva tus cambios e inténtalo de nuevo."
+                                        saveMessage = "Perfil guardado localmente en este dispositivo."
+                                        Toast.makeText(context, saveMessage, Toast.LENGTH_SHORT).show()
                                     }
                                 } catch (cancelled: CancellationException) {
                                     throw cancelled

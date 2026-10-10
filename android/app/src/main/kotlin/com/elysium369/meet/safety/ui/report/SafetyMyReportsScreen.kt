@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.Videocam
@@ -369,8 +370,35 @@ private fun MyReportCard(
                             .background(MeetColors.cyberCyan.copy(alpha = 0.1f))
                             .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
-                        Text("v${report.serverVersion} autorizada", fontSize = 10.sp, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
+                        Text("v${report.serverVersion} registrada", fontSize = 10.sp, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+
+            // Explicación de custodia constitucional
+            if (report.syncState == "SYNCED" && report.serverState != "PUBLISHED") {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MeetColors.cyberCyan.copy(alpha = 0.07f))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Shield,
+                        contentDescription = null,
+                        tint = MeetColors.cyberCyan,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        "🔒 Resguardo Privado: Tu reporte está asegurado en el servidor bajo custodia estricta. No se proyecta en el mapa público hasta contar con corroboración de fuentes independientes o validación institucional.",
+                        fontSize = 9.sp,
+                        color = MeetColors.textSecondary,
+                        lineHeight = 12.sp,
+                    )
                 }
             }
 
@@ -539,14 +567,26 @@ private fun EvidenceChip(item: SafetyEvidenceEntity, onClick: () -> Unit = {}) {
 
 /** Map localState to a human-friendly triple: (icon, color, label) */
 private fun resolveLocalState(report: com.elysium369.meet.safety.data.local.SafetyReportEntity): Triple<ImageVector, Color, String> {
-    // Priority: if synced online, show that. Otherwise show raw state.
+    val isSynced = report.localState == "SYNCED_ONLINE" || report.syncState == "SYNCED"
+    if (isSynced) {
+        return when (report.serverState?.uppercase()) {
+            "PUBLISHED" ->
+                Triple(Icons.Filled.Verified, Color(0xFF10B981), "Proyección pública (Corroborado)")
+            "HELD" ->
+                Triple(Icons.Filled.Shield, Color(0xFFFFB020), "En revisión preventiva (Contradicciones)")
+            "RETRACTED", "WITHDRAWN" ->
+                Triple(Icons.Filled.Delete, Color(0xFF94A3B8), "Retractado formalmente")
+            "REJECTED" ->
+                Triple(Icons.Filled.CloudOff, Color(0xFFEF4444), "Desestimado")
+            else ->
+                Triple(Icons.Filled.CloudDone, Color(0xFF06B6D4), "En custodia segura (Privado · En validación)")
+        }
+    }
     return when {
-        report.localState == "SYNCED_ONLINE" || report.syncState == "SYNCED" ->
-            Triple(Icons.Filled.CloudDone, Color(0xFF10B981), "Sincronizado mundialmente")
         report.syncState == "SYNCING" ->
             Triple(Icons.Filled.CloudSync, Color(0xFF06B6D4), "Sincronizando...")
         report.syncState == "QUEUED" ->
-            Triple(Icons.Filled.CloudUpload, Color(0xFFFFB020), "En cola de sincronización")
+            Triple(Icons.Filled.CloudUpload, Color(0xFFFFB020), "En cola de sincronización local")
         report.syncState == "FAILED" ->
             Triple(Icons.Filled.CloudOff, Color(0xFFEF4444), "Error de sincronización")
         report.localState == "LOCAL_ONLY" ->

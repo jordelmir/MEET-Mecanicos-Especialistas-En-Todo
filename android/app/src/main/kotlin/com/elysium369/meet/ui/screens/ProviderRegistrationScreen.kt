@@ -105,6 +105,14 @@ private val providerTypes = listOf(
         subtitle = "Ofrece servicios de transporte con la red Elysium Vanguard AI OS",
         accentColor = MeetColors.electricBlue,
         specialtiesPlaceholder = "Ej: Sedán, SUV, Van, Premium…"
+    ),
+    ProviderTypeInfo(
+        type = "SERVICE_PROVIDER",
+        icon = "🏪",
+        label = "Servicios & Oficios Elysium",
+        subtitle = "Plomería, electricidad, ferretería, pulperías, sodas, detailing y oficios",
+        accentColor = MeetColors.neonGreen,
+        specialtiesPlaceholder = "Ej: Plomería, Electricidad, Ferretería, Pulpería, Soda, Detailing…"
     )
 )
 

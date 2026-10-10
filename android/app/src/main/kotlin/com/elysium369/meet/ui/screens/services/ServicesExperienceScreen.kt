@@ -1,14 +1,33 @@
 package com.elysium369.meet.ui.screens.services
 
+import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.elysium369.meet.ui.ObdViewModel
+import com.elysium369.meet.ui.components.EliteCard
 import com.elysium369.meet.ui.screens.UniversalServicesScreen
+import com.elysium369.meet.ui.theme.MeetColors
 
 data class ServicesOfferDraft(val priceCrc: Long, val hours: Double, val warrantyDays: Int, val note: String)
 val LocalServiceOfferDraft = staticCompositionLocalOf<(ServicesOfferDraft) -> Unit> { {} }
@@ -42,30 +61,256 @@ fun ServicesExperienceScreen(
     var draft by remember(actor, initialRequestDraft) { mutableStateOf(initialRequestDraft) }
     var offerDraft by remember(actor) { mutableStateOf<ServicesOfferDraft?>(null) }
     var authorityNotice by remember(actor) { mutableStateOf<String?>(null) }
-    CompositionLocalProvider(LocalServiceOnlineAction provides { message -> authorityNotice = message; pane = 1 },
-        LocalServiceOfferDraft provides { value -> offerDraft = value; pane = 1; authorityNotice = "Contraoferta conservada. Selecciona su solicitud en línea y revisa los datos antes de enviarla." }) {
-    Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf("Catálogo y oficios", "En línea", "Cotización avanzada").forEachIndexed { index, label ->
-                FilterChip(modifier = Modifier.weight(1f), selected = pane == index,
-                    onClick = { pane = index }, label = { Text(label) })
-            }
+
+    val tabs = remember {
+        listOf(
+            Triple("🏪", "Catálogo & Oficios", MeetColors.cyberCyan),
+            Triple("⚡", "En Línea", MeetColors.neonGreen),
+            Triple("🎯", "Subasta Avanzada", MeetColors.electricBlue)
+        )
+    }
+
+    CompositionLocalProvider(
+        LocalServiceOnlineAction provides { message -> authorityNotice = message; pane = 1 },
+        LocalServiceOfferDraft provides { value ->
+            offerDraft = value
+            pane = 1
+            authorityNotice = "Contraoferta conservada. Selecciona su solicitud en línea y revisa los datos antes de enviarla."
         }
-        authorityNotice?.let { Text(it, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) }
-        if (pane != 1) Text("Los registros anteriores son historial local. Publicación, propuestas y cierre se confirman en En línea.", modifier = Modifier.padding(horizontal = 12.dp))
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            when (pane) {
-                0 -> UniversalServicesScreen(viewModel, onBack, onMessages, onActive, onHistory,
-                    onProviderConfig, onOpenAdvancedMarketplace = { pane = 1 },
-                    onPrepareRequest = { draft = it; pane = 1 })
-                1 -> UnifiedServicesScreen(viewModel, onBack, onMessages, onProviderConfig,
-                    onAdvanced = { pane = 2 }, onServiceMessages = onServiceMessages,
-                    requestDraft = draft, onDraftConsumed = { draft = null },
-                    offerDraft = offerDraft, onOfferDraftConsumed = { offerDraft = null },
-                    initialHistory = initialHistory)
-                else -> ElysiumServicesMarketplaceScreen(navController, viewModel, onPrepareRequest = { draft = it; pane = 1 })
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF080D17),
+                            Color(0xFF0B111E),
+                            Color(0xFF05080E)
+                        )
+                    )
+                )
+        ) {
+            // ── Top Header Navigation Bar ──
+            Surface(
+                color = Color(0xDD0A0F1D),
+                border = BorderStroke(1.dp, MeetColors.borderSubtle.copy(alpha = 0.4f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            IconButton(
+                                onClick = onBack,
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(MeetColors.cardBackground)
+                                    .border(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f), CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Regresar",
+                                    tint = MeetColors.cyberCyan,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(
+                                        text = "ELYSIUM SERVICIOS",
+                                        fontWeight = FontWeight.Black,
+                                        fontSize = 15.sp,
+                                        color = Color.White,
+                                        letterSpacing = 0.8.sp
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(MeetColors.neonGreen.copy(alpha = 0.15f))
+                                            .border(1.dp, MeetColors.neonGreen.copy(alpha = 0.6f), RoundedCornerShape(4.dp))
+                                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(
+                                            "OS v2",
+                                            color = MeetColors.neonGreen,
+                                            fontWeight = FontWeight.ExtraBold,
+                                            fontSize = 9.sp
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = "Mano de obra · Repuestos & Materiales · Subasta dual",
+                                    color = MeetColors.textSecondary,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+
+                        // Right actions (Active / History quick pills)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Surface(
+                                onClick = onActive,
+                                shape = RoundedCornerShape(8.dp),
+                                color = MeetColors.neonGreen.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Text("⚡", fontSize = 10.sp)
+                                    Text("Activos", color = MeetColors.neonGreen, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                }
+                            }
+                            Surface(
+                                onClick = onHistory,
+                                shape = RoundedCornerShape(8.dp),
+                                color = MeetColors.cyberCyan.copy(alpha = 0.12f),
+                                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Text("📜", fontSize = 10.sp)
+                                    Text("Historial", color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // ── Segmented Cyber Dock Switcher (Home Acciones Rápidas aesthetic) ──
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFF0D1424),
+                        border = BorderStroke(1.dp, MeetColors.borderSubtle.copy(alpha = 0.6f))
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(3.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            tabs.forEachIndexed { index, (icon, label, accent) ->
+                                val isSelected = pane == index
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .background(
+                                            if (isSelected) accent.copy(alpha = 0.18f) else Color.Transparent
+                                        )
+                                        .border(
+                                            width = if (isSelected) 1.2.dp else 0.dp,
+                                            color = if (isSelected) accent else Color.Transparent,
+                                            shape = RoundedCornerShape(9.dp)
+                                        )
+                                        .clickable { pane = index }
+                                        .padding(vertical = 7.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Text(icon, fontSize = 12.sp)
+                                        Text(
+                                            text = label,
+                                            color = if (isSelected) Color.White else MeetColors.textSecondary,
+                                            fontWeight = if (isSelected) FontWeight.Black else FontWeight.Medium,
+                                            fontSize = 11.sp,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Notice / Authority Banner
+            authorityNotice?.let { notice ->
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    color = MeetColors.cyberCyan.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f))
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("ℹ️", fontSize = 14.sp)
+                        Text(
+                            text = notice,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            lineHeight = 15.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { authorityNotice = null }, modifier = Modifier.size(20.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MeetColors.textMuted, modifier = Modifier.size(14.dp))
+                        }
+                    }
+                }
+            }
+
+            // Main Content Area
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                when (pane) {
+                    0 -> UniversalServicesScreen(
+                        viewModel = viewModel,
+                        onBack = onBack,
+                        onOpenMessages = onMessages,
+                        onNavigateToActiveServices = onActive,
+                        onNavigateToHistory = onHistory,
+                        onNavigateToProviderConfig = onProviderConfig,
+                        onOpenAdvancedMarketplace = { pane = 1 },
+                        onPrepareRequest = { draft = it; pane = 1 }
+                    )
+                    1 -> UnifiedServicesScreen(
+                        viewModel = viewModel,
+                        onBack = onBack,
+                        onOpenMessages = onMessages,
+                        onProviderConfig = onProviderConfig,
+                        onAdvanced = { pane = 2 },
+                        onServiceMessages = onServiceMessages,
+                        requestDraft = draft,
+                        onDraftConsumed = { draft = null },
+                        offerDraft = offerDraft,
+                        onOfferDraftConsumed = { offerDraft = null },
+                        initialHistory = initialHistory,
+                        onNavigateToAuth = { navController.navigate("auth") }
+                    )
+                    else -> ElysiumServicesMarketplaceScreen(
+                        navController = navController,
+                        viewModel = viewModel,
+                        onPrepareRequest = { draft = it; pane = 1 }
+                    )
+                }
             }
         }
     }
-}
 }

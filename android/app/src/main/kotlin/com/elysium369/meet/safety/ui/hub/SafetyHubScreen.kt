@@ -284,6 +284,67 @@ fun SafetyHubScreen(
                 }
             }
 
+            // Parliamentary Deputies Mode Hero Banner
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable {
+                            SafetyHaptics.selectionTick(view)
+                            onNavigateToInstitutional()
+                        },
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+                    border = BorderStroke(1.2.dp, MeetColors.neonGreen.copy(alpha = 0.5f)),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(MeetColors.neonGreen.copy(alpha = 0.18f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text("🏛️", fontSize = 18.sp)
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        "MODO DIPUTADOS (COSTA RICA)",
+                                        color = MeetColors.neonGreen,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Black,
+                                        letterSpacing = 1.sp,
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("🇨🇷", fontSize = 11.sp)
+                                }
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    "Presentación Institucional: Los 7 Pilares de Seguridad y Evidencia",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+                        }
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Abrir presentación",
+                            tint = MeetColors.neonGreen,
+                            modifier = Modifier.size(18.dp),
+                        )
+                    }
+                }
+            }
+
             // View Mode & Tab Switcher Bar
             item {
                 Row(

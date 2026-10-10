@@ -59,20 +59,41 @@ enum class ProviderType(val dbValue: String, val displayName: String) {
     UNKNOWN("unknown", "Tipo de Proveedor Desconocido");
 
     companion object {
-        fun fromDbValue(value: String): ProviderType = when (value.trim().lowercase()) {
-            "mechanic" -> MECHANIC
-            "workshop" -> WORKSHOP
-            "parts_store", "part_store", "store" -> PARTS_STORE
-            "tow_provider", "tow_truck", "tow", "tow_driver" -> TOW_PROVIDER
-            "ride_driver", "driver", "ride" -> RIDE_DRIVER
-            "service_provider", "provider", "universal_provider" -> SERVICE_PROVIDER
-            "auto_locksmith", "locksmith", "keys" -> AUTO_LOCKSMITH
-            else -> values().firstOrNull { it.name.equals(value.trim(), ignoreCase = true) } ?: UNKNOWN
+        fun fromDbValue(value: String): ProviderType {
+            val normalized = value.trim().lowercase()
+            return when {
+                normalized == "mechanic" -> MECHANIC
+                normalized == "workshop" -> WORKSHOP
+                normalized in listOf("parts_store", "part_store", "store", "repuestos", "autopartes", "auto_parts") -> PARTS_STORE
+                normalized in listOf("tow_provider", "tow_truck", "tow", "tow_driver", "grua", "gruas", "roadside") -> TOW_PROVIDER
+                normalized in listOf("ride_driver", "driver", "ride", "chofer", "taxi", "uber") -> RIDE_DRIVER
+                normalized in listOf("service_provider", "provider", "universal_provider", "universal", "oficios") -> SERVICE_PROVIDER
+                normalized in listOf("auto_locksmith", "locksmith", "keys", "cerrajeria", "cerrajero") -> AUTO_LOCKSMITH
+                normalized.startsWith("universal_") -> when {
+                    normalized.contains("locksmith") || normalized.contains("cerraj") -> AUTO_LOCKSMITH
+                    normalized.contains("tow") || normalized.contains("grua") || normalized.contains("roadside") -> TOW_PROVIDER
+                    normalized.contains("mech") || normalized.contains("mecanic") -> MECHANIC
+                    normalized.contains("part") || normalized.contains("repuest") -> PARTS_STORE
+                    else -> SERVICE_PROVIDER
+                }
+                normalized in listOf(
+                    "pulperia", "pulperia_groceries", "soda", "soda_restaurant", "soda_traditional_food",
+                    "hardware", "hardware_materials", "plumbing", "plumbing_water", "electrical", "electrical_home",
+                    "detailing", "vehicle_detailing", "battery", "battery_jumpstart", "cleaning", "home_cleaning",
+                    "moving", "courier", "beauty", "fitness", "tutoring", "translation", "accounting", "legal"
+                ) -> SERVICE_PROVIDER
+                else -> entries.firstOrNull { it.name.equals(value.trim(), ignoreCase = true) } ?: UNKNOWN
+            }
         }
 
         fun fromDbValueStrict(value: String): ProviderType {
             val res = fromDbValue(value)
             if (res == UNKNOWN) {
+                // If it looks like a custom universal trade or category, safely map to SERVICE_PROVIDER
+                val trimmed = value.trim()
+                if (trimmed.isNotBlank()) {
+                    return SERVICE_PROVIDER
+                }
                 throw UnsupportedProviderTypeException("Tipo de proveedor '$value' no es reconocido por la plataforma")
             }
             return res

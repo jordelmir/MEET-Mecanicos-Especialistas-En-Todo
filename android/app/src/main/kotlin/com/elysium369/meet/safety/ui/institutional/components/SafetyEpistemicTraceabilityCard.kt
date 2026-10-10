@@ -247,27 +247,78 @@ fun SafetyEpistemicTraceabilityCard(
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(14.dp))
 
-            // Epistemic Golden Rule Banner
+            // Epistemic Contrast Card: 'Una persona reportó' vs 'La autoridad confirmó'
             Surface(
-                shape = RoundedCornerShape(10.dp),
+                shape = RoundedCornerShape(12.dp),
                 color = MeetColors.backgroundDeep,
-                border = BorderStroke(1.dp, MeetColors.borderSubtle),
+                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.4f)),
             ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        Icons.Default.Info,
-                        contentDescription = null,
-                        tint = MeetColors.cyberCyan,
-                        modifier = Modifier.size(20.dp),
-                    )
-                    Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.padding(14.dp)) {
                     Text(
-                        "Garantía institucional: Un reporte ciudadano (OBSERVED) jamás se promueve automáticamente a delito probado (AUTHORITATIVE) sin el debido proceso y resolución de autoridad.",
+                        "DISTINCIÓN INSTITUCIONAL CLAVE",
+                        color = MeetColors.cyberCyan,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "El sistema puede mantener la diferencia estricta entre:",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MeetColors.cardBackground,
+                        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.3f)),
+                    ) {
+                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("👤", fontSize = 14.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "“Una persona reportó este acontecimiento.”",
+                                color = MeetColors.cyberCyan,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        "y:",
+                        color = MeetColors.textSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 12.dp),
+                    )
+                    Spacer(Modifier.height(6.dp))
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MeetColors.cardBackground,
+                        border = BorderStroke(1.dp, MeetColors.neonGreen.copy(alpha = 0.3f)),
+                    ) {
+                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("⚖️", fontSize = 14.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "“La autoridad competente confirmó este acontecimiento.”",
+                                color = MeetColors.neonGreen,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Esta separación reduce el riesgo de convertir rumores, hipótesis o información no verificada en conclusiones oficiales. Un reporte ciudadano no debe convertirse automáticamente en un hecho probado.",
                         color = MeetColors.textSecondary,
                         fontSize = 11.sp,
                         lineHeight = 15.sp,
