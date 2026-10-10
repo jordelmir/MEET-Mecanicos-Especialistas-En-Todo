@@ -24,42 +24,58 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.elysium369.meet.ui.theme.MeetColors
 
-private enum class DemonstrationReviewPhase {
-    INGESTED_PRIVATE,   // Estado inicial: OBSERVED, privado en bóveda
-    RECOMMENDED_BY_A,   // Calificado por Revisor A (Candidato)
-    AUTHORIZED_BY_B,    // Autorizado por Revisor B (Publicado en mapa)
-    REJECTED,           // Desestimado por inconsistencias
-}
-
 /**
- * Interactive Parliamentary & Academic Console for Two-Person Validation.
- *
- * Demonstrates the Epistemic & Institutional Rule of Elysium Safety:
- * - Reviewer A (Fact & Evidence Analyst, TRUST_REVIEWER) != Reviewer B (Legal & Publication Authority, LEGAL_REVIEWER)
- * - Citizen Report (OBSERVED) never self-elevates to public projection.
- * - Prevents false reports, lynching, defamatory claims, and single-operator bias.
+ * Backward-compatible entrypoint delegating to [SafetyTripartiteValidationCard].
  */
 @Composable
 fun SafetyTwoPersonValidationCard(
     modifier: Modifier = Modifier,
     onOpenAccreditation: () -> Unit = {},
 ) {
-    var phase by remember { mutableStateOf(DemonstrationReviewPhase.INGESTED_PRIVATE) }
+    SafetyTripartiteValidationCard(
+        modifier = modifier,
+        onOpenAccreditation = onOpenAccreditation,
+    )
+}
+
+/**
+ * Interactive Parliamentary & Academic Console for Tripartite Asymmetric Validation.
+ *
+ * Implements the Epistemic & Institutional Tripartite Architecture:
+ * - Grupo A (Prensa & Investigación Documental, TRUST_REVIEWER)
+ * - Grupo B (Juristas, Especialistas en Derecho & DDHH, LEGAL_REVIEWER)
+ * - Grupo C (Autoridades Públicas & Órganos Jurisdiccionales, AUTHORITY_REVIEWER - Demo / Reserva)
+ *
+ * Regla de Operación Asimétrica:
+ * - Basta 1 de los 3 validadores calificados para que el reporte sea proyectado al mapa público.
+ * - El carril C es opcional, demostrativo y no bloqueante (Principio de No-Veto Ciudadano).
+ * - En el mapa y en la consola, se muestran claramente qué validadores certificaron el reporte.
+ */
+@Composable
+fun SafetyTripartiteValidationCard(
+    modifier: Modifier = Modifier,
+    onOpenAccreditation: () -> Unit = {},
+) {
+    var isValidatedA by remember { mutableStateOf(false) }
+    var isValidatedB by remember { mutableStateOf(false) }
+    var isValidatedC by remember { mutableStateOf(false) }
+    var isRejected by remember { mutableStateOf(false) }
     var selectedReportIndex by remember { mutableIntStateOf(0) }
     var showSameReviewerError by remember { mutableStateOf(false) }
 
     val sampleReports = listOf(
         Pair(
             "REP-2026-CR-089",
-            "Asalto con arma de fuego y vehículo en fuga en cuadrante San José Central. Testigo presencial aporta video de seguridad externo.",
+            "Asalto con arma de fuego y vehículo en fuga en cuadrante San José Central. Testigo presencial aporta video de seguridad externo con hash inmutable.",
         ),
         Pair(
             "REP-2026-CR-094",
-            "Presunta inconsistencia en adjudicación de licitación SICOP #2026LN-004. Documento contractual y acta notarial adjuntos.",
+            "Presunta inconsistencia en adjudicación de licitación SICOP #2026LN-004. Documento contractual y acta notarial adjuntos con sellos temporales.",
         ),
     )
 
     val currentReport = sampleReports[selectedReportIndex]
+    val hasAnyValidation = !isRejected && (isValidatedA || isValidatedB || isValidatedC)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -92,16 +108,16 @@ fun SafetyTwoPersonValidationCard(
                     Spacer(Modifier.width(10.dp))
                     Column {
                         Text(
-                            "PROTOCOLO DE VALIDACIÓN INDEPENDIENTE",
+                            "PROTOCOLO DE VALIDACIÓN TRIPARTITA ASIMÉTRICA",
                             color = Color.White,
-                            fontSize = 12.sp,
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp,
+                            letterSpacing = 0.8.sp,
                         )
                         Text(
-                            "Regla de Dos Personas (Revisor A ≠ Revisor B)",
+                            "Estamentos A (Prensa), B (Juristas) y C (Autoridades)",
                             color = MeetColors.cyberCyan,
-                            fontSize = 11.sp,
+                            fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                         )
                     }
@@ -124,12 +140,32 @@ fun SafetyTwoPersonValidationCard(
 
             Spacer(Modifier.height(10.dp))
 
-            Text(
-                "Ningún reporte ciudadano se publica en el mapa abierto por sí mismo. Para evitar denuncias falsas, linchamientos o calumnias, la plataforma exige dos revisiones independientes con roles y firmas separadas.",
-                color = MeetColors.textSecondary,
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
-            )
+            // Banner de Soberanía Ciudadana & Principio de No-Veto
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = MeetColors.backgroundDeep,
+                border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        Icons.Default.Gavel,
+                        contentDescription = null,
+                        tint = MeetColors.cyberCyan,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "PRINCIPIO DE NO-VETO: Con la validación de cualquiera de los 3 estamentos (A, B o C), el caso pasa al mapa territorial. El carril estatal C es opcional y de demostración; la inacción o demora gubernamental nunca censura la alerta ciudadana.",
+                        color = MeetColors.textSecondary,
+                        fontSize = 10.sp,
+                        lineHeight = 14.sp,
+                    )
+                }
+            }
 
             Spacer(Modifier.height(10.dp))
 
@@ -171,7 +207,7 @@ fun SafetyTwoPersonValidationCard(
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
 
             // Selector de reporte en cola
             Text(
@@ -199,7 +235,10 @@ fun SafetyTwoPersonValidationCard(
                             .weight(1f)
                             .clickable {
                                 selectedReportIndex = idx
-                                phase = DemonstrationReviewPhase.INGESTED_PRIVATE
+                                isValidatedA = false
+                                isValidatedB = false
+                                isValidatedC = false
+                                isRejected = false
                                 showSameReviewerError = false
                             },
                     ) {
@@ -235,7 +274,12 @@ fun SafetyTwoPersonValidationCard(
                             fontWeight = FontWeight.Black,
                             color = Color.White,
                         )
-                        StateBadge(phase)
+                        TripartiteStateBadge(
+                            isValidatedA = isValidatedA,
+                            isValidatedB = isValidatedB,
+                            isValidatedC = isValidatedC,
+                            isRejected = isRejected,
+                        )
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
@@ -247,7 +291,7 @@ fun SafetyTwoPersonValidationCard(
                     Spacer(Modifier.height(8.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         Text("🛡️ Play Integrity: VÁLIDO", fontSize = 9.sp, color = MeetColors.neonGreen)
                         Text("⏱️ Reloj: SIN DESFASE", fontSize = 9.sp, color = MeetColors.neonGreen)
@@ -256,134 +300,230 @@ fun SafetyTwoPersonValidationCard(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
             // ═══════════════════════════════════════════════════════════════
-            // PASO 1: REVISOR A (Analista de Hechos / Evidencia)
+            // PASO 1: REVISOR A (Prensa & Investigación Documental)
             // ═══════════════════════════════════════════════════════════════
             ReviewerStepCard(
-                stepNumber = "1",
-                roleTitle = "REVISOR A — Analista de Hechos y Evidencia",
-                roleId = "ID: rev_alfa_041 (Certificado Forense)",
-                description = "Evalúa coherencia espaciotemporal, autenticidad del hash SHA-256 en evidencia y descarta contradicciones físicas.",
-                isCompleted = phase != DemonstrationReviewPhase.INGESTED_PRIVATE,
-                isActive = phase == DemonstrationReviewPhase.INGESTED_PRIVATE,
-                statusText = when (phase) {
-                    DemonstrationReviewPhase.INGESTED_PRIVATE -> "Pendiente de calificación técnica"
-                    DemonstrationReviewPhase.REJECTED -> "❌ Calificado como INCONSISTENTE"
-                    else -> "✓ Recomendación FAVORABLE registrada (Candidato a Publicación)"
+                stepNumber = "A",
+                roleTitle = "GRUPO A — Periodistas, Medios & Investigadores",
+                roleId = "ID: rev_prensa_041 (Colegiatura / Medios Acreditados)",
+                description = "Evalúa coherencia espaciotemporal, autenticidad del hash SHA-256 en evidencia audiovisual y corrobora testimonios independientes.",
+                isCompleted = isValidatedA,
+                isActive = !isValidatedA && !isRejected,
+                statusText = when {
+                    isRejected -> "❌ Proceso desestimado por inconsistencias"
+                    isValidatedA -> "✓ VALIDACIÓN PERIODÍSTICA REGISTRADA (Alerta Temprana en Mapa)"
+                    else -> "Pendiente de calificación periodística"
                 },
                 accentColor = MeetColors.cyberCyan,
             ) {
-                if (phase == DemonstrationReviewPhase.INGESTED_PRIVATE) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Button(
+                        onClick = {
+                            isValidatedA = true
+                            isRejected = false
+                            showSameReviewerError = false
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                    ) {
+                        Text("Aprobar Validación A", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            isRejected = true
+                            isValidatedA = false
+                            isValidatedB = false
+                            isValidatedC = false
+                            showSameReviewerError = false
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.error),
+                        border = BorderStroke(1.dp, MeetColors.error.copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                    ) {
+                        Text("Rechazar (Inconsistente)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // ═══════════════════════════════════════════════════════════════
+            // PASO 2: REVISOR B (Juristas & Especialistas en Derecho / DDHH)
+            // ═══════════════════════════════════════════════════════════════
+            ReviewerStepCard(
+                stepNumber = "B",
+                roleTitle = "GRUPO B — Abogados, Juristas & DDHH",
+                roleId = "ID: rev_legal_099 (Colegio de Abogados / Clínicas Jurídicas)",
+                description = "Verifica salvaguardas de intimidad (blur residencial 25km), ausencia de imputación calumniosa y tipificación penal formal.",
+                isCompleted = isValidatedB,
+                isActive = !isValidatedB && !isRejected,
+                statusText = when {
+                    isRejected -> "❌ Proceso desestimado"
+                    isValidatedB -> "✓ VALIDACIÓN JURÍDICA REGISTRADA (Consistencia Legal en Mapa)"
+                    else -> "Pendiente de calificación legal independiente"
+                },
+                accentColor = MeetColors.neonGreen,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Button(
                             onClick = {
-                                phase = DemonstrationReviewPhase.RECOMMENDED_BY_A
+                                isValidatedB = true
+                                isRejected = false
                                 showSameReviewerError = false
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.cyberCyan),
+                            colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(vertical = 8.dp),
                         ) {
-                            Text("Aprobar Candidato", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("Aprobar Validación B", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                         }
+
+                        // Botón de prueba de seguridad: Intento de auto-aprobación con el mismo revisor
                         OutlinedButton(
                             onClick = {
-                                phase = DemonstrationReviewPhase.REJECTED
-                                showSameReviewerError = false
+                                showSameReviewerError = true
                             },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MeetColors.error),
-                            border = BorderStroke(1.dp, MeetColors.error.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD54F)),
+                            border = BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.5f)),
                             shape = RoundedCornerShape(8.dp),
                             modifier = Modifier.weight(1f),
                             contentPadding = PaddingValues(vertical = 8.dp),
                         ) {
-                            Text("Rechazar (Duda)", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            Text("Simular Revisor A = B", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    AnimatedVisibility(visible = showSameReviewerError) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MeetColors.error.copy(alpha = 0.15f),
+                            border = BorderStroke(1.dp, MeetColors.error),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(Icons.Default.Block, contentDescription = null, tint = MeetColors.error, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    "BLOQUEO AUTOMÁTICO: Revisor B debe ser una persona distinta a Revisor A. Se prohíbe la auto-autorización unilateral entre estamentos.",
+                                    color = MeetColors.error,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    lineHeight = 12.sp,
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
 
             // ═══════════════════════════════════════════════════════════════
-            // PASO 2: REVISOR B (Autoridad Legal y Publicación)
+            // PASO 3: REVISOR C (Autoridades Públicas - Demo / Reserva)
             // ═══════════════════════════════════════════════════════════════
             ReviewerStepCard(
-                stepNumber = "2",
-                roleTitle = "REVISOR B — Autoridad Legal y Publicación",
-                roleId = "ID: rev_beta_099 (Revisor Legal Independiente)",
-                description = "Verifica salvaguardas de intimidad (blur residencial 25km), ausencia de imputación calumniosa y pertinencia legal.",
-                isCompleted = phase == DemonstrationReviewPhase.AUTHORIZED_BY_B,
-                isActive = phase == DemonstrationReviewPhase.RECOMMENDED_BY_A,
-                statusText = when (phase) {
-                    DemonstrationReviewPhase.INGESTED_PRIVATE -> "En espera del dictamen del Revisor A"
-                    DemonstrationReviewPhase.RECOMMENDED_BY_A -> "Pendiente de autorización legal definitiva"
-                    DemonstrationReviewPhase.REJECTED -> "Proceso desestimado"
-                    DemonstrationReviewPhase.AUTHORIZED_BY_B -> "✓ PROYECCIÓN PÚBLICA AUTORIZADA (Mapa & Casos)"
+                stepNumber = "C",
+                roleTitle = "GRUPO C — Autoridades Públicas & Órganos Jurisdiccionales",
+                roleId = "CONVENIO: Pendiente de Ratificación (Poder Judicial, OIJ, Fiscalía)",
+                description = "Carril institucional reservado para convenios formales de interconexión. Muestra a diputados y jerarcas cómo su participación se integra al ecosistema sin condicionar la alerta civil.",
+                isCompleted = isValidatedC,
+                isActive = true,
+                statusText = when {
+                    isValidatedC -> "✓ ADHESIÓN ESTATAL SIMULADA (Validación Oficial en Demostración)"
+                    else -> "🔒 EN RESERVA DE CONVENIO MARCO — MODO DEMOSTRACIÓN PARLAMENTARIA"
                 },
-                accentColor = MeetColors.neonGreen,
+                accentColor = Color(0xFFFFD54F),
             ) {
-                if (phase == DemonstrationReviewPhase.RECOMMENDED_BY_A) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MeetColors.backgroundDeep,
+                    border = BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.4f)),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("🏛️", fontSize = 13.sp)
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "CANAL DE DEMOSTRACIÓN PARA DIPUTADOS",
+                                    color = Color(0xFFFFD54F),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = Color(0xFFFFD54F).copy(alpha = 0.2f),
+                            ) {
+                                Text(
+                                    "NO BLOQUEANTE",
+                                    color = Color(0xFFFFD54F),
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
+
+                        Text(
+                            "La plataforma nunca espera por trámites burocráticos. Si el Estado no valida, el reporte se proyecta con A o B. Este botón permite mostrar la respuesta estatal en audiencias legislativas.",
+                            color = MeetColors.textSecondary,
+                            fontSize = 9.sp,
+                            lineHeight = 13.sp,
+                        )
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             Button(
                                 onClick = {
-                                    phase = DemonstrationReviewPhase.AUTHORIZED_BY_B
-                                    showSameReviewerError = false
+                                    isValidatedC = !isValidatedC
+                                    if (isValidatedC) isRejected = false
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isValidatedC) MeetColors.neonGreen else Color(0xFFFFD54F),
+                                ),
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(vertical = 8.dp),
+                                contentPadding = PaddingValues(vertical = 7.dp),
                             ) {
-                                Text("Autorizar Publicación", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            }
-
-                            // Botón de prueba de seguridad: Intento de auto-aprobación con el mismo revisor
-                            OutlinedButton(
-                                onClick = {
-                                    showSameReviewerError = true
-                                },
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFFFD54F)),
-                                border = BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.5f)),
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(vertical = 8.dp),
-                            ) {
-                                Text("Simular Revisor A = B", fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-
-                        AnimatedVisibility(visible = showSameReviewerError) {
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MeetColors.error.copy(alpha = 0.15f),
-                                border = BorderStroke(1.dp, MeetColors.error),
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(Icons.Default.Block, contentDescription = null, tint = MeetColors.error, modifier = Modifier.size(16.dp))
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        "BLOQUEO AUTOMÁTICO: Revisor B debe ser una persona distinta a Revisor A. Se prohíbe la auto-autorización unilateral.",
-                                        color = MeetColors.error,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        lineHeight = 12.sp,
-                                    )
-                                }
+                                Icon(
+                                    if (isValidatedC) Icons.Default.Check else Icons.Default.AccountBalance,
+                                    contentDescription = null,
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(13.dp),
+                                )
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    if (isValidatedC) "Revocar Simulación C" else "Simular Adhesión Estatal (C)",
+                                    color = Color.Black,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
                             }
                         }
                     }
@@ -392,66 +532,151 @@ fun SafetyTwoPersonValidationCard(
 
             Spacer(Modifier.height(14.dp))
 
-            // Resultado final
+            // Resultado final de Proyección Territorial
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MeetColors.backgroundDeep,
                 border = BorderStroke(
                     1.dp,
-                    if (phase == DemonstrationReviewPhase.AUTHORIZED_BY_B) MeetColors.neonGreen else MeetColors.borderSubtle,
+                    if (hasAnyValidation) MeetColors.neonGreen else MeetColors.borderSubtle,
                 ),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            if (phase == DemonstrationReviewPhase.AUTHORIZED_BY_B) Icons.Default.CheckCircle else Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = if (phase == DemonstrationReviewPhase.AUTHORIZED_BY_B) MeetColors.neonGreen else MeetColors.cyberCyan,
-                            modifier = Modifier.size(16.dp),
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            "ESTADO DE PROYECCIÓN TERRITORIAL:",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MeetColors.textMuted,
-                            letterSpacing = 1.sp,
-                        )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (hasAnyValidation) Icons.Default.CheckCircle else Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = if (hasAnyValidation) MeetColors.neonGreen else MeetColors.cyberCyan,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                "ESTADO DE PROYECCIÓN TERRITORIAL:",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MeetColors.textMuted,
+                                letterSpacing = 1.sp,
+                            )
+                        }
+
+                        if (hasAnyValidation) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                                border = BorderStroke(1.dp, MeetColors.neonGreen),
+                            ) {
+                                Text(
+                                    "EN MAPA ABIERTO",
+                                    color = MeetColors.neonGreen,
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                )
+                            }
+                        }
                     }
-                    Spacer(Modifier.height(4.dp))
+
+                    Spacer(Modifier.height(6.dp))
+
                     Text(
-                        when (phase) {
-                            DemonstrationReviewPhase.INGESTED_PRIVATE ->
-                                "🔒 BÓVEDA PRIVADA: El reporte está asegurado criptográficamente. Ningún tercero en el mapa puede verlo todavía."
-                            DemonstrationReviewPhase.RECOMMENDED_BY_A ->
-                                "🟡 FASE CANDIDATO: Superó la validación técnica del Revisor A. Sigue en reserva hasta el visto bueno legal del Revisor B."
-                            DemonstrationReviewPhase.AUTHORIZED_BY_B ->
-                                "🟢 PROYECCIÓN PÚBLICA ACTIVA: Aprobado por dos revisores independientes. Visible en Mapa Territorial y Casos Públicos con blur de privacidad."
-                            DemonstrationReviewPhase.REJECTED ->
-                                "🔴 EN RESERVA PREVENTIVA: Desestimado por no superar criterios de consistencia o evidencia."
+                        when {
+                            isRejected ->
+                                "🔴 EN RESERVA PREVENTIVA: Desestimado por no superar criterios de consistencia o evidencia objetiva."
+                            hasAnyValidation -> {
+                                val activeBadges = mutableListOf<String>()
+                                if (isValidatedA) activeBadges.add("[A: Prensa]")
+                                if (isValidatedB) activeBadges.add("[B: Jurídico]")
+                                if (isValidatedC) activeBadges.add("[C: Autoridad]")
+                                "🟢 PROYECCIÓN PÚBLICA ACTIVA: Superó el umbral de validación independiente con sellos: ${activeBadges.joinToString(" + ")}. Visible en Mapa Territorial y Ficha Pública con salvaguarda de intimidad."
+                            }
+                            else ->
+                                "🔒 BÓVEDA PRIVADA: El reporte está asegurado criptográficamente. Requiere al menos 1 validación de A, B o C para ingresar al mapa territorial público."
                         },
                         fontSize = 11.sp,
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
                         lineHeight = 16.sp,
                     )
+
+                    // Sellos interactivos proyectados
+                    if (hasAnyValidation) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            if (isValidatedA) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MeetColors.cyberCyan.copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, MeetColors.cyberCyan),
+                                ) {
+                                    Text(
+                                        "📰 Sello A: Prensa",
+                                        color = MeetColors.cyberCyan,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    )
+                                }
+                            }
+                            if (isValidatedB) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MeetColors.neonGreen.copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, MeetColors.neonGreen),
+                                ) {
+                                    Text(
+                                        "⚖️ Sello B: Juristas",
+                                        color = MeetColors.neonGreen,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    )
+                                }
+                            }
+                            if (isValidatedC) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = Color(0xFFFFD54F).copy(alpha = 0.2f),
+                                    border = BorderStroke(1.dp, Color(0xFFFFD54F)),
+                                ) {
+                                    Text(
+                                        "🏛️ Sello C: Autoridad (Demo)",
+                                        color = Color(0xFFFFD54F),
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
             // Botón de reinicio de simulación
-            if (phase != DemonstrationReviewPhase.INGESTED_PRIVATE) {
+            if (isValidatedA || isValidatedB || isValidatedC || isRejected) {
                 Spacer(Modifier.height(8.dp))
                 TextButton(
                     onClick = {
-                        phase = DemonstrationReviewPhase.INGESTED_PRIVATE
+                        isValidatedA = false
+                        isValidatedB = false
+                        isValidatedC = false
+                        isRejected = false
                         showSameReviewerError = false
                     },
                     modifier = Modifier.align(Alignment.End),
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(14.dp), tint = MeetColors.cyberCyan)
                     Spacer(Modifier.width(4.dp))
-                    Text("Reiniciar Demostración", fontSize = 11.sp, color = MeetColors.cyberCyan)
+                    Text("Reiniciar Simulación Tripartita", fontSize = 11.sp, color = MeetColors.cyberCyan)
                 }
             }
         }
@@ -459,12 +684,22 @@ fun SafetyTwoPersonValidationCard(
 }
 
 @Composable
-private fun StateBadge(phase: DemonstrationReviewPhase) {
-    val (color, text) = when (phase) {
-        DemonstrationReviewPhase.INGESTED_PRIVATE -> MeetColors.cyberCyan to "OBSERVED (PRIVADO)"
-        DemonstrationReviewPhase.RECOMMENDED_BY_A -> Color(0xFFFFD54F) to "CANDIDATE (REVISOR A ✓)"
-        DemonstrationReviewPhase.AUTHORIZED_BY_B -> MeetColors.neonGreen to "PUBLISHED (AUTORIZADO)"
-        DemonstrationReviewPhase.REJECTED -> MeetColors.error to "RECHAZADO"
+private fun TripartiteStateBadge(
+    isValidatedA: Boolean,
+    isValidatedB: Boolean,
+    isValidatedC: Boolean,
+    isRejected: Boolean,
+) {
+    val (color, text) = when {
+        isRejected -> MeetColors.error to "RECHAZADO"
+        isValidatedA && isValidatedB && isValidatedC -> Color(0xFFFFD54F) to "TRIPARTITO (A+B+C)"
+        isValidatedA && isValidatedB -> MeetColors.neonGreen to "CIVIL PLENO (A+B)"
+        isValidatedA && isValidatedC -> Color(0xFF69F0AE) to "PRENSA + ESTADO (A+C)"
+        isValidatedB && isValidatedC -> Color(0xFF82B1FF) to "LEGAL + ESTADO (B+C)"
+        isValidatedA -> MeetColors.cyberCyan to "PRENSA (A ✓)"
+        isValidatedB -> MeetColors.neonGreen to "LEGAL (B ✓)"
+        isValidatedC -> Color(0xFFFFD54F) to "ESTATAL (C ✓ DEMO)"
+        else -> MeetColors.cyberCyan to "OBSERVED (PRIVADO)"
     }
 
     Surface(
@@ -512,7 +747,7 @@ private fun ReviewerStepCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(22.dp)
+                            .size(24.dp)
                             .clip(CircleShape)
                             .background(if (isCompleted) accentColor else MeetColors.cardBackground),
                         contentAlignment = Alignment.Center,
@@ -521,7 +756,7 @@ private fun ReviewerStepCard(
                             stepNumber,
                             color = if (isCompleted) Color.Black else Color.White,
                             fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.Black,
                         )
                     }
                     Spacer(Modifier.width(8.dp))

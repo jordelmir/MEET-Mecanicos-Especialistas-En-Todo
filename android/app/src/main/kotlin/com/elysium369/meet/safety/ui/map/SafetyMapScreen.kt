@@ -649,6 +649,11 @@ private fun PublicPointDetail(
             }
         }
 
+        // === 3.1 Tripartite Validation Panel (A, B, C) ===
+        item {
+            TripartiteValidationDetailCard(point = point)
+        }
+
         // === 4. Coordenadas Card ===
         item {
             Card(
@@ -901,6 +906,126 @@ private fun PublicPointDetail(
                     lineHeight = 16.sp,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun TripartiteValidationDetailCard(point: SafetyPublicPointEntity) {
+    val valA = point.hasValidationA()
+    val valB = point.hasValidationB()
+    val valC = point.hasValidationC()
+    val title = point.tripartiteValidationTitle()
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
+    ) {
+        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.Shield,
+                        contentDescription = null,
+                        tint = MeetColors.cyberCyan,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "VALIDACIÓN TRIPARTITA ASIMÉTRICA",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        color = MeetColors.cyberCyan,
+                        letterSpacing = 0.8.sp,
+                    )
+                }
+                Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                ) {
+                    Text(
+                        "1 DE 3 SUFICIENTE",
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.neonGreen,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
+            }
+
+            Text(
+                title,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+
+            // Discrete chips for A, B, C
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                // Estamento A: Prensa
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (valA) MeetColors.cyberCyan.copy(alpha = 0.2f) else MeetColors.backgroundDeep,
+                    border = BorderStroke(1.dp, if (valA) MeetColors.cyberCyan else MeetColors.borderSubtle),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text("📰 GRUPO A", fontSize = 9.sp, fontWeight = FontWeight.Black, color = if (valA) MeetColors.cyberCyan else MeetColors.textMuted)
+                        Text(if (valA) "Prensa ✓" else "Pendiente", fontSize = 9.sp, color = if (valA) Color.White else MeetColors.textMuted)
+                    }
+                }
+
+                // Estamento B: Jurídico
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (valB) MeetColors.neonGreen.copy(alpha = 0.2f) else MeetColors.backgroundDeep,
+                    border = BorderStroke(1.dp, if (valB) MeetColors.neonGreen else MeetColors.borderSubtle),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text("⚖️ GRUPO B", fontSize = 9.sp, fontWeight = FontWeight.Black, color = if (valB) MeetColors.neonGreen else MeetColors.textMuted)
+                        Text(if (valB) "Jurídico ✓" else "Pendiente", fontSize = 9.sp, color = if (valB) Color.White else MeetColors.textMuted)
+                    }
+                }
+
+                // Estamento C: Autoridad
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = if (valC) Color(0xFFFFD54F).copy(alpha = 0.2f) else MeetColors.backgroundDeep,
+                    border = BorderStroke(1.dp, if (valC) Color(0xFFFFD54F) else MeetColors.borderSubtle),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(6.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Text("🏛️ GRUPO C", fontSize = 9.sp, fontWeight = FontWeight.Black, color = if (valC) Color(0xFFFFD54F) else MeetColors.textMuted)
+                        Text(if (valC) "Autoridad ✓" else "En Reserva", fontSize = 9.sp, color = if (valC) Color.White else MeetColors.textMuted)
+                    }
+                }
+            }
+
+            Text(
+                "Soberanía ciudadana: La ausencia de validación estatal (C) no bloquea la alerta territorial si cuenta con respaldo de prensa (A) o jurídico (B).",
+                fontSize = 9.sp,
+                color = MeetColors.textSecondary,
+                lineHeight = 13.sp,
+            )
         }
     }
 }

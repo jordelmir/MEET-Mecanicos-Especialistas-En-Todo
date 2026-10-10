@@ -100,7 +100,7 @@ fun SafetyReviewerAccreditationScreen(
                             letterSpacing = 1.sp,
                         )
                         Text(
-                            "Protocolo de Incorporación para Revisores A y B",
+                            "Protocolo de Incorporación para Revisores A, B y C (Autoridades)",
                             fontSize = 11.sp,
                             color = MeetColors.cyberCyan,
                         )
@@ -181,7 +181,7 @@ fun SafetyReviewerAccreditationScreen(
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
@@ -190,12 +190,12 @@ fun SafetyReviewerAccreditationScreen(
                                 modifier = Modifier.weight(1f),
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(8.dp),
+                                    modifier = Modifier.padding(6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(14.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Revisor A: ACTIVO", fontSize = 10.sp, color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(13.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Revisor A: ACTIVO", fontSize = 9.sp, color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
                                 }
                             }
                             Surface(
@@ -205,12 +205,27 @@ fun SafetyReviewerAccreditationScreen(
                                 modifier = Modifier.weight(1f),
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(8.dp),
+                                    modifier = Modifier.padding(6.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(14.dp))
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Revisor B: ACTIVO", fontSize = 10.sp, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(13.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Revisor B: ACTIVO", fontSize = 9.sp, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MeetColors.backgroundDeep,
+                                border = BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.5f)),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Default.AccountBalance, contentDescription = null, tint = Color(0xFFFFD54F), modifier = Modifier.size(13.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Revisor C: DEMO", fontSize = 9.sp, color = Color(0xFFFFD54F), fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -330,20 +345,51 @@ fun SafetyReviewerAccreditationScreen(
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
                             ) {
                                 FilterChip(
                                     selected = selectedRole == "TRUST_REVIEWER",
                                     onClick = { selectedRole = "TRUST_REVIEWER" },
-                                    label = { Text("Revisor A (Hechos & Evidencia)", fontSize = 10.sp) },
+                                    label = { Text("A: Hechos/Prensa", fontSize = 9.sp) },
                                     modifier = Modifier.weight(1f),
                                 )
                                 FilterChip(
                                     selected = selectedRole == "LEGAL_REVIEWER",
                                     onClick = { selectedRole = "LEGAL_REVIEWER" },
-                                    label = { Text("Revisor B (Legal & DDHH)", fontSize = 10.sp) },
+                                    label = { Text("B: Jurídico/DDHH", fontSize = 9.sp) },
                                     modifier = Modifier.weight(1f),
                                 )
+                                FilterChip(
+                                    selected = selectedRole == "AUTHORITY_REVIEWER",
+                                    onClick = { selectedRole = "AUTHORITY_REVIEWER" },
+                                    label = { Text("C: Autoridad (Demo)", fontSize = 9.sp) },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+
+                            if (selectedRole == "AUTHORITY_REVIEWER") {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = Color(0xFFFFD54F).copy(alpha = 0.15f),
+                                    border = BorderStroke(1.dp, Color(0xFFFFD54F)),
+                                    modifier = Modifier.fillMaxWidth(),
+                                ) {
+                                    Column(modifier = Modifier.padding(10.dp)) {
+                                        Text(
+                                            "🏛️ MODALIDAD DEMOSTRATIVA / CONVENIO EN TRÁMITE",
+                                            color = Color(0xFFFFD54F),
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold,
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            "Este registro genera una credencial de muestra para acreditación ante comisiones parlamentarias y ministerios. El canal real requiere la ratificación de un convenio marco de cooperación interinstitucional.",
+                                            color = MeetColors.textSecondary,
+                                            fontSize = 9.sp,
+                                            lineHeight = 13.sp,
+                                        )
+                                    }
+                                }
                             }
 
                             Button(
@@ -524,17 +570,29 @@ fun SafetyReviewerAccreditationScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(Icons.Default.Verified, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(24.dp))
+                                    val isAuth = selectedRole == "AUTHORITY_REVIEWER"
+                                    val badgeColor = if (isAuth) Color(0xFFFFD54F) else MeetColors.neonGreen
+                                    Icon(
+                                        if (isAuth) Icons.Default.AccountBalance else Icons.Default.Verified,
+                                        contentDescription = null,
+                                        tint = badgeColor,
+                                        modifier = Modifier.size(24.dp),
+                                    )
                                     Spacer(Modifier.width(8.dp))
-                                    Text("CREDENCIAL ACTIVA", color = MeetColors.neonGreen, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                                    Text(
+                                        if (isAuth) "CREDENCIAL DEMOSTRATIVA" else "CREDENCIAL ACTIVA",
+                                        color = badgeColor,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Black,
+                                    )
                                 }
                                 Surface(
                                     shape = RoundedCornerShape(6.dp),
-                                    color = MeetColors.neonGreen.copy(alpha = 0.15f),
+                                    color = if (selectedRole == "AUTHORITY_REVIEWER") Color(0xFFFFD54F).copy(alpha = 0.15f) else MeetColors.neonGreen.copy(alpha = 0.15f),
                                 ) {
                                     Text(
-                                        selectedRole,
-                                        color = MeetColors.neonGreen,
+                                        if (selectedRole == "AUTHORITY_REVIEWER") "C: AUTORIDAD (DEMO)" else selectedRole,
+                                        color = if (selectedRole == "AUTHORITY_REVIEWER") Color(0xFFFFD54F) else MeetColors.neonGreen,
                                         fontSize = 9.sp,
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
@@ -543,7 +601,11 @@ fun SafetyReviewerAccreditationScreen(
                             }
 
                             Text(
-                                "El titular ha completado la validación de identidad real, certificación criptográfica AAL2 y juramento legal. Su firma Ed25519 está facultada para calificar reportes.",
+                                if (selectedRole == "AUTHORITY_REVIEWER") {
+                                    "Credencial institucional emitida con propósito demostrativo para comisiones legislativas y fiscalías. Sujeto a ratificación de convenio interinstitucional."
+                                } else {
+                                    "El titular ha completado la validación de identidad real, certificación criptográfica AAL2 y juramento legal. Su firma Ed25519 está facultada para calificar reportes."
+                                },
                                 fontSize = 11.sp,
                                 color = MeetColors.textSecondary,
                                 lineHeight = 16.sp,
@@ -559,8 +621,13 @@ fun SafetyReviewerAccreditationScreen(
                                     Text("TITULAR: $fullName", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                     Text("INSTITUCIÓN: $institution", fontSize = 10.sp, color = MeetColors.cyberCyan)
                                     Text("CREDENCIAL PROFESIONAL: $credentialNumber", fontSize = 10.sp, color = MeetColors.textPrimary)
-                                    Text("ID FORENSE: ${issuedCredentialId ?: "REV-ACT-2026-99"}", fontSize = 10.sp, color = MeetColors.neonGreen, fontFamily = FontFamily.Monospace)
-                                    Text("ESTADO: ACREDITADO & ACTIVO ✓", fontSize = 10.sp, color = MeetColors.neonGreen, fontWeight = FontWeight.Bold)
+                                    Text("ID FORENSE: ${issuedCredentialId ?: "REV-ACT-2026-99"}", fontSize = 10.sp, color = if (selectedRole == "AUTHORITY_REVIEWER") Color(0xFFFFD54F) else MeetColors.neonGreen, fontFamily = FontFamily.Monospace)
+                                    Text(
+                                        if (selectedRole == "AUTHORITY_REVIEWER") "ESTADO: DEMOSTRACIÓN / CONVENIO PENDIENTE 🏛️" else "ESTADO: ACREDITADO & ACTIVO ✓",
+                                        fontSize = 10.sp,
+                                        color = if (selectedRole == "AUTHORITY_REVIEWER") Color(0xFFFFD54F) else MeetColors.neonGreen,
+                                        fontWeight = FontWeight.Bold,
+                                    )
                                 }
                             }
 
@@ -568,9 +635,15 @@ fun SafetyReviewerAccreditationScreen(
                                 onClick = onBack,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = MeetColors.neonGreen),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (selectedRole == "AUTHORITY_REVIEWER") Color(0xFFFFD54F) else MeetColors.neonGreen,
+                                ),
                             ) {
-                                Text("Ir a la Consola de Validación A+B", color = Color.Black, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "Ir a la Consola de Validación Tripartita",
+                                    color = Color.Black,
+                                    fontWeight = FontWeight.Bold,
+                                )
                             }
                         }
                     }

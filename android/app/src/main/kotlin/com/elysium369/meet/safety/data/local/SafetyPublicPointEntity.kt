@@ -54,4 +54,26 @@ data class SafetyPublicPointEntity(
     val victimFemaleCount: Int = 0,
     val victimMaleCount: Int = 0,
     val victimUnknownSexCount: Int = 0,
-)
+) {
+    fun hasValidationA(): Boolean = journalisticSourceCount > 0 || civilSourceCount > 0
+    fun hasValidationB(): Boolean = publicRecordSourceCount > 0 || documentarySourceCount > 0
+    fun hasValidationC(): Boolean = institutionalSourceCount > 0
+
+    fun hasAnyTripartiteValidation(): Boolean = hasValidationA() || hasValidationB() || hasValidationC()
+
+    fun tripartiteValidationTitle(): String {
+        val a = hasValidationA()
+        val b = hasValidationB()
+        val c = hasValidationC()
+        return when {
+            a && b && c -> "[A + B + C] Validación Tripartita de Estado"
+            a && b -> "[A + B] Validación Civil Plena"
+            a && c -> "[A + C] Prensa + Autoridad Estatal"
+            b && c -> "[B + C] Jurídico + Autoridad Estatal"
+            a -> "[A] Validación Periodística Independiente"
+            b -> "[B] Respaldo Jurídico y Derechos Humanos"
+            c -> "[C] Admisión Institucional Oficial"
+            else -> "[En Proceso de Validación]"
+        }
+    }
+}
