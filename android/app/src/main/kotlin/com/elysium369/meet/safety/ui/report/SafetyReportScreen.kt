@@ -1509,14 +1509,10 @@ private fun StepEvidence(
                         lineHeight = 14.sp,
                     )
                     Text(
-                        "Pasos recomendados:
-" +
-                            "1. Sube tu video primero a YouTube (puedes marcarlo como 'Oculto / No listado' si deseas privacidad, o 'Público'), Google Drive, TikTok, X o Facebook.
-" +
-                            "2. Copia el enlace web (URL) del video.
-" +
-                            "3. Pégalo en el campo inferior y presiona 'Agregar Video'.
-" +
+                        "Pasos recomendados:\n" +
+                            "1. Sube tu video primero a YouTube (puedes marcarlo como 'Oculto / No listado' si deseas privacidad, o 'Público'), Google Drive, TikTok, X o Facebook.\n" +
+                            "2. Copia el enlace web (URL) del video.\n" +
+                            "3. Pégalo en el campo inferior y presiona 'Agregar Video'.\n" +
                             "✓ Las autoridades y peritos podrán abrir y reproducir el video al instante sin demoras ni pérdida de calidad.",
                         color = MeetColors.textPrimary,
                         fontSize = 10.sp,
