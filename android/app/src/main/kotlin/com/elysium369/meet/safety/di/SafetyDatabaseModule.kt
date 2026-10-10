@@ -36,4 +36,9 @@ object SafetyDatabaseModule {
         database.safetyPublicDao()
     @Provides
     fun provideSafetyEvidenceDao(database: MeetDatabase): com.elysium369.meet.safety.evidence.SafetyEvidenceDao = database.safetyEvidenceDao()
+
+    @Provides
+    @Singleton
+    fun provideSafetyReportUpdateDao(database: MeetDatabase): com.elysium369.meet.safety.data.local.SafetyReportUpdateDao =
+        database.safetyReportUpdateDao()
 }

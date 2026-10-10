@@ -21,7 +21,7 @@ for item in "${artifacts[@]}"; do
   bytes="$(stat -c %s "$path" 2>/dev/null || stat -f %z "$path")"
   maximum="$(jq -r ".artifacts.$kind.maximumBytes" "$budgets")"
   warning="$(jq -r ".artifacts.$kind.warningBytes" "$budgets")"
-  (( bytes <= maximum )) || { echo "$kind exceeds maximum size budget" >&2; exit 32; }
+  (( bytes <= maximum )) || { echo "$kind exceeds maximum size budget: $bytes bytes > $maximum bytes allowed" >&2; exit 32; }
   state="OK"; (( bytes <= warning )) || state="WARNING_REVIEW_REQUIRED"
   sha="$(shasum -a 256 "$path" | awk '{print $1}')"
   rows+=("$(jq -cn --arg kind "$kind" --arg path "${path#$repo_root/}" --arg sha "$sha" --arg state "$state" --argjson bytes "$bytes" '{kind:$kind,path:$path,bytes:$bytes,sha256:$sha,sizeState:$state}')")

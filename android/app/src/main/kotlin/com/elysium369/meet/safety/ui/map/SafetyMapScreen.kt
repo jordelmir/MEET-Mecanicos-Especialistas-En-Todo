@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Timeline
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -54,6 +55,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -364,6 +366,11 @@ fun SafetyMapScreen(
                 clm.predicate.contains(shortId, ignoreCase = true)
             }
         }
+        val reportUpdates = remember(state.updatesByReport, point.reportId) {
+            state.updatesByReport[point.reportId]
+                ?: state.updatesByReport[point.reportId.lowercase()]
+                ?: emptyList()
+        }
         ModalBottomSheet(
             onDismissRequest = { selectedId = null },
             containerColor = MeetColors.cardBackground,
@@ -371,6 +378,7 @@ fun SafetyMapScreen(
             PrivateReportDetailSheet(
                 point = point,
                 evidenceList = evidenceList,
+                updates = reportUpdates,
                 onClose = { selectedId = null },
                 onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId, item.encryptedPath, item.mimeType) },
                 onLoadThumbnail = { evidenceId, storagePath -> viewModel.loadEvidenceThumbnail(evidenceId, storagePath) },
@@ -403,6 +411,11 @@ fun SafetyMapScreen(
                 clm.predicate.contains(shortId, ignoreCase = true)
             }
         }
+        val pointUpdates = remember(state.updatesByReport, point.publicPointId) {
+            state.updatesByReport[point.publicPointId]
+                ?: state.updatesByReport[point.publicPointId.lowercase()]
+                ?: emptyList()
+        }
         ModalBottomSheet(
             onDismissRequest = { selectedId = null },
             containerColor = MeetColors.cardBackground,
@@ -415,6 +428,7 @@ fun SafetyMapScreen(
                 store = impunityStore,
                 evidenceList = evidenceList,
                 matchingPrivate = matchingPrivate,
+                updates = pointUpdates,
                 onClose = { selectedId = null },
                 onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId, item.encryptedPath, item.mimeType) },
                 onLoadThumbnail = { evidenceId, storagePath -> viewModel.loadEvidenceThumbnail(evidenceId, storagePath) },
@@ -451,6 +465,7 @@ private fun PublicPointDetail(
     store: DrugMarketImpunityStore,
     evidenceList: List<SafetyEvidenceEntity> = emptyList(),
     matchingPrivate: SafetyPrivateMapPoint? = null,
+    updates: List<com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity> = emptyList(),
     onClose: () -> Unit = {},
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit = {},
     onLoadThumbnail: suspend (String, String?) -> ByteArray? = { _, _ -> null },
@@ -891,6 +906,37 @@ private fun PublicPointDetail(
             }
         }
 
+        // === 8.5. Línea de Tiempo y Evolución del Caso (Avistamientos / Hitos) ===
+        if (updates.isNotEmpty()) {
+            item {
+                CaseEvolutionTimelineCard(
+                    updates = updates,
+                    onOpenVideo = { url ->
+                        try {
+                            val uri = android.net.Uri.parse(url)
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            try {
+                                val uri = android.net.Uri.parse(url)
+                                val chooser = android.content.Intent.createChooser(
+                                    android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    },
+                                    "Ver video"
+                                )
+                                context.startActivity(chooser)
+                            } catch (e: Exception) {
+                                android.util.Log.e("SafetyMap", "Error opening video link $url", e)
+                            }
+                        }
+                    }
+                )
+            }
+        }
+
         // === 9. Epistemic & Security Notice ===
         item {
             HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
@@ -1056,6 +1102,7 @@ private fun SafetyTimeRange.labelResource() = when (this) {
 private fun PrivateReportDetailSheet(
     point: SafetyPrivateMapPoint,
     evidenceList: List<SafetyEvidenceEntity>,
+    updates: List<com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity> = emptyList(),
     onClose: () -> Unit,
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit,
     onLoadThumbnail: suspend (String, String?) -> ByteArray? = { _, _ -> null },
@@ -1467,6 +1514,37 @@ private fun PrivateReportDetailSheet(
             }
         }
 
+        // === 8.5. Línea de Tiempo y Evolución del Caso (Avistamientos / Hitos) ===
+        if (updates.isNotEmpty()) {
+            item {
+                CaseEvolutionTimelineCard(
+                    updates = updates,
+                    onOpenVideo = { url ->
+                        try {
+                            val uri = android.net.Uri.parse(url)
+                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            try {
+                                val uri = android.net.Uri.parse(url)
+                                val chooser = android.content.Intent.createChooser(
+                                    android.content.Intent(android.content.Intent.ACTION_VIEW, uri).apply {
+                                        addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    },
+                                    "Ver video"
+                                )
+                                context.startActivity(chooser)
+                            } catch (e: Exception) {
+                                android.util.Log.e("SafetyMap", "Error opening video link $url", e)
+                            }
+                        }
+                    }
+                )
+            }
+        }
+
         // === 9. Security & Cryptographic Transparency Notice ===
         item {
             HorizontalDivider(color = MeetColors.borderSubtle, thickness = 1.dp)
@@ -1486,6 +1564,183 @@ private fun PrivateReportDetailSheet(
     }
 }
 
+@Composable
+private fun CaseEvolutionTimelineCard(
+    updates: List<com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity>,
+    onOpenVideo: (String) -> Unit,
+) {
+    val dateFormat = remember { java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()) }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(1.2.dp, MeetColors.cyberCyan.copy(alpha = 0.35f)),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(MeetColors.cyberCyan.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Timeline,
+                            contentDescription = null,
+                            tint = MeetColors.cyberCyan,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            "EVOLUCIÓN Y SEGUIMIENTO DEL CASO",
+                            fontWeight = FontWeight.Black,
+                            fontSize = 11.sp,
+                            color = MeetColors.cyberCyan,
+                            letterSpacing = 1.sp,
+                        )
+                        Text(
+                            "${updates.size} avistamiento(s) documentado(s) en línea de tiempo",
+                            fontSize = 10.sp,
+                            color = MeetColors.neonGreen,
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                updates.forEachIndexed { idx, update ->
+                    val videoUrls = remember(update.videoUrlsJson) { update.getVideoUrls() }
+                    var expanded by remember { mutableStateOf(false) }
+
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .clip(CircleShape)
+                                    .background(MeetColors.neonGreen.copy(alpha = 0.2f)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "#${idx + 1}",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = MeetColors.neonGreen,
+                                )
+                            }
+                            if (idx < updates.lastIndex) {
+                                Box(
+                                    modifier = Modifier
+                                        .width(2.dp)
+                                        .height(40.dp)
+                                        .background(MeetColors.neonGreen.copy(alpha = 0.3f))
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(MeetColors.backgroundDeep)
+                                .padding(10.dp),
+                        ) {
+                            Text(
+                                update.locationLabel,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MeetColors.textPrimary,
+                            )
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            ) {
+                                Text(
+                                    "🕒 Hechos: ${dateFormat.format(java.util.Date(update.occurredAt))}",
+                                    fontSize = 9.sp,
+                                    color = MeetColors.cyberCyan,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    "• 🔒 Grabado: ${dateFormat.format(java.util.Date(update.recordedAt))}",
+                                    fontSize = 9.sp,
+                                    color = MeetColors.textMuted,
+                                )
+                            }
+
+                            if (update.clothingAndFeatures.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "👕 Señas/Vestimenta: ${update.clothingAndFeatures}",
+                                    fontSize = 11.sp,
+                                    color = MeetColors.textSecondary,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                            }
+
+                            if (update.narrative.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                val isLong = update.narrative.length > 180
+                                Text(
+                                    update.narrative,
+                                    fontSize = 11.sp,
+                                    color = MeetColors.textSecondary,
+                                    maxLines = if (expanded || !isLong) Int.MAX_VALUE else 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    lineHeight = 15.sp,
+                                )
+                                if (isLong) {
+                                    Text(
+                                        if (expanded) "Ver menos ▲" else "Ver completo (${update.narrative.length} car.) ▼",
+                                        fontSize = 10.sp,
+                                        color = MeetColors.cyberCyan,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier
+                                            .clickable { expanded = !expanded }
+                                            .padding(vertical = 2.dp),
+                                    )
+                                }
+                            }
+
+                            if (videoUrls.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    "VIDEOS (${videoUrls.size}):",
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFFFFB020),
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    items(videoUrls) { url ->
+                                        VideoLinkChip(url = url, onClick = { onOpenVideo(url) })
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private data class VideoPlatformInfo(val name: String, val emoji: String)
 
 private fun resolveVideoPlatform(url: String): VideoPlatformInfo {
@@ -1499,6 +1754,23 @@ private fun resolveVideoPlatform(url: String): VideoPlatformInfo {
         lower.contains("instagram.com") -> VideoPlatformInfo("Instagram", "📸")
         lower.contains("facebook.com") || lower.contains("fb.watch") -> VideoPlatformInfo("Facebook", "👤")
         else -> VideoPlatformInfo("Enlace de Video", "🎥")
+    }
+}
+
+@Composable
+private fun VideoLinkChip(url: String, onClick: () -> Unit) {
+    val platform = resolveVideoPlatform(url)
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MeetColors.backgroundDeep)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(platform.emoji, fontSize = 11.sp)
+        Text(platform.name, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = MeetColors.cyberCyan)
     }
 }
 

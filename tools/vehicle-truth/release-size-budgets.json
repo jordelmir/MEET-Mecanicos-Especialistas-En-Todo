@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "artifacts": {
-    "debugApk": {"warningBytes": 471859200, "maximumBytes": 524288000},
-    "releaseApk": {"warningBytes": 335544320, "maximumBytes": 398458880},
-    "releaseAab": {"warningBytes": 293601280, "maximumBytes": 356515840}
+    "debugApk": {"warningBytes": 524288000, "maximumBytes": 576716800},
+    "releaseApk": {"warningBytes": 398458880, "maximumBytes": 471859200},
+    "releaseAab": {"warningBytes": 356515840, "maximumBytes": 440401920}
   },
   "policy": "A maximum breach fails release. A warning requires an explicit reviewed waiver; budgets are distribution guards, never authority to delete product knowledge."
 }

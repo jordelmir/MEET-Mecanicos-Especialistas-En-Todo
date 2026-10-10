@@ -133,4 +133,7 @@ interface SafetyReportDao {
 
     @Query("DELETE FROM safety_reports WHERE reportId = :reportId AND ownerUserId = :ownerUserId")
     suspend fun deleteOwned(reportId: String, ownerUserId: String): Int
+
+    @Query("UPDATE safety_reports SET updatedAt = :now WHERE reportId = :reportId")
+    suspend fun touchUpdatedAt(reportId: String, now: Long): Int
 }

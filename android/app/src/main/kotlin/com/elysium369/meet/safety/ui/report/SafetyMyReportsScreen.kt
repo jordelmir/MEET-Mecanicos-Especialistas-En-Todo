@@ -18,6 +18,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Assignment
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
@@ -72,6 +74,35 @@ fun SafetyMyReportsScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val state by viewModel.state.collectAsState()
     var reportToWithdraw by remember { mutableStateOf<String?>(null) }
+    var reportForNewUpdate by remember { mutableStateOf<com.elysium369.meet.safety.data.local.SafetyReportEntity?>(null) }
+    var showArchitectureExplainer by remember { mutableStateOf(false) }
+
+    if (showArchitectureExplainer) {
+        SafetyCaseArchitectureExplainerSheet(
+            onDismiss = { showArchitectureExplainer = false },
+        )
+    }
+
+    reportForNewUpdate?.let { targetReport ->
+        SafetyAddReportUpdateSheet(
+            reportId = targetReport.reportId,
+            reportCategory = targetReport.category,
+            onDismiss = { reportForNewUpdate = null },
+            onSaveUpdate = { occurredAt, locationLabel, clothing, narrative, videos, attachmentUris ->
+                viewModel.addReportUpdate(
+                    reportId = targetReport.reportId,
+                    occurredAt = occurredAt,
+                    locationLabel = locationLabel,
+                    clothingAndFeatures = clothing,
+                    narrative = narrative,
+                    videoUrls = videos,
+                    attachmentUris = attachmentUris,
+                ) {
+                    reportForNewUpdate = null
+                }
+            },
+        )
+    }
 
     Scaffold(
         containerColor = MeetColors.backgroundDeep,
@@ -102,6 +133,16 @@ fun SafetyMyReportsScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showArchitectureExplainer = true }) {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Filled.Refresh.let {
+                                // Use help icon or timeline icon
+                                androidx.compose.material.icons.Icons.Filled.Shield
+                            },
+                            contentDescription = "Guía del Sistema",
+                            tint = MeetColors.neonGreen,
+                        )
+                    }
                     if (state.pendingCount > 0) {
                         IconButton(onClick = { viewModel.retrySyncAll() }) {
                             Icon(
@@ -194,12 +235,15 @@ fun SafetyMyReportsScreen(
                             visible = true,
                             enter = fadeIn() + slideInVertically { it / 4 },
                         ) {
+                            val updates = state.updatesByReport[report.reportId] ?: emptyList()
                             MyReportCard(
                                 report = report,
                                 evidence = evidence,
                                 videoUrls = videoUrls,
+                                updates = updates,
                                 withdrawing = state.withdrawingReportId == report.reportId,
                                 onWithdraw = { reportToWithdraw = report.reportId },
+                                onAddUpdate = { reportForNewUpdate = report },
                                 onRetrySync = { viewModel.retrySyncAll() },
                                 onOpenEvidence = { item -> viewModel.openEvidence(context, item.evidenceId) },
                                 onOpenVideo = { url ->
@@ -280,8 +324,10 @@ private fun MyReportCard(
     report: com.elysium369.meet.safety.data.local.SafetyReportEntity,
     evidence: List<SafetyEvidenceEntity>,
     videoUrls: List<String> = emptyList(),
+    updates: List<com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity> = emptyList(),
     withdrawing: Boolean,
     onWithdraw: () -> Unit,
+    onAddUpdate: () -> Unit = {},
     onRetrySync: () -> Unit,
     onOpenEvidence: (SafetyEvidenceEntity) -> Unit = {},
     onOpenVideo: (String) -> Unit = {},
@@ -471,6 +517,56 @@ private fun MyReportCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("Reintentar sincronización", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
+            }
+
+            // === SIGHTINGS & CONTINUOUS UPDATES SECTION ===
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "SEGUIMIENTO DE CASO (${updates.size} AVISTAMIENTOS)",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MeetColors.neonGreen,
+                    letterSpacing = 1.sp,
+                )
+                Button(
+                    onClick = onAddUpdate,
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MeetColors.neonGreen.copy(alpha = 0.15f),
+                        contentColor = MeetColors.neonGreen,
+                    ),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("+ Agregar Avistamiento", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            if (updates.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    updates.forEachIndexed { index, update ->
+                        ReportUpdateItemCard(
+                            index = index + 1,
+                            update = update,
+                            onOpenVideo = onOpenVideo,
+                        )
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Sin avistamientos posteriores registrados. Si observas al mismo sujeto, vehículo o actividad, agrega un nuevo hito para consolidar el caso.",
+                    fontSize = 10.sp,
+                    color = MeetColors.textMuted,
+                    lineHeight = 13.sp,
+                )
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -669,7 +765,116 @@ private fun VideoLinkChip(url: String, onClick: () -> Unit) {
     }
 }
 
+@Composable
+private fun ReportUpdateItemCard(
+    index: Int,
+    update: com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity,
+    onOpenVideo: (String) -> Unit,
+) {
+    val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
+    var expanded by remember { mutableStateOf(false) }
+    val videoUrls = remember(update.videoUrlsJson) { update.getVideoUrls() }
 
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.backgroundDeep),
+        border = BorderStroke(1.dp, MeetColors.cyberCyan.copy(alpha = 0.2f)),
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MeetColors.neonGreen.copy(alpha = 0.2f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text("Avistamiento #$index", fontSize = 10.sp, fontWeight = FontWeight.Black, color = MeetColors.neonGreen)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        update.locationLabel,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MeetColors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Timestamps: Hechos vs Grabación inmutable
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.AccessTime, contentDescription = null, tint = MeetColors.cyberCyan, modifier = Modifier.size(11.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("Hechos: ${dateFormat.format(Date(update.occurredAt))}", fontSize = 9.sp, color = MeetColors.cyberCyan)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Shield, contentDescription = null, tint = MeetColors.textMuted, modifier = Modifier.size(11.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Text("Grabado: ${dateFormat.format(Date(update.recordedAt))}", fontSize = 9.sp, color = MeetColors.textMuted)
+                }
+            }
+
+            if (update.clothingAndFeatures.isNotBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    "👕 Señas/Prendas: ${update.clothingAndFeatures}",
+                    fontSize = 11.sp,
+                    color = MeetColors.textSecondary,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+
+            if (update.narrative.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                val isLong = update.narrative.length > 200
+                Text(
+                    update.narrative,
+                    fontSize = 11.sp,
+                    color = MeetColors.textSecondary,
+                    maxLines = if (expanded || !isLong) Int.MAX_VALUE else 3,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 15.sp,
+                )
+                if (isLong) {
+                    Text(
+                        if (expanded) "Ver menos ▲" else "Ver relato completo (${update.narrative.length} car.) ▼",
+                        fontSize = 10.sp,
+                        color = MeetColors.cyberCyan,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clickable { expanded = !expanded }
+                            .padding(vertical = 2.dp),
+                    )
+                }
+            }
+
+            // Videos
+            if (videoUrls.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text("VIDEOS ADJUNTOS (${videoUrls.size}):", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFFB020))
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(videoUrls) { url ->
+                        VideoLinkChip(url = url, onClick = { onOpenVideo(url) })
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun ReportsCommandDeck(totalCount: Int, pendingCount: Int, failedCount: Int) {

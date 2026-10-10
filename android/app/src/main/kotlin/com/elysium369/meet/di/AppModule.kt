@@ -5600,6 +5600,33 @@ object AppModule {
         }
     }
 
+    // ── SAFETY REPORT CONTINUOUS SIGHTINGS & APPEND-ONLY TIMELINE v1 ─────────
+    val MIGRATION_90_91 = object : Migration(90, 91) {
+        override fun migrate(db: SupportSQLiteDatabase) {
+            db.execSQL("""
+                CREATE TABLE IF NOT EXISTS `safety_report_updates` (
+                    `updateId` TEXT NOT NULL,
+                    `reportId` TEXT NOT NULL,
+                    `occurredAt` INTEGER NOT NULL,
+                    `recordedAt` INTEGER NOT NULL,
+                    `locationLabel` TEXT NOT NULL,
+                    `latitude` REAL,
+                    `longitude` REAL,
+                    `clothingAndFeatures` TEXT NOT NULL,
+                    `narrative` TEXT NOT NULL,
+                    `videoUrlsJson` TEXT NOT NULL DEFAULT '[]',
+                    `syncState` TEXT NOT NULL DEFAULT 'SYNCED',
+                    `serverVersion` INTEGER NOT NULL DEFAULT 1,
+                    `createdAt` INTEGER NOT NULL,
+                    PRIMARY KEY(`updateId`)
+                )
+            """.trimIndent())
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_report_updates_reportId` ON `safety_report_updates` (`reportId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_report_updates_occurredAt` ON `safety_report_updates` (`occurredAt`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_safety_report_updates_recordedAt` ON `safety_report_updates` (`recordedAt`)")
+        }
+    }
+
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): MeetDatabase {
@@ -5677,6 +5704,7 @@ object AppModule {
             MIGRATION_87_88,
             MIGRATION_88_89,
             MIGRATION_89_90,
+            MIGRATION_90_91,
         )
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {

@@ -1044,39 +1044,72 @@ private fun StepWhen(state: SafetyReportUiState, viewModel: SafetyReportViewMode
         border = BorderStroke(1.dp, MeetColors.borderSubtle),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(stringResource(R.string.safety_report_step_when_title), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MeetColors.textSecondary, letterSpacing = 1.2.sp)
+            Text(
+                "FECHA Y HORA DE LOS HECHOS (CONSTRUCCIÓN DEL CASO)",
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                color = MeetColors.neonGreen,
+                letterSpacing = 1.2.sp,
+            )
             Spacer(modifier = Modifier.height(4.dp))
-            Text(stringResource(R.string.safety_report_step_when_optional), fontSize = 11.sp, color = MeetColors.textSecondary)
-            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "El sistema graba automáticamente la hora exacta de registro inmutable. Te pedimos indicar cuándo sucedieron los hechos para iniciar la construcción de la línea de tiempo forense del caso:",
+                fontSize = 11.sp,
+                color = MeetColors.textSecondary,
+                lineHeight = 15.sp,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
+                FilterChip(
+                    selected = state.occurredAtIso != null && state.occurredAtIso.startsWith(java.time.LocalDate.now().toString()),
+                    onClick = {
+                        SafetyHaptics.selectionTick(view)
+                        viewModel.updateOccurredAt(java.time.Instant.now().toString())
+                    },
+                    label = { Text("Ahora", fontSize = 11.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MeetColors.neonGreen.copy(alpha = 0.2f),
+                        selectedLabelColor = MeetColors.neonGreen,
+                    ),
+                )
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        SafetyHaptics.selectionTick(view)
+                        viewModel.updateOccurredAt(java.time.Instant.now().minusSeconds(3600).toString())
+                    },
+                    label = { Text("Hace 1h", fontSize = 11.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MeetColors.cyberCyan.copy(alpha = 0.2f),
+                        selectedLabelColor = MeetColors.cyberCyan,
+                    ),
+                )
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        SafetyHaptics.selectionTick(view)
+                        viewModel.updateOccurredAt(java.time.Instant.now().minusSeconds(86400).toString())
+                    },
+                    label = { Text("Ayer", fontSize = 11.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MeetColors.cyberCyan.copy(alpha = 0.2f),
+                        selectedLabelColor = MeetColors.cyberCyan,
+                    ),
+                )
                 FilterChip(
                     selected = state.occurredAtIso == null,
                     onClick = {
                         SafetyHaptics.selectionTick(view)
                         viewModel.updateOccurredAt(null)
                     },
-                    label = { Text(stringResource(R.string.safety_report_step_when_none)) },
-                    modifier = Modifier.weight(1f),
+                    label = { Text("Omitir", fontSize = 11.sp) },
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MeetColors.neonGreen.copy(alpha = 0.15f),
-                        selectedLabelColor = MeetColors.neonGreen,
-                    ),
-                )
-                FilterChip(
-                    selected = state.occurredAtIso != null,
-                    onClick = {
-                        SafetyHaptics.selectionTick(view)
-                        viewModel.updateOccurredAt(java.time.Instant.now().toString())
-                    },
-                    label = { Text(stringResource(R.string.safety_report_step_when_now)) },
-                    modifier = Modifier.weight(1f),
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MeetColors.cyberCyan.copy(alpha = 0.15f),
-                        selectedLabelColor = MeetColors.cyberCyan,
+                        selectedContainerColor = MeetColors.borderSubtle.copy(alpha = 0.2f),
+                        selectedLabelColor = MeetColors.textMuted,
                     ),
                 )
             }
@@ -1086,8 +1119,8 @@ private fun StepWhen(state: SafetyReportUiState, viewModel: SafetyReportViewMode
                 value = state.occurredAtIso ?: "",
                 onValueChange = { viewModel.updateOccurredAt(it.ifBlank { null }) },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(stringResource(R.string.safety_report_step_when_label), color = MeetColors.textSecondary) },
-                placeholder = { Text(stringResource(R.string.safety_report_step_when_placeholder), color = MeetColors.textSecondary) },
+                label = { Text("Hora/Fecha exacta de los hechos (ISO o texto)", color = MeetColors.textSecondary, fontSize = 11.sp) },
+                placeholder = { Text("Ej: 2026-10-10T12:23:00 o Hoy 12:23 PM", color = MeetColors.textMuted, fontSize = 12.sp) },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MeetColors.neonGreen,
@@ -1097,6 +1130,25 @@ private fun StepWhen(state: SafetyReportUiState, viewModel: SafetyReportViewMode
                     cursorColor = MeetColors.neonGreen,
                 ),
             )
+
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Filled.Shield,
+                    contentDescription = null,
+                    tint = MeetColors.textMuted,
+                    modifier = Modifier.size(12.dp),
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    "🔒 Hora de grabación en sistema: Se sellará automáticamente al enviar.",
+                    fontSize = 10.sp,
+                    color = MeetColors.textMuted,
+                )
+            }
         }
     }
 }

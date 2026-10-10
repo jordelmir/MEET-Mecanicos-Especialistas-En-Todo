@@ -55,6 +55,7 @@ data class SafetyMapSources(
     val private: List<SafetyPrivateMapPoint>,
     val query: String,
     val evidenceByReport: Map<String, List<SafetyEvidenceEntity>>,
+    val updatesByReport: Map<String, List<com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity>> = emptyMap(),
 )
 
 data class SafetyMapUiState(
@@ -70,6 +71,7 @@ data class SafetyMapUiState(
     val evidenceByReport: Map<String, List<SafetyEvidenceEntity>> = emptyMap(),
     val hypotheses: List<SciHypothesisEntity> = emptyList(),
     val claims: List<SciClaimEntity> = emptyList(),
+    val updatesByReport: Map<String, List<com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity>> = emptyMap(),
 )
 
 private data class MapStatusAndScience(
@@ -95,13 +97,10 @@ class SafetyMapViewModel @Inject constructor(
     private val loading = MutableStateFlow(true)
     private val error = MutableStateFlow<String?>(null)
     private val search = savedStateHandle.getStateFlow("safetySearch", "")
-    private val mapSources = combine(
-        publicRepository.observePoints(),
-        safetyRepository.observeMyPrivateMapPoints(),
-        search,
+    private val evidenceSources = combine(
         evidenceRepository.observeOwner(),
         publicRepository.publicEvidence,
-    ) { public, private, query, localEvidenceList, publicEvidenceMap ->
+    ) { localEvidenceList, publicEvidenceMap ->
         val mergedEvidence = mutableMapOf<String, MutableList<SafetyEvidenceEntity>>()
 
         publicEvidenceMap.forEach { (reportId, list) ->
@@ -122,8 +121,18 @@ class SafetyMapViewModel @Inject constructor(
             existingLower.removeAll { it.evidenceId in localIds }
             existingLower.addAll(list)
         }
+        mergedEvidence
+    }
 
-        SafetyMapSources(public, private, query, mergedEvidence)
+    private val mapSources = combine(
+        publicRepository.observePoints(),
+        safetyRepository.observeMyPrivateMapPoints(),
+        search,
+        evidenceSources,
+        safetyRepository.observeAllReportUpdates(),
+    ) { public, private, query, mergedEvidence, allUpdates ->
+        val groupedUpdates = allUpdates.groupBy { it.reportId }
+        SafetyMapSources(public, private, query, mergedEvidence, groupedUpdates)
     }
     private val scienceStatus = combine(
         loading,
@@ -135,7 +144,7 @@ class SafetyMapViewModel @Inject constructor(
     }
 
     val uiState = combine(mapSources, layer, range, scienceStatus) { sources, layerName, rangeName, sci ->
-        val (all, allPrivate, query, evidenceGrouped) = sources
+        val (all, allPrivate, query, evidenceGrouped, updatesGrouped) = sources
         val selectedLayer = SafetyMapLayer.valueOf(layerName)
         val selectedRange = SafetyTimeRange.valueOf(rangeName)
         val now = System.currentTimeMillis()
@@ -161,6 +170,7 @@ class SafetyMapViewModel @Inject constructor(
             evidenceByReport = evidenceGrouped,
             hypotheses = sci.hypotheses,
             claims = sci.claims,
+            updatesByReport = sources.updatesByReport,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SafetyMapUiState())
 

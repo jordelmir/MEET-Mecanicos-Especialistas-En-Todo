@@ -1,6 +1,7 @@
 package com.elysium369.meet.safety.ui.report
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.elysium369.meet.safety.data.SafetyRepository
@@ -31,6 +32,8 @@ data class SafetyMyReportsUiState(
     val evidenceByReport: Map<String, List<SafetyEvidenceEntity>> = emptyMap(),
     /** Private map points with decrypted videoUrls and narrative */
     val privatePointsByReport: Map<String, com.elysium369.meet.safety.data.SafetyPrivateMapPoint> = emptyMap(),
+    /** Updates / Sightings grouped by reportId */
+    val updatesByReport: Map<String, List<com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity>> = emptyMap(),
 )
 
 @HiltViewModel
@@ -46,11 +49,13 @@ class SafetyMyReportsViewModel @Inject constructor(
         repository.observeMyReports(),
         evidenceRepository.observeOwner(),
         repository.observeMyPrivateMapPoints(),
+        repository.observeAllReportUpdates(),
         withdrawal,
-    ) { reports, allEvidence, privatePoints, action ->
+    ) { reports, allEvidence, privatePoints, allUpdates, action ->
         val pending = reports.count { it.syncState != "SYNCED" }
         val evidenceByReport = allEvidence.groupBy { it.reportId }
         val pointsByReport = privatePoints.associateBy { it.reportId }
+        val updatesByReport = allUpdates.groupBy { it.reportId }
         SafetyMyReportsUiState(
             reports = reports,
             totalReports = reports.size,
@@ -61,6 +66,7 @@ class SafetyMyReportsViewModel @Inject constructor(
             actionMessage = action.second,
             evidenceByReport = evidenceByReport,
             privatePointsByReport = pointsByReport,
+            updatesByReport = updatesByReport,
         )
     }
         .stateIn(
@@ -98,6 +104,49 @@ class SafetyMyReportsViewModel @Inject constructor(
                     Log.e("ElysiumSafetyWithdrawal", "Withdrawal failed for $reportId", it)
                     withdrawal.value = null to "No se pudo quitar: ${it.message ?: "error de sincronización"}. Reintenta."
                 }
+        }
+    }
+
+    fun addReportUpdate(
+        reportId: String,
+        occurredAt: Long,
+        locationLabel: String,
+        clothingAndFeatures: String,
+        narrative: String,
+        videoUrls: List<String>,
+        attachmentUris: List<Uri> = emptyList(),
+        onSuccess: () -> Unit = {},
+    ) {
+        viewModelScope.launch {
+            runCatching {
+                var stagedCount = 0
+                attachmentUris.forEach { uri ->
+                    try {
+                        evidenceRepository.stage(reportId, uri)
+                        stagedCount++
+                    } catch (e: Exception) {
+                        Log.e("SafetyMyReports", "Error staging attachment for report $reportId", e)
+                    }
+                }
+                if (stagedCount > 0) {
+                    repository.resumePendingUploads()
+                }
+                repository.addReportUpdate(
+                    reportId = reportId,
+                    occurredAt = occurredAt,
+                    locationLabel = locationLabel,
+                    clothingAndFeatures = clothingAndFeatures,
+                    narrative = narrative,
+                    videoUrls = videoUrls,
+                    attachmentsCount = stagedCount,
+                )
+            }.onSuccess {
+                withdrawal.value = null to "Nuevo avistamiento añadido al expediente con éxito."
+                onSuccess()
+            }.onFailure { err ->
+                Log.e("SafetyMyReports", "Error adding update to report $reportId", err)
+                withdrawal.value = null to "Error al registrar avistamiento: ${err.message}"
+            }
         }
     }
 }

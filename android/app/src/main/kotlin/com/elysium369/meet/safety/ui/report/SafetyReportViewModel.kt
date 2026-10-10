@@ -186,7 +186,7 @@ class SafetyReportViewModel @Inject constructor(
 
     fun updateNarrative(text: String) {
         // Narrative remains only in memory until the encrypted transactional save.
-        _state.update { it.copy(narrative = text.take(30_000), error = null) }
+        _state.update { it.copy(narrative = text.take(100_000), error = null) }
     }
 
     fun updateOccurredAt(iso: String?) {

@@ -113,7 +113,7 @@
     <string name="safety_report_source_unknown_desc">No encajo en las anteriores</string>
 
     <string name="safety_report_step_narrative_title">Describe lo ocurrido</string>
-    <string name="safety_report_step_narrative_count">%1$d / 30,000 caracteres</string>
+    <string name="safety_report_step_narrative_count">%1$d / 100,000 caracteres</string>
     <string name="safety_report_step_narrative_placeholder">Mínimo 10 caracteres...</string>
 
     <string name="safety_report_step_when_title">¿Cuándo ocurrió?</string>

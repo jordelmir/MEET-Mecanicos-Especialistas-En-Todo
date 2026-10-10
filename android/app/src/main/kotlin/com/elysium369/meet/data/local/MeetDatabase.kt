@@ -221,6 +221,7 @@ import com.elysium369.meet.safety.science.data.*
         SafetyPublicCaseEntity::class,
         SafetyPublicTimelineEntity::class,
         SafetyPublicClaimEntity::class,
+        com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity::class,
         VehicleFinancialLedgerEntity::class,
         // EMISSIONS LAB PERSISTENCE
         EmissionSessionEntity::class,
@@ -262,7 +263,7 @@ import com.elysium369.meet.safety.science.data.*
         SciCaseEntity::class,
         SciCaseItemEntity::class,
     ],
-    version = 90,
+    version = 91,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -379,4 +380,7 @@ abstract class MeetDatabase : RoomDatabase() {
 
         // ELYSIUM SAFETY SCIENTIFIC AUTHORITY v1 DAO
         abstract fun scientificAuthorityDao(): ScientificAuthorityDao
+
+        // SAFETY REPORT CONTINUOUS UPDATES DAO
+        abstract fun safetyReportUpdateDao(): com.elysium369.meet.safety.data.local.SafetyReportUpdateDao
 }

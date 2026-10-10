@@ -61,6 +61,7 @@ class SafetyRepository @Inject constructor(
     private val gateway: SafetyCommandGateway,
     private val publicRepository: Provider<SafetyPublicRepository>,
     private val evidenceRepository: Provider<com.elysium369.meet.safety.evidence.SafetyEvidenceRepository>,
+    private val updateDao: com.elysium369.meet.safety.data.local.SafetyReportUpdateDao,
 ) {
     private val json = Json {
         ignoreUnknownKeys = true
@@ -415,6 +416,7 @@ class SafetyRepository @Inject constructor(
                 if (authoritative?.state == "WITHDRAWN") {
                     payloadDao.redact(local.payloadId, System.currentTimeMillis())
                     reportDao.deleteOwned(local.reportId, principal.id)
+                    updateDao.deleteForReport(local.reportId)
                     publicDao.deletePoint(local.reportId)
                     publicDao.deleteCase(local.reportId)
                     publicDao.clearTimeline(local.reportId)
@@ -425,8 +427,86 @@ class SafetyRepository @Inject constructor(
         }
     }
 
+    /**
+     * Agrega una actualización o nuevo avistamiento inmutable a un reporte existente.
+     * Principio Append-Only: No altera registros previos.
+     * Restricción: Videos exclusivamente como URLs externas (videoUrls).
+     * Límite narrativo: Hasta 100,000 caracteres para expedientes exhaustivos.
+     */
+    suspend fun addReportUpdate(
+        reportId: String,
+        occurredAt: Long,
+        locationLabel: String,
+        clothingAndFeatures: String,
+        narrative: String,
+        videoUrls: List<String>,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        attachmentsCount: Int = 0,
+    ): com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity {
+        val cleanNarrative = narrative.trim()
+        require(cleanNarrative.isNotBlank() && cleanNarrative.length <= 100_000) {
+            "SAFETY_INVALID_UPDATE_NARRATIVE_LENGTH"
+        }
+        val cleanLocation = locationLabel.trim().ifBlank { "Ubicación del reporte" }
+        val cleanFeatures = clothingAndFeatures.trim()
+        val validatedVideoUrls = videoUrls.map { it.trim() }.filter { it.isNotBlank() }.map {
+            if (!it.startsWith("http://") && !it.startsWith("https://")) "https://$it" else it
+        }.distinct()
+
+        val now = System.currentTimeMillis()
+        val updateId = UUID.randomUUID().toString()
+        val entity = com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity(
+            updateId = updateId,
+            reportId = reportId,
+            occurredAt = occurredAt,
+            recordedAt = now,
+            locationLabel = cleanLocation,
+            latitude = latitude,
+            longitude = longitude,
+            clothingAndFeatures = cleanFeatures,
+            narrative = cleanNarrative,
+            videoUrlsJson = com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity.encodeVideoUrls(validatedVideoUrls),
+            syncState = "SYNCED",
+            serverVersion = 1L,
+            createdAt = now,
+        )
+
+        database.withTransaction {
+            updateDao.insert(entity)
+            reportDao.touchUpdatedAt(reportId, now)
+            // Proyectar de inmediato en la línea de tiempo pública del caso para visibilidad de toda la comunidad
+            runCatching {
+                val publicTimeline = com.elysium369.meet.safety.data.local.SafetyPublicTimelineEntity(
+                    caseId = reportId,
+                    milestoneId = updateId,
+                    eventType = "SIGHTING_UPDATE",
+                    publicSummary = "[$cleanLocation] $cleanFeatures: $cleanNarrative".take(1000),
+                    occurredAt = occurredAt,
+                    recordedAt = now,
+                    sourceCount = 1,
+                    evidenceCount = validatedVideoUrls.size + attachmentsCount,
+                    serverVersion = 1L,
+                )
+                database.safetyPublicDao().upsertTimeline(listOf(publicTimeline))
+            }
+        }
+
+        // Auto-refrescar proyecciones públicas
+        runCatching { publicRepository.get().refreshPoints() }
+        runCatching { publicRepository.get().refreshCases() }
+
+        return entity
+    }
+
+    fun observeReportUpdates(reportId: String): Flow<List<com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity>> =
+        updateDao.observeUpdatesForReport(reportId)
+
+    fun observeAllReportUpdates(): Flow<List<com.elysium369.meet.safety.data.local.SafetyReportUpdateEntity>> =
+        updateDao.observeAllUpdates()
+
     private fun validate(payload: CreateSafetyReportPayload) {
-        require(payload.narrative.trim().length in 10..30_000) {
+        require(payload.narrative.trim().length in 10..100_000) {
             "SAFETY_INVALID_NARRATIVE_LENGTH"
         }
         payload.occurredAtIso?.let { require(runCatching { Instant.parse(it) }.isSuccess) { "SAFETY_INVALID_OCCURRED_AT" } }
