@@ -28,6 +28,12 @@ data class PublicAccountabilityEvent(
 )
 
 @Serializable
+enum class SafetyObservatoryDataState {
+    REMOTE_AGGREGATE,
+    UNAVAILABLE,
+}
+
+@Serializable
 data class SafetyObservatoryMetrics(
     val public_point_count: Long = 0,
     val privacy_suppressed: Boolean = false,
@@ -54,6 +60,8 @@ data class SafetyObservatoryMetrics(
     val avg_resolution_days_all: Double = -1.0,
     val avg_resolution_days_female_victim: Double = -1.0,
     val avg_resolution_days_male_victim: Double = -1.0,
+    // Zero is authoritative only when a successful aggregate query returned it.
+    val data_state: SafetyObservatoryDataState = SafetyObservatoryDataState.UNAVAILABLE,
 ) {
     /** Category breakdown as label→count pairs for chart rendering. */
     fun categoryBreakdown(): List<Pair<String, Long>> = listOf(
@@ -82,6 +90,14 @@ data class SafetyObservatoryMetrics(
     ).filter { it.second > 0 }
 
     val hasResolutionData: Boolean get() = avg_resolution_days_all >= 0
+
+    companion object {
+        fun unavailable() = SafetyObservatoryMetrics(
+            privacy_suppressed = true,
+            sensitive_metrics_available = false,
+            data_state = SafetyObservatoryDataState.UNAVAILABLE,
+        )
+    }
 }
 
 data class SafetyObservatoryFilters(
@@ -105,7 +121,6 @@ data class SafetyObservatoryFilters(
 class SafetyInsightsRepository @Inject constructor(
     private val client: SupabaseClient,
     private val gates: SafetyRuntimeFeatureGates,
-    private val safetyDao: com.elysium369.meet.safety.data.local.SafetyPublicDao,
 ) {
     suspend fun accountability(): List<PublicAccountabilityEvent> {
         gates.requireEnabled("safety_accountability")
@@ -120,65 +135,26 @@ class SafetyInsightsRepository @Inject constructor(
         }
     }
 
-    /** Public V3 cells with local authoritative fallback and source provenance enrichment. */
+    /**
+     * The remote V3 projection is the only source for aggregate observatory metrics.
+     * If it is unavailable, return an explicit UNAVAILABLE state rather than estimating
+     * source counts from point totals or presenting local cache as a complete aggregate.
+     * Cached public points can still be shown in the separate list/map flow.
+     */
     suspend fun observatory(filters: SafetyObservatoryFilters): SafetyObservatoryMetrics {
         gates.requireEnabled("safety_observatory")
-        val baseMetrics = try {
-            val projection = client.postgrest.rpc("safety_observatory_query_v3", filters.v3Parameters()).decodeAs<SafetyObservatoryProjectionV3>()
+        return try {
+            val projection = client.postgrest.rpc(
+                "safety_observatory_query_v3",
+                filters.v3Parameters(),
+            ).decodeAs<SafetyObservatoryProjectionV3>()
             require(projection.policy_version == "SAFETY-OBSERVATORY-V3")
             projection.toMetrics()
-        } catch (e: CancellationException) {
-            throw e
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (_: Exception) {
-            null
+            SafetyObservatoryMetrics.unavailable()
         }
-
-        // Enrich with local authoritative points and claims provenance
-        val localPoints = runCatching { safetyDao.getPoints() }.getOrDefault(emptyList())
-        val localClaims = runCatching { safetyDao.getClaims() }.getOrDefault(emptyList())
-
-        val civilSources = localPoints.sumOf { it.civilSourceCount.toLong() }.coerceAtLeast(localClaims.sumOf { it.civilSourceCount.toLong() })
-        val journalisticSources = localPoints.sumOf { it.journalisticSourceCount.toLong() }.coerceAtLeast(localClaims.sumOf { it.journalisticSourceCount.toLong() })
-        val publicRecordSources = localPoints.sumOf { it.publicRecordSourceCount.toLong() }.coerceAtLeast(localClaims.sumOf { it.publicRecordSourceCount.toLong() })
-        val documentarySources = localPoints.sumOf { it.documentarySourceCount.toLong() }.coerceAtLeast(localClaims.sumOf { it.documentarySourceCount.toLong() })
-        val institutionalSources = localPoints.sumOf { it.institutionalSourceCount.toLong() }.coerceAtLeast(localClaims.sumOf { it.institutionalSourceCount.toLong() })
-        val totalIndependent = (civilSources + journalisticSources + publicRecordSources + documentarySources + institutionalSources)
-            .coerceAtLeast(localPoints.sumOf { it.independentSourceCount.toLong() })
-
-        val totalPoints = baseMetrics?.public_point_count?.takeIf { it > 0 } ?: localPoints.size.toLong()
-        val homicideCount = baseMetrics?.homicide_count?.takeIf { it > 0 } ?: localPoints.count { it.category == "HOMICIDE" }.toLong()
-        val violenceCount = baseMetrics?.violence_count?.takeIf { it > 0 } ?: localPoints.count { it.category == "VIOLENT_INCIDENT" }.toLong()
-        val drugCount = baseMetrics?.drugs_count?.takeIf { it > 0 } ?: localPoints.count { it.category == "DRUG_SALE_ACTIVITY" }.toLong()
-        val threatCount = baseMetrics?.threat_count?.takeIf { it > 0 } ?: localPoints.count { it.category == "THREAT" }.toLong()
-        val missingCount = baseMetrics?.missing_count?.takeIf { it > 0 } ?: localPoints.count { it.category == "MISSING_PERSON" }.toLong()
-        val institutionalCount = baseMetrics?.institutional_count?.takeIf { it > 0 } ?: localPoints.count { it.category == "INSTITUTIONAL_CONDUCT" }.toLong()
-
-        val femaleVictims = localPoints.sumOf { it.victimFemaleCount.toLong() }
-        val maleVictims = localPoints.sumOf { it.victimMaleCount.toLong() }
-        val unknownSexVictims = localPoints.sumOf { it.victimUnknownSexCount.toLong() }
-        val totalVictims = (femaleVictims + maleVictims + unknownSexVictims).coerceAtLeast(localPoints.sumOf { it.victimCountDocumented.toLong() })
-
-        return SafetyObservatoryMetrics(
-            public_point_count = totalPoints,
-            privacy_suppressed = baseMetrics?.privacy_suppressed ?: false,
-            sensitive_metrics_available = true,
-            independent_source_count = if (totalIndependent > 0) totalIndependent else if (totalPoints > 0) totalPoints * 2 else 0L,
-            civil_source_count = if (civilSources > 0) civilSources else if (totalPoints > 0) (totalPoints * 0.40).toLong().coerceAtLeast(1) else 0L,
-            journalistic_source_count = if (journalisticSources > 0) journalisticSources else if (totalPoints > 0) (totalPoints * 0.35).toLong().coerceAtLeast(1) else 0L,
-            public_record_source_count = if (publicRecordSources > 0) publicRecordSources else if (totalPoints > 0) (totalPoints * 0.15).toLong().coerceAtLeast(1) else 0L,
-            documentary_source_count = if (documentarySources > 0) documentarySources else if (totalPoints > 0) (totalPoints * 0.10).toLong() else 0L,
-            institutional_source_count = if (institutionalSources > 0) institutionalSources else if (totalPoints > 0) (totalPoints * 0.20).toLong().coerceAtLeast(1) else 0L,
-            homicide_count = homicideCount,
-            violence_count = violenceCount,
-            drugs_count = drugCount,
-            threat_count = threatCount,
-            missing_count = missingCount,
-            institutional_count = institutionalCount,
-            total_victims_documented = totalVictims,
-            female_victims = femaleVictims,
-            male_victims = maleVictims,
-            unknown_sex_victims = unknownSexVictims,
-        )
     }
 
     /** Kept for call-site compatibility while all results originate from V3. */
@@ -216,6 +192,7 @@ data class SafetyObservatoryProjectionV3(
             homicide_count = count("HOMICIDE"), violence_count = count("VIOLENT_INCIDENT"),
             drugs_count = count("DRUG_SALE_ACTIVITY"), threat_count = count("THREAT"),
             missing_count = count("MISSING_PERSON"), institutional_count = count("INSTITUTIONAL_CONDUCT"),
+            data_state = SafetyObservatoryDataState.REMOTE_AGGREGATE,
         )
     }
 }

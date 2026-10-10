@@ -2284,17 +2284,9 @@ class ObdViewModel @Inject constructor(
         context: android.content.Context? = null
     ) {
         val cloudUserId = currentCloudUserId()
-        if (cloudUserId == null) {
-            context?.let {
-                android.widget.Toast.makeText(
-                    it,
-                    "Inicia sesión antes de enviar una solicitud de proveedor.",
-                    android.widget.Toast.LENGTH_LONG,
-                ).show()
-            }
-            return
-        }
         val userId = cloudUserId
+            ?: activePrincipalKernel.current().id.takeIf(String::isNotBlank)
+            ?: "local_provider_user"
         val canonicalProviderType =
             com.elysium369.meet.core.services.kernel.ProviderType
                 .fromDbValueStrict(providerType)
@@ -2355,28 +2347,32 @@ class ObdViewModel @Inject constructor(
 
             providerProfileDao.insertProfile(profile)
 
-            val cloudSubmission = runCatching {
-                PlatformTrustCenterGateway.submit(
-                    ServiceVerificationSubmission(
-                        serviceType = canonicalProviderType.dbValue,
-                        profileReference = profile.profileId,
-                        displayName = ownerName,
-                        businessName = businessName,
-                        phone = phone,
-                        locationLabel = location,
-                        licenseReference = licenseNumber.takeIf { it.isNotBlank() },
-                    ),
-                )
-            }
+            val cloudSubmission = if (cloudUserId != null) {
+                runCatching {
+                    PlatformTrustCenterGateway.submit(
+                        ServiceVerificationSubmission(
+                            serviceType = canonicalProviderType.dbValue,
+                            profileReference = profile.profileId,
+                            displayName = ownerName,
+                            businessName = businessName,
+                            phone = phone,
+                            locationLabel = location,
+                            licenseReference = licenseNumber.takeIf { it.isNotBlank() },
+                        ),
+                    )
+                }
+            } else null
 
             withContext(Dispatchers.Main) {
                 context?.let {
                     val typeLabel = providerTypeLabel(canonicalProviderType.dbValue)
                     val message = when {
-                        cloudSubmission.isSuccess ->
+                        cloudSubmission != null && cloudSubmission.isSuccess ->
                             "Solicitud de $typeLabel enviada al Centro de Confianza. Estado: pendiente."
-                        else ->
+                        cloudSubmission != null ->
                             "Perfil guardado localmente; la verificación remota está pendiente de sincronización."
+                        else ->
+                            "✅ Perfil de $typeLabel registrado localmente con éxito."
                     }
                     android.widget.Toast.makeText(it, message, android.widget.Toast.LENGTH_LONG).show()
                 }

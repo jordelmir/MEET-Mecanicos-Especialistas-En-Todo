@@ -109,6 +109,47 @@ class DrugMarketImpunityStore @Inject constructor(
         } ?: DrugImpunityRecord(pointId = pointId, initialReportedAt = defaultInitialReportedAt, clockType = clockType)
     }
 
+    /**
+     * Stores an externally sourced update submitted by a user.
+     * It does not certify the source, outlet, official action, or headline.
+     */
+    fun recordExternalUpdate(
+        pointId: String,
+        initialReportedAt: Long,
+        mediaName: String,
+        mediaUrl: String,
+        headline: String,
+        journalistName: String,
+        clockType: ImpunityClockType = ImpunityClockType.DRUG_SALE,
+        recordedAt: Long = System.currentTimeMillis(),
+    ): Result<DrugImpunityRecord> = runCatching {
+        require(mediaName.isNotBlank()) { "El origen declarado es obligatorio." }
+        require(headline.isNotBlank()) { "El resumen de la actualización es obligatorio." }
+        val validatedUrl = normalizeSafetyUpdateSourceUrl(mediaUrl).getOrThrow()
+
+        val existing = getRecord(pointId, initialReportedAt, clockType)
+        val updated = existing.copy(
+            clockType = clockType,
+            isIntervened = true,
+            intervenedAt = recordedAt,
+            mediaName = mediaName.trim(),
+            mediaUrl = validatedUrl,
+            interventionHeadline = headline.trim(),
+            journalistName = journalistName.trim().takeIf { it.isNotBlank() },
+            isReactivated = false,
+        )
+        saveRecord(updated)
+        updated
+    }
+
+    /**
+     * Legacy compatibility wrapper. It stores an unverified update and does not
+     * authenticate a publisher or certify an official action.
+     */
+    @Deprecated(
+        message = "Use recordExternalUpdate; a user-submitted link does not certify an official action.",
+        replaceWith = ReplaceWith("recordExternalUpdate(pointId, initialReportedAt, mediaName, mediaUrl, headline, journalistName, clockType, intervenedAt)"),
+    )
     fun certifyIntervention(
         pointId: String,
         initialReportedAt: Long,
@@ -118,25 +159,16 @@ class DrugMarketImpunityStore @Inject constructor(
         journalistName: String,
         clockType: ImpunityClockType = ImpunityClockType.DRUG_SALE,
         intervenedAt: Long = System.currentTimeMillis(),
-    ): Result<DrugImpunityRecord> = runCatching {
-        require(mediaName.isNotBlank()) { "El nombre del medio es obligatorio" }
-        require(headline.isNotBlank()) { "El titular o resumen de la noticia es obligatorio" }
-
-        val existing = getRecord(pointId, initialReportedAt, clockType)
-        val updated = existing.copy(
-            clockType = clockType,
-            isIntervened = true,
-            intervenedAt = intervenedAt,
-            mediaName = mediaName.trim(),
-            mediaUrl = mediaUrl.trim().takeIf { it.isNotBlank() },
-            interventionHeadline = headline.trim(),
-            journalistName = journalistName.trim().takeIf { it.isNotBlank() },
-            isReactivated = false,
-        )
-
-        saveRecord(updated)
-        updated
-    }
+    ): Result<DrugImpunityRecord> = recordExternalUpdate(
+        pointId = pointId,
+        initialReportedAt = initialReportedAt,
+        mediaName = mediaName,
+        mediaUrl = mediaUrl,
+        headline = headline,
+        journalistName = journalistName,
+        clockType = clockType,
+        recordedAt = intervenedAt,
+    )
 
     fun reportReactivation(
         pointId: String,

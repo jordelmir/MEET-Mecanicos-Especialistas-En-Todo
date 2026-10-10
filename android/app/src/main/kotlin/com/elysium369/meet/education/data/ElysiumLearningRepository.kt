@@ -34,16 +34,59 @@ import kotlinx.serialization.json.put
 @Singleton
 class ElysiumLearningRepository(
     private val principalProvider: com.elysium369.meet.identity.ActivePrincipalProvider?,
+    val progressStorage: EducationProgressStorage,
 ) {
     @Inject
-    constructor(activePrincipalKernel: ActivePrincipalKernel) : this(principalProvider = activePrincipalKernel)
+    constructor(
+        activePrincipalKernel: ActivePrincipalKernel,
+        @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
+    ) : this(principalProvider = activePrincipalKernel, progressStorage = SharedPreferencesEducationProgressStorage(context))
 
-    constructor() : this(null)
+    constructor(activePrincipalKernel: ActivePrincipalKernel) : this(principalProvider = activePrincipalKernel, progressStorage = InMemoryEducationProgressStorage())
+
+    constructor() : this(null, InMemoryEducationProgressStorage())
 
     private val json = Json { ignoreUnknownKeys = true }
     private val localConceptStates = mutableMapOf<String, ConceptKnowledgeState>()
     private val recordedEvidenceHashes = mutableListOf<String>()
     private val fsrsCards = mutableMapOf<String, com.elysium369.meet.education.domain.FsrsCardState>()
+
+    init {
+        localConceptStates.putAll(progressStorage.getAllConceptStates())
+        recordedEvidenceHashes.addAll(progressStorage.getAllEvidenceHashes())
+    }
+
+    fun saveTrackProgress(
+        track: CurriculumTrack,
+        selectedUnitId: String?,
+        selectedConceptId: String?,
+        currentTaskIndex: Int,
+        completedTaskIds: Set<String> = emptySet(),
+        accumulatedColones: Int = 0,
+    ) {
+        val existing = progressStorage.getTrackProgress(track.name)
+        val mergedCompleted = (existing?.completedTaskIds ?: emptySet()) + completedTaskIds
+        val progress = EducationTrackProgress(
+            trackName = track.name,
+            selectedUnitId = selectedUnitId,
+            selectedConceptId = selectedConceptId,
+            currentTaskIndex = currentTaskIndex,
+            completedTaskIds = mergedCompleted,
+            accumulatedColones = accumulatedColones,
+            updatedAtEpochMs = System.currentTimeMillis(),
+        )
+        progressStorage.saveTrackProgress(progress)
+        progressStorage.saveLastActiveTrack(track.name)
+    }
+
+    fun getTrackProgress(track: CurriculumTrack): EducationTrackProgress? {
+        return progressStorage.getTrackProgress(track.name)
+    }
+
+    fun getLastActiveTrack(): CurriculumTrack? {
+        val name = progressStorage.getLastActiveTrack() ?: return null
+        return runCatching { CurriculumTrack.valueOf(name) }.getOrNull()
+    }
 
     fun getRecentEvidenceHashesForTrack(track: CurriculumTrack): List<String> {
         return recordedEvidenceHashes.toList()
@@ -51,7 +94,7 @@ class ElysiumLearningRepository(
 
     fun getFsrsCard(conceptId: String): com.elysium369.meet.education.domain.FsrsCardState {
         return fsrsCards.getOrPut(conceptId) {
-            com.elysium369.meet.education.domain.FsrsCardState(conceptId = conceptId)
+            progressStorage.getFsrsCard(conceptId) ?: com.elysium369.meet.education.domain.FsrsCardState(conceptId = conceptId)
         }
     }
 
@@ -65,6 +108,7 @@ class ElysiumLearningRepository(
         }
         val updatedCard = com.elysium369.meet.education.domain.FsrsMemoryEngine.review(currentCard, rating)
         fsrsCards[conceptId] = updatedCard
+        progressStorage.saveFsrsCard(updatedCard)
     }
 
     private val principalId: String
@@ -226,7 +270,7 @@ class ElysiumLearningRepository(
     fun getLocalConceptState(conceptId: String): ConceptKnowledgeState {
         val pId = principalId
         return localConceptStates.getOrPut(conceptId) {
-            ConceptKnowledgeState(
+            progressStorage.getConceptState(conceptId) ?: ConceptKnowledgeState(
                 learnerId = pId,
                 conceptId = conceptId,
                 masteryEstimate = 0.0,
@@ -327,6 +371,7 @@ class ElysiumLearningRepository(
             todayEpochDay = todayEpochDay,
         )
         localConceptStates[conceptId] = updatedState
+        progressStorage.saveConceptState(updatedState)
 
         // Build local cryptographic evidence packet
         val localEvidence = ForgeEducationBridge.createEvidencePacket(
@@ -373,6 +418,7 @@ class ElysiumLearningRepository(
         }
 
         recordedEvidenceHashes.add(evidenceRecord.rawEvidenceHash)
+        progressStorage.recordEvidenceHash(evidenceRecord.rawEvidenceHash)
         updateFsrsCard(conceptId, isCorrect, responseLatencyMs)
 
         Result.success(evidenceRecord)

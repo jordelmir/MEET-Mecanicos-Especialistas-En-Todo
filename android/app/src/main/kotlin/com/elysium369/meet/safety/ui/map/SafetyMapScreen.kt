@@ -46,6 +46,7 @@ import com.elysium369.meet.safety.drugimpunity.DrugMarketImpunityClockCard
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -67,6 +68,8 @@ import com.elysium369.meet.safety.domain.SourceRelation
 import com.elysium369.meet.safety.domain.label
 import com.elysium369.meet.safety.domain.toObservatoryBadge
 import com.elysium369.meet.safety.evidence.SafetyEvidenceEntity
+import com.elysium369.meet.safety.evidence.SafetyEvidenceStatusTone
+import com.elysium369.meet.safety.evidence.safetyEvidencePresentation
 import com.elysium369.meet.safety.science.data.SciClaimEntity
 import com.elysium369.meet.safety.science.data.SciHypothesisEntity
 import com.elysium369.meet.safety.ui.cases.safetyPublicDate
@@ -163,6 +166,8 @@ fun SafetyMapScreen(
                 SafetyMetricCard(stringResource(R.string.safety_map_my_reports), state.privatePoints.size.toString(), MeetColors.neonGreen, Modifier.weight(1f))
                 SafetyMetricCard(stringResource(R.string.safety_map_public_points), state.points.size.toString(), MeetColors.textPrimary, Modifier.weight(1f))
             }
+
+            MapTruthNotice()
 
             // Search Bar
             OutlinedTextField(
@@ -571,7 +576,7 @@ private fun PublicPointDetail(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         Icon(Icons.Filled.CloudDone, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(14.dp))
-                        Text("Sincronizado mundialmente", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        Text("Disponible en mapa público", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
                     }
                 }
 
@@ -582,7 +587,7 @@ private fun PublicPointDetail(
                             .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     ) {
-                        Text("v${point.serverVersion} autorizada", fontSize = 11.sp, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
+                        Text("Versión del servidor v${point.serverVersion}", fontSize = 11.sp, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -594,13 +599,13 @@ private fun PublicPointDetail(
                 point.journalisticSourceCount > 0 -> "Fuente Periodística"
                 point.institutionalSourceCount > 0 -> "Fuente Institucional"
                 point.publicRecordSourceCount > 0 -> "Registro Público"
-                else -> "Fuente Civil Protegida"
+                else -> "Fuente ciudadana"
             }
             val sourceSubtitle = when {
                 point.journalisticSourceCount > 0 -> "Investigación periodística / Medios"
-                point.institutionalSourceCount > 0 -> "Fuerza Pública / OIJ / Oficial"
+                point.institutionalSourceCount > 0 -> "Origen institucional clasificado; consulte el documento de respaldo"
                 point.publicRecordSourceCount > 0 -> "Expediente judicial o registral"
-                else -> "Testimonio ciudadano verificado"
+                else -> "Reporte ciudadano; no confirma por sí solo el incidente"
             }
             val sourceEmoji = when {
                 point.journalisticSourceCount > 0 -> "📰"
@@ -665,7 +670,7 @@ private fun PublicPointDetail(
                             color = MeetColors.textPrimary,
                         )
                         val accuracyText = point.locationAccuracyMeters?.let { "Precisión: ±${it}m" } ?: "Precisión no informada"
-                        Text("$accuracyText · Red pública global", fontSize = 11.sp, color = MeetColors.textMuted)
+                        Text("$accuracyText · Proyección pública de Safety", fontSize = 11.sp, color = MeetColors.textMuted)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     IconButton(
@@ -890,7 +895,7 @@ private fun PublicPointDetail(
                 Icon(Icons.Filled.Shield, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "Reporte público sincronizado en red descentralizada con atestación criptográfica. ${stringResource(R.string.safety_public_epistemic_notice)}",
+                    "El estado de sincronización indica recepción por el servidor, no que el incidente esté confirmado ni que el reporte se haya divulgado. La verificación de bytes de cada adjunto tiene un estado separado. ${stringResource(R.string.safety_public_epistemic_notice)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MeetColors.textSecondary,
                     lineHeight = 16.sp,
@@ -911,6 +916,9 @@ private fun SafetyMapLayer.labelResource() = when (this) {
     SafetyMapLayer.THREAT -> R.string.safety_public_threat
     SafetyMapLayer.MISSING_PERSON -> R.string.safety_public_missing
     SafetyMapLayer.INSTITUTIONAL -> R.string.safety_public_institutional
+    SafetyMapLayer.SICOP_PROCUREMENT -> R.string.safety_public_procurement
+    SafetyMapLayer.CORPORATE_STRUCTURES -> R.string.safety_public_corporate
+    SafetyMapLayer.FINANCIAL_INTELLIGENCE -> R.string.safety_public_financial
 }
 private fun SafetyTimeRange.labelResource() = when (this) {
     SafetyTimeRange.ALL -> R.string.safety_public_all_dates
@@ -1056,7 +1064,7 @@ private fun PrivateReportDetailSheet(
                             .background(MeetColors.cyberCyan.copy(alpha = 0.15f))
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     ) {
-                        Text("v${point.serverVersion} autorizada", fontSize = 11.sp, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
+                        Text("Versión del servidor v${point.serverVersion}", fontSize = 11.sp, color = MeetColors.cyberCyan, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1343,7 +1351,7 @@ private fun PrivateReportDetailSheet(
                 Icon(Icons.Filled.Shield, contentDescription = null, tint = MeetColors.neonGreen, modifier = Modifier.size(16.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "Este reporte está sellado y protegido con criptografía soberana local (ChaCha20-Poly1305 / AEAD). La ubicación exacta y archivos solo son accesibles desde tu dispositivo autorizado.",
+                    "Esta vista muestra una proyección pública de campos autorizados. Los adjuntos y las coordenadas exactas siguen sujetos a permisos; una huella de bytes verificada no confirma la veracidad de su contenido ni su admisibilidad judicial.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MeetColors.textSecondary,
                     lineHeight = 16.sp,
@@ -1731,6 +1739,25 @@ private fun EvidenceFileCard(
                             fontSize = 10.sp,
                             color = MeetColors.textMuted,
                         )
+                        val evidenceStatus = safetyEvidencePresentation(item.uploadState, item.lastErrorCode)
+                        val evidenceStatusColor = when (evidenceStatus.tone) {
+                            SafetyEvidenceStatusTone.VERIFIED -> MeetColors.neonGreen
+                            SafetyEvidenceStatusTone.IN_PROGRESS -> MeetColors.cyberCyan
+                            SafetyEvidenceStatusTone.PENDING -> MeetColors.warning
+                            SafetyEvidenceStatusTone.ERROR -> MeetColors.error
+                            SafetyEvidenceStatusTone.NEUTRAL -> MeetColors.textMuted
+                        }
+                        Text(
+                            evidenceStatus.label,
+                            modifier = Modifier
+                                .padding(top = 4.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(evidenceStatusColor.copy(alpha = 0.12f))
+                                .padding(horizontal = 7.dp, vertical = 4.dp),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = evidenceStatusColor,
+                        )
                     }
                 }
 
@@ -1754,8 +1781,10 @@ private fun EvidenceFileCard(
 
 private fun resolvePrivateState(point: SafetyPrivateMapPoint): Triple<ImageVector, Color, String> {
     return when {
-        point.serverState == "CONFIRMED" || point.syncState == "SYNCED" ->
-            Triple(Icons.Filled.CloudDone, Color(0xFF10B981), "Sincronizado mundialmente")
+        point.syncState == "SYNCED" ->
+            Triple(Icons.Filled.CloudDone, Color(0xFF10B981), "Recibido por el servidor")
+        point.serverState != null ->
+            Triple(Icons.Filled.CloudUpload, MeetColors.textMuted, "Estado remoto: ${point.serverState}")
         point.syncState == "SYNCING" ->
             Triple(Icons.Filled.CloudSync, Color(0xFF06B6D4), "Sincronizando...")
         point.syncState == "QUEUED" ->
@@ -1812,6 +1841,54 @@ private fun openWazeNavigation(context: android.content.Context, lat: Double, lo
             context.startActivity(playIntent)
         } catch (_: Exception) {
             // Silently fail if even Play Store is not available
+        }
+    }
+}
+
+
+@Composable
+internal fun MapTruthNotice() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MeetColors.cardBackground),
+        border = BorderStroke(
+            1.dp,
+            Brush.linearGradient(
+                listOf(
+                    MeetColors.cyberCyan.copy(alpha = 0.65f),
+                    MeetColors.electricBlue.copy(alpha = 0.45f),
+                    MeetColors.hotMagenta.copy(alpha = 0.28f),
+                ),
+            ),
+        ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Filled.Info,
+                contentDescription = null,
+                tint = MeetColors.cyberCyan,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(
+                    "LECTURA RESPONSABLE DEL MAPA",
+                    color = MeetColors.cyberCyan,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.8.sp,
+                )
+                Text(
+                    "Cada punto representa un registro accesible con su nivel de exposición. Un marcador no confirma por sí solo un delito; una capa vacía puede reflejar cobertura incompleta.",
+                    color = MeetColors.textSecondary,
+                    fontSize = 10.sp,
+                    lineHeight = 13.sp,
+                )
+            }
         }
     }
 }

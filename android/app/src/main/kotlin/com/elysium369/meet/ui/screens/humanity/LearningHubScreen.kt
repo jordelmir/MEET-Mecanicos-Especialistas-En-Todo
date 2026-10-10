@@ -194,7 +194,7 @@ fun LearningHubScreen(
                                         ),
                                     )
                                     Text(
-                                        text = "MEP 2026 · Matemática 1.º & 7.º Fontanería",
+                                        text = "MEP 2026 · Estándar OCDE PISA & Oficios Técnicos",
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             color = MaterialTheme.colorScheme.primary,
                                             fontWeight = FontWeight.Bold,
@@ -212,7 +212,7 @@ fun LearningHubScreen(
                         }
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Aprende con el programa escolar oficial, simulaciones 3D, desafíos de transferencia y puente hacia oficios reales verificados con SHA-256.",
+                            text = "Aprende con el programa oficial, Tutor Socrático IA, preparación para Nivel 6 PISA (800+ pts), simulaciones 3D y certificación verificada offline con SHA-256.",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                             ),

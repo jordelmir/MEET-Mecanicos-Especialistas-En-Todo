@@ -24,11 +24,38 @@ enum class ProviderDomainCategory(val id: String, val title: String, val icon: S
     PLUMBING_WATER("PLUMBING_WATER", "Plomería & Tuberías", "🚰"),
     ELECTRICAL_RESIDENTIAL("ELECTRICAL_RESIDENTIAL", "Electricidad & Redes", "⚡"),
     LOCKSMITH_SECURITY("LOCKSMITH_SECURITY", "Cerrajería & Cerraduras", "🔑"),
-    HOME_MAINTENANCE("HOME_MAINTENANCE", "Mantenimiento del Hogar", "🛠️");
+    HOME_MAINTENANCE("HOME_MAINTENANCE", "Mantenimiento del Hogar", "🛠️"),
+    HARDWARE_STORE("HARDWARE_STORE", "Ferretería & Materiales", "🔩"),
+    AUTO_DETAILING("AUTO_DETAILING", "Lavado & Detailing", "✨"),
+    BATTERY_JUMPSTART("BATTERY_JUMPSTART", "Batería & Arranque", "🔋"),
+    PARTS_STORE("PARTS_STORE", "Repuestos & Autopartes", "⚙️"),
+    COURIER_DELIVERY("COURIER_DELIVERY", "Mensajería & Entregas", "🛵"),
+    MOVING_FREIGHT("MOVING_FREIGHT", "Mudanzas & Fletes", "📦"),
+    PROFESSIONAL_SERVICES("PROFESSIONAL_SERVICES", "Servicios Profesionales", "💼"),
+    EDUCATION_TUTORING("EDUCATION_TUTORING", "Tutorías & Clases", "📚");
 
     companion object {
         fun fromId(id: String): ProviderDomainCategory {
-            return entries.firstOrNull { it.id.equals(id, ignoreCase = true) } ?: AUTOMOTIVE_MECHANIC
+            val clean = id.trim().uppercase()
+            return when {
+                clean in listOf("AUTOMOTIVE_MECHANIC", "AUTO_MECHANICAL", "MECHANICAL", "MECHANIC", "TALLER") -> AUTOMOTIVE_MECHANIC
+                clean in listOf("TOW_TRUCK", "AUTO_TOW", "TOW", "ROADSIDE", "GRUA") -> TOW_TRUCK
+                clean in listOf("LOCAL_COMMERCE_GROCERY", "PULPERIA", "PULPERIA_GROCERIES", "MINISUPER") -> LOCAL_COMMERCE_GROCERY
+                clean in listOf("SODA_RESTAURANT", "SODA", "SODA_TRADITIONAL_FOOD", "RESTAURANT") -> SODA_RESTAURANT
+                clean in listOf("PLUMBING_WATER", "PLUMBING", "FONTANERIA", "PLOMERIA") -> PLUMBING_WATER
+                clean in listOf("ELECTRICAL_RESIDENTIAL", "ELECTRICAL", "ELECTRICAL_HOME", "ELECTRICIDAD") -> ELECTRICAL_RESIDENTIAL
+                clean in listOf("LOCKSMITH_SECURITY", "LOCKSMITH", "HARDWARE_LOCKSMITH", "CERRAJERIA") -> LOCKSMITH_SECURITY
+                clean in listOf("HARDWARE_STORE", "HARDWARE", "HARDWARE_MATERIALS", "FERRETERIA") -> HARDWARE_STORE
+                clean in listOf("AUTO_DETAILING", "DETAILING", "VEHICLE_DETAILING", "LAVADO") -> AUTO_DETAILING
+                clean in listOf("BATTERY_JUMPSTART", "BATTERY", "ARRANQUE") -> BATTERY_JUMPSTART
+                clean in listOf("PARTS_STORE", "PARTS", "AUTO_PARTS", "REPUESTOS") -> PARTS_STORE
+                clean in listOf("COURIER_DELIVERY", "COURIER", "MENSAJERIA", "EXPRESS") -> COURIER_DELIVERY
+                clean in listOf("MOVING_FREIGHT", "MOVING", "MUDANZAS", "FLETE") -> MOVING_FREIGHT
+                clean in listOf("PROFESSIONAL_SERVICES", "PROFESSIONAL", "ACCOUNTING", "LEGAL", "SOFTWARE") -> PROFESSIONAL_SERVICES
+                clean in listOf("EDUCATION_TUTORING", "EDUCATION", "TUTORING", "CLASES") -> EDUCATION_TUTORING
+                clean in listOf("HOME_MAINTENANCE", "HOME", "HOME_CLEANING", "LIMPIEZA", "PINTURA") -> HOME_MAINTENANCE
+                else -> entries.firstOrNull { it.id.equals(clean, ignoreCase = true) } ?: AUTOMOTIVE_MECHANIC
+            }
         }
     }
 }
@@ -456,6 +483,122 @@ data class ProviderServiceProfileData(
                     subServices = listOf(
                         OfferedSubService("home_paint", "Pintura Interior / Exterior", "Preparación de superficie, lijado, sellador y dos manos de pintura.", 4.0, 45000L, listOf("Plásticos protectores", "Cinta masking tape")),
                         OfferedSubService("home_drywall", "Reparación de Gypsum y Cielorraso", "Parcheo de humedad, empastado y lijado liso.", 2.0, 25000L, listOf("Pasta gypsum", "Cinta de malla", "Lijas finas"))
+                    )
+                )
+
+                ProviderDomainCategory.HARDWARE_STORE -> ProviderServiceProfileData(
+                    domainCategory = category,
+                    hourlyLaborRateCrc = 0L,
+                    baseDiagnosticFeeCrc = 2000L, // Despacho de ferretería
+                    ratePerKmCrc = 500L,
+                    materialPolicy = MaterialSupplyPolicy.MATERIALS_INCLUDED,
+                    warrantyDays = 30,
+                    certifiedEquipment = listOf("Montacargas de Patio", "Cortadora de Metales / Tubería", "Facturación Electrónica Hacienda D-104"),
+                    subServices = listOf(
+                        OfferedSubService("hard_pipe", "Tubos y Accesorios PVC / CPVC", "Suministro de tubería de 1/2\", 3/4\", 2\", codos, tees, uniones y pegamento.", 0.5, 12000L, listOf("Tubo PVC SDR-26", "Pegamento Tangit", "Teflón")),
+                        OfferedSubService("hard_elec", "Conductores y Dispositivos Eléctricos", "Cableado THHN, interruptores, tomacorrientes y cajas termomagnéticas.", 0.5, 15000L, listOf("Cable THHN #12", "Tomacorriente Leviton", "Breaker")),
+                        OfferedSubService("hard_cement", "Materiales Pesados y Cemento", "Sacos de cemento Holcim/Cemex, arena calibrada, piedra y varillas de acero.", 1.0, 25000L, listOf("Cemento Tipo GU", "Varilla corrugada #3", "Arena"))
+                    )
+                )
+
+                ProviderDomainCategory.AUTO_DETAILING -> ProviderServiceProfileData(
+                    domainCategory = category,
+                    hourlyLaborRateCrc = 12000L,
+                    baseDiagnosticFeeCrc = 15000L,
+                    ratePerKmCrc = 700L,
+                    materialPolicy = MaterialSupplyPolicy.MATERIALS_INCLUDED,
+                    warrantyDays = 14,
+                    certifiedEquipment = listOf("Pulidora Roto-Orbital Rupes", "Hidrolavadora de Alta Presión Kärcher", "Máquina de Extracción de Tapicería", "Generador de Ozono"),
+                    subServices = listOf(
+                        OfferedSubService("detail_wash", "Lavado Premium y Encerado Cerámico", "Descontaminación con barra de arcilla, lavado a mano con espuma pH neutro y cera.", 2.0, 22000L, listOf("Shampoo pH neutro", "Sellador cerámico", "Toallas microfibra")),
+                        OfferedSubService("detail_seats", "Lavado Profundo de Tapicería e Interior", "Inyección y succión de sillones, alfombras, techo y desinfección con ozono.", 3.0, 35000L, listOf("Desengrasante textil", "Acondicionador de cuero", "Neutralizador olores")),
+                        OfferedSubService("detail_polish", "Pulido y Corrección de Pintura 2 Pasos", "Eliminación de microrrayas (swirls), abrillantado y protección de capa transparente.", 4.5, 55000L, listOf("Compuesto pulidor fino", "Pads de microfibra/espuma", "Sellador"))
+                    )
+                )
+
+                ProviderDomainCategory.BATTERY_JUMPSTART -> ProviderServiceProfileData(
+                    domainCategory = category,
+                    hourlyLaborRateCrc = 8000L,
+                    baseDiagnosticFeeCrc = 12000L,
+                    ratePerKmCrc = 800L,
+                    materialPolicy = MaterialSupplyPolicy.MATERIALS_INCLUDED,
+                    warrantyDays = 365,
+                    warrantyKm = 20000,
+                    certifiedEquipment = listOf("Analizador de Baterías Digital Midtronics", "Booster de Litio Profesional NOCO 3000A", "Probador de Carga de Alternador"),
+                    subServices = listOf(
+                        OfferedSubService("bat_jump", "Paso de Corriente de Emergencia", "Auxilio en ruta, conexión segura con supresor de picos y prueba de alternador.", 0.4, 12000L, listOf("Prueba de diagnóstico impresa")),
+                        OfferedSubService("bat_install", "Suministro e Instalación de Batería Nueva", "Instalación a domicilio de batería sellada libre de mantenimiento con garantía.", 0.8, 48000L, listOf("Batería sellada 12V (Grupo 24/35/48)", "Terminales de bronce", "Protector antisulfato"))
+                    )
+                )
+
+                ProviderDomainCategory.PARTS_STORE -> ProviderServiceProfileData(
+                    domainCategory = category,
+                    hourlyLaborRateCrc = 0L,
+                    baseDiagnosticFeeCrc = 2500L,
+                    ratePerKmCrc = 600L,
+                    materialPolicy = MaterialSupplyPolicy.MATERIALS_INCLUDED,
+                    warrantyDays = 90,
+                    certifiedEquipment = listOf("Catálogo Electrónico de Partes EPC", "Escáner de Código de Barras / VIN", "Almacén Climatizado"),
+                    subServices = listOf(
+                        OfferedSubService("parts_brakes", "Repuestos de Frenos y Fricción", "Pastillas cerámicas, discos ventilados y zapatas garantizados por chasis/VIN.", 0.5, 28000L, listOf("Pastillas OEM", "Discos")),
+                        OfferedSubService("parts_filters", "Kit de Filtros y Mantenimiento", "Filtro de aire, aceite, combustible y cabina para modelo específico.", 0.3, 16000L, listOf("Kit de filtros")),
+                        OfferedSubService("parts_suspension", "Componentes de Suspensión y Dirección", "Amortiguadores, rótulas, terminales y bujes con especificación OEM.", 0.5, 45000L, listOf("Amortiguadores par delantero"))
+                    )
+                )
+
+                ProviderDomainCategory.COURIER_DELIVERY -> ProviderServiceProfileData(
+                    domainCategory = category,
+                    hourlyLaborRateCrc = 0L,
+                    baseDiagnosticFeeCrc = 2000L,
+                    ratePerKmCrc = 500L,
+                    materialPolicy = MaterialSupplyPolicy.MATERIALS_INCLUDED,
+                    warrantyDays = 1,
+                    certifiedEquipment = listOf("Cajón Térmico / Maletín Impermeable", "Soporte de Navegación GPS", "Cámara para Evidencia de Entrega"),
+                    subServices = listOf(
+                        OfferedSubService("courier_docs", "Envío Express de Documentos y Facturas", "Entrega punto a punto con firma digital y comprobante fotográfico.", 0.5, 3500L, listOf("Sobre protector sellado")),
+                        OfferedSubService("courier_parcel", "Entrega de Paquetería y Compras", "Transporte seguro de encomiendas de hasta 15 kg.", 0.6, 4500L, listOf("Embalaje y cinchas de sujeción"))
+                    )
+                )
+
+                ProviderDomainCategory.MOVING_FREIGHT -> ProviderServiceProfileData(
+                    domainCategory = category,
+                    hourlyLaborRateCrc = 8000L,
+                    baseDiagnosticFeeCrc = 25000L,
+                    ratePerKmCrc = 1200L,
+                    materialPolicy = MaterialSupplyPolicy.MATERIALS_INCLUDED,
+                    warrantyDays = 7,
+                    certifiedEquipment = listOf("Camión de Carga con Rampa Hidráulica", "Carretilla de Carga 300 kg", "Mantas de Mudanza y Plástico Stretch"),
+                    subServices = listOf(
+                        OfferedSubService("move_freight", "Flete Local y Transporte de Muebles", "Traslado de enseres, electrodomésticos o mercadería con estiba segura.", 2.0, 35000L, listOf("Mantas protectoras", "Cinchas de trinquete")),
+                        OfferedSubService("move_full", "Mudanza Integral con Carga y Descarga", "Equipo de estibadores para subir, acomodar y proteger pertenencias.", 4.0, 75000L, listOf("Plástico burbuja", "Cajas reforzadas"))
+                    )
+                )
+
+                ProviderDomainCategory.PROFESSIONAL_SERVICES -> ProviderServiceProfileData(
+                    domainCategory = category,
+                    hourlyLaborRateCrc = 20000L,
+                    baseDiagnosticFeeCrc = 25000L,
+                    ratePerKmCrc = 0L,
+                    materialPolicy = MaterialSupplyPolicy.CLIENT_SUPPLIED,
+                    warrantyDays = 90,
+                    certifiedEquipment = listOf("Firma Digital Certificada BCCR", "Software Contable / Tributario Homologado", "Conexión Encriptada VPN"),
+                    subServices = listOf(
+                        OfferedSubService("prof_tax", "Declaración de Impuestos y Facturación", "Preparación de declaraciones IVA (D-104), renta (D-101) y conciliación fiscal.", 1.5, 25000L, listOf("Comprobante con firma digital")),
+                        OfferedSubService("prof_legal", "Elaboración de Contratos y Asesoría Legal", "Redacción de contratos de alquiler, compraventa vehicular o servicios con validez jurídica.", 2.0, 35000L, listOf("Instrumento legal firmado"))
+                    )
+                )
+
+                ProviderDomainCategory.EDUCATION_TUTORING -> ProviderServiceProfileData(
+                    domainCategory = category,
+                    hourlyLaborRateCrc = 10000L,
+                    baseDiagnosticFeeCrc = 10000L,
+                    ratePerKmCrc = 500L,
+                    materialPolicy = MaterialSupplyPolicy.MATERIALS_INCLUDED,
+                    warrantyDays = 30,
+                    certifiedEquipment = listOf("Pizarra Digital Interactiva", "Material Didáctico Homologado MEP", "Plataforma de Videoconferencia HD"),
+                    subServices = listOf(
+                        OfferedSubService("tutor_stem", "Tutoría de Matemáticas y Ciencias", "Refuerzo escolar y colegial (7° a 11° año) enfocado en resolución de problemas.", 1.0, 10000L, listOf("Guías de práctica y exámenes")),
+                        OfferedSubService("tutor_lang", "Clases de Idiomas (Inglés Conversacional)", "Práctica oral, gramática aplicada y preparación para certificaciones.", 1.0, 12000L, listOf("Material auditivo y fichas"))
                     )
                 )
             }

@@ -213,7 +213,49 @@ object CourseZeroCurriculumSeed {
             title = "Simbología y Medidas: Trazado y Longitud",
             description = "Trazado 0-9, ordinales hasta décimo, líneas de posición, metro y centímetro.",
             estimatedLessons = 8,
-            concepts = emptyList(),
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_mat1_c_length_measurement",
+                    conceptCode = "CR_MAT1_LENGTH_MEASUREMENT",
+                    title = "Medición de longitud: unidades no convencionales y convencionales",
+                    description = "Comparación de longitudes usando pasos, cuartas y el metro/centímetro.",
+                    targetMonth = 4,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_mat1_length_wrench",
+                            conceptId = "cr_mat1_c_length_measurement",
+                            title = "Instrumento de Medición Preciso",
+                            prompt = "¿Qué instrumento proporciona una medida exacta y universal de la longitud de un tornillo en el taller?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "Una regla graduada en centímetros y milímetros",
+                                "El ancho de una mano o cuarta",
+                                "Un pedazo de cuerda sin marcas",
+                                "Contar pasos"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "La regla graduada provee una unidad estandarizada (centímetros) que no cambia entre diferentes personas.",
+                        ),
+                        InteractiveTaskData(
+                            id = "task_mat1_length_transfer_gap",
+                            conceptId = "cr_mat1_c_length_measurement",
+                            title = "Desafío de Transferencia: Holgura de Precisión",
+                            prompt = "En mecánica automotriz, para calibrar la separación de una bujía (calibre en milímetros), ¿por qué es indispensable medir con exactitud?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Porque variaciones de menos de un milímetro afectan la chispa y el encendido del motor",
+                                "Porque el metal cambia de color si no se mide",
+                                "Porque las bujías se miden exclusivamente a ojo",
+                                "Porque el motor solo funciona en pulgadas"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "¡Excelente transferencia! La medición milimétrica de precisión asegura tolerancias mecánicas seguras.",
+                        )
+                    ),
+                )
+            ),
         ),
         CourseUnitData(
             id = "cr_mat1_u05",
@@ -297,7 +339,47 @@ object CourseZeroCurriculumSeed {
             title = "Masa y Cronometría: Peso y Nociones de Tiempo",
             description = "Comparación de peso e intervalos temporales (amanecer, día, tarde, noche).",
             estimatedLessons = 8,
-            concepts = emptyList(),
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_mat1_c_mass_time",
+                    conceptCode = "CR_MAT1_MASS_TIME",
+                    title = "Comparación de masa y secuencia temporal",
+                    description = "Conceptos de pesado/liviano y ordenamiento temporal de sucesos cotidianos.",
+                    targetMonth = 7,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_mat1_mass_jack",
+                            conceptId = "cr_mat1_c_mass_time",
+                            title = "Balanza de Taller: Gato Hidráulico",
+                            prompt = "Al colocar un gato hidráulico de acero y un trapo de microfibra en una balanza de dos platos, ¿cuál inclinará la balanza hacia abajo?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "El gato hidráulico (tiene mucha más masa y peso)",
+                                "El trapo de microfibra",
+                                "Ninguno, pesan exactamente igual"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "El objeto de mayor masa ejerce mayor fuerza gravitacional, inclinando la balanza.",
+                        ),
+                        InteractiveTaskData(
+                            id = "task_mat1_time_transfer_sequence",
+                            conceptId = "cr_mat1_c_mass_time",
+                            title = "Desafío de Transferencia: Secuencia Temporal Crítica",
+                            prompt = "¿Cuál es el orden cronológico seguro antes de encender un vehículo en el taller?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "1. Revisar nivel de aceite y fluidos -> 2. Encender motor",
+                                "1. Acelerar a fondo -> 2. Buscar si tiene aceite",
+                                "1. Retirar el motor -> 2. Arrancar el switch"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "¡Excelente transferencia! La secuencia temporal garantiza lubricación antes de la fricción mecánica.",
+                        )
+                    ),
+                )
+            ),
         ),
         CourseUnitData(
             id = "cr_mat1_u08",
@@ -340,7 +422,39 @@ object CourseZeroCurriculumSeed {
             title = "Aritmética Profunda: Doble, Mitad y Problemas",
             description = "Doble y mitad, problemas aditivos < 100, símbolos +, -, = y cálculo mental.",
             estimatedLessons = 8,
-            concepts = emptyList(),
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_mat1_c_double_half",
+                    conceptCode = "CR_MAT1_DOUBLE_HALF",
+                    title = "El doble y la mitad en situaciones reales",
+                    description = "Comprensión de relaciones de duplicación y división a la mitad en números.",
+                    targetMonth = 9,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_mat1_double_bays",
+                            conceptId = "cr_mat1_c_double_half",
+                            title = "Duplicar la Capacidad del Taller",
+                            prompt = "Un taller tiene 4 bahías de servicio y decide construir el DOBLE de bahías para atender más clientes. ¿Cuántas bahías tendrá ahora?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf("8 bahías (4 + 4)", "6 bahías", "2 bahías", "16 bahías"),
+                            correctOptionIndex = 0,
+                            explanation = "El doble de 4 es sumar el número consigo mismo: 4 + 4 = 8.",
+                        ),
+                        InteractiveTaskData(
+                            id = "task_mat1_half_transfer_psi",
+                            conceptId = "cr_mat1_c_double_half",
+                            title = "Desafío de Transferencia: Mitad de Presión",
+                            prompt = "Un neumático debe tener 32 PSI. Si el manómetro marca exactamente la MITAD, ¿cuánta presión tiene?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf("16 PSI (la mitad de 32)", "30 PSI", "64 PSI", "8 PSI"),
+                            correctOptionIndex = 0,
+                            explanation = "¡Excelente transferencia! 32 dividido entre 2 es exactamente 16 PSI.",
+                        )
+                    ),
+                )
+            ),
         ),
         CourseUnitData(
             id = "cr_mat1_u10",
@@ -351,7 +465,44 @@ object CourseZeroCurriculumSeed {
             title = "Cuerpos Geométricos y Capacidad: Cajas e Igualdades",
             description = "Cuerpos con forma de caja, capacidad, equivalencias y expresiones matemáticas.",
             estimatedLessons = 8,
-            concepts = emptyList(),
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_mat1_c_geometric_solids",
+                    conceptCode = "CR_MAT1_GEOMETRIC_SOLIDS",
+                    title = "Cuerpos geométricos (prismas) y capacidad volumétrica",
+                    description = "Identificación de formas espaciales tridimensionales y concepto de capacidad en litros.",
+                    targetMonth = 10,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_mat1_solid_battery",
+                            conceptId = "cr_mat1_c_geometric_solids",
+                            title = "Forma de la Batería del Auto",
+                            prompt = "¿A qué cuerpo geométrico tridimensional corresponde la forma de una batería automotriz o caja de fusibles?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "Prisma rectangular (caja con 6 caras planas)",
+                                "Esfera perfecta",
+                                "Cono circular",
+                                "Cilindro sin tapas"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "Una batería tiene caras rectangulares planas opuestas y paralelas: es un prisma rectangular.",
+                        ),
+                        InteractiveTaskData(
+                            id = "task_mat1_capacity_transfer_oil",
+                            conceptId = "cr_mat1_c_geometric_solids",
+                            title = "Desafío de Transferencia: Capacidad en Litros",
+                            prompt = "El depósito de limpiaparabrisas tiene capacidad total de 3 litros. Si ya vertiste 2 litros, ¿cuánto líquido más cabe?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf("1 litro restante", "3 litros", "5 litros", "cero, rebalsa"),
+                            correctOptionIndex = 0,
+                            explanation = "¡Excelente transferencia! 3 litros - 2 litros = 1 litro restante de capacidad.",
+                        )
+                    ),
+                )
+            ),
         ),
         CourseUnitData(
             id = "cr_mat1_u11",
@@ -397,7 +548,49 @@ object CourseZeroCurriculumSeed {
             title = "Fundamentos y Seguridad Ocupacional en Fontanería",
             description = "Conservación del agua, normas de seguridad y equipo de protección personal.",
             estimatedLessons = 10,
-            concepts = emptyList(),
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_font7_c_safety_epp",
+                    conceptCode = "CR_FONT7_SAFETY_EPP",
+                    title = "Seguridad Ocupacional y Equipo de Protección Personal",
+                    description = "Normas de bioseguridad, EPP y prevención de riesgos en redes y talleres.",
+                    targetMonth = 3,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_font7_safety_glasses",
+                            conceptId = "cr_font7_c_safety_epp",
+                            title = "Protección Ocular al Cortar y Soldar PVC",
+                            prompt = "¿Qué equipo de protección es indispensable al usar limpiador químico, pegamento solvente o cortar tubos de PVC?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "Gafas de seguridad resistentes a salpicaduras químicas y partículas",
+                                "Lentes oscuros corrientes de sol",
+                                "No se requiere protección ocular",
+                                "Guantes de tela únicamente"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "Las gotas de solvente o virutas de polímero causan severas lesiones oculares inmediatas.",
+                        ),
+                        InteractiveTaskData(
+                            id = "task_font7_safety_transfer_ventilation",
+                            conceptId = "cr_font7_c_safety_epp",
+                            title = "Desafío de Transferencia: Ventilación en Espacios Confinados",
+                            prompt = "Al aplicar pegamento solvente de PVC en una zanja profunda o cuarto de bombas cerrado, ¿cuál medida es vital?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Garantizar ventilación forzada o usar respirador para vapores orgánicos",
+                                "Encender un fósforo para quemar los gases",
+                                "Cerrar herméticamente todas las salidas",
+                                "Trabajar sin pausas para salir rápido"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "¡Excelente transferencia! Los solventes desprenden vapores tóxicos más pesados que el aire que desplazan el oxígeno.",
+                        )
+                    ),
+                )
+            ),
         ),
         CourseUnitData(
             id = "cr_font7_u02",
@@ -408,7 +601,49 @@ object CourseZeroCurriculumSeed {
             title = "Herramientas y Equipos de Fontanería",
             description = "Uso y calibración de llaves ajustables, terrajas, cortatubos y manómetros.",
             estimatedLessons = 12,
-            concepts = emptyList(),
+            concepts = listOf(
+                CurriculumConceptData(
+                    id = "cr_font7_c_tools_selection",
+                    conceptCode = "CR_FONT7_TOOLS_SELECTION",
+                    title = "Herramientas de Corte, Roscado y Apriete",
+                    description = "Selección y operación de llaves Stillson, cortatubos y terrajas.",
+                    targetMonth = 4,
+                    tasks = listOf(
+                        InteractiveTaskData(
+                            id = "task_font7_tool_stillson",
+                            conceptId = "cr_font7_c_tools_selection",
+                            title = "Uso de la Llave Stillson vs Llave Ajustable",
+                            prompt = "¿En qué elemento debe usarse preferentemente la llave Stillson en vez de una llave ajustable inglesa?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = false,
+                            options = listOf(
+                                "En tuberías y accesorios redondos de hierro donde sus dientes pueden morder el metal",
+                                "En tuercas hexagonales cromadas para no rayarlas",
+                                "En accesorios plásticos lisos sin protección",
+                                "En cables eléctricos"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "La Stillson tiene mordazas dentadas que aumentan el agarre sobre perfiles circulares bajo torque.",
+                        ),
+                        InteractiveTaskData(
+                            id = "task_font7_tool_transfer_pipe_cutter",
+                            conceptId = "cr_font7_c_tools_selection",
+                            title = "Desafío de Transferencia: Corte a 90° con Cortatubo",
+                            prompt = "Al cortar una tubería con cortatubo o segueta, ¿por qué es crítico que el corte sea exactamente a escuadra (90°)?",
+                            type = TaskType.MULTIPLE_CHOICE,
+                            isTransferTask = true,
+                            options = listOf(
+                                "Para que el tubo haga tope plano en el fondo del accesorio garantizando el área completa de soldadura",
+                                "Solo por estética externa",
+                                "Para que el agua circule al doble de velocidad",
+                                "Porque si no el plástico se derrite solo"
+                            ),
+                            correctOptionIndex = 0,
+                            explanation = "¡Excelente transferencia! Un corte oblicuo deja un espacio vacío en el fondo del casquillo que debilita la resistencia a la presión.",
+                        )
+                    ),
+                )
+            ),
         ),
         CourseUnitData(
             id = "cr_font7_u03",

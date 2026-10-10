@@ -21,6 +21,9 @@
     <string name="safety_public_threat">Amenazas</string>
     <string name="safety_public_missing">Personas desaparecidas</string>
     <string name="safety_public_institutional">Conducta institucional</string>
+    <string name="safety_public_procurement">Contratación SICOP</string>
+    <string name="safety_public_corporate">Estructuras Corporativas</string>
+    <string name="safety_public_financial">Fraude Financiero</string>
     <string name="safety_public_all_dates">Todas las fechas</string>
     <string name="safety_public_days7">7 días</string>
     <string name="safety_public_days30">30 días</string>

@@ -460,6 +460,10 @@ fun MeetApp(
         }
     }
 
+    val presentationModeStore = remember(context) { com.elysium369.meet.safety.ui.SafetyPresentationModeStore.getInstance(context) }
+    val presentationMode by presentationModeStore.mode.collectAsState()
+    val isInstitutionalPresentation = presentationMode == com.elysium369.meet.safety.ui.PresentationMode.INSTITUTIONAL_DEPUTIES_SAFETY
+
     val startDestination = when {
         !onboardingCompleted -> "onboarding"
         !hasProfile -> "onboarding"
@@ -489,14 +493,14 @@ fun MeetApp(
         Scaffold(
         containerColor = MeetColors.backgroundDeep,
         bottomBar = {
-            // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect/safety/* o herramientas inmersivas
+            // Solo mostrar BottomNav si NO estamos en onboarding/auth/connect/safety/*, modo institucional para diputados o herramientas inmersivas
             val hideNavRoutes = listOf(
                 "onboarding", "auth", "connect", "premium", "ride_service",
                 "ride_active_tracking", "ride_schedule", "ride_driver_registration",
                 "dragon_calc", "supreme_bass", "file_manager", "record_shield"
             )
             val isSafetyRoute = activeRoute?.startsWith("safety") == true
-            if (activeRoute !in hideNavRoutes && !isSafetyRoute && activeRoute != null) {
+            if (activeRoute !in hideNavRoutes && !isSafetyRoute && !isInstitutionalPresentation && activeRoute != null) {
                 MeetBottomNavigation(navController)
             }
         },
@@ -506,17 +510,19 @@ fun MeetApp(
                 "ride_active_tracking", "ride_schedule", "ride_driver_registration",
                 "dragon_calc", "supreme_bass", "file_manager", "record_shield"
             )
-            val showConnection = activeRoute !in hideBarRoutes && activeRoute?.startsWith("safety") != true && activeRoute != null
-            Row(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding().background(MeetColors.backgroundDeep),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.weight(1f)) {
-                    if (showConnection) ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
-                    else Text("ELYSIUM VANGUARD", modifier = Modifier.padding(horizontal = 16.dp), color = MeetColors.textSecondary, style = MaterialTheme.typography.labelMedium)
-                }
-                IconButton(onClick = { showGlobalVisualStudio = true }) {
-                    Icon(Icons.Default.Palette, contentDescription = "Personalizar esta pantalla", tint = MeetColors.secondary)
+            val isSafetyRoute = activeRoute?.startsWith("safety") == true
+            val showTopBar = !isInstitutionalPresentation && !isSafetyRoute && activeRoute !in hideBarRoutes && activeRoute != null
+            if (showTopBar) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().statusBarsPadding().background(MeetColors.backgroundDeep),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.weight(1f)) {
+                        ConnectionStatusBar(viewModel = obdViewModel, showQos = true)
+                    }
+                    IconButton(onClick = { showGlobalVisualStudio = true }) {
+                        Icon(Icons.Default.Palette, contentDescription = "Personalizar esta pantalla", tint = MeetColors.secondary)
+                    }
                 }
             }
         }
@@ -1798,16 +1804,87 @@ fun MeetApp(
                 HealthScoreScreen(navController = navController, viewModel = obdViewModel)
             }
 
-            // SAFETY FOUNDATION V1
-            composable(MeetDestinations.SAFETY_HOME) {
-                com.elysium369.meet.safety.ui.hub.SafetyHubScreen(
-                    onBack = { navController.backOrHome() },
+            // SAFETY INSTITUTIONAL PARLIAMENTARY PRESENTATION (COSTA RICA DEPUTIES)
+            composable(MeetDestinations.SAFETY_INSTITUTIONAL) {
+                com.elysium369.meet.safety.ui.institutional.SafetyInstitutionalDashboardScreen(
+                    onBack = {
+                        val popped = navController.popBackStack()
+                        if (!popped) {
+                            navController.navigate(MeetDestinations.HOME) {
+                                popUpTo(MeetDestinations.HOME) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        }
+                    },
                     onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
                     onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
+                    onNavigateToReportCategory = { category ->
+                        navController.navigate("${MeetDestinations.SAFETY_REPORT}?category=${category.name}")
+                    },
+                    onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
+                    onNavigateToCases = { navController.navigate(MeetDestinations.SAFETY_CASES) },
+                    onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_TIMELINES) },
+                    onNavigateToObservatory = { navController.navigate(MeetDestinations.SAFETY_OBSERVATORY) },
+                    onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
+                    onTogglePresentationMode = {
+                        presentationModeStore.toggleMode()
+                    },
+                    currentMode = presentationMode,
+                )
+            }
+
+            // SAFETY INVESTIGATIVE WORKSPACE (FINANCIAL INTELLIGENCE & SICOP)
+            composable(MeetDestinations.SAFETY_INVESTIGATIVE_WORKSPACE) {
+                com.elysium369.meet.safety.ui.intelligence.SafetyInvestigativeWorkspaceScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            }
+
+            // SAFETY REVIEWER ACCREDITATION PROTOCOL (REVISOR A / B)
+            composable(MeetDestinations.SAFETY_REVIEWER_ACCREDITATION) {
+                com.elysium369.meet.safety.ui.institutional.SafetyReviewerAccreditationScreen(
+                    onBack = { navController.popBackStack() },
+                )
+            }
+
+            // SAFETY FOUNDATION V1 & UNIFIED CORE
+            composable(MeetDestinations.SAFETY_HOME) {
+                com.elysium369.meet.safety.ui.hub.SafetyHubScreen(
+                    onBack = {
+                        val popped = navController.popBackStack()
+                        if (!popped) {
+                            navController.navigate(MeetDestinations.HOME) {
+                                popUpTo(MeetDestinations.HOME) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        }
+                    },
+                    onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
+                    onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
+                    onNavigateToReportCategory = { category ->
+                        navController.navigate("${MeetDestinations.SAFETY_REPORT}?category=${category.name}")
+                    },
                     onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
                     onNavigateToCases = { navController.navigate(MeetDestinations.SAFETY_CASES) },
                     onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_TIMELINES) },
                     onNavigateToAccountability = { navController.navigate(MeetDestinations.SAFETY_ACCOUNTABILITY) },
+                    onNavigateToObservatory = { navController.navigate(MeetDestinations.SAFETY_OBSERVATORY) },
+                    onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
+                    onNavigateToInstitutional = { navController.navigate(MeetDestinations.SAFETY_INSTITUTIONAL) },
+                    onNavigateToInvestigativeWorkspace = { navController.navigate(MeetDestinations.SAFETY_INVESTIGATIVE_WORKSPACE) },
+                    onNavigateToInstitutionalPresentation = {
+                        navController.navigate(MeetDestinations.SAFETY_INSTITUTIONAL_PRESENTATION)
+                    },
+                )
+            }
+            composable(MeetDestinations.SAFETY_INSTITUTIONAL_PRESENTATION) {
+                com.elysium369.meet.safety.ui.institutional.SafetyInstitutionalPresentationScreen(
+                    onBack = { navController.backOrHome() },
+                    onNavigateToReport = { navController.navigate(MeetDestinations.SAFETY_REPORT) },
+                    onNavigateToMap = { navController.navigate(MeetDestinations.SAFETY_MAP) },
+                    onNavigateToMyReports = { navController.navigate(MeetDestinations.SAFETY_MY_REPORTS) },
+                    onNavigateToCases = { navController.navigate(MeetDestinations.SAFETY_CASES) },
+                    onNavigateToTimelines = { navController.navigate(MeetDestinations.SAFETY_TIMELINES) },
                     onNavigateToObservatory = { navController.navigate(MeetDestinations.SAFETY_OBSERVATORY) },
                     onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
                 )
@@ -1826,7 +1903,21 @@ fun MeetApp(
                     onNavigateToResearch = { navController.navigate(MeetDestinations.SAFETY_RESEARCH) },
                 )
             }
-            composable(MeetDestinations.SAFETY_REPORT) {
+            composable(
+                route = "${MeetDestinations.SAFETY_REPORT}?category={category}&relation={relation}",
+                arguments = listOf(
+                    navArgument("category") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                    navArgument("relation") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) {
                 com.elysium369.meet.safety.ui.report.SafetyReportScreen(
                     onBack = { navController.popBackStack() },
                     onReportSubmitted = {
@@ -1967,29 +2058,31 @@ fun MeetApp(
         }
 
         val liveCallState by obdViewModel.liveCallState.collectAsState()
-        RideLiveCallOverlay(
-            state = liveCallState,
-            onToggleMute = { obdViewModel.toggleRideCallMute() },
-            onHangUp = { obdViewModel.endRideCall() },
-            onAnswer = {
-                val incoming = liveCallState as? com.elysium369.meet.communications.LiveCallState.Incoming
-                if (incoming != null) {
-                    val role = if (incoming.callerRole.equals("DRIVER", ignoreCase = true)) "PASSENGER" else "DRIVER"
-                    obdViewModel.startRideCall(incoming.rideId, role)
-                }
-            },
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .zIndex(99f),
-        )
+        if (!isInstitutionalPresentation) {
+            RideLiveCallOverlay(
+                state = liveCallState,
+                onToggleMute = { obdViewModel.toggleRideCallMute() },
+                onHangUp = { obdViewModel.endRideCall() },
+                onAnswer = {
+                    val incoming = liveCallState as? com.elysium369.meet.communications.LiveCallState.Incoming
+                    if (incoming != null) {
+                        val role = if (incoming.callerRole.equals("DRIVER", ignoreCase = true)) "PASSENGER" else "DRIVER"
+                        obdViewModel.startRideCall(incoming.rideId, role)
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .zIndex(99f),
+            )
 
-        // Elysium Living 3D Companion Overlay (Draco Dragon, Volt Aether, Titan Vanguard, Evair, etc.)
-        // Lives across all screens, draggable, speech bubble, TTS audible interaction, companion switcher
-        ElysiumLivingCompanionOverlay(
-            navController = navController,
-            obdViewModel = obdViewModel,
-            activeRoute = activeRoute,
-        )
+            // Elysium Living 3D Companion Overlay (Draco Dragon, Volt Aether, Titan Vanguard, Evair, etc.)
+            // Lives across all screens, draggable, speech bubble, TTS audible interaction, companion switcher
+            ElysiumLivingCompanionOverlay(
+                navController = navController,
+                obdViewModel = obdViewModel,
+                activeRoute = activeRoute,
+            )
+        }
         }
         BackHandler(enabled = activeRoute != null && activeRoute != MeetDestinations.HOME) {
             navController.backOrHome()

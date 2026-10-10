@@ -72,8 +72,11 @@ class SafetyObservatoryViewModel @Inject constructor(
             }
 
             try {
-                val stats = repository.observatoryV2(filters)
-                // Reload points and cases after potential quick sync
+                val queriedStats = repository.observatoryV2(filters)
+                val stats = queriedStats.takeIf {
+                    it.data_state != com.elysium369.meet.safety.data.SafetyObservatoryDataState.UNAVAILABLE
+                }
+                // Reload only previously published public records; these do not replace aggregates.
                 points = runCatching { safetyDao.getPoints().take(24) }.getOrDefault(points)
                 cases = runCatching { safetyDao.getCases().take(24) }.getOrDefault(cases)
 
@@ -82,11 +85,14 @@ class SafetyObservatoryViewModel @Inject constructor(
                         stats = stats,
                         isLoading = false,
                         recentPoints = points,
-                        recentCases = cases
+                        recentCases = cases,
+                        error = if (stats == null) {
+                            "La agregación remota del Observatorio no está disponible. No se presentan conteos como cero; los registros públicos locales pueden seguir visibles."
+                        } else null,
                     )
                 }
 
-                if (filters.category.isBlank() || filters.category == "DRUG_SALE_ACTIVITY") {
+                if (stats != null && (filters.category.isBlank() || filters.category == "DRUG_SALE_ACTIVITY")) {
                     try {
                         val patterns = repository.counternarcotics(filters)
                         mutable.update { it.copy(illicitPatterns = patterns.patterns) }
@@ -99,34 +105,22 @@ class SafetyObservatoryViewModel @Inject constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
-                // If remote query fails, fallback to local metrics so dashboard remains populated
+                // Do not turn a disabled gate, query error, or missing aggregate into zeros.
+                // Already-published public records can still be listed independently.
                 val localPoints = runCatching { safetyDao.getPoints() }.getOrDefault(emptyList())
                 val localCases = runCatching { safetyDao.getCases() }.getOrDefault(emptyList())
-                val fallbackStats = SafetyObservatoryMetrics(
-                    public_point_count = localPoints.size.toLong().coerceAtLeast(localCases.size.toLong()),
-                    privacy_suppressed = false,
-                    sensitive_metrics_available = true,
-                    independent_source_count = (localPoints.sumOf { it.independentSourceCount.toLong() }).coerceAtLeast(12L),
-                    civil_source_count = (localPoints.sumOf { it.civilSourceCount.toLong() }).coerceAtLeast(5L),
-                    journalistic_source_count = (localPoints.sumOf { it.journalisticSourceCount.toLong() }).coerceAtLeast(4L),
-                    public_record_source_count = (localPoints.sumOf { it.publicRecordSourceCount.toLong() }).coerceAtLeast(2L),
-                    documentary_source_count = (localPoints.sumOf { it.documentarySourceCount.toLong() }).coerceAtLeast(1L),
-                    institutional_source_count = (localPoints.sumOf { it.institutionalSourceCount.toLong() }).coerceAtLeast(2L),
-                    homicide_count = localPoints.count { it.category == "HOMICIDE" }.toLong(),
-                    violence_count = localPoints.count { it.category == "VIOLENT_INCIDENT" }.toLong(),
-                    drugs_count = localPoints.count { it.category == "DRUG_SALE_ACTIVITY" }.toLong(),
-                    threat_count = localPoints.count { it.category == "THREAT" }.toLong(),
-                    missing_count = localPoints.count { it.category == "MISSING_PERSON" }.toLong(),
-                    institutional_count = localPoints.count { it.category == "INSTITUTIONAL_CONDUCT" }.toLong(),
-                )
-
+                val message = if (error.message?.contains("SAFETY_OBSERVATORY_DISABLED") == true) {
+                    "El Observatorio no está habilitado por la configuración del servidor."
+                } else {
+                    "No se pudo consultar la proyección agregada del Observatorio. No se mostrarán métricas como cero; vuelve a intentarlo."
+                }
                 mutable.update {
                     it.copy(
-                        stats = fallbackStats,
+                        stats = null,
                         isLoading = false,
                         recentPoints = localPoints.take(24),
                         recentCases = localCases.take(24),
-                        error = null
+                        error = message,
                     )
                 }
             }

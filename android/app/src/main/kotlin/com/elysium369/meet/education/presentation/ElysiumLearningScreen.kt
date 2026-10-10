@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import com.elysium369.meet.education.data.CurriculumTrack
 import com.elysium369.meet.education.data.TaskType
 import com.elysium369.meet.education.presentation.components.CertifiedDiplomaDialog
+import com.elysium369.meet.education.presentation.components.ElysiumSystemSelfExplainerCard
+import com.elysium369.meet.education.presentation.components.PisaOecdBenchmarkCard
 import com.elysium369.meet.education.presentation.components.SocraticTutorBottomSheet
 import com.elysium369.meet.education.presentation.sandboxes.AnalyticalGeometrySandbox
 import com.elysium369.meet.education.presentation.sandboxes.ElectricalCircuitSandbox
@@ -76,6 +78,20 @@ fun ElysiumLearningScreen(
                     }
                 },
                 actions = {
+                    FilledTonalButton(
+                        onClick = { viewModel.toggleCourseIndexDialog() },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.height(34.dp),
+                    ) {
+                        Text(text = "📑 Secciones", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    IconButton(onClick = { viewModel.toggleSystemExplainer() }) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Cómo funciona la plataforma",
+                            tint = if (state.isSystemExplainerVisible) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     if (state.isTransferUnlocked || state.currentMasteryEstimate >= 0.75) {
                         FilledTonalButton(
                             onClick = { viewModel.openDiplomaDialog() },
@@ -123,6 +139,28 @@ fun ElysiumLearningScreen(
                 SafeguardsBanner()
             }
 
+            // 1b. Interactive System Self-Explainer ("¿Cómo funciona Elysium Education OS?")
+            item {
+                ElysiumSystemSelfExplainerCard(
+                    isVisible = state.isSystemExplainerVisible,
+                    onToggle = { viewModel.toggleSystemExplainer() },
+                    onOpenTutor = { viewModel.openSocraticTutor() },
+                )
+            }
+
+            // 1c. OECD PISA International Assessment & Level 6 Mastery Roadmap
+            item {
+                PisaOecdBenchmarkCard(
+                    selectedDomain = state.pisaSelectedDomain,
+                    report = state.pisaReport,
+                    progressionSpec = state.pisaProgressionSpec,
+                    isExpanded = state.isPisaExpanded,
+                    onToggleExpanded = { viewModel.togglePisaExpanded() },
+                    onSelectDomain = { viewModel.selectPisaDomain(it) },
+                    onOpenTutor = { viewModel.openSocraticTutorForPisa(state.pisaSelectedDomain) },
+                )
+            }
+
             // 2. National Curriculum Matrix Navigator (MEP 2026: 1.º a 11.º & BxM)
             item {
                 GradeAndSubjectMatrixNavigator(
@@ -155,32 +193,132 @@ fun ElysiumLearningScreen(
                         ),
                     )
 
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
-                        items(state.units) { unit ->
-                            val isSelected = unit.id == state.selectedUnitId
-                            FilterChip(
-                                selected = isSelected,
-                                onClick = { viewModel.selectUnit(unit.id) },
-                                label = {
-                                    Text(
-                                        text = "${unit.monthName} (U${unit.unitNumber})",
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                    )
-                                },
-                                leadingIcon = if (unit.concepts.isNotEmpty()) {
-                                    {
-                                        Icon(
-                                            imageVector = Icons.Default.Star,
-                                            contentDescription = null,
-                                            tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                                            modifier = Modifier.size(16.dp),
+                        IconButton(
+                            onClick = { viewModel.previousUnit() },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Text("⏪", fontSize = 13.sp)
+                        }
+
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            items(state.units) { unit ->
+                                val isSelected = unit.id == state.selectedUnitId
+                                FilterChip(
+                                    selected = isSelected,
+                                    onClick = { viewModel.selectUnit(unit.id) },
+                                    label = {
+                                        Text(
+                                            text = "${unit.monthName} (U${unit.unitNumber})",
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                         )
-                                    }
-                                } else null,
+                                    },
+                                    leadingIcon = if (unit.concepts.isNotEmpty()) {
+                                        {
+                                            Icon(
+                                                imageVector = Icons.Default.Star,
+                                                contentDescription = null,
+                                                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        }
+                                    } else null,
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.advanceToNextUnit() },
+                            modifier = Modifier.size(32.dp),
+                        ) {
+                            Text("⏩", fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+
+            // 4b. Dedicated Section Selector (Secciones / Conceptos de la Unidad)
+            val currentUnit = state.units.firstOrNull { it.id == state.selectedUnitId }
+            if (currentUnit != null && currentUnit.concepts.isNotEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = "SECCIONES FORMATIVAS (U${currentUnit.unitNumber} · ${currentUnit.concepts.size} SECCIONES)",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                ),
                             )
+                            TextButton(
+                                onClick = { viewModel.toggleCourseIndexDialog() },
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                            ) {
+                                Text(
+                                    text = "📑 Ver Todas las Secciones",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            IconButton(
+                                onClick = { viewModel.previousConcept() },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Text("⏮️", fontSize = 13.sp)
+                            }
+
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                items(currentUnit.concepts) { concept ->
+                                    val isConceptSelected = concept.id == state.selectedConceptId
+                                    val conceptIdx = currentUnit.concepts.indexOf(concept) + 1
+                                    FilterChip(
+                                        selected = isConceptSelected,
+                                        onClick = { viewModel.selectConcept(concept.id) },
+                                        label = {
+                                            Text(
+                                                text = "§$conceptIdx ${concept.title}",
+                                                fontWeight = if (isConceptSelected) FontWeight.Bold else FontWeight.Normal,
+                                                maxLines = 1,
+                                            )
+                                        },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        ),
+                                    )
+                                }
+                            }
+
+                            IconButton(
+                                onClick = { viewModel.advanceToNextConcept() },
+                                modifier = Modifier.size(32.dp),
+                            ) {
+                                Text("⏭️", fontSize = 13.sp)
+                            }
                         }
                     }
                 }
@@ -262,6 +400,11 @@ fun ElysiumLearningScreen(
                         onResetColones = { viewModel.resetColones() },
                         onSubmit = { viewModel.submitAnswer() },
                         onOpenSocraticTutor = { viewModel.openSocraticTutor() },
+                        onAdvance = { viewModel.advanceToNextTaskOrConcept() },
+                        onPrevious = { viewModel.previousTaskOrConcept() },
+                        onAdvanceSection = { viewModel.advanceToNextConcept() },
+                        onPreviousSection = { viewModel.previousConcept() },
+                        onToggleLessonExplanation = { viewModel.toggleLessonExplanation() },
                     )
                 } ?: run {
                     Card(
@@ -303,6 +446,13 @@ fun ElysiumLearningScreen(
             mastery = state.currentMasteryEstimate,
             confidence = state.currentConfidence,
             isTransferUnlocked = state.isTransferUnlocked,
+            onAdvance = { viewModel.advanceToNextTaskOrConcept() },
+            onRetry = { viewModel.retryCurrentTask() },
+            onOpenSocraticTutor = {
+                viewModel.dismissFeedback()
+                viewModel.openSocraticTutor()
+                viewModel.requestMisconceptionHelp()
+            },
             onDismiss = { viewModel.dismissFeedback() },
         )
     }
@@ -327,6 +477,123 @@ fun ElysiumLearningScreen(
             onDismiss = { viewModel.dismissDiplomaDialog() },
         )
     }
+
+    // Complete Course Section Index Dialog
+    if (state.isCourseIndexVisible) {
+        CourseIndexDialog(
+            state = state,
+            onSelectSection = { uId, cId -> viewModel.selectSection(uId, cId) },
+            onDismiss = { viewModel.toggleCourseIndexDialog() },
+        )
+    }
+}
+
+@Composable
+private fun CourseIndexDialog(
+    state: ElysiumLearningUiState,
+    onSelectSection: (unitId: String, conceptId: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text(
+                    text = "📑 ÍNDICE DE SECCIONES",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Black),
+                )
+                Text(
+                    text = "${state.track.displayName} (${state.units.size} unidades)",
+                    style = MaterialTheme.typography.bodySmall.copy(color = MaterialTheme.colorScheme.outline),
+                )
+            }
+        },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 440.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                items(state.units) { unit ->
+                    val isCurrentUnit = unit.id == state.selectedUnitId
+                    Card(
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isCurrentUnit)
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                            else
+                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = "U${unit.unitNumber}: ${unit.monthName} — ${unit.title}",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            unit.concepts.forEachIndexed { idx, concept ->
+                                val isSelected = concept.id == state.selectedConceptId
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else Color.Transparent,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onSelectSection(unit.id, concept.id) }
+                                        .padding(vertical = 2.dp),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            text = "§${idx + 1}",
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = concept.title,
+                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                ),
+                                            )
+                                            Text(
+                                                text = "${concept.tasks.size} ejercicios formativos",
+                                                style = MaterialTheme.typography.labelSmall.copy(
+                                                    fontSize = 10.sp,
+                                                    color = MaterialTheme.colorScheme.outline,
+                                                ),
+                                            )
+                                        }
+                                        if (isSelected) {
+                                            Text(
+                                                text = "📍 Actual",
+                                                fontSize = 11.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar")
+            }
+        },
+    )
 }
 
 @Composable
@@ -566,6 +833,11 @@ private fun InteractiveTaskArena(
     onResetColones: () -> Unit,
     onSubmit: () -> Unit,
     onOpenSocraticTutor: () -> Unit,
+    onAdvance: () -> Unit,
+    onPrevious: () -> Unit,
+    onAdvanceSection: () -> Unit,
+    onPreviousSection: () -> Unit,
+    onToggleLessonExplanation: () -> Unit,
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -575,41 +847,175 @@ private fun InteractiveTaskArena(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header
+            // Step & Progress Tracker
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = task.title.uppercase(),
-                    style = MaterialTheme.typography.titleSmall.copy(
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary,
-                    ),
-                    modifier = Modifier.weight(1f),
-                )
+                Surface(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(
+                        text = "EJERCICIO ${state.currentTaskIndex + 1} DE ${state.totalTasksInCurrentConcept.coerceAtLeast(1)}",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary,
+                        ),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    )
+                }
+
                 if (task.isTransferTask) {
                     AssistChip(
                         onClick = {},
-                        label = { Text("DESAFÍO > 75%", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
+                        label = { Text("🏆 TRANSFERENCIA PISA (> 75%)", fontSize = 10.sp, fontWeight = FontWeight.Bold) },
                         colors = AssistChipDefaults.assistChipColors(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer,
                         ),
+                    )
+                } else {
+                    AssistChip(
+                        onClick = {},
+                        label = { Text("FUNDAMENTAL", fontSize = 10.sp, fontWeight = FontWeight.Medium) },
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Prompt
+            // Linear Progress Bar
+            val progressFraction = ((state.currentTaskIndex + 1).toFloat() / state.totalTasksInCurrentConcept.coerceAtLeast(1)).coerceIn(0f, 1f)
+            LinearProgressIndicator(
+                progress = { progressFraction },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = MaterialTheme.colorScheme.surfaceVariant,
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Task Title
             Text(
-                text = task.prompt,
-                style = MaterialTheme.typography.bodyMedium.copy(
-                    fontWeight = FontWeight.Medium,
-                    lineHeight = 20.sp,
+                text = task.title.uppercase(),
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.primary,
                 ),
             )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Lesson / Theoretical Guidance Toggle
+            OutlinedButton(
+                onClick = onToggleLessonExplanation,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    text = if (state.isLessonExplanationVisible) "📖 Ocultar Lección y Modelo Mental" else "📖 Ver Cómo Pensar Este Concepto (Lección)",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                )
+            }
+
+            AnimatedVisibility(visible = state.isLessonExplanationVisible) {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = "🧠", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "FUNDAMENTO CONCEPTUAL & PROTOCOLO DE PENSAMIENTO",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                        }
+
+                        state.currentDeepKnowledge?.let { dk ->
+                            Text(
+                                text = dk.coreIntuition,
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    lineHeight = 18.sp,
+                                ),
+                            )
+
+                            if (dk.expertMentalModel.isNotEmpty()) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+                                Text(
+                                    text = "Cómo piensa un experto (paso a paso):",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                )
+                                dk.expertMentalModel.forEach { step ->
+                                    Text(
+                                        text = "• $step",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    )
+                                }
+                            }
+
+                            dk.vocationalEngineeringBridge?.let { bridge ->
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+                                Text(
+                                    text = "🔧 Conexión Técnica / Vocacional:",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                    ),
+                                )
+                                Text(
+                                    text = bridge,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                )
+                            }
+
+                            if (dk.reflectionPrompt.isNotBlank()) {
+                                HorizontalDivider(modifier = Modifier.padding(vertical = 2.dp))
+                                Text(
+                                    text = "🤔 Pregunta de Reflexión Socrática: ${dk.reflectionPrompt}",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontSize = 11.sp,
+                                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Task Prompt
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = task.prompt,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.Medium,
+                        lineHeight = 20.sp,
+                    ),
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -682,6 +1088,54 @@ private fun InteractiveTaskArena(
                         text = "REGISTRAR EVIDENCIA CRIPTOGRÁFICA",
                         fontWeight = FontWeight.Bold,
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Navigation Row: Ejercicio Anterior / Ejercicio Siguiente
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(
+                    onClick = onPrevious,
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(text = "⬅️ Ejercicio Ant.")
+                }
+
+                FilledTonalButton(
+                    onClick = onAdvance,
+                    shape = RoundedCornerShape(8.dp),
+                ) {
+                    Text(text = "Ejercicio Sig. ➡️", fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Navigation Row: Sección Anterior / Sección Siguiente
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedButton(
+                    onClick = onPreviousSection,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(text = "⏮️ Sección Anterior", fontSize = 11.sp)
+                }
+
+                FilledTonalButton(
+                    onClick = onAdvanceSection,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(text = "Sección Siguiente ⏭️", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -952,6 +1406,9 @@ private fun EvidenceProofDialog(
     mastery: Double,
     confidence: Double,
     isTransferUnlocked: Boolean,
+    onAdvance: () -> Unit,
+    onRetry: () -> Unit,
+    onOpenSocraticTutor: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -1013,8 +1470,36 @@ private fun EvidenceProofDialog(
             }
         },
         confirmButton = {
-            Button(onClick = onDismiss) {
-                Text("CONTINUAR")
+            if (isSuccess) {
+                Button(
+                    onClick = onAdvance,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                ) {
+                    Text("SIGUIENTE EJERCICIO ➡️", fontWeight = FontWeight.Bold)
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onOpenSocraticTutor) {
+                        Text("🧠 TUTOR IA", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Button(
+                        onClick = onRetry,
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary),
+                    ) {
+                        Text("REINTENTAR 🔄", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            if (isSuccess) {
+                TextButton(onClick = onDismiss) {
+                    Text("Repasar este ejercicio", fontSize = 12.sp)
+                }
+            } else {
+                TextButton(onClick = onAdvance) {
+                    Text("Avanzar de todos modos ➡️", fontSize = 11.sp)
+                }
             }
         },
     )

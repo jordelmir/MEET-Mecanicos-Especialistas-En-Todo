@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -68,6 +69,27 @@ interface SafetyScienceDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertEvent(event: SciEventEntity)
+
+    /**
+     * Persist one report's local scientific projection atomically.
+     * This is NOT the remote scientific outbox and must not be shown as remote acknowledgement.
+     */
+    @Transaction
+    suspend fun persistReportProjection(
+        claim: SciClaimEntity,
+        hypothesis: SciHypothesisEntity?,
+        event: SciEventEntity,
+        evidenceLinks: List<SciClaimEvidenceEntity>,
+        provenanceNodes: List<SciProvenanceNodeEntity>,
+        provenanceEdges: List<SciProvenanceEdgeEntity>,
+    ) {
+        upsertClaim(claim)
+        hypothesis?.let { upsertHypothesis(it) }
+        upsertEvent(event)
+        evidenceLinks.forEach { upsertClaimEvidence(it) }
+        provenanceNodes.forEach { upsertProvenanceNode(it) }
+        provenanceEdges.forEach { upsertProvenanceEdge(it) }
+    }
 
     @Query("SELECT * FROM safety_scientific_events ORDER BY COALESCE(occurredAt, recordedAt) DESC LIMIT :limit")
     fun observeRecentEvents(limit: Int = 100): Flow<List<SciEventEntity>>

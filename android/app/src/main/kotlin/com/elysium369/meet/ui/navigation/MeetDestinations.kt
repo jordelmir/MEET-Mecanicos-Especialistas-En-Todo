@@ -91,6 +91,10 @@ object MeetDestinations {
     const val SAFETY_ACCOUNTABILITY = "safety/accountability"
     const val SAFETY_OBSERVATORY = "safety/observatory"
     const val SAFETY_RESEARCH = "safety/research"
+    const val SAFETY_INSTITUTIONAL = "safety/institutional"
+    const val SAFETY_INVESTIGATIVE_WORKSPACE = "safety/investigative-workspace"
+    const val SAFETY_REVIEWER_ACCREDITATION = "safety/reviewer-accreditation"
+    const val SAFETY_INSTITUTIONAL_PRESENTATION = "safety/institutional-presentation"
 }
 
 fun androidx.navigation.NavController.safeNavigate(route: String) {
@@ -111,16 +115,18 @@ fun androidx.navigation.NavController.safeNavigate(route: String) {
 fun NavController.backOrHome(): Boolean {
     val currentRoute = currentDestination?.route
     val hasPrevious = previousBackStackEntry != null
+    val startRoute = runCatching { graph.findStartDestination().route }.getOrNull() ?: MeetDestinations.HOME
     return when (
         MeetBackStackPolicy.action(
             currentRoute = currentRoute,
             hasPreviousEntry = hasPrevious,
+            startRoute = startRoute,
         )
     ) {
         MeetBackStackPolicy.Action.POP_ONE -> {
-            if (popBackStack()) true else navigateHomeFallback()
+            if (popBackStack()) true else navigateHomeFallback(startRoute)
         }
-        MeetBackStackPolicy.Action.NAVIGATE_HOME -> navigateHomeFallback()
+        MeetBackStackPolicy.Action.NAVIGATE_HOME -> navigateHomeFallback(startRoute)
         MeetBackStackPolicy.Action.STAY_HOME -> false
     }
 }
@@ -143,8 +149,9 @@ fun NavController.navigateTopLevel(route: String) {
     }
 }
 
-private fun NavController.navigateHomeFallback(): Boolean {
-    navigate(MeetDestinations.HOME) {
+private fun NavController.navigateHomeFallback(startRoute: String = MeetDestinations.HOME): Boolean {
+    val target = MeetDestinations.HOME
+    navigate(target) {
         popUpTo(graph.findStartDestination().id) { inclusive = false }
         launchSingleTop = true
         restoreState = true
@@ -155,9 +162,13 @@ private fun NavController.navigateHomeFallback(): Boolean {
 object MeetBackStackPolicy {
     enum class Action { POP_ONE, NAVIGATE_HOME, STAY_HOME }
 
-    fun action(currentRoute: String?, hasPreviousEntry: Boolean): Action = when {
+    fun action(
+        currentRoute: String?,
+        hasPreviousEntry: Boolean,
+        startRoute: String = MeetDestinations.HOME,
+    ): Action = when {
         currentRoute == MeetDestinations.HOME -> Action.STAY_HOME
-        currentRoute == null -> Action.NAVIGATE_HOME
+        currentRoute == startRoute && startRoute == MeetDestinations.HOME -> Action.STAY_HOME
         hasPreviousEntry -> Action.POP_ONE
         else -> Action.NAVIGATE_HOME
     }

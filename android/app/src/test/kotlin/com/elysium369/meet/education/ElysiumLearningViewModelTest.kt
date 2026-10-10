@@ -120,10 +120,16 @@ class ElysiumLearningViewModelTest {
         assertEquals(CurriculumTrack.FONTANERIA_7, state.track)
         assertEquals(7, state.activeGrade)
         assertEquals(4, state.units.size)
-        assertEquals("cr_font7_u03", state.selectedUnitId)
-        assertEquals("cr_font7_c_pvc_joinery", state.selectedConceptId)
+        assertEquals("cr_font7_u01", state.selectedUnitId)
+        assertEquals("cr_font7_c_safety_epp", state.selectedConceptId)
         assertNotNull(state.activeTask)
-        assertEquals("task_font7_pvc_holding_time", state.activeTask?.id)
+        assertEquals("task_font7_safety_glasses", state.activeTask?.id)
+
+        // Switch to Unit 3 to verify PVC joinery
+        viewModel.selectUnit("cr_font7_u03")
+        assertEquals("cr_font7_u03", viewModel.uiState.value.selectedUnitId)
+        assertEquals("cr_font7_c_pvc_joinery", viewModel.uiState.value.selectedConceptId)
+        assertEquals("task_font7_pvc_holding_time", viewModel.uiState.value.activeTask?.id)
 
         val mappings = repository.getEconomicBridgeMappings()
         assertTrue("Must include ISCO-08 7126 mapping", mappings.any { it.iscoCode == "7126" && it.serviceVertical == "RESIDENTIAL_PLUMBING" })
@@ -293,5 +299,64 @@ class ElysiumLearningViewModelTest {
         assertTrue(userEntry.isUser)
         assertEquals("¿Dónde queda la parte de atrás?", userEntry.text)
         assertFalse(tutorEntry.isUser)
+    }
+
+    @Test
+    fun `advanceToNextTaskOrConcept advances through tasks, concepts, and units sequentially across full course`() = runBlocking {
+        val repository = ElysiumLearningRepository()
+        val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val viewModel = ElysiumLearningViewModel(repository, testScope)
+
+        // 1. Initial state: Unit 1, Concept 1, Task 0
+        val initial = viewModel.uiState.value
+        assertEquals("cr_mat1_u02", initial.selectedUnitId)
+        assertEquals("cr_mat1_c_spatial_pos", initial.selectedConceptId)
+        assertEquals("task_mat1_spatial_cat_house", initial.activeTask?.id)
+        assertEquals(0, initial.currentTaskIndex)
+
+        // 2. Advance to Task 1 in same concept (transfer task)
+        viewModel.advanceToNextTaskOrConcept()
+        val afterTask1 = viewModel.uiState.value
+        assertEquals("cr_mat1_c_spatial_pos", afterTask1.selectedConceptId)
+        assertEquals("task_mat1_spatial_transfer_exhaust", afterTask1.activeTask?.id)
+        assertEquals(1, afterTask1.currentTaskIndex)
+
+        // 3. Advance past last task of Concept 1 -> Advances to Concept 2 in same unit!
+        viewModel.advanceToNextTaskOrConcept()
+        val afterConcept1 = viewModel.uiState.value
+        assertEquals("cr_mat1_u02", afterConcept1.selectedUnitId)
+        assertEquals("cr_mat1_c_dimensions", afterConcept1.selectedConceptId)
+        assertEquals("task_mat1_dim_wrench", afterConcept1.activeTask?.id)
+        assertEquals(0, afterConcept1.currentTaskIndex)
+
+        // 4. Advance past last task of Concept 2 -> Advances to Unit 2 (Marzo)!
+        viewModel.advanceToNextTaskOrConcept()
+        val afterUnit1 = viewModel.uiState.value
+        assertEquals("cr_mat1_u03", afterUnit1.selectedUnitId)
+        assertEquals("cr_mat1_c_counting_100", afterUnit1.selectedConceptId)
+        assertEquals("task_mat1_counting_bolts", afterUnit1.activeTask?.id)
+
+        // 5. Test previousTaskOrConcept goes back seamlessly!
+        viewModel.previousTaskOrConcept()
+        val afterBack = viewModel.uiState.value
+        assertEquals("cr_mat1_u02", afterBack.selectedUnitId)
+        assertEquals("cr_mat1_c_dimensions", afterBack.selectedConceptId)
+        assertEquals("task_mat1_dim_wrench", afterBack.activeTask?.id)
+    }
+
+    @Test
+    fun `retryCurrentTask clears selection and closes error modal`() = runBlocking {
+        val repository = ElysiumLearningRepository()
+        val testScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
+        val viewModel = ElysiumLearningViewModel(repository, testScope)
+
+        viewModel.selectOption(1)
+        viewModel.submitAnswerSync() // Incorrect answer triggers modal
+        assertTrue(viewModel.uiState.value.isEvidenceModalVisible)
+        assertEquals(1, viewModel.uiState.value.selectedOptionIndex)
+
+        viewModel.retryCurrentTask()
+        assertFalse(viewModel.uiState.value.isEvidenceModalVisible)
+        assertEquals(null, viewModel.uiState.value.selectedOptionIndex)
     }
 }
