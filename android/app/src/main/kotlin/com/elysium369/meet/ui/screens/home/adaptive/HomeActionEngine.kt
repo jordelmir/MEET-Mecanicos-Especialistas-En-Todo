@@ -108,20 +108,6 @@ object HomeActionEngine {
             )
         }
 
-        // 5b. Education & PISA 6 Action
-        actions.add(
-            HomeAction(
-                id = "ACT_ELYSIUM_EDUCATION",
-                priority = HomeActionPriority.NORMAL,
-                category = HomeActionCategory.SYSTEM_NOTICE,
-                title = "Elysium Educación OS · PISA 6",
-                subtitle = "Tutor Socrático IA, estándar internacional OCDE PISA y certificación 100% offline.",
-                destination = MeetDestinations.ELYSIUM_LEARNING_OS,
-                buttonLabel = "ABRIR EDUCACIÓN",
-                glyph = "🎓"
-            )
-        )
-
         // 6. Routine Health Check fallback if clean
         if (actions.isEmpty()) {
             actions.add(
